@@ -1,0 +1,14 @@
+OUTPUT_FORMAT(elf32-i386)
+OUTPUT_ARCH(i8086)
+
+ENTRY(loaderStart)
+
+SECTIONS {
+  . = loadAddress;
+  .text : {
+    textstart = .;
+    *(.Bootloader)
+    . = textstart + 0x200 - BootSignatureSize;
+    *(.BootSignature)
+  }
+}
