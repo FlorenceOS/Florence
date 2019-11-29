@@ -32,5 +32,7 @@ All values are little endian.
 * Some (albeit small) stack is set.
 * Nothing is reserved above you by the first stage, but you still have to watch out for what the platform wants to use.
 * All the memory below your program is reserved as long as you're either using the provided GDT *OR* stack. If you have stopped using them, you are free to use this memory too.
+* Interrupts disabled
+* a20 enabled
 
 Note that this bootsector only can load a second stage up to a size of about `0xFD00` (barely less than 64K), so don't make it too large.
