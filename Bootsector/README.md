@@ -31,7 +31,7 @@ All values are little endian.
 * All selectors start at `0x00`.
 * Some (albeit small) stack is set.
 * Nothing is reserved above you by the first stage, but you still have to watch out for what the platform wants to use.
-* All the memory below your program is reserved as long as you're either using the provided GDT *OR* stack. If you have stopped using them, you are free to use this memory too.
+* All the memory below your program is reserved as long as you're using either the provided GDT *OR* stack. If you have stopped using them, you are free to use this memory too.
 * Interrupts disabled
 * a20 enabled
 
