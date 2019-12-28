@@ -3,6 +3,11 @@
 
 #include <vector>
 
+template<typename Container>
+void SortedInvariant(flo::Sorted<Container> const &cont) {
+  EXPECT_TRUE(std::is_sorted(cont.begin(), cont.end()));
+}
+
 TEST(Sorted, elements) {
   uSz elements[] {
     Testing::urand(),
@@ -15,8 +20,10 @@ TEST(Sorted, elements) {
   };
 
   flo::Sorted<std::vector<uSz>> v;
-  for(auto &ele: elements)
+  for(auto &ele: elements) {
     v.insert(ele);
+    SortedInvariant(v);
+  }
 
   std::sort(std::begin(elements), std::end(elements));
 
@@ -26,9 +33,13 @@ TEST(Sorted, elements) {
 TEST(Sorted, find) {
   flo::Sorted<std::vector<uSz>> v;
   v.insert(5);
+  SortedInvariant(v);
   v.insert(4);
+  SortedInvariant(v);
   v.insert(3);
+  SortedInvariant(v);
   v.insert(2);
+  SortedInvariant(v);
 
   EXPECT_EQ(v.find(4), v.begin() + 2);
 }
@@ -36,9 +47,13 @@ TEST(Sorted, find) {
 TEST(Sorted, contains) {
   flo::Sorted<std::vector<uSz>> v;
   v.insert(5);
+  SortedInvariant(v);
   v.insert(4);
+  SortedInvariant(v);
   v.insert(3);
+  SortedInvariant(v);
   v.insert(2);
+  SortedInvariant(v);
 
   EXPECT_EQ(v.contains(4), true);
   EXPECT_EQ(v.contains(1), false);
@@ -46,11 +61,15 @@ TEST(Sorted, contains) {
 
 TEST(Sorted, count) {
   flo::Sorted<std::vector<uSz>> v;
-  for(int i = 0; i < 20; ++ i)
+  for(int i = 0; i < 20; ++ i) {
     v.insert(5);
+    SortedInvariant(v);
+  }
 
-  for(int i = 0; i < 5; ++ i)
+  for(int i = 0; i < 5; ++ i) {
     v.insert(4);
+    SortedInvariant(v);
+  }
 
   EXPECT_EQ(v.count(6), 0);
   EXPECT_EQ(v.count(5), 20);
