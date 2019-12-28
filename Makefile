@@ -1,21 +1,32 @@
 all: out/Disk.bin
 
 ifndef QEMUExec
-QEMUExec := qemu-system-i386
+QEMUExec := qemu-system-x86_64
 endif
 
 ifndef QEMUFlags
-QEMUFlags := -m 1024
+QEMUFlags := -m 128M -enable-kvm -cpu host
 endif
 
 QEMU := $(QEMUExec) $(QEMUFlags)
 
-.PHONY: clean all dbg go
+CXXFlags := $(CXXFlags) -ffreestanding -g -Wall -fno-stack-protector\
+	-mno-red-zone -fno-exceptions -fno-rtti -Wno-sign-compare\
+	-std=c++17 -Os -mno-soft-float -Iinclude
+
+.PHONY: clean all dbg bochs test
 .SECONDARY:;
+
+CommonHeaders := $(wildcard include/**/*.hpp)
+
+Tests/build/CMakeCache.txt: Tests/CMakeLists.txt
+	@#rm -rfv $(@D)/CMake*
+	@mkdir -p $(@D)
+	cd $(@D) && cmake ..
 
 # Phony targets
 clean:
-	rm -rf build out
+	@rm -rfv build out Tests/build/CMake*
 
 dbg: out/Disk.bin
 	$(QEMU) -drive format=raw,file=$< -S -s &
