@@ -8,22 +8,25 @@
 namespace Testing {
   inline static std::mt19937_64 rng(std::chrono::system_clock::now().time_since_epoch().count());
 
-  template<typename F>
-  inline static void forRandomInt(F &&f) {
-    for(int i = 0; i < 1000; ++ i) {
-      f(Testing::rng());
-    }
-  }
-
   inline static auto urand(uSz maxVal = std::numeric_limits<uSz>::max()) {
     return std::uniform_int_distribution<uSz>(0, maxVal)(rng);
   }
 
+  template<typename F>
+  inline static void forRandomInt(F &&f, std::chrono::duration<double> runFor = std::chrono::seconds(1)) {
+    auto start = std::chrono::steady_clock::now();
+    while(std::chrono::steady_clock::now() - start < runFor) {
+      f(urand());
+    }
+  }
+
   template<typename T>
   struct DefaultAllocator: std::allocator<T> {
-    constexpr auto goodSize(uSz least) const {
+    constexpr static auto goodSize(uSz least) {
       return least;
     }
+
+    constexpr static auto maxSize = 1ull << 38;
   };
 }
 

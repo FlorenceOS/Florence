@@ -1,6 +1,7 @@
 #pragma once
 
 #include <limits>
+#include <utility>
 
 namespace flo {
   enum struct IterationDecision {
@@ -137,6 +138,12 @@ namespace flo {
 
     template<typename Val>
     [[nodiscard]]
+    constexpr bool isPow2(Val value) {
+      return !(value & (value - 1));
+    }
+
+    template<typename Val>
+    [[nodiscard]]
     constexpr Val pow2Down(Val v) {
       if(v < 1)
         return 1;
@@ -148,8 +155,40 @@ namespace flo {
     constexpr Val pow2Up(Val v) {
       if(v < 1)
         return 1;
-      /* Shift 1 if not power of 2, not otherwise */
-      return pow2Down(v) << (bool)(v & (v - 1));
+      /* Shift 1 iff not power of 2 */
+      return pow2Down(v) << !isPow2(v);
+    }
+
+    template<typename T>
+    using Two = std::pair<T, T>;
+
+    template<typename Val, typename Compare>
+    [[nodiscard]]
+    constexpr Two<Val *> smallerLarger(Val const &lhs, Val const &rhs, Compare &cmp) {
+      if(cmp(lhs, rhs))
+        return { &lhs, &rhs };
+      return { &rhs, &lhs };
+    }
+
+    template<typename Func>
+    constexpr auto compareValueFunc(Func &&valueFunc) {
+      return [f = std::forward<Func>(valueFunc)](auto lhs, auto rhs) {
+        return f(lhs) < f(lhs);
+      };
+    }
+
+    template<typename T, typename Val>
+    constexpr auto compareMemberFunc(Val (T::*mfunc)()) {
+      return compareValueFunc([mfunc](T &v) {
+        return (v.*mfunc)();
+      });
+    }
+
+    template<typename T, typename Val>
+    constexpr auto compareMember(Val T::*memb) {
+      return compareValueFunc([memb](T &v) {
+        return v.*memb;
+      });
     }
   }
 }

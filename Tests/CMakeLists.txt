@@ -28,7 +28,7 @@ endif()
 
 include_directories("${gmock_SOURCE_DIR}/include")
 
-set(CMAKE_CXX_FLAGS "-Werror -fsanitize=address,undefined -Wall -Wno-sign-compare")
+set(CMAKE_CXX_FLAGS "-g -Werror -fsanitize=address,undefined -Wall -Wno-sign-compare")
 
 file(GLOB TestSources "*.cpp")
 add_executable(tests ${TestSources})

@@ -3,10 +3,11 @@
 #include <cstring>
 #include <algorithm>
 
+#include "flo/Util.hpp"
 #include "flo/Containers/Impl/ContainerBase.hpp"
 
 namespace flo {
-  template<typename Vector, typename T, typename iterator, typename size_type>
+  template<typename Vector, typename T, typename size_type>
   struct VectorBase: ContainerBase<Vector> {
     [[nodiscard]] constexpr auto       &operator[](size_type ind)       { return begin()[ind]; }
     [[nodiscard]] constexpr auto const &operator[](size_type ind) const { return begin()[ind]; }
@@ -29,16 +30,80 @@ namespace flo {
     [[nodiscard]] constexpr T const *cbegin() const { return data(); }
     [[nodiscard]] constexpr T const *cend()   const { return cbegin() + v().size(); }
 
+    using iterator = T *;
+    using const_iterator = T const *;
+    using reverse_iterator = std::reverse_iterator<T *>;
+    using const_reverse_iterator = std::reverse_iterator<T const *>;
+    using value_type = T;
+    using pointer = T *;
+    using const_pointer = T const *;
+
     constexpr void clear() { while(!this->empty()) pop_back(); }
 
     constexpr void reserve(size_type new_capacity) {
       if(new_capacity > v().capacity())
-        v().grow(new_capacity,
+        v().template grow<DoNotShrink>(new_capacity,
           []() { /* no realloc, noop */ },
-          [this](auto newStorageIt, auto newCapacity) { // Realloc, relocate elements
-            itMoveConstuctDestroy(newStorageIt, begin(), v().end());
+          [beg = begin(), nd = end()](auto newStorageIt, auto newCapacity) { // Realloc, relocate elements
+            itMoveConstuctDestroy(newStorageIt, beg, nd);
           }
         );
+    }
+
+    constexpr Vector &swap(Vector &other) {
+      if(&v() == &other)
+        return v();
+
+      if(v().empty() && other.empty())
+        return v();
+
+      // Let's make sure that if exactly one is inline, it's v().
+      if(!v().isInline() && other.isInline()) {
+        other.swap(v);
+        return v();
+      }
+
+      if(v().isInline()) { // If at least one is inline:
+        if(other.isInline()) { // If both are inline, we just have to swap the elements
+          auto &[smaller, larger] = Util::smallerLarger(v(), other, Util::compareMemberFunc(&Vector::size));
+
+          itMoveDestruct(smaller->begin() + smaller->size(), larger->data() + smaller->size(), larger->data() + larger->size());
+
+          for(uSz i = 0; i < smaller->size(); ++ i)
+            std::swap(v()[i], other[i]);
+        }
+        else { // If only v() is inline, we have to move the pointer to v() after moving all the inline elements
+          auto outOfLineData = other.data();
+          auto outOfLineSize = other.capacity();
+
+          other.makeInline();
+          itMoveConstuct(other->begin(), v()->begin(), v()->end());
+
+          v().adoptStorage(outOfLineData, outOfLineSize);
+
+          swapSizes(other);
+        }
+      }
+      else { // None inline, just swap around the data, size and capacity
+        auto storageL = v().data(), storageR = other.data();
+        auto capacityL = v().capacity(), capacityR = other.capacity();
+
+        v().adoptStorage(storageR, capacityR);
+        other.adoptStorage(storageL, capacityL);
+
+        swapSizes(other);
+      }
+      return v();
+    }
+
+    constexpr auto shrink_to_fit() const {
+      v().template grow<DoShrinking>(v().size(),
+        []() { /* No realloc is a no-op */ },
+        [beg = begin(), nd = end()](auto newStorage, auto newCapacity) {
+          // Move over elements to new storage
+          itMoveConstuctDestroy(newStorage, beg, nd);
+        }
+      );
     }
 
     constexpr void resize(size_type newSize) {
@@ -68,6 +133,8 @@ namespace flo {
 
     template<typename ...Ty>
     constexpr auto emplace(iterator pos, Ty &&...vs) {
+      if(pos == v().end())
+        return &emplace_back(std::forward<Ty>(vs)...);
       return new (&*makeElementSpace(pos)) T(std::forward<Ty>(vs)...);
     }
 
@@ -91,6 +158,9 @@ namespace flo {
     }
 
   private:
+    struct DoShrinking{};
+    using DoNotShrink = void;
+
     [[nodiscard]] constexpr Vector       &v()       { return static_cast<Vector       &>(*this); }
     [[nodiscard]] constexpr Vector const &v() const { return static_cast<Vector const &>(*this); }
 
@@ -99,7 +169,8 @@ namespace flo {
     [[nodiscard]]
     constexpr iterator makeElementSpace(iterator at, size_type num = 1) {
       auto const atInd = at - v().begin();
-      v().grow(v().size() + num,
+      auto prevSize = v().size();
+      v().template grow<DoNotShrink>(v().size() + num,
         [&v = v(), num, at]() {
           // No realloc
 
@@ -109,17 +180,17 @@ namespace flo {
           // Elements after at, moves into constructed
           itMove<Backwards>(at + num, at, v.end() - num);
         },
-        [&v = v(), num, at, atInd](auto newStorageIt, auto newCapacity) {
+        [num, at, atInd, beg = begin(), nd = end()](auto newStorageIt, auto newCapacity) {
           // Realloc
 
           // Move over all elements before at
-          itMoveConstuctDestroy(newStorageIt, v.begin(), at);
+          itMoveConstuctDestroy(newStorageIt, beg, at);
           // Move over the elements after at
-          itMoveConstuctDestroy(newStorageIt + atInd + num, at, v.end());
+          itMoveConstuctDestroy(newStorageIt + atInd + num, at, nd);
         }
       );
 
-      v().adoptNewSize(v().size() + num);
+      v().adoptNewSize(prevSize + num);
 
       return begin() + atInd;
     }
@@ -128,12 +199,12 @@ namespace flo {
     // Also invalidates iterators if we grow
     [[nodiscard]]
     constexpr iterator makeElementSpace(size_type num = 1) {
-      v().grow(v().size() + num, []() { /* No realloc: no-op */ },
-        [&v = v()](auto newStorageIt, auto newCapacity) {
+      v().template grow<DoNotShrink>(v().size() + num, []() { /* No realloc: no-op */ },
+        [beg = begin(), nd = end()](auto newStorageIt, auto newCapacity) {
           // Realloc
 
           // Move over all elements
-          itMoveConstuctDestroy(newStorageIt, v.begin(), v.end());
+          itMoveConstuctDestroy(newStorageIt, beg, nd);
         }
       );
 
@@ -143,18 +214,24 @@ namespace flo {
     }
 
     constexpr static void itMoveBytes(iterator dest, iterator begin, iterator end) {
-      if(begin == end) return;
+      if(begin >= end) return;
       std::memmove((u8 *)&*dest, (u8 const *)&*begin, (u8 const *)&*end - (u8 const *)&*begin);
+    }
+
+    constexpr void swapSizes(Vector &other) {
+      auto mySize = v().size();
+      v().adoptNewSize(other.size());
+      other.adoptNewSize(mySize);
     }
 
   protected:
     constexpr static void itMoveConstuct(iterator dest, iterator begin, iterator end) {
-      if constexpr(std::is_trivially_move_assignable_v<T>)
+      if constexpr(std::is_trivially_move_constructible_v<T>)
         itMoveBytes(dest, begin, end);
 
       // We can do this move in any direction, since we're moving
       // into non-overlapping storage, since it's not constructed
-      else while(begin != end)
+      else while(begin < end)
         new(&*dest++) T(std::move(*begin++));
     }
 

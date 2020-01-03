@@ -4,7 +4,7 @@
 #include "VectorTests.hpp"
 
 template<typename T, auto maxSize>
-void StaticVectorInvariant(flo::StaticVector<T, maxSize> const &v) {
+void StaticVectorInvariant(flo::StaticVector<T, maxSize> &v) {
   vectorInvariant(v);
   EXPECT_EQ(v.capacity(), maxSize);
 }

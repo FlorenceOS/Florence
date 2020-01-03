@@ -49,6 +49,14 @@ TEST(Util, pow2Down) {
   EXPECT_EQ(flo::Util::pow2Down(5), 4);
 }
 
+TEST(Util, isPow2) {
+  EXPECT_EQ(flo::Util::isPow2(1), true);
+  EXPECT_EQ(flo::Util::isPow2(2), true);
+  EXPECT_EQ(flo::Util::isPow2(3), false);
+  EXPECT_EQ(flo::Util::isPow2(4), true);
+  EXPECT_EQ(flo::Util::isPow2(5), false);
+}
+
 TEST(Util, roundUp) {
   EXPECT_EQ(flo::Util::roundUp<5>(0), 0);
   EXPECT_EQ(flo::Util::roundUp<5>(1), 5);

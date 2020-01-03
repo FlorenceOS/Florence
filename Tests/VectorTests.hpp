@@ -18,7 +18,7 @@ void expectElement(Vec const &v, uSz index, Ty const &value) {
 }
 
 template<typename Vec>
-void vectorInvariant(Vec const &vec) {
+void vectorInvariant(Vec &vec) {
   EXPECT_EQ(vec.size(), std::distance(vec.begin(),   vec.end()));
   EXPECT_EQ(vec.size(), std::distance(vec.rbegin(),  vec.rend()));
   EXPECT_EQ(vec.size(), std::distance(vec.crbegin(), vec.crend()));
@@ -33,6 +33,13 @@ void vectorInvariant(Vec const &vec) {
   if(vec.capacity()) {
     EXPECT_NE(vec.data(), nullptr);
   }
-}
 
-//template<typename Vec>
+  EXPECT_LE(vec.capacity(), vec.max_size());
+
+  // All elements accessible, assume some address santization is running
+  for(typename Vec::value_type &v: vec) {
+    auto *t = reinterpret_cast<volatile char *>(&v);
+    for(auto p = t; p != t + sizeof(v); ++ p)
+      *p = *p;
+  }
+}
