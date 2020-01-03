@@ -29,6 +29,7 @@ All values are little endian.
   |`0x28`    | Code | 64   |`0`   |`RX`         |
   |`0x30`    | Data | 64   |`0`   |`RW`         |
 * All selectors start at `0x00`.
+* Executing in real mode
 * Some (albeit small) stack is set.
 * Nothing is reserved above you by the first stage, but you still have to watch out for what the platform wants to use.
 * All the memory below your program is reserved as long as you're using either the provided GDT *OR* stack. If you have stopped using them, you are free to use this memory too.
