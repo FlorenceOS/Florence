@@ -8,7 +8,7 @@ All values are little endian.
 * Reads in second stage header from the sector directly following the first boot sector
 * Header:
 
-  | Offset  | Size (bytes) | Value                      |
+  | Offset | Size (bytes) | Value                      |
   |:-------|:-------------|:---------------------------|
   |`0`     |`4`           |`0xb16d1cc5`                |
   |`4`     |`2`           |`0x6969`                    |
