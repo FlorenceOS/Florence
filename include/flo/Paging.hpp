@@ -25,9 +25,9 @@ namespace flo {
     using flo::StrongTypedef<PhysicalAddress, u64>::StrongTypedef;
   };
 
-  template<typename T, int sz = sizeof(uptr)>
+  template<typename T>
   T *getPhys(PhysicalAddress addr) { return reinterpret_cast<T *>(getPtrPhys(addr)); }
-  template<typename T, int sz = sizeof(uptr)>
+  template<typename T>
   T *getVirt(VirtualAddress addr)  { return reinterpret_cast<T *>(getPtrVirt(addr)); }
 
   /*
@@ -215,7 +215,6 @@ namespace flo {
     static_assert(sizeof(PageTable<4>) == PageSize<1>);
     static_assert(sizeof(PageTable<5>) == PageSize<1>);
 
-    template<int ptrSz = sizeof(uptr)>
     auto *getPagingRoot() {
       uptr retval;
       asm("mov %%cr3, %0" : "=r"(retval));
@@ -360,6 +359,11 @@ namespace flo {
     [[nodiscard]]
     auto map(PhysicalAddress phys, VirtualAddress virt, u64 size, Permissions perm, Tracer &&tracer) {
       return map(phys, virt, size, perm, *getPagingRoot(), std::forward<Tracer>(tracer));
+    }
+
+    [[nodiscard]]
+    auto map(PhysicalAddress phys, VirtualAddress virt, u64 size, Permissions perm) {
+      return map(phys, virt, size, perm, [](auto...) { });
     }
   }
 
