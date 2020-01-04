@@ -1,9 +1,9 @@
-image: Ubuntu
+image: Ubuntu1804
 build: off
 install:
-        - sh: make
+- sh: make
 
 test_script:
-        - sh: make autotest
-        - ps: (new-object net.webclient).UploadFile("https://ci.appveyor.com/api/testresults/junit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path .\tests.xml))
+- sh: make autotest
+- ps: (new-object net.webclient).UploadFile("https://ci.appveyor.com/api/testresults/junit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path .\tests.xml))
 
