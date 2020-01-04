@@ -48,9 +48,6 @@ dbg: out/Disk.bin
 kvm: out/Disk.bin
 	$(QEMU) -drive format=raw,file=$<
 
-bochs: out/Disk.bin
-	bochs -qf bochs.bxrc
-
 test: Tests/build/CMakeCache.txt
 	make -j -C Tests/build
 	gdb Tests/build/tests\
