@@ -1,6 +1,9 @@
 image: Ubuntu1804
 build: off
 install:
+- sh: sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+- sh: yes | sudo apt-get install gcc-9 g++-9
+- sh: sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 900 --slave /usr/bin/g++ g++ /usr/bin/g++-9
 - sh: make
 
 test_script:
