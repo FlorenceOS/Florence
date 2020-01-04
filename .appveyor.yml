@@ -4,7 +4,7 @@ install:
 - sh: yes | sudo apt-get install gcc-9-multilib g++-9-multilib
 - sh: sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 900 --slave /usr/bin/g++ g++ /usr/bin/g++-9
 - sh: make
-- sh: zip Florence.zip -r include out/Disk.bin
+- sh: zip Florence.zip -r include
 
 test_script:
 - sh: make autotest
@@ -12,4 +12,6 @@ test_script:
 
 artifacts:
 - path: Florence.zip
-  name: Florence binary and headers
+  name: Florence headers
+- path: out/Disk.bin
+  name: Florence bootable disk
