@@ -19,7 +19,7 @@
   or al, 2
   out 0x92, al
 
-  mov sp, 0x600      # Make a small stack
+  mov sp, 0x600 # Make a small stack
 
   jmp 0x0000:loadSectors - loaderStart + loadAddress
 
@@ -45,7 +45,6 @@ loadSectors:
   # Zero out segments
   mov ds, bx
   mov ss, bx
-  mov ds, bx
   mov fs, bx
   mov gs, bx
 
@@ -82,6 +81,11 @@ afterFirstRead:
   mov al, es:[bx+8]  # Get the number of sectors to load now (al)
   mov ah, 0x02       # Command (ah) = 2 (Read Sectors From Drive)
 
+  # Load the rest at 0x8000
+  mov bx, 0x0800
+  mov es, bx
+  xor bx, bx
+
   # Read sectors
 beforeSecondRead:
   int 0x13
@@ -97,7 +101,7 @@ jumpNextStage:
   mov es, ax
 
   # Tailcall the next stage in the bootloader
-  jmp 0x7e00
+  jmp 0x8000
 
 # All of the below functions have to be called before switching to
 # protected mode, since they are only compatible with the starting
