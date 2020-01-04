@@ -190,5 +190,10 @@ namespace flo {
         return v.*memb;
       });
     }
+
+    inline void setmem(u8 *data, u8 value, uSz size) {
+      while(size--)
+        *data++ = value;
+    }
   }
 }
