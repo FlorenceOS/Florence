@@ -13,11 +13,17 @@ namespace Testing {
   }
 
   template<typename F>
-  inline static void forRandomInt(F &&f, std::chrono::duration<double> runFor = std::chrono::seconds(1)) {
+  void runFor(F &&f, std::chrono::duration<double> duration = std::chrono::seconds(1)) {
     auto start = std::chrono::steady_clock::now();
-    while(std::chrono::steady_clock::now() - start < runFor) {
+    while(std::chrono::steady_clock::now() - start < duration)
+      f();
+  }
+
+  template<typename F>
+  inline static void forRandomInt(F &&f, std::chrono::duration<double> duration = std::chrono::seconds(1)) {
+    runFor([&]() {
       f(urand());
-    }
+    }, duration);
   }
 
   template<typename T>
