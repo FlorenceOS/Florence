@@ -5,24 +5,30 @@ QEMUExec := qemu-system-x86_64
 endif
 
 ifndef QEMUFlags
-QEMUFlags := -m 128M -enable-kvm -cpu host
+QEMUFlags := -m 8G -enable-kvm -cpu host -serial stdio
 endif
 
 QEMU := $(QEMUExec) $(QEMUFlags)
 
 CXXFlags := $(CXXFlags) -ffreestanding -g -Wall -fno-stack-protector\
 	-mno-red-zone -fno-exceptions -fno-rtti -Wno-sign-compare\
-	-std=c++17 -Os -mno-soft-float -Iinclude
+	-std=c++17 -Os -mno-soft-float -Iinclude -ffunction-sections\
+	-fdata-sections
+
+CommonHeaders := $(wildcard include/**/*.hpp)
 
 .PHONY: clean all dbg bochs test
 .SECONDARY:;
 
-CommonHeaders := $(wildcard include/**/*.hpp)
+TestSources := $(wildcard Tests/*.?pp)
 
-Tests/build/CMakeCache.txt: Tests/CMakeLists.txt
+Tests/build/CMakeCache.txt: Tests/CMakeLists.txt $(TestSources) $(CommonHeaders) Makefile
 	@#rm -rfv $(@D)/CMake*
 	@mkdir -p $(@D)
 	cd $(@D) && cmake ..
+
+%.stripped.elf: %.elf
+	strip $< -s -o $@
 
 # Phony targets
 clean:
@@ -33,56 +39,62 @@ dbg: out/Disk.bin
 	gdb\
 		-ex 'shell sleep .2'\
 		-ex 'target remote :1234'\
-		-ex 'add-symbol-file-auto build/Bootsector.elf'\
-		-ex 'add-symbol-file-auto build/Bootstrapper.elf'\
+		-ex 'add-symbol-file-auto build/Bootstrapper/Bootstrapper.elf'\
 		-ex 'set architecture i386'\
 		-ex 'set disassembly-flavor intel'\
-		-ex 'break bootstrapStart'\
-		-ex 'c' || \$(killall $(QEMUExec) && false)
+		|| \$(killall $(QEMUExec) && false)
 	killall $(QEMUExec)
 
-go: out/Disk.bin
+kvm: out/Disk.bin
 	$(QEMU) -drive format=raw,file=$<
 
-kvm: out/Disk.bin
-	$(QEMU) -drive format=raw,file=$< -enable-kvm -cpu host
+bochs: out/Disk.bin
+	bochs -qf bochs.bxrc
+
+test: Tests/build/CMakeCache.txt
+	make -j -C Tests/build
+	gdb Tests/build/tests\
+		-ex 'r --gtest_break_on_failure'
+
+autotest: Tests/build/CMakeCache.txt
+	make -j -C Tests/build
+	Tests/build/tests --gtest_output=xml:"tests.xml"
 
 # Bootsector
-build/Bootsector.S.o: Bootsector/Bootsector.S Makefile
+build/Bootsector/Bootsector.S.o: Bootsector/Bootsector.S Makefile
 	@mkdir -p $(@D)
 	as $< -o $@ -32 -march=i386
 
-build/Bootsector.elf: Bootsector/Linker.lds build/Bootsector.S.o
+build/Bootsector/Bootsector.elf: Bootsector/Linker.lds build/Bootsector/Bootsector.S.o
 	ld -T $^ -o $@
 	@readelf -a $@ | grep 'loaderSize' | awk '{ print "MBR size: " strtonum("0x" $$2)/0x1FE * 100 "%" }'
 
-build/Bootsector.bin: build/Bootsector.elf
+build/Bootsector/Bootsector.bin: build/Bootsector/Bootsector.elf
 	@mkdir -p $(@D)
 	objcopy -O binary $< $@
-
 
 # Bootstrapper
 BootstrapperSources := $(wildcard Bootstrapper/*.S) $(wildcard Bootstrapper/*.cpp)
 BootstrapperObjects := $(patsubst %,build/%.o,$(BootstrapperSources))
+BootstrapperHeaders := $(wildcard Bootstrapper/*.hpp)
 
 build/Bootstrapper/%.S.o: Bootstrapper/%.S Makefile
-	mkdir -p $(@D)
+	@mkdir -p $(@D)
 	as $< -o $@ -32
 
-build/Bootstrapper/%.cpp.o: Bootstrapper/%.cpp Bootstrapper/*.hpp include/*.hpp Makefile
+build/Bootstrapper/%.cpp.o: Bootstrapper/%.cpp $(BootstrapperHeaders) $(CommonHeaders) Makefile
 	@mkdir -p $(@D)
-	gcc -m32 -march=i386 -std=c++17 -c $< -o $@
+	g++ -m32 -fno-pic -fno-pie -march=i386 $(CXXFlags) -fno-use-cxa-atexit -IBootstrapper -c $< -o $@
 
-build/Bootstrapper.elf: Bootstrapper/Linker.lds $(BootstrapperObjects)
-	ld -T $^ -o $@
+build/Bootstrapper/Bootstrapper.elf: Bootstrapper/Linker.lds $(BootstrapperObjects)
+	ld -T $^ -o $@ --gc-sections
 	@readelf -a $@ | grep 'BootstrapSize' | awk '{ print "Bootstrapper size: " strtonum("0x" $$2)/(64*1024) * 100 "%" }'
 
-build/Bootstrapper.bin: build/Bootstrapper.elf
+build/Bootstrapper/Bootstrapper.bin: build/Bootstrapper/Bootstrapper.stripped.elf
 	@mkdir -p $(@D)
 	objcopy -O binary $< $@
 
-out/Disk.bin: build/Bootsector.bin build/Bootstrapper.bin
+# Literally just concat them lol
+out/Disk.bin: build/Bootsector/Bootsector.bin build/Bootstrapper/Bootstrapper.bin
 	@mkdir -p $(@D)
-	@# Literally just concat them lol
 	cat $^ > $@
-

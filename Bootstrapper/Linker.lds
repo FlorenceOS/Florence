@@ -1,22 +1,51 @@
 OUTPUT_FORMAT(elf32-i386)
-OUTPUT_ARCH(i8086)
+OUTPUT_ARCH(i386)
 
 SectorBytes =  0x200;
-loadAddress  = 0x7C00 + SectorBytes;
+SectionAlign = 16;
 
 SECTIONS {
-  . = 0x7C00;
-  .text : {
+  . = 0x7E00;
+
+  .text :{
     *(.BootstrapHeader)
     . = ALIGN(SectorBytes);
     BootstrapStart = .;
+    . = ALIGN(SectionAlign);
     *(.BootstrapEntry)
-    *(.data)
-    *(.text)
-    *(.rodata)
-    *(.bss)
+    . = ALIGN(SectionAlign);
+
+    constructorsStart = .;
+    KEEP(*( .init_array ));
+    KEEP(*(SORT_BY_INIT_PRIORITY( .init_array.* )));
+    constructorsEnd = .;
+
+    . = ALIGN(SectionAlign);
+
+    /* Don't do these
+    destructorsStart = .;
+    KEEP(*( .fini_array ));
+    KEEP(*(SORT_BY_INIT_PRIORITY( .fini_array.* )));
+    destructorsEnd = .;
+
+    . = ALIGN(SectionAlign);
+    */
+
+    *(.data*)
+    . = ALIGN(SectionAlign);
+    *(.text*)
+    . = ALIGN(SectionAlign);
+    *(.rodata*)
+    . = ALIGN(SectionAlign);
+    *(.bss*)
+    . = ALIGN(SectionAlign);
+
     BootstrapEnd = .;
     . = ALIGN(SectorBytes);
+  } = 0x00
+
+  /DISCARD/ : {
+    *(*)
   }
 }
 
