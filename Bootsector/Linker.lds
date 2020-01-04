@@ -10,5 +10,5 @@ SECTIONS {
     *(.Bootloader)
     . = textstart + 0x200 - BootSignatureSize;
     *(.BootSignature)
-  }
+  } = 0x00
 }
