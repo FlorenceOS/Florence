@@ -92,3 +92,16 @@ TEST(Util, lsb) {
   EXPECT_EQ(flo::Util::lsb(4), 4);
   EXPECT_EQ(flo::Util::lsb(5), 1);
 }
+
+TEST(Util, genMagic) {
+  EXPECT_EQ(flo::Util::genMagic("ABCDEFGH"),
+       ((u64)'A'
+     | ((u64)'B' << 8)
+     | ((u64)'C' << 16)
+     | ((u64)'D' << 24)
+     | ((u64)'E' << 32)
+     | ((u64)'F' << 40)
+     | ((u64)'G' << 48)
+     | ((u64)'H' << 56)
+  ));
+}
