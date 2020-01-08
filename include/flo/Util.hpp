@@ -195,5 +195,83 @@ namespace flo {
       while(size--)
         *data++ = value;
     }
+
+    inline void copymem(u8 *dest, u8 const *src, uSz size) {
+      while(size--)
+      *dest++ = *src++;
+    }
+
+    inline bool memeq(u8 const *lhs, u8 const *rhs, uSz size) {
+      while(size--) if(*lhs++ != *rhs++)
+        return false;
+      return true;
+    }
+
+    template<typename T>
+    [[nodiscard]] constexpr inline T kilo(T val) {
+      return T{1024} * val;
+    }
+
+    template<typename T>
+    [[nodiscard]] constexpr inline T mega(T val) {
+      return T{1024} * kilo(val);
+    }
+
+    template<typename T>
+    [[nodiscard]] constexpr inline T giga(T val) {
+      return T{1024} * mega(val);
+    }
+
+    template<typename T>
+    [[nodiscard]] constexpr inline T tera(T val) {
+      return T{1024} * giga(val);
+    }
+
+    template<typename T>
+    [[nodiscard]] constexpr inline T peta(T val) {
+      return T{1024} * tera(val);
+    }
+
+    // String literal to constexpr u64
+    constexpr u64 genMagic(char const (&dat)[9]) {
+      u64 result = 0;
+      for(int i = 8; i --> 0;) {
+        result <<= 8;
+        result  |= (u8)dat[i];
+      }
+      return result;
+    }
+
+    template<typename T>
+    struct Range {
+      T begin;
+      T end;
+
+      constexpr bool overlaps(Range const &other) const {
+        return this->contains(other.begin) || this->contains(other.end - T{1}) ||
+               other.contains(this->begin) || other.contains(this->end - T{1});
+      }
+
+      constexpr bool contains(Range const &other) const {
+        return begin <= other.begin && other.end <= end;
+      }
+
+      constexpr bool contains(T const &value) const {
+        return begin <= value && value < end;
+      }
+
+      constexpr bool operator<(Range &other) const {
+        return begin < other.begin;
+      }
+
+      constexpr auto size() const {
+        return end - begin;
+      }
+    };
+
+    template<typename T>
+    T &get(u8 *ptr, u64 offset) {
+      return *(T *)(ptr + offset);
+    }
   }
 }

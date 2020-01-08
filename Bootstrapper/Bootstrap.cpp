@@ -1,13 +1,12 @@
-#include "Bootstrap.hpp"
-#include "Bootstrapper.hpp"
-
+#include "flo/IO.hpp"
 #include "flo/CPU.hpp"
+#include "flo/Bios.hpp"
 #include "flo/Paging.hpp"
 #include "flo/Random.hpp"
-#include "flo/Serial.hpp"
+#include "flo/Florence.hpp"
 #include "flo/Bitfields.hpp"
 
-#include <algorithm>
+#include "flo/Containers/StaticVector.hpp"
 
 #include <algorithm>
 
@@ -22,353 +21,231 @@ extern "C" void doConstructors() {
   });
 }
 
+using flo::Decimal;
+using flo::spaces;
+
 namespace {
   constexpr bool quiet = false;
+  constexpr bool disableKASLR = true;
+  bool vgaDisabled = false;
 
-  int currX = 0;
-  int currY = 0;
-
-  constexpr auto VGAWidth = 80, VGAHeight = 25;
-
-  volatile u16 *charaddr(int x, int y) {
-    return (volatile u16 *)0xB8000 + (y * VGAWidth + x);
-  }
-
-  enum struct Color {
-    red,
-    cyan,
-    yellow,
-    white,
+  struct MemoryRange {
+    flo::PhysicalAddress begin;
+    flo::PhysicalAddress end;
   };
 
-  u8 currentVGAColor;
+  // Memory ranges above the 4GB memory limit, we have to wait to
+  // consume these to after we've enabled paging.
+  flo::StaticVector<MemoryRange, 0x10> highMemRanges;
 
-  void setchar(int x, int y, char c) {
-    *charaddr(x, y) = (currentVGAColor << 8) | c;
-  }
+  // Head of physical page freelist
+  flo::PhysicalAddress physicalFreeList = flo::PhysicalAddress{0};
 
-  void setchar(int x, int y, u16 entireChar) {
-    *charaddr(x, y) = entireChar;
-  }
+  // Base virtual address of physical memory
+  flo::VirtualAddress physicalVirtBase;
 
-  u16 getchar(int x, int y) {
-    return *charaddr(x, y);
-  }
+  auto pline = flo::makePline("[FBTS] ");
 
-  void vgaFeedLine() {
-    currX = 0;
-    if(currY == VGAHeight - 1) {
-      // Scroll
-      for(int i = 0; i < VGAHeight - 1; ++ i) for(int x = 0; x < VGAWidth; ++ x)
-          setchar(x, i, getchar(x, i + 1));
+  // KASLR base for the kernel.
+  // The kernel is loaded just below this and physical memory is mapped just above.
+  flo::VirtualAddress kaslrBase;
 
-      // Clear bottom line
-      for(int x = 0; x < VGAWidth; ++ x)
-        setchar(x, VGAHeight - 1, ' ');
-    }
-    else
-      ++currY;
-  }
+  // Info about the display we've ended up picking goes in here
+  struct {
+    u64 framebuffer;
+    u32 width;
+    u32 height;
+    u32 bpp;
+    u32 pitch;
+    u16 mode; 
+  } pickedDisplay;
+};
 
-  bool escaping = false;
-  void vgaPutchar(char c) {
-    if(c == '\n')
-      return vgaFeedLine();
-    if(currX == VGAWidth)
-      vgaFeedLine();
+// This data needs to be accessible from asm
+extern "C" {
+  flo::VirtualAddress kernelLoaderEntry;
+  flo::VirtualAddress loaderStack;
+}
 
-    setchar(currX++, currY, c);
-  }
+// Data provided by asm
+extern "C" u16 desiredWidth;
+extern "C" u16 desiredHeight;
+extern "C" u8 diskNum;
+extern "C" union { struct flo::BIOS::VesaInfo vesa; struct flo::BIOS::MemmapEntry mem; } biosBuf;
+extern "C" union { struct flo::BIOS::DAP dap; struct flo::BIOS::VideoMode vm; } currentModeBuf;
+extern "C" char BootstrapEnd;
+
+// Typed references to the data provided just above
+auto &vesa = biosBuf.vesa;
+auto &mem  = biosBuf.mem;
+auto diskdata = (u8 *)&biosBuf;
+auto &vidmode = currentModeBuf.vm;
+auto &dap = currentModeBuf.dap;
+auto const minMemory = flo::PhysicalAddress{(u64)&BootstrapEnd};
+
+// IO functions
+void flo::feedLine() {
+  if constexpr(quiet)
+    return;
+
+  if(!vgaDisabled)
+    flo::IO::VGA::feedLine();
+  flo::IO::serial1.feedLine();
+}
+
+void flo::putchar(char c) {
+  if constexpr(quiet)
+    return;
+
+  if(c == '\n')
+    return feedLine();
+
+  if(!vgaDisabled)
+    flo::IO::VGA::putchar(c);
+  flo::IO::serial1.write(c);
+}
+
+void flo::setColor(flo::IO::Color col) {
+  if constexpr(quiet)
+    return;
+
+  if(!vgaDisabled)
+    flo::IO::VGA::setColor(col);
+  flo::IO::serial1.setColor(col);
 }
 
 namespace {
-  bool vgaDisabled = false;
-
-  void putchar(char c){
-    if constexpr(!quiet) {
-      flo::serial1.write(c);
-      if(!vgaDisabled && !escaping)
-        vgaPutchar(c);
-    }
-  }
-
-  void feedLine() {
-    if constexpr(!quiet) {
-      flo::serial1.write('\n');
-      if(!vgaDisabled)
-        vgaFeedLine();
-    }
-  }
-
-  void print(char const *str) {
-    while(*str)
-      putchar(*str++);
-  }
-
-  void setColor(char const *colorStr) {
-    escaping = true;
-    print("\x1b[");
-    print(colorStr);
-    print("m");
-    escaping = false;
-  }
-
-  void setRed() {
-    currentVGAColor = 0x4;
-    setColor("31");
-  }
-
-  void setYellow() {
-    currentVGAColor = 0xE;
-    setColor("33");
-  }
-
-  void setCyan() {
-    currentVGAColor = 0x3;
-    setColor("36");
-  }
-
-  void setWhite() {
-    currentVGAColor = 0x7;
-    setColor("37");
-  }
-
-  void setBlue() {
-    currentVGAColor = 0x1;
-    setColor("34");
-  }
-
-  template<bool removeLeadingZeroes = false, bool prefix = false, typename T>
-  auto printNum(T num) {
-    auto constexpr numChars = std::numeric_limits<T>::digits/4;
-
-    std::array<char, numChars + 1> buf{};
-    auto it = buf.rbegin() + 1;
-    while(it != buf.rend()) {
-      *it++ = "0123456789ABCDEF"[num & T{0xf}];
-      num >>= 4;
-
-      if constexpr(removeLeadingZeroes) if(!num)
-        break;
-    }
-
-    if constexpr(prefix)
-      print("0x");
-    return print(&*--it);
-  }
-
-  template<typename T>
-  auto printDec(T num) {
-    std::array<char, std::numeric_limits<T>::digits10 + 1> buf{};
-    auto it = buf.rbegin();
-    do {
-      *++it = '0' + (num % 10);
-      num /= 10;
-    } while(num);
-
-    return print(&*it);
-  }
-
-  template<typename T>
-  struct Dec { T val; };
-  template<typename T>
-  Dec(T) -> Dec<T>;
-
-  template<typename T>
-  struct IsDec { static constexpr bool value = false; };
-  template<typename T>
-  struct IsDec<Dec<T>> { static constexpr bool value = true; };
-
-  template <typename ...Ts>
-  void pline(Ts &&...vs) {
-    auto p = [](auto &&val) {
-      if constexpr(IsDec<std::decay_t<decltype(val)>>::value) {
-        setYellow();
-        return printDec(val.val);
-      }
-      else if constexpr(std::is_convertible_v<decltype(val), char const *>) {
-        setWhite();
-        return print(val);
-      }
-      else if constexpr(std::is_pointer_v<std::decay_t<decltype(val)>>) {
-        setBlue();
-        return printNum(reinterpret_cast<uptr>(val));
-      }
-      else {
-        setCyan();
-        return printNum(val);
-      }
-    };
-
-    setRed();
-    print("[FBTS] ");
-    (p(std::forward<Ts>(vs)), ...);
-    feedLine();
-  }
-
-  template<typename T>
-  struct RealPtr {
-    u16 offset;
-    u16 segment;
-
-    T *operator()() const { return reinterpret_cast<T *>(offset + (segment << 4)); }
-  } __attribute__((packed));
-
-  struct VesaInfo {
-    char signature[4];
-    u8 versionMinor, versionMajor;
-    RealPtr<char> oem;
-    u32 capabilities;
-    RealPtr<u16> video_modes;
-    u16 video_memory;
-    u16 software_rev;
-    RealPtr<char> vendor;
-    RealPtr<char> product_name;
-    RealPtr<char> product_rev;
-  } __attribute__((packed));
-
-  struct VideoMode {
-    u16 attributes;
-    u8  window_a;
-    u8  window_b;
-    u16 granularity;
-    u16 window_size;
-    u16 segment_a;
-    u16 segment_b;
-    u32 win_func_ptr;
-    u16 pitch; // Bytes per line
-    u16 width;
-    u16 height;
-    u8  w_char;
-    u8  y_char;
-    u8  planes;
-    u8  bpp; // Bits per pixel
-    u8  banks;
-    u8  memory_model;
-    u8  bank_size;
-    u8  image_pages;
-    u8  reserved0;
-   
-    u8  red_mask;
-    u8  red_position;
-    u8  green_mask;
-    u8  green_position;
-    u8  blue_mask;
-    u8  blue_position;
-    u8  reserved_mask;
-    u8  reserved_position;
-    u8  direct_color_attributes;
-   
-    u32 framebuffer;
-    u32 off_screen_mem_off;
-    u16 off_screen_mem_size;
-  } __attribute__((packed));
-
-  namespace ExtendedAttribs {
-    enum : u32 {
-      Ignore = 1,
-      NonVolatile = 2,
-    };
-  }
-
-  struct MemmapEntry {
-    flo::PhysicalAddress base;
-    flo::PhysicalAddress size;
-
-    enum struct RegionType: u32 {
-      Usable = 1,
-      Reserved = 2,
-      ACPIReclaimable = 3,
-      ACPINonReclaimable = 4,
-      Bad = 5,
-    } type;
-
-    u32 attribs;
-
-    u32 savedEbx;
-    u16 bytesFetched;
-  };
-
-  bool shouldUse(MemmapEntry const &ent) {
-    if(ent.type != MemmapEntry::RegionType::Usable)
+  bool shouldUse(flo::BIOS::MemmapEntry const &ent) {
+    if(ent.type != flo::BIOS::MemmapEntry::RegionType::Usable)
       return false;
 
     if(ent.bytesFetched > 20)
-      if(ent.attribs & (ExtendedAttribs::Ignore | ExtendedAttribs::NonVolatile))
+      if(ent.attribs & (flo::BIOS::MemmapEntry::ExtendedAttribs::Ignore | flo::BIOS::MemmapEntry::ExtendedAttribs::NonVolatile))
         return false;
 
     return true;
   }
 
-  void assertAssumptions() {
-    // Check if the CPU supports 5 level paging
+  [[noreturn]]
+  void noLong() {
+    pline("This doesn't look like a 64 bit CPU, we cannot proceed!");
+    flo::CPU::hang();
+  }
+
+  void check5Level() {
     u32 ecx;
     asm("cpuid":"=c"(ecx):"a"(7),"c"(0));
     bool supports5lvls = ecx & (1 << 16);
+
     pline("5 level paging is ", supports5lvls ? "" : "not", " supported by your CPU");
-    if constexpr(flo::Paging::PageTableLevels == 4) if( supports5lvls) {
+    if constexpr(flo::Paging::PageTableLevels == 4) if(supports5lvls) {
       pline("Please rebuild florence with 5 level paging support for security reasons");
       pline("You will gain an additional 9 bits of KASLR :)");
     }
-    if constexpr(flo::Paging::PageTableLevels == 5) if(!supports5lvls) {
-      pline("Florence was built with 5 level paging support, we cannot continue");
-      flo::CPU::hang();
+    if constexpr(flo::Paging::PageTableLevels == 5) {
+      if(!supports5lvls) {
+        pline("Florence was built with 5 level paging support, we cannot continue");
+        flo::CPU::hang();
+      }
+      else {
+        pline("Enabling 5 level paging...");
+        flo::CPU::cr4 = flo::CPU::cr4 | (1 << 12);
+      }
     }
   }
-}
 
-extern "C" void initializeDebug() {
-  flo::serial1.initialize();
-  flo::serial2.initialize();
-  flo::serial3.initialize();
-  flo::serial4.initialize();
+  void checkRDRAND() {
+    if constexpr(!disableKASLR) {
+      u32 ecx;
+      asm("cpuid" : "=c"(ecx) : "a"(1));
+      if(!(ecx & (1 << 30))) {
+        pline("ERROR: Your CPU is missing RDRAND support."),
+        pline("Please run Florence with a more modern CPU.");
+        pline("If using KVM, use flag \"-cpu host\".");
+        pline("If you don't have RDRAND, disable KASLR.");
 
-  if constexpr(!quiet) {
-    for(int x = 0; x < VGAWidth;  ++ x)
-    for(int y = 0; y < VGAHeight; ++ y)
-      setchar(x, y, ' ');
+        flo::CPU::hang();
+      }
+    }
   }
 
-  assertAssumptions();
-}
+  void checkLong() {
+    u32 eax;
+    asm("cpuid":"=a"(eax):"a"(0x80000000));
+    if(eax < 0x80000001)
+      noLong();
+    else {
+      u32 edx;
+      asm("cpuid":"=d"(edx):"a"(0x80000001));
+      if(!(edx & (1 << 29)))
+        noLong();
+    }
+  }
 
-extern "C" void rdrandError() {
-  pline("ERROR: Your CPU is missing RDRAND support."),
-  pline("Please run Florence with a more modern CPU.");
-  pline("If using KVM, use flag \"-cpu host\".");
+  void assertAssumptions() {
+    checkLong();
+    check5Level();
+    checkRDRAND();
+  }
 
-  flo::CPU::hang();
-}
+  template<typename PT>
+  void printPaging(PT &pt, u64 virtaddr = 0, u8 indent = 0) {
+    bool visitedAny = false;
+    for(int i = 0; i < flo::Paging::PageTableSize; ++ i) {
+      auto &ent = pt.table[i];
+      [[maybe_unused]]
+      auto nextVirt = flo::Paging::makeCanonical(virtaddr | ((u64)i << flo::Paging::pageOffsetBits<ent.lvl>));
+      if(!ent.present)
+        continue;
 
-extern "C" union { struct VesaInfo vesa; struct MemmapEntry mem; } biosBuf;
-auto &vesa = biosBuf.vesa;
-auto &mem  = biosBuf.mem;
-extern "C" struct VideoMode currentModeBuf;
-extern "C" {
-  flo::Displayinfo pickedDisplay;
-}
+      visitedAny = true;
+      
+      if constexpr(flo::Paging::noisy)
+        pline(spaces(indent), "Entry ", Decimal{i}, " at ", (u32)&ent," (", nextVirt, ", ", ent.rep, ") mapping to ", ent.isMapping() ? "physical addr " : "page table at physical ", ent.physaddr()());
+      if(!ent.isMapping()) {
+        if constexpr(ent.lvl < 2) {
+          pline(spaces(indent + 1), "Present level 1 mapping without mapping bit set!!");
+          continue;
+        }
+        else {
+          pline(spaces(indent), "Entry ", Decimal{i}, " at ", (u32)&ent," (", nextVirt, ", ", ent.rep, ") mapping to page table at physical ", ent.physaddr()());
+          auto ptr = flo::getPhys<flo::Paging::PageTable<ent.lvl - 1>>(ent.physaddr());
+          printPaging(*ptr, nextVirt, indent + 1);
+        }
+      }
+    }
+    if(!visitedAny) {
+      pline(spaces(indent), (uptr) &pt, ": This table was empty :(");
+    }
+  };
 
-namespace {
-  // This magic function switches back to 16 bits 
-  // and fetches the mode info, switches back to 32 bits
-  // and then returns. Don't ask any questions.
-
-  // The mode switch to 16 bits and back clobbers edx
-  // The BIOS calls clobber ax
-  // di and memory are clobbered by the bios call to get a video mode.
-
+  // Sets `vidmode`
   void fetchMode(i16 mode) {
     asm("call getVideoMode" :: "c"(mode) : "ax", "edx", "di", "memory");
   }
 
-  // Same thing goes here, but just sets it.
+  // Chose a mode
   void setMode(i16 mode) {
     asm("call setVideoMode" :: "b"(mode) : "ax", "edx");
   }
+
+  void fetchMemoryRegion() {
+    asm("call getMemoryMap" ::: "eax", "ebx", "ecx", "edx", "di", "memory");
+  }
 }
 
-extern "C" u16 desiredWidth;
-extern "C" u16 desiredHeight;
+extern "C" void initializeDebug() {
+  if constexpr(!quiet)
+    flo::IO::VGA::clear();
+
+  // We always initialize serial as other parts could be non-quiet
+  flo::IO::serial1.initialize();
+  flo::IO::serial2.initialize();
+  flo::IO::serial3.initialize();
+  flo::IO::serial4.initialize();
+
+  assertAssumptions();
+}
 
 extern "C" void setupVideo() {
   pline("Picking VBE2 mode");
@@ -381,28 +258,28 @@ extern "C" void setupVideo() {
     fetchMode(*mode);
 
     // No linear framebuffer support, skip
-    if(!(currentModeBuf.attributes & (1 << 7)))
+    if(!(vidmode.attributes & (1 << 7)))
       continue;
 
     // Verify bits per color is 4
-    if(currentModeBuf.bpp != 32)
+    if(vidmode.bpp != 32)
       continue;
 
-    pline("Mode: ", *mode, ", ", Dec{currentModeBuf.width}, "x", Dec{currentModeBuf.height});
+    pline("Mode: ", *mode, ", ", Decimal{vidmode.width}, "x", Decimal{vidmode.height});
 
-    if(currentModeBuf.width  == desiredWidth &&
-       currentModeBuf.height == desiredHeight) {
+    if(vidmode.width  == desiredWidth &&
+       vidmode.height == desiredHeight) {
       pline("Found desired mode!");
     }
     else
       continue;
 
     pickedDisplay.mode   = *mode;
-    pickedDisplay.width  = currentModeBuf.width;
-    pickedDisplay.height = currentModeBuf.height;
-    pickedDisplay.pitch  = currentModeBuf.pitch;
-    pickedDisplay.bpp    = currentModeBuf.bpp / 8;
-    pickedDisplay.framebuffer = currentModeBuf.framebuffer;
+    pickedDisplay.width  = vidmode.width;
+    pickedDisplay.height = vidmode.height;
+    pickedDisplay.pitch  = vidmode.pitch;
+    pickedDisplay.bpp    = vidmode.bpp / 8;
+    pickedDisplay.framebuffer = vidmode.framebuffer;
     break;
   }
 
@@ -417,9 +294,11 @@ extern "C" void setupVideo() {
   // draw some test pattern on the screen
   for(int y = 0; y < pickedDisplay.height; ++ y)
   for(int x = 0; x < pickedDisplay.width;  ++ x) {
-    auto col = x % 8 == 0 || y % 8 == 0 ? 255 : 0;
+    auto col = x % 8 == 0 || y % 8 == 0 ? 1 : 0;
     auto offset = y * pickedDisplay.pitch + x * pickedDisplay.bpp;
-    *(u8*)(pickedDisplay.framebuffer + offset) = col;
+    *(u8*)(pickedDisplay.framebuffer + offset + 0) = col ? 0x24 : 0;
+    *(u8*)(pickedDisplay.framebuffer + offset + 1) = col ? 0x3d : 0;
+    *(u8*)(pickedDisplay.framebuffer + offset + 2) = col ? 0xdc : 0;
   }
 }
 
@@ -431,24 +310,6 @@ extern "C" [[noreturn]] void printVideoModeError() {
 
   flo::CPU::hang();
 }
-
-extern "C" [[noreturn]] void noLong() {
-  pline("This doesn't look like a 64 bit CPU, we cannot proceed!");
-  flo::CPU::hang();
-}
-
-namespace {
-  void fetchMemoryRegion() {
-    asm("call getMemoryMap" ::: "eax", "ebx", "ecx", "edx", "di", "memory");
-  }
-};
-
-decltype(highMemRanges) highMemRanges;
-decltype(physicalFreeList) physicalFreeList = flo::PhysicalAddress{0};
-decltype(physicalVirtBase) physicalVirtBase;
-
-extern char BootstrapEnd;
-auto const minMemory = flo::PhysicalAddress{(u64)&BootstrapEnd};
 
 auto physHigh = minMemory;
 
@@ -539,7 +400,11 @@ namespace {
 
 extern "C" void doEarlyPaging() {
   // We will locate the physical memory at this point
-  auto kaslrBase = randomizeKASLRBase();
+  if constexpr(disableKASLR) {
+    kaslrBase = flo::VirtualAddress{1ull << 34};
+  } else {
+    kaslrBase = randomizeKASLRBase();
+  }
   pline("KASLR base: ", kaslrBase());
   physicalVirtBase = kaslrBase;
 
@@ -560,69 +425,232 @@ extern "C" void doEarlyPaging() {
   permissions.allowUserAccess = 0;
   permissions.writethrough = 0;
   permissions.disableCache = 0;
-  permissions.exectueDisable = 1;
-  permissions.mapping.global = 1;
+  permissions.mapping.global = 0;
+  permissions.mapping.exectueDisable = 1;
 
-  char const spaceBuf[]{' ', ' ', ' ', ' ', ' ', ' ', '\x00'};
-  auto spaces = [&spaceBuf](int numSpaces) {
-    return &spaceBuf[6 - numSpaces];
-  };
+  auto err =
+    flo::Paging::map(
+      flo::PhysicalAddress{0}, kaslrBase, physHigh, permissions,
+      [](auto ...vals) { pline(std::forward<decltype(vals)>(vals)...); }
+    );
 
-  auto printPaging = [&spaces, indent = 0](auto &pt, auto &self, u64 virtaddr) mutable {
-    bool visitedAny = false;
-    for(int i = 0; i < flo::Paging::PageTableSize; ++ i) {
-      auto &ent = pt.table[i];
-      if(!ent.present)
-        continue;
+  if(!err) {
+    permissions.mapping.exectueDisable = 0;
 
-      visitedAny = true;
-      //This gets a little too noisy
-      //pline(spaces(indent), "Entry ", Dec{i}, " at ", (u32)&ent," (", nextVirt, ", ", ent.rep, ") mapping to ", ent.isMapping() ? "physical addr " : "page table at physical ", ent.physaddr()());
-      if(!ent.isMapping()) {
-        if constexpr(ent.lvl < 2) {
-          pline(spaces(indent + 1), "Present level 1 mapping without mapping bit set!!");
-          continue;
-        }
-        else {
-          auto nextVirt = flo::Paging::makeCanonical(virtaddr | ((u64)i << flo::Paging::pageOffsetBits<ent.lvl>));
-          pline(spaces(indent), "Entry ", Dec{i}, " at ", (u32)&ent," (", nextVirt, ", ", ent.rep, ") mapping to page table at physical ", ent.physaddr()());
-          ++ indent;
-          auto ptr = flo::getPhys<flo::Paging::PageTable<ent.lvl - 1>>(ent.physaddr());
-          self(*ptr, self, nextVirt);
-          -- indent;
-        }
-      }
-    }
-    if(!visitedAny) {
-      pline(spaces(indent), (uptr) &pt, ": This table was empty :(");
-    }
-  };
-
-  auto err = flo::Paging::map(flo::PhysicalAddress{0}, kaslrBase, physHigh, permissions,
-    [](auto ...vals) {
-      pline(std::forward<decltype(vals)>(vals)...);
-    }
-  );
-
-  printPaging(pageRootPhys, printPaging, 0);
-  if(err) {
-    pline("Error while mapping ", err->virt(), " to ", err->phys(), " at paging level ", Dec{err->level});
-    switch(err->type) {
-      case flo::Paging::MappingError::AlreadyMapped:
-        pline(spaces(2), "Already mapped, ", "PT: ", err->alreadyMapped.pageTableWithMapping, ", ind = ", Dec{err->alreadyMapped.mappingIndex});
-        break;
-      case flo::Paging::MappingError::NoAlignment:
-        pline(spaces(2), "Misaligned pointers!");
-        break;
-      default:
-        pline(spaces(2), "Unknown error!");
-        break;
-    }
-
-    flo::CPU::hang();
-  } else {
-    pline("Successfully mapped physical memory!");
+    err = flo::Paging::map(
+      flo::PhysicalAddress{0}, flo::VirtualAddress{0}, physHigh, permissions,
+      [](auto ...vals) { pline(std::forward<decltype(vals)>(vals)...); }
+    );
   }
+
+  printPaging(pageRootPhys);
+  flo::checkMappingError(err, [](auto ...vals) {
+    pline(std::forward<decltype(vals)>(vals)...);
+  }, flo::CPU::hang);
+
+  pline("Successfully mapped physical memory!");
+}
+
+namespace {
+  u8 diskReadCode;
+
+  void checkReadError() {
+    char const *errstr = flo::BIOS::int0x13err(diskReadCode);
+    if(errstr) {
+      pline("Disk read error: ", errstr);
+      flo::CPU::hang();
+    }
+  }
+
+  u8 *readDisk(u64 sector) {
+    dap.sectorToRead = sector;
+    asm volatile("call readDisk" :::  "eax", "ebx", "ecx", "edx", "si", "memory");
+    checkReadError();
+    return diskdata;
+  }
+
+  void doLoadLoader(u32 startingSector, u32 numPages) {
+    auto outAddr = flo::VirtualAddress{flo::Util::mega(512)};
+    loaderStack = outAddr;
+    pline("Kernel loader (", Decimal{numPages}, " page(s)) at ", outAddr());
+
+    // RWX, supervisor only
+    flo::Paging::Permissions perms;
+    perms.writeEnable = 1;
+    perms.allowUserAccess = 0;
+    perms.writethrough = 0;
+    perms.disableCache = 0;
+    perms.mapping.exectueDisable = 0;
+    u64 *physFreeWriteLoc = nullptr;
+
+    auto rewriteLoaderHeader =
+      [&, passedMagic = false, entryFound = false](u64 *mem) mutable {
+        u64 ind = 0;
+
+        if(std::exchange(passedMagic, true))
+          ind += 2;
+
+        while(ind != flo::IO::Disk::SectorSize/8 && !entryFound) {
+          switch(mem[ind]) {
+            break; case flo::Util::genMagic("FLORKLOD"):
+              // Calculate the virtual address this is loaded at
+              kernelLoaderEntry = outAddr + flo::VirtualAddress{(ind + 1) * 8};
+              pline("Kernel loader entry: ", kernelLoaderEntry);
+              entryFound = true;
+
+            break; case flo::Util::genMagic("PhysFree"):
+              physFreeWriteLoc = &mem[ind];
+
+            break; case flo::Util::genMagic("PhysBase"):
+              (flo::VirtualAddress &)mem[ind] = kaslrBase;
+
+            break; case flo::Util::genMagic("HighFree"):
+
+            break; case flo::Util::genMagic("DispWide"):
+              mem[ind] = pickedDisplay.width;
+
+            break; case flo::Util::genMagic("DispHigh"):
+              mem[ind] = pickedDisplay.height;
+
+            break; case flo::Util::genMagic("DispPitc"):
+              mem[ind] = pickedDisplay.pitch;
+
+            break; case flo::Util::genMagic("FrameBuf"):
+              mem[ind] = pickedDisplay.framebuffer;
+
+            break; case flo::Util::genMagic("DriveNum"):
+              mem[ind] = diskNum;
+
+            break; default: // Unknown magic
+              mem[ind] = flo::Util::genMagic("UNKNOMAG");
+          }
+          ++ind;
+        }
+      };
+
+    for(u32 i = 0; i < numPages; ++ i) {
+      auto ppage = flo::getPhysicalPage();
+
+      for(u32 offs = 0; offs < flo::Paging::PageSize<1>; offs += flo::IO::Disk::SectorSize) {
+        flo::Util::copymem(flo::getPhys<u8>(ppage) + offs, diskdata, flo::IO::Disk::SectorSize);
+
+        rewriteLoaderHeader((u64*)(ppage() + offs));
+
+        readDisk(++startingSector);
+      }
+
+      auto err = flo::Paging::map(ppage, outAddr, flo::Paging::PageSize<1>, perms);
+      flo::checkMappingError(err, [](auto ...vals) {
+        pline(std::forward<decltype(vals)>(vals)...);
+      }, flo::CPU::hang);
+
+      outAddr += flo::VirtualAddress{flo::Paging::PageSize<1>};
+    }
+
+    // We cannot use `getPhysicalPage()` after this point, that would invalidate the list given to the next stage.
+    if(physFreeWriteLoc) {
+      *physFreeWriteLoc = physicalFreeList();
+    } else {
+      pline("Physical base entry missing in kernel loader header!");
+    }
+
+    if(!kernelLoaderEntry) {
+      pline("Could not find kernel loader entry, stopping!");
+      flo::CPU::hang();
+    }
+
+    perms.writeEnable = 1;
+    perms.allowUserAccess = 0;
+    perms.writethrough = 0;
+    perms.disableCache = 0;
+    perms.mapping.exectueDisable = 1;
+
+    // Make a stack for the loader
+    auto err = flo::Paging::map(loaderStack - flo::VirtualAddress{0x20000}, 0x20000, perms);
+    flo::checkMappingError(err, [](auto ...vals) {
+      pline(std::forward<decltype(vals)>(vals)...);
+    }, flo::CPU::hang);
+    pline("Mapped stack for loader");
+  }
+}
+
+extern "C" void loadKernelLoader() {
+  pline("Loading kernel loader...");
+
+  u8 const magic[16] {
+    0x09, 0xF9, 0x11, 0x02, 0x9D, 0x74, 0xE3, 0x5B,
+    0xD8, 0x41, 0x56, 0xC5, 0x63, 0x56, 0x88, 0xC0,
+  };
+
+  for(u32 loaderSector = 0; loaderSector < 1000; ++loaderSector) {
+    readDisk(loaderSector);
+
+    if(flo::Util::memeq(magic, diskdata, sizeof(magic))) {
+      pline("Kernel loader found at sector ", Decimal{loaderSector});
+
+      u32 loaderPages = flo::Util::get<u32>(diskdata, sizeof(magic));
+      u64 loaderSize = loaderPages * flo::Paging::PageSize<1>;
+      pline("Kernel loader with size ", Decimal{loaderPages}, ", ", loaderSize);
+
+      doLoadLoader(loaderSector, loaderPages);
+      return;
+    }
+  }
+  pline("Kernel loader not found in first 1000 sectors of disk. Giving up.");
+  flo::CPU::hang();
+}
+
+extern "C" void prepare64() {
+
+  u32 cr4;
+  // Enable PAE
+  asm("mov %%cr4, %0" :  "=r"(cr4));
+  pline("CR4: ", cr4);
+  cr4 |= (1 << 5);
+  pline("CR4: ", cr4);
+  asm("mov %0, %%cr4" :: "Nd"(cr4));
+
+  u32 efer;
+  // Enable long mode and WX
+  asm("rdmsr" : "=a"(efer) : "c"(0xC0000080)); // Bit 8: LM, Bit 11: NX
+  pline("IA32_EFER: ", efer);
+  efer |= (1 << 8) | (1 << 11);
+  pline("IA32_EFER: ", efer);
+  asm("wrmsr" :            : "c"(0xC0000080), "a"(efer));
+
+  u32 cr0;
+  // Enable paging
+  asm("mov %%cr0, %0" :  "=r"(cr0));
+  pline("CR0: ", cr0);
+  cr0 |= (1 << 31);
+  pline("CR0: ", cr0);
+  //asm("mov %0, %%cr0" :: "Nd"(cr0));
+
+  asm("jmp .");
+
+  flo::CPU::hang();
+
+
+  /*
+    # Enable PAE
+  mov eax, cr4
+  or  eax, 1 << 5
+  mov cr4, eax
+
+  # Enable long mode and NX
+  mov ecx, 0xC0000080 # EFER MSR
+  rdmsr
+  or  eax, 1 << 8  # LM bit
+  or  eax, 1 << 11 # NX bit
+  wrmsr
+
+  # jmp .
+
+  # Enable paging
+  mov eax, cr0
+  or  eax, 1 << 31
+  mov cr0, eax
+  */
 }
 
 u8 *flo::getPtrPhys(flo::PhysicalAddress addr) {
@@ -638,6 +666,5 @@ u8 *flo::getPtrVirt<sizeof(uptr)>(flo::VirtualAddress addr) {
 */
 
 flo::PhysicalAddress flo::getPhysicalPage() {
-  pline("Providing physical page: ", getPhys<void *>(physicalFreeList));
   return std::exchange(physicalFreeList, *(flo::PhysicalAddress *)physicalFreeList());
 }

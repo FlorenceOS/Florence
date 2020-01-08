@@ -1,5 +1,16 @@
 .intel_syntax noprefix
 
+.section .BootstrapHeader
+.long 0xb16d1cc5
+.word 0x6969, 0x1337
+
+.extern BootstrapSectors
+.byte   BootstrapSectors
+.global desiredWidth
+        desiredWidth: .word 1440
+.global desiredHeight
+        desiredHeight: .word 900
+
 .section .BootstrapEntry
 .code16
 
@@ -51,6 +62,8 @@
 
 .global bootstrapStart
         bootstrapStart:
+  mov byte ptr[diskNum], dl
+
   # WOHOOO WE MADE IT
 
   # We just entered here in 16 bit mode
@@ -72,25 +85,6 @@
 .extern initializeDebug
   call  initializeDebug
 
-  # Detect that the CPU supports 64 long mode
-  mov eax, 0x80000000
-  cpuid
-  cmp eax, 0x80000001
-.extern noLong
-  jb    noLong
-
-  mov eax, 0x80000001
-  cpuid
-  test edx, 1 << 29
-.extern noLong
-  jz    noLong
-
-  # Detect that the CPU supports RDRAND
-  mov eax, 1
-  cpuid
-  test ecx, 1 << 30
-  jz rdrandError
-
   go32to16
 
   # First let's get a list of video modes.
@@ -107,16 +101,64 @@
   # Clear ebx for memory map
   mov dword ptr[biosBuf + 24], 0
 
-.extern setupMemory
+# .extern setupMemory
   call  setupMemory
 
-.extern doEarlyPaging
+# .extern doEarlyPaging
   call  doEarlyPaging
 
-  # TODO: Load a kernel loader, and jump to it in 64 bit mode
+# .extern loadKernelLoader
+  call  loadKernelLoader
 
-1:hlt
-  jmp 1b
+  # Enable PAE
+  mov eax, cr4
+  or  eax, 1 << 5
+  mov cr4, eax
+
+  # Enable long mode and NX
+  mov ecx, 0xC0000080 # EFER MSR
+  rdmsr
+  or  eax, 1 << 8  # LM bit
+  or  eax, 1 << 11 # NX bit
+  wrmsr
+
+  # jmp .
+
+  # Reload cr3
+  mov eax, cr3
+  mov cr3, eax
+
+  # Enable paging
+  mov eax, cr0
+  or  eax, 1 << 31
+  mov cr0, eax
+  # jmp .
+
+  # We have to grab these pointers before the switch to 64 bits. Thanks ELF.
+  lea ebx, [loaderStack]
+  lea ecx, [kernelLoaderEntry]
+
+  jmp 0x28:1f
+1:.code64
+  # Switch over to 64 bit segments
+  mov dx, 0x30
+  dataSelDx
+
+  # Set stack pointer
+  mov rsp, qword ptr[ebx]
+
+  # Enable SSE
+  mov rax, cr0
+  and ax, 0xFFFB
+  or ax, 0x2
+  mov cr0, rax
+  mov rax, cr4
+  or ax, 3 << 9
+  mov cr4, rax
+
+  # Tailcall kernel loader
+  mov rcx, qword ptr[ecx]
+  jmp rcx
 
 getVideoModeListError:
   .asciz "Could not get video mode list!"
@@ -172,10 +214,27 @@ afterGetMode:
 
 .global readDisk
         readDisk:
+  mov byte ptr[currentModeBuf],     0x10           # Size
+  mov byte ptr[currentModeBuf + 1], 0              # Reserved
+  mov word ptr[currentModeBuf + 2], 0x1            # Number of sectors to read
+  mov word ptr[currentModeBuf + 4], offset biosBuf # Destination offset
+  mov word ptr[currentModeBuf + 6], 0              # Destination segment
+
   go32to16
+  lea si, currentModeBuf
+  mov dl, byte ptr[diskNum]
+  mov ah, 0x42
+  int 0x13
 
   go16to32
   ret
+
+.global diskNum
+        diskNum:
+  .byte 0
+diskReadCode:
+  .byte 0
+.balign 8
 
 .code16
 vesaError:

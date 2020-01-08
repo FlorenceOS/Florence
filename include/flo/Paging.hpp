@@ -1,56 +1,18 @@
 #pragma once
 
 #include "Ints.hpp"
+#include "Florence.hpp"
 #include "flo/Util.hpp"
 #include "flo/Bitfields.hpp"
-#include "flo/StrongTypedef.hpp"
 
 #include <array>
 #include <cstring>
 #include <optional>
 
 namespace flo {
-  struct VirtualAddress;
-  struct PhysicalAddress;
-
-  extern u8 *getPtrVirt(VirtualAddress);
-  extern u8 *getPtrPhys(PhysicalAddress);
-  extern PhysicalAddress getPhysicalPage();
-
-  struct VirtualAddress: flo::StrongTypedef<VirtualAddress, u64> {
-    using flo::StrongTypedef<VirtualAddress, u64>::StrongTypedef;
-  };
-
-  struct PhysicalAddress: flo::StrongTypedef<PhysicalAddress, u64> {
-    using flo::StrongTypedef<PhysicalAddress, u64>::StrongTypedef;
-  };
-
-  template<typename T>
-  T *getPhys(PhysicalAddress addr) { return reinterpret_cast<T *>(getPtrPhys(addr)); }
-  template<typename T>
-  T *getVirt(VirtualAddress addr)  { return reinterpret_cast<T *>(getPtrVirt(addr)); }
-
-  /*
-  template<typename T>
-  struct VirtualPointer: flo::StrongTypedef<VirtualPointer, T *> {
-    using flo::StrongTypedef<VirtualPointer, T *>::StrongTypedef;
-
-    T *operator*() const {
-      return getPtrVirt(VirtualAddress{this->get<u64>()});
-    }
-  };
-
-  template<typename T>
-  struct PhysicalPointer: flo::StrongTypedef<PhysicalPointer, T *> {
-    using flo::StrongTypedef<PhysicalPointer, T *>::StrongTypedef;
-
-    T *operator*() const {
-      return getPtrPhys(PhysicalAddress{this->get<u64>()});
-    }
-  };
-  */
-
   namespace Paging {
+    constexpr inline bool noisy = false;
+
     // This is generally 4 but 5 is coming to the market...
     constexpr static u64 PageTableLevels = 4;
 
@@ -119,10 +81,10 @@ namespace flo {
       flo::Bitfield<2, 1> allowUserAccess;
       flo::Bitfield<3, 1> writethrough;
       flo::Bitfield<4, 1> disableCache;
-      flo::Bitfield<63, 1> exectueDisable;
 
       union {
         flo::Bitfield<8, 1> global;
+        flo::Bitfield<63, 1> exectueDisable;
       } mapping;
 
       u64 rep;
@@ -240,7 +202,6 @@ namespace flo {
         perms.allowUserAccess = 0;
         perms.writethrough = 0;
         perms.disableCache = 0;
-        perms.exectueDisable = 1;
 
         PageTableEntry<Level> pte;
         pte.rep = perms.rep;
@@ -276,9 +237,13 @@ namespace flo {
 
     template<int Level, typename Tracer>
     [[nodiscard]]
-    std::optional<MappingError> map(PhysicalAddress phys, VirtualAddress virt, u64 size, Permissions perms, PageTable<Level> &table, Tracer &&tracer) {
-      auto const ind = Impl::getIndex<Level>(virt);
+    std::optional<MappingError> map(PhysicalAddress phys, VirtualAddress virt, u64 &size, Permissions perms, PageTable<Level> &table, Tracer &&tracer) {
+      auto ind = Impl::getIndex<Level>(virt);
       auto &currPTE = table.table[ind];
+
+      auto trace = [&](auto ...vs) {
+        tracer("[", (u8)Level, "]@", &table, "[", (u16)ind, "]: ", std::forward<decltype(vs)>(vs)...);
+      };
 
       MappingError err{};
       err.phys = phys;
@@ -288,24 +253,24 @@ namespace flo {
          phys == alignPageDown<Level>(phys) &&
          virt == alignPageDown<Level>(virt)) {
         if(currPTE.present) {
+          trace("Present mapping at ", virt(), ": ", currPTE.rep, " maps to ", currPTE.physaddr()());
           err.type = MappingError::AlreadyMapped;
           err.alreadyMapped.pageTableWithMapping = &table;
           err.alreadyMapped.mappingIndex = ind;
           return err;
         }
         //This gets a little noisy
-        //trace("Mapping p", phys(), " to v", virt());
+        if constexpr(flo::Paging::noisy) {
+          trace("Mapping v", virt(), " to p", phys());
+        }
         currPTE = Impl::mapping<Level>(perms, phys);
+        size -= PageSize<Level>;
       } else {
         if constexpr(Level == 1) {
           // We can't map this as the pointers aren't aligned
           err.type = MappingError::NoAlignment;
           return err;
         } else {
-          auto trace = [&](auto ...vs) {
-            tracer("[", (u8)Level, "]@", &table, "[", (u16)ind, "]: ", std::forward<decltype(vs)>(vs)...);
-          };
-
           PageTable<Level - 1> *nextTable;
 
           // Split the unaligned pointers up to the next level
@@ -330,7 +295,7 @@ namespace flo {
             nextTable = new (getPhys<PageTable<Level - 1>>(pageTablePhys)) PageTable<Level - 1>();
 
             // Map this into the current table
-            trace("Next level table missing, mapping to ", nextTable);
+            //trace("Next level table missing, mapping to ", nextTable);
             auto pte = Impl::table<Level>();
             pte.setPhysaddr(pageTablePhys);
             currPTE = pte;
@@ -338,17 +303,17 @@ namespace flo {
           }
 
           constexpr auto step = PageSize<Level - 1>;
+
           while(size) {
-            auto err = map<Level - 1>(phys, virt, std::min(step, size), perms, *nextTable, tracer);
+            auto err = map<Level - 1>(phys, virt, size, perms, *nextTable, tracer);
             if(err)
               return err;
 
-            if(size < step)
+            if(ind++ == PageTableSize - 1)
               break;
 
             phys += static_cast<PhysicalAddress>(step);
             virt += static_cast<VirtualAddress>(step);
-            size -= step;
           }
         }
       }
@@ -358,15 +323,44 @@ namespace flo {
     template<typename Tracer>
     [[nodiscard]]
     auto map(PhysicalAddress phys, VirtualAddress virt, u64 size, Permissions perm, Tracer &&tracer) {
-      return map(phys, virt, size, perm, *getPagingRoot(), std::forward<Tracer>(tracer));
+      while(1) {
+        auto err = map(phys, virt, size, perm, *getPagingRoot(), tracer);
+        if(err)
+          return err;
+
+        // Advance to the next top level page
+        virt = alignPageUp<PageTableLevels>(virt + VirtualAddress {1ull});
+        phys = alignPageUp<PageTableLevels>(phys + PhysicalAddress{1ull});
+
+        if(!size)
+          return err;
+      }
     }
 
     [[nodiscard]]
     auto map(PhysicalAddress phys, VirtualAddress virt, u64 size, Permissions perm) {
       return map(phys, virt, size, perm, [](auto...) { });
     }
+
+    [[nodiscard]]
+    auto map(VirtualAddress virt, u64 size, Permissions perm) {
+      size = alignPageUp<1>(size);
+      while(1) {
+        auto psz = PageSize<1>;
+        auto err = map(getPhysicalPage(), virt, psz, perm);
+        if(err)
+          return err;
+
+        virt += VirtualAddress{PageSize<1>};
+        size -= PageSize<1>;
+
+        if(!size)
+          return err;
+      }
+    }
   }
 
+  [[nodiscard]]
   char const *error(Paging::MappingError err) {
     switch(err.type) {
       case flo::Paging::MappingError::AlreadyMapped:
@@ -375,6 +369,26 @@ namespace flo {
         return "Misaligned pointers";
       default:
         return "Unknown mapping error";
+    }
+  }
+
+  template<typename Out, typename ErrorFunc>
+  void checkMappingError(std::optional<Paging::MappingError> err, Out &&out, ErrorFunc &&errf) {
+    if(err) {
+      out("Error while mapping at paging level ", (u8)err->level);
+      switch(err->type) {
+        case flo::Paging::MappingError::AlreadyMapped:
+          std::forward<Out>(out)("  Already mapped, ", "PT: ", err->alreadyMapped.pageTableWithMapping, ", ind = ", (u16)err->alreadyMapped.mappingIndex);
+          break;
+        case flo::Paging::MappingError::NoAlignment:
+          std::forward<Out>(out)("  Misaligned pointers!");
+          break;
+        default:
+          std::forward<Out>(out)("  Unknown error!");
+          break;
+      }
+
+      std::forward<ErrorFunc>(errf)();
     }
   }
 }
