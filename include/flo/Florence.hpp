@@ -19,4 +19,9 @@ namespace flo {
   T *getPhys(PhysicalAddress addr) { return reinterpret_cast<T *>(getPtrPhys(addr)); }
   template<typename T>
   T *getVirt(VirtualAddress addr)  { return reinterpret_cast<T *>(getPtrVirt(addr)); }
+
+  template<typename T>
+  struct Decimal { T val; };
+  template<typename T>
+  Decimal(T) -> Decimal<T>;
 }

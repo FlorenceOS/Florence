@@ -7,11 +7,6 @@
 
 namespace flo {
   template<typename T>
-  struct Decimal { T val; };
-  template<typename T>
-  Decimal(T) -> Decimal<T>;
-
-  template<typename T>
   struct IsDecimal { static constexpr bool value = false; };
   template<typename T>
   struct IsDecimal<Decimal<T>> { static constexpr bool value = true; };

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Ints.hpp"
-#include "Florence.hpp"
+#include "flo/Florence.hpp"
 #include "flo/Util.hpp"
 #include "flo/Bitfields.hpp"
 
@@ -242,7 +242,7 @@ namespace flo {
       auto &currPTE = table.table[ind];
 
       auto trace = [&](auto ...vs) {
-        tracer("[", (u8)Level, "]@", &table, "[", (u16)ind, "]: ", std::forward<decltype(vs)>(vs)...);
+        tracer("[", Decimal{(u8)Level}, "]@", &table, "[", Decimal{(u16)ind}, "]: v", virt(), " w", size, " ", std::forward<decltype(vs)>(vs)...);
       };
 
       MappingError err{};
@@ -253,7 +253,7 @@ namespace flo {
          phys == alignPageDown<Level>(phys) &&
          virt == alignPageDown<Level>(virt)) {
         if(currPTE.present) {
-          trace("Present mapping at ", virt(), ": ", currPTE.rep, " maps to ", currPTE.physaddr()());
+          trace("Present mapping: ", currPTE.rep, " maps to ", currPTE.physaddr()());
           err.type = MappingError::AlreadyMapped;
           err.alreadyMapped.pageTableWithMapping = &table;
           err.alreadyMapped.mappingIndex = ind;
@@ -261,10 +261,13 @@ namespace flo {
         }
         //This gets a little noisy
         if constexpr(flo::Paging::noisy) {
-          trace("Mapping v", virt(), " to p", phys());
+          trace("Mapping to p", phys());
         }
         currPTE = Impl::mapping<Level>(perms, phys);
-        size -= PageSize<Level>;
+        if(size < PageSize<Level>)
+          size = 0;
+        else
+          size -= PageSize<Level>;
       } else {
         if constexpr(Level == 1) {
           // We can't map this as the pointers aren't aligned

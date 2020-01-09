@@ -4,7 +4,7 @@ OUTPUT_ARCH(i386:x86-64)
 SectorBytes = 0x200;
 
 SECTIONS {
-  . = 512M;
+  . = 1024M;
 
   .text :{
     KernelLoaderBegin = .;

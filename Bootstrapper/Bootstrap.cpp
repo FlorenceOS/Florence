@@ -24,9 +24,38 @@ extern "C" void doConstructors() {
 using flo::Decimal;
 using flo::spaces;
 
+// This data needs to be accessible from asm
+extern "C" {
+  flo::VirtualAddress kernelLoaderEntry;
+  flo::VirtualAddress loaderStack;
+}
+
+// Data provided by asm
+extern "C" u16 desiredWidth;
+extern "C" u16 desiredHeight;
+extern "C" u8 diskNum;
+extern "C" union { struct flo::BIOS::VesaInfo vesa; struct flo::BIOS::MemmapEntry mem; } biosBuf;
+extern "C" union { struct flo::BIOS::DAP dap; struct flo::BIOS::VideoMode vm; } currentModeBuf;
+extern "C" char BootstrapEnd;
+
+// Typed references to the data provided just above
+auto &vesa = biosBuf.vesa;
+auto &mem  = biosBuf.mem;
+auto diskdata = (u8 *)&biosBuf;
+auto &vidmode = currentModeBuf.vm;
+auto &dap = currentModeBuf.dap;
+auto const minMemory = flo::PhysicalAddress{(u64)&BootstrapEnd};
+
 namespace {
   constexpr bool quiet = false;
   constexpr bool disableKASLR = true;
+
+  // 3 -> aligned to 1GB, 2 -> aligned to 2MB, 1 -> aligned to 4KB etc
+  // Every level higher alignment means one factor of 512 less memory overhead
+  // but also 9 less bits of entropy.
+  // That means lower numbers are more secure but also take more memory.
+  constexpr auto kaslrAlignmentLevel = 3;
+
   bool vgaDisabled = false;
 
   struct MemoryRange {
@@ -59,29 +88,10 @@ namespace {
     u32 pitch;
     u16 mode; 
   } pickedDisplay;
-};
 
-// This data needs to be accessible from asm
-extern "C" {
-  flo::VirtualAddress kernelLoaderEntry;
-  flo::VirtualAddress loaderStack;
+  // Highest memory address spotted
+  auto physHigh = minMemory;
 }
-
-// Data provided by asm
-extern "C" u16 desiredWidth;
-extern "C" u16 desiredHeight;
-extern "C" u8 diskNum;
-extern "C" union { struct flo::BIOS::VesaInfo vesa; struct flo::BIOS::MemmapEntry mem; } biosBuf;
-extern "C" union { struct flo::BIOS::DAP dap; struct flo::BIOS::VideoMode vm; } currentModeBuf;
-extern "C" char BootstrapEnd;
-
-// Typed references to the data provided just above
-auto &vesa = biosBuf.vesa;
-auto &mem  = biosBuf.mem;
-auto diskdata = (u8 *)&biosBuf;
-auto &vidmode = currentModeBuf.vm;
-auto &dap = currentModeBuf.dap;
-auto const minMemory = flo::PhysicalAddress{(u64)&BootstrapEnd};
 
 // IO functions
 void flo::feedLine() {
@@ -115,6 +125,27 @@ void flo::setColor(flo::IO::Color col) {
 }
 
 namespace {
+  flo::VirtualAddress randomizeKASLRBase() {
+  redo:
+    // We're currently running in 32 bit so we have to generate 32 bits at a time
+    auto base = flo::VirtualAddress{((u64)flo::random32() << 32) | flo::random32()};
+
+    // Start at possible addresses at 8 GB, we don't wan't to map the lower 4 GB
+    if(base < flo::VirtualAddress{2ull << 32})
+      goto redo;
+
+    // Make sure we're in the lower half of virtual memory, we want space for any amount of physical memory.
+    // Half of the virtual address space better be enough.
+    base %= (flo::Paging::maxUaddr) >> 1ull;
+
+    base = flo::Paging::alignPageDown<kaslrAlignmentLevel>(base);
+
+    // Make the pointer canonical
+    base = flo::Paging::makeCanonical(base);
+
+    return base;
+  }
+
   bool shouldUse(flo::BIOS::MemmapEntry const &ent) {
     if(ent.type != flo::BIOS::MemmapEntry::RegionType::Usable)
       return false;
@@ -311,8 +342,6 @@ extern "C" [[noreturn]] void printVideoModeError() {
   flo::CPU::hang();
 }
 
-auto physHigh = minMemory;
-
 void consumeMemory(MemoryRange &range) {
   // Make sure we're not taking any memory we're loaded into, we can't
   // use them for our free list as we need to write to them.
@@ -348,7 +377,7 @@ void consumeMemory(MemoryRange &range) {
     processLater(std::move(upper));
   }
 
-  pline(" Consuming ", range.begin(), " to ", range.end(), " right now");
+  pline(flo::spaces(1), "Consuming ", range.begin(), " to ", range.end(), " right now");
 
   // Consume the memory, nom nom
   for(; range.begin < range.end; range.begin += flo::PhysicalAddress{flo::Paging::PageSize<1>})
@@ -359,8 +388,9 @@ extern "C" void setupMemory() {
   do {
     fetchMemoryRegion();
 
-    pline(shouldUse(mem) ? "U":"Not u", "sing memory of size ", mem.size(), " at ", mem.base());
-    if(shouldUse(mem)) {
+    bool use = shouldUse(mem);
+    pline(use ? "U":"Not u", "sing memory of size ", mem.size(), " at ", mem.base());
+    if(use) {
       MemoryRange mr;
       mr.begin = mem.base;
       mr.end = mem.base + mem.size;
@@ -369,39 +399,10 @@ extern "C" void setupMemory() {
   } while(mem.savedEbx);
 }
 
-namespace {
-  // 3 -> aligned to 1GB, 2 -> aligned to 2MB, 1 -> aligned to 4KB etc
-  // Every level higher alignment means one factor of 512 less memory overhead
-  // but also 9 less bits of entropy.
-  // That means lower numbers are more secure but also take more memory.
-  constexpr auto kaslrAlignmentLevel = 2;
-
-  flo::VirtualAddress randomizeKASLRBase() {
-  redo:
-    // We're currently running in 32 bit so we have to generate 32 bits at a time
-    auto base = flo::VirtualAddress{((u64)flo::random32() << 32) | flo::random32()};
-
-    // Start at possible addresses at 8 GB, we don't wan't to map the lower 4 GB
-    if(base < flo::VirtualAddress{2ull << 32})
-      goto redo;
-
-    // Make sure we're in the lower half of virtual memory, we want space for any amount of physical memory.
-    // Half of the virtual address space better be enough.
-    base %= (flo::Paging::maxUaddr) >> 1ull;
-
-    base = flo::Paging::alignPageDown<kaslrAlignmentLevel>(base);
-
-    // Make the pointer canonical
-    base = flo::Paging::makeCanonical(base);
-
-    return base;
-  }
-}
-
 extern "C" void doEarlyPaging() {
   // We will locate the physical memory at this point
   if constexpr(disableKASLR) {
-    kaslrBase = flo::VirtualAddress{1ull << 34};
+    kaslrBase = flo::VirtualAddress{flo::Util::giga(8ull)};
   } else {
     kaslrBase = randomizeKASLRBase();
   }
@@ -431,24 +432,28 @@ extern "C" void doEarlyPaging() {
   auto err =
     flo::Paging::map(
       flo::PhysicalAddress{0}, kaslrBase, physHigh, permissions,
-      [](auto ...vals) { pline(std::forward<decltype(vals)>(vals)...); }
+      [](auto &&...vals) { pline(std::forward<decltype(vals)>(vals)...); }
     );
-
-  if(!err) {
-    permissions.mapping.exectueDisable = 0;
-
-    err = flo::Paging::map(
-      flo::PhysicalAddress{0}, flo::VirtualAddress{0}, physHigh, permissions,
-      [](auto ...vals) { pline(std::forward<decltype(vals)>(vals)...); }
-    );
-  }
 
   printPaging(pageRootPhys);
-  flo::checkMappingError(err, [](auto ...vals) {
+  flo::checkMappingError(err, [](auto &&...vals) {
     pline(std::forward<decltype(vals)>(vals)...);
   }, flo::CPU::hang);
 
   pline("Successfully mapped physical memory!");
+
+
+  permissions.mapping.exectueDisable = 0;
+
+  // Identity map ourselves to be able to turn on paging
+  err = flo::Paging::map(
+    flo::PhysicalAddress{0}, flo::VirtualAddress{0}, 0x100000, permissions,
+    [](auto &&...vals) { pline(std::forward<decltype(vals)>(vals)...); }
+  );
+  flo::checkMappingError(err, [](auto &&...vals) {
+    pline(std::forward<decltype(vals)>(vals)...);
+  }, flo::CPU::hang);
+  pline("Identity mapped ourselves!");
 }
 
 namespace {
@@ -470,7 +475,7 @@ namespace {
   }
 
   void doLoadLoader(u32 startingSector, u32 numPages) {
-    auto outAddr = flo::VirtualAddress{flo::Util::mega(512)};
+    auto outAddr = flo::VirtualAddress{flo::Util::giga(1ull)};
     loaderStack = outAddr;
     pline("Kernel loader (", Decimal{numPages}, " page(s)) at ", outAddr());
 
@@ -490,12 +495,12 @@ namespace {
         if(std::exchange(passedMagic, true))
           ind += 2;
 
-        while(ind != flo::IO::Disk::SectorSize/8 && !entryFound) {
+        while(ind < flo::IO::Disk::SectorSize/8 && !entryFound) {
           switch(mem[ind]) {
             break; case flo::Util::genMagic("FLORKLOD"):
               // Calculate the virtual address this is loaded at
               kernelLoaderEntry = outAddr + flo::VirtualAddress{(ind + 1) * 8};
-              pline("Kernel loader entry: ", kernelLoaderEntry);
+              pline("Kernel loader entry: ", kernelLoaderEntry());
               entryFound = true;
 
             break; case flo::Util::genMagic("PhysFree"):
@@ -540,7 +545,7 @@ namespace {
       }
 
       auto err = flo::Paging::map(ppage, outAddr, flo::Paging::PageSize<1>, perms);
-      flo::checkMappingError(err, [](auto ...vals) {
+      flo::checkMappingError(err, [](auto &&...vals) {
         pline(std::forward<decltype(vals)>(vals)...);
       }, flo::CPU::hang);
 
@@ -566,8 +571,9 @@ namespace {
     perms.mapping.exectueDisable = 1;
 
     // Make a stack for the loader
-    auto err = flo::Paging::map(loaderStack - flo::VirtualAddress{0x20000}, 0x20000, perms);
-    flo::checkMappingError(err, [](auto ...vals) {
+    auto constexpr loaderStackSize = flo::Util::mega(2ull);
+    auto err = flo::Paging::map(loaderStack - flo::VirtualAddress{loaderStackSize}, loaderStackSize, perms);
+    flo::checkMappingError(err, [](auto &&...vals) {
       pline(std::forward<decltype(vals)>(vals)...);
     }, flo::CPU::hang);
     pline("Mapped stack for loader");
@@ -666,5 +672,9 @@ u8 *flo::getPtrVirt<sizeof(uptr)>(flo::VirtualAddress addr) {
 */
 
 flo::PhysicalAddress flo::getPhysicalPage() {
+  if(!physicalFreeList()) {
+    pline("Ran out of physical pages!!!");
+    flo::CPU::hang();
+  }
   return std::exchange(physicalFreeList, *(flo::PhysicalAddress *)physicalFreeList());
 }
