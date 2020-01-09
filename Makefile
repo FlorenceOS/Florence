@@ -5,7 +5,7 @@ QEMUExec := qemu-system-x86_64
 endif
 
 ifndef QEMUFlags
-QEMUFlags := -m 8G -serial stdio
+QEMUFlags := -m 128M -serial stdio
 endif
 
 QEMU := $(QEMUExec) $(QEMUFlags)
