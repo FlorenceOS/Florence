@@ -5,11 +5,11 @@ install:
 - sh: sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 900 --slave /usr/bin/g++ g++ /usr/bin/g++-9
 - sh: make
 - sh: zip Florence.zip -r include
-- sh: QEMUFlags=-nographic timeout 5 make go || true
 
 test_script:
 - sh: make autotest
 - ps: (new-object net.webclient).UploadFile("https://ci.appveyor.com/api/testresults/junit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path .\tests.xml))
+- sh: QEMUFlags=-nographic timeout 5 make go || true
 
 artifacts:
 - path: Florence.zip
