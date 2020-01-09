@@ -5,7 +5,7 @@ install:
 - sh: sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 900 --slave /usr/bin/g++ g++ /usr/bin/g++-9
 - sh: make
 - sh: zip Florence.zip -r include
-- sh: timeout 5 QEMUFlags=-nographic make go || true
+- sh: QEMUFlags=-nographic timeout 5 make go || true
 
 test_script:
 - sh: make autotest
