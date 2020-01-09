@@ -5,14 +5,11 @@ QEMUExec := qemu-system-x86_64
 endif
 
 ifndef QEMUFlags
-QEMUFlags := -m 128M -serial stdio
+QEMUFlags := -serial stdio
 endif
 
-QEMU := $(QEMUExec) $(QEMUFlags)
-
-ifndef KVM
+QEMU := $(QEMUExec) $(QEMUFlags) -m 128M
 KVM := $(QEMU) -enable-kvm -cpu host
-endif
 
 CXXFlags := $(CXXFlags) -ffreestanding -g -Wall -fno-stack-protector\
 	-mno-red-zone -fno-exceptions -fno-rtti -Wno-sign-compare\
