@@ -51,10 +51,7 @@
         _start:
 .extern doConstructors
   call  doConstructors
-
-.extern aquireStack
-  call  aquireStack
-
+  
 .extern unmapLowMemory
   call  unmapLowMemory
 

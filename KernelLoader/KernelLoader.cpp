@@ -33,12 +33,8 @@ namespace {
   auto pline = flo::makePline("[FLORKLOAD] ");
 }
 
-extern "C" void aquireStack() {
-  
-}
-
 extern "C" void unmapLowMemory() {
-  
+
 }
 
 extern "C" void consumeHighPhysicalMemory() {
