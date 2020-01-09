@@ -4,7 +4,6 @@
 .long 0xb16d1cc5
 .word 0x6969, 0x1337
 
-.extern BootstrapSectors
 .byte   BootstrapSectors
 .global desiredWidth
         desiredWidth: .word 1440
@@ -79,10 +78,7 @@
 
   go16to32
 
-.extern doConstructors
   call  doConstructors
-
-.extern initializeDebug
   call  initializeDebug
 
   go32to16
@@ -95,20 +91,15 @@
 
   go16to32
 
-.extern setupVideo
-  call  setupVideo
+  call setupVideo
 
   # Clear ebx for memory map
   mov dword ptr[biosBuf + 24], 0
 
-# .extern setupMemory
-  call  setupMemory
-
-# .extern doEarlyPaging
-  call  doEarlyPaging
-
-# .extern loadKernelLoader
-  call  loadKernelLoader
+  call setupMemory
+  call doEarlyPaging
+  call loadKernelLoader
+  call doDestructors
 
   # Enable PAE
   mov eax, cr4
@@ -122,8 +113,6 @@
   or  eax, 1 << 11 # NX bit
   wrmsr
 
-  # jmp .
-
   # Reload cr3
   mov eax, cr3
   mov cr3, eax
@@ -132,7 +121,6 @@
   mov eax, cr0
   or  eax, 1 << 31
   mov cr0, eax
-  # jmp .
 
   # We have to grab these pointers before the switch to 64 bits. Thanks ELF.
   lea ebx, [loaderStack]
@@ -239,8 +227,7 @@ diskReadCode:
 .code16
 vesaError:
   go16to32
-.extern printVideoModeError
-  jmp   printVideoModeError
+  jmp printVideoModeError
 
 .balign 8
 .global biosBuf

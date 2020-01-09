@@ -4,6 +4,7 @@
 #include "flo/Florence.hpp"
 #include "flo/Util.hpp"
 #include "flo/Bitfields.hpp"
+#include "flo/CPU.hpp"
 
 #include <array>
 #include <cstring>
@@ -178,9 +179,7 @@ namespace flo {
     static_assert(sizeof(PageTable<5>) == PageSize<1>);
 
     auto *getPagingRoot() {
-      uptr retval;
-      asm("mov %%cr3, %0" : "=r"(retval));
-      return getPhys<PageTable<PageTableLevels>>(PhysicalAddress{retval});
+      return getPhys<PageTable<PageTableLevels>>(flo::PhysicalAddress{flo::CPU::cr3});
     }
 
     namespace Impl {

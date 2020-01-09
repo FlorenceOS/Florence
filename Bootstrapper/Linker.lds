@@ -22,14 +22,12 @@ SECTIONS {
 
     . = ALIGN(SectionAlign);
 
-    /* Don't do these
     destructorsStart = .;
     KEEP(*( .fini_array ));
     KEEP(*(SORT_BY_INIT_PRIORITY( .fini_array.* )));
     destructorsEnd = .;
 
     . = ALIGN(SectionAlign);
-    */
 
     *(.data*)
     . = ALIGN(SectionAlign);

@@ -21,6 +21,17 @@ extern "C" void doConstructors() {
   });
 }
 
+using Destructor = void(*)();
+
+extern "C" Constructor destructorsStart;
+extern "C" Constructor destructorsEnd;
+
+extern "C" void doDestructors() {
+  std::for_each(&constructorsStart, &constructorsEnd, [](Constructor c){
+    (*c)();
+  });
+}
+
 using flo::Decimal;
 using flo::spaces;
 
@@ -180,7 +191,7 @@ namespace {
       }
       else {
         pline("Enabling 5 level paging...");
-        flo::CPU::cr4 = flo::CPU::cr4 | (1 << 12);
+        flo::CPU::cr4 |= (1 << 12);
       }
     }
   }
@@ -415,7 +426,7 @@ extern "C" void doEarlyPaging() {
   auto &pageRootPhys = *new ((PageRoot*) flo::getPhysicalPage()()) PageRoot();
 
   // Set the paging root
-  asm("mov %0, %%cr3" :: "Nd"(&pageRootPhys));
+  flo::CPU::cr3 = (uptr)&pageRootPhys;
   pline("New paging root: ", &pageRootPhys, ", ", flo::Paging::getPagingRoot());
 
   // Align the physical memory size
