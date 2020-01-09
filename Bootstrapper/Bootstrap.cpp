@@ -606,59 +606,6 @@ extern "C" void loadKernelLoader() {
   flo::CPU::hang();
 }
 
-extern "C" void prepare64() {
-
-  u32 cr4;
-  // Enable PAE
-  asm("mov %%cr4, %0" :  "=r"(cr4));
-  pline("CR4: ", cr4);
-  cr4 |= (1 << 5);
-  pline("CR4: ", cr4);
-  asm("mov %0, %%cr4" :: "Nd"(cr4));
-
-  u32 efer;
-  // Enable long mode and WX
-  asm("rdmsr" : "=a"(efer) : "c"(0xC0000080)); // Bit 8: LM, Bit 11: NX
-  pline("IA32_EFER: ", efer);
-  efer |= (1 << 8) | (1 << 11);
-  pline("IA32_EFER: ", efer);
-  asm("wrmsr" :            : "c"(0xC0000080), "a"(efer));
-
-  u32 cr0;
-  // Enable paging
-  asm("mov %%cr0, %0" :  "=r"(cr0));
-  pline("CR0: ", cr0);
-  cr0 |= (1 << 31);
-  pline("CR0: ", cr0);
-  //asm("mov %0, %%cr0" :: "Nd"(cr0));
-
-  asm("jmp .");
-
-  flo::CPU::hang();
-
-
-  /*
-    # Enable PAE
-  mov eax, cr4
-  or  eax, 1 << 5
-  mov cr4, eax
-
-  # Enable long mode and NX
-  mov ecx, 0xC0000080 # EFER MSR
-  rdmsr
-  or  eax, 1 << 8  # LM bit
-  or  eax, 1 << 11 # NX bit
-  wrmsr
-
-  # jmp .
-
-  # Enable paging
-  mov eax, cr0
-  or  eax, 1 << 31
-  mov cr0, eax
-  */
-}
-
 u8 *flo::getPtrPhys(flo::PhysicalAddress addr) {
   return (u8 *)addr();
 }
