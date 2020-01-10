@@ -24,8 +24,8 @@ namespace flo {
     constexpr bool operator> (StrongTypedef const &other) const { return val >  other(); }
     constexpr bool operator<=(StrongTypedef const &other) const { return val <= other(); }
     constexpr bool operator>=(StrongTypedef const &other) const { return val >= other(); }
-    constexpr bool operator!=(std::nullptr_t) const { return static_cast<bool>(*this); }
-    constexpr bool operator==(std::nullptr_t) const { return !(*this != nullptr); }
+    //constexpr bool operator!=(std::nullptr_t) const { return static_cast<bool>(*this); }
+    //constexpr bool operator==(std::nullptr_t) const { return !(*this != nullptr); }
 
     // Arithmetics
     constexpr auto operator<<(ValueT const &other) const { return Tag{StrongTypedef{val << other}}; }

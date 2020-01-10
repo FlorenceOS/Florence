@@ -51,6 +51,9 @@
         _start:
 .extern doConstructors
   call  doConstructors
+
+.extern assertAssumptions
+  call  assertAssumptions
   
 .extern unmapLowMemory
   call  unmapLowMemory

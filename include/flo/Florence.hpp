@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Ints.hpp"
+
 #include "flo/StrongTypedef.hpp"
 
 namespace flo {
@@ -14,6 +16,7 @@ namespace flo {
   extern u8 *getPtrVirt(VirtualAddress);
   extern u8 *getPtrPhys(PhysicalAddress);
   extern PhysicalAddress getPhysicalPage();
+  extern void returnPhysicalPage(PhysicalAddress, int pageLevel);
 
   template<typename T>
   T *getPhys(PhysicalAddress addr) { return reinterpret_cast<T *>(getPtrPhys(addr)); }
@@ -24,4 +27,7 @@ namespace flo {
   struct Decimal { T val; };
   template<typename T>
   Decimal(T) -> Decimal<T>;
+
+  struct Spaces { int numSpaces; };
+  auto spaces(int numSpaces) { return Spaces{numSpaces}; }
 }

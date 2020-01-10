@@ -206,9 +206,6 @@ namespace flo {
     inline Impl::Serial<4> serial4;
   }
 
-  struct Spaces { int numSpaces; };
-  auto spaces(int numSpaces) { return Spaces{numSpaces}; }
-
   template<typename T>
   struct IsSpaces { static constexpr bool value = false; };
   template<>

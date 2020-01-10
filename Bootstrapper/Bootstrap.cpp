@@ -65,7 +65,7 @@ namespace {
   // Every level higher alignment means one factor of 512 less memory overhead
   // but also 9 less bits of entropy.
   // That means lower numbers are more secure but also take more memory.
-  constexpr auto kaslrAlignmentLevel = 3;
+  constexpr auto kaslrAlignmentLevel = 2;
 
   bool vgaDisabled = false;
 
@@ -142,7 +142,7 @@ namespace {
     auto base = flo::VirtualAddress{((u64)flo::random32() << 32) | flo::random32()};
 
     // Start at possible addresses at 8 GB, we don't wan't to map the lower 4 GB
-    if(base < flo::VirtualAddress{2ull << 32})
+    if(base < flo::VirtualAddress{flo::Util::giga(8ull)})
       goto redo;
 
     // Make sure we're in the lower half of virtual memory, we want space for any amount of physical memory.
@@ -229,37 +229,6 @@ namespace {
     check5Level();
     checkRDRAND();
   }
-
-  template<typename PT>
-  void printPaging(PT &pt, u64 virtaddr = 0, u8 indent = 0) {
-    bool visitedAny = false;
-    for(int i = 0; i < flo::Paging::PageTableSize; ++ i) {
-      auto &ent = pt.table[i];
-      [[maybe_unused]]
-      auto nextVirt = flo::Paging::makeCanonical(virtaddr | ((u64)i << flo::Paging::pageOffsetBits<ent.lvl>));
-      if(!ent.present)
-        continue;
-
-      visitedAny = true;
-      
-      if constexpr(flo::Paging::noisy)
-        pline(spaces(indent), "Entry ", Decimal{i}, " at ", (u32)&ent," (", nextVirt, ", ", ent.rep, ") mapping to ", ent.isMapping() ? "physical addr " : "page table at physical ", ent.physaddr()());
-      if(!ent.isMapping()) {
-        if constexpr(ent.lvl < 2) {
-          pline(spaces(indent + 1), "Present level 1 mapping without mapping bit set!!");
-          continue;
-        }
-        else {
-          pline(spaces(indent), "Entry ", Decimal{i}, " at ", (u32)&ent," (", nextVirt, ", ", ent.rep, ") mapping to page table at physical ", ent.physaddr()());
-          auto ptr = flo::getPhys<flo::Paging::PageTable<ent.lvl - 1>>(ent.physaddr());
-          printPaging(*ptr, nextVirt, indent + 1);
-        }
-      }
-    }
-    if(!visitedAny) {
-      pline(spaces(indent), (uptr) &pt, ": This table was empty :(");
-    }
-  };
 
   // Sets `vidmode`
   void fetchMode(i16 mode) {
@@ -440,16 +409,10 @@ extern "C" void doEarlyPaging() {
   permissions.mapping.global = 0;
   permissions.mapping.exectueDisable = 1;
 
-  auto err =
-    flo::Paging::map(
-      flo::PhysicalAddress{0}, kaslrBase, physHigh, permissions,
-      [](auto &&...vals) { pline(std::forward<decltype(vals)>(vals)...); }
-    );
+  auto err = flo::Paging::map(flo::PhysicalAddress{0}, kaslrBase, physHigh, permissions, pline);
 
-  printPaging(pageRootPhys);
-  flo::checkMappingError(err, [](auto &&...vals) {
-    pline(std::forward<decltype(vals)>(vals)...);
-  }, flo::CPU::hang);
+  flo::printPaging(pageRootPhys, pline);
+  flo::checkMappingError(err, pline, flo::CPU::hang);
 
   pline("Successfully mapped physical memory!");
 
@@ -457,13 +420,8 @@ extern "C" void doEarlyPaging() {
   permissions.mapping.exectueDisable = 0;
 
   // Identity map ourselves to be able to turn on paging
-  err = flo::Paging::map(
-    flo::PhysicalAddress{0}, flo::VirtualAddress{0}, 0x100000, permissions,
-    [](auto &&...vals) { pline(std::forward<decltype(vals)>(vals)...); }
-  );
-  flo::checkMappingError(err, [](auto &&...vals) {
-    pline(std::forward<decltype(vals)>(vals)...);
-  }, flo::CPU::hang);
+  err = flo::Paging::map(flo::PhysicalAddress{0}, flo::VirtualAddress{0}, flo::Util::kilo(64), permissions, pline);
+  flo::checkMappingError(err, pline, flo::CPU::hang);
   pline("Identity mapped ourselves!");
 }
 
@@ -556,9 +514,7 @@ namespace {
       }
 
       auto err = flo::Paging::map(ppage, outAddr, flo::Paging::PageSize<1>, perms);
-      flo::checkMappingError(err, [](auto &&...vals) {
-        pline(std::forward<decltype(vals)>(vals)...);
-      }, flo::CPU::hang);
+      flo::checkMappingError(err, pline, flo::CPU::hang);
 
       outAddr += flo::VirtualAddress{flo::Paging::PageSize<1>};
     }
@@ -582,11 +538,9 @@ namespace {
     perms.mapping.exectueDisable = 1;
 
     // Make a stack for the loader
-    auto constexpr loaderStackSize = flo::Util::mega(2ull);
+    auto constexpr loaderStackSize = flo::Util::kilo(64);
     auto err = flo::Paging::map(loaderStack - flo::VirtualAddress{loaderStackSize}, loaderStackSize, perms);
-    flo::checkMappingError(err, [](auto &&...vals) {
-      pline(std::forward<decltype(vals)>(vals)...);
-    }, flo::CPU::hang);
+    flo::checkMappingError(err, pline, flo::CPU::hang);
     pline("Mapped stack for loader");
   }
 }

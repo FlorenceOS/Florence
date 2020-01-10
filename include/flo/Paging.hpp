@@ -241,7 +241,7 @@ namespace flo {
       auto &currPTE = table.table[ind];
 
       auto trace = [&](auto ...vs) {
-        tracer("[", Decimal{(u8)Level}, "]@", &table, "[", Decimal{(u16)ind}, "]: v", virt(), " w", size, " ", std::forward<decltype(vs)>(vs)...);
+        tracer("[", Decimal{(u8)Level}, "]@", &table, "[", Decimal{(u16)ind}, "]: v", virt(), " sz=", size, " ", std::forward<decltype(vs)>(vs)...);
       };
 
       MappingError err{};
@@ -360,17 +360,62 @@ namespace flo {
           return err;
       }
     }
-  }
 
-  [[nodiscard]]
-  char const *error(Paging::MappingError err) {
-    switch(err.type) {
-      case flo::Paging::MappingError::AlreadyMapped:
-        return "Memory already mapped";
-      case flo::Paging::MappingError::NoAlignment:
-        return "Misaligned pointers";
-      default:
-        return "Unknown mapping error";
+    template<bool reclaimPages, int Level>
+    bool unmap(VirtualAddress &virt, u64 &size, PageTable<Level> &table) {
+      auto advance = [&]() {
+        constexpr auto stepSize = PageSize<Level>;
+        if(size < stepSize) {
+          virt += VirtualAddress{size};
+          size = 0;
+          return true;
+        } else {
+          virt += VirtualAddress{stepSize};
+          size -= stepSize;
+          return false;
+        }
+      };
+
+      auto it = std::begin(table.table);
+      for(; it != std::end(table.table); ++ it) {
+        auto &currPTE = *it;
+        if(currPTE.present) {
+          if(currPTE.isMapping()) {
+            if constexpr(reclaimPages)
+              returnPhysicalPage(currPTE.physaddr(), currPTE.lvl);
+          } else {
+            if constexpr (Level != 1) {
+              auto tempsz = size;
+              // Is table, recurse
+              auto fullyUnmapped = unmap<reclaimPages>(virt, tempsz, *getPhys<PageTable<Level - 1>>(currPTE.physaddr()));
+
+              // Then unmap current level if no children are left
+              if(fullyUnmapped) {
+                returnPhysicalPage(currPTE.physaddr(), 1);
+                currPTE.present = 0;
+              }
+            }
+          }
+        }
+        if(advance())
+          break;
+      }
+
+      for(; it != std::end(table.table); ++ it)
+        if(it->present)
+          return false;
+      return true;
+    }
+
+    // Don't reclaim the pages if they're not supposed to get reused :^)
+    template<bool reclaimPages>
+    void unmap(VirtualAddress virt, u64 size) {
+      while(1) {
+        unmap<reclaimPages>(virt, size, *getPagingRoot());
+
+        if(!size)
+          return;
+      }
     }
   }
 
@@ -393,4 +438,34 @@ namespace flo {
       std::forward<ErrorFunc>(errf)();
     }
   }
+
+  template<typename PT, typename Tracer>
+  void printPaging(PT &pt, Tracer &&tracer, u64 virtaddr = 0, u8 indent = 0) {
+    bool visitedAny = false;
+    for(int i = 0; i < flo::Paging::PageTableSize; ++ i) {
+      auto &ent = pt.table[i];
+      [[maybe_unused]]
+      auto nextVirt = flo::Paging::makeCanonical(virtaddr | ((u64)i << flo::Paging::pageOffsetBits<ent.lvl>));
+      if(!ent.present)
+        continue;
+
+      visitedAny = true;
+      
+      if constexpr(flo::Paging::noisy)
+        tracer(spaces(indent), "Entry ", Decimal{i}, " at ", &ent," (v", nextVirt, ", r", ent.rep, ") mapping to ", ent.isMapping() ? "p" : "page table at p", ent.physaddr()());
+      if(!ent.isMapping()) {
+        if constexpr(ent.lvl < 2) {
+          tracer(spaces(indent + 1), "Present level 1 mapping without mapping bit set!!");
+          continue;
+        }
+        else {
+          auto ptr = flo::getPhys<flo::Paging::PageTable<ent.lvl - 1>>(ent.physaddr());
+          printPaging(*ptr, tracer, nextVirt, indent + 1);
+        }
+      }
+    }
+    if(!visitedAny) {
+      tracer(spaces(indent), (uptr) &pt, ": This table was empty :(");
+    }
+  };
 }
