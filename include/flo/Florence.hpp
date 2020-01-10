@@ -15,7 +15,7 @@ namespace flo {
 
   extern u8 *getPtrVirt(VirtualAddress);
   extern u8 *getPtrPhys(PhysicalAddress);
-  extern PhysicalAddress getPhysicalPage();
+  extern PhysicalAddress getPhysicalPage(int pageLevel);
   extern void returnPhysicalPage(PhysicalAddress, int pageLevel);
 
   template<typename T>

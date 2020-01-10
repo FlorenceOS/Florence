@@ -19,7 +19,11 @@ extern "C" void doConstructors() {
 }
 
 extern "C" u64 unknownField;
-extern "C" flo::PhysicalAddress physFreeHead;
+extern "C" flo::PhysicalAddress physFreeHead1;
+extern "C" flo::PhysicalAddress physFreeHead2;
+extern "C" flo::PhysicalAddress physFreeHead3;
+extern "C" flo::PhysicalAddress physFreeHead4;
+extern "C" flo::PhysicalAddress physFreeHead5;
 extern "C" flo::VirtualAddress physBase;
 extern "C" u64 physMemRanges;
 extern "C" u64 displayWidth;
@@ -50,24 +54,13 @@ namespace flo {
   }
 
   void returnPhysicalPage(flo::PhysicalAddress phys, int pageLevel) {
-    u64 sz;
     switch(pageLevel) {
-      case 1:
-        // Ah yes we know how to handle this, just push it onto the freelist
-        *getPhys<PhysicalAddress>(phys) = std::exchange(physFreeHead, phys);
-        return;
-      case 2: sz = flo::Paging::PageSize<2>; break;
-      case 3: sz = flo::Paging::PageSize<3>; break;
-      case 4: sz = flo::Paging::PageSize<4>; break;
-      case 5: sz = flo::Paging::PageSize<5>; break;
+      case 1: *getPhys<PhysicalAddress>(phys) = std::exchange(physFreeHead1, phys); return;
+      case 2: *getPhys<PhysicalAddress>(phys) = std::exchange(physFreeHead2, phys); return;
+      case 3: *getPhys<PhysicalAddress>(phys) = std::exchange(physFreeHead3, phys); return;
+      case 4: *getPhys<PhysicalAddress>(phys) = std::exchange(physFreeHead4, phys); return;
+      case 5: *getPhys<PhysicalAddress>(phys) = std::exchange(physFreeHead5, phys); return;
       default: pline("Unkown paging level: ", Decimal{pageLevel}); flo::CPU::hang();
-    }
-
-    pline("TODO: Handle return of physical page ", phys(), " of size ", sz, ", just splitting for now.");
-    while(sz) {
-      returnPhysicalPage(phys, 1);
-      phys += PhysicalAddress{flo::Paging::PageSize<1>};
-      sz -= flo::Paging::PageSize<1>;
     }
   }
 }
@@ -81,7 +74,11 @@ extern "C" void assertAssumptions() {
       }
     };
 
-  check(physFreeHead);
+  check(physFreeHead1);
+  check(physFreeHead2);
+  check(physFreeHead3);
+  check(physFreeHead4);
+  check(physFreeHead5);
   check(physMemRanges);
   check(displayWidth);
   check(displayHeight);

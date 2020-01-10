@@ -35,6 +35,14 @@ namespace flo {
     static_assert(PageSize<1> == 0x1000);
     static_assert(PageSize<1> == 4096);
 
+    inline constexpr u64 pageSizes[] {
+      PageSize<1>,
+      PageSize<2>,
+      PageSize<3>,
+      PageSize<4>,
+      PageSize<5>,
+    };
+
     template<int Level = 1, typename T>
     auto constexpr alignPageDown(T value) {
       return value & T{~(PageSize<Level> - 1)};
@@ -293,7 +301,7 @@ namespace flo {
           }
           else {
             // Make a new page table, none is present
-            auto pageTablePhys = getPhysicalPage();
+            auto pageTablePhys = getPhysicalPage(1);
             nextTable = new (getPhys<PageTable<Level - 1>>(pageTablePhys)) PageTable<Level - 1>();
 
             // Map this into the current table
@@ -344,22 +352,33 @@ namespace flo {
       return map(phys, virt, size, perm, [](auto...) { });
     }
 
+#define mapMacro(lvl)\
+  {auto constexpr pageSz = PageSize<lvl>; \
+  if(size >= pageSz && virt % VirtualAddress{pageSz} == VirtualAddress{0}){ /* Large enough and aligned */\
+    PhysicalAddress page = getPhysicalPage(lvl);\
+    if(page) {\
+      auto err = map(page, virt, pageSz, perm);\
+      if(err) return err;\
+      virt += VirtualAddress{pageSz};\
+      size -= pageSz;\
+      continue;\
+    }\
+  }}
+
     [[nodiscard]]
-    auto map(VirtualAddress virt, u64 size, Permissions perm) {
-      size = alignPageUp<1>(size);
-      while(1) {
-        auto psz = PageSize<1>;
-        auto err = map(getPhysicalPage(), virt, psz, perm);
-        if(err)
-          return err;
-
-        virt += VirtualAddress{PageSize<1>};
-        size -= PageSize<1>;
-
-        if(!size)
-          return err;
+    std::optional<MappingError> map(VirtualAddress virt, u64 size, Permissions perm) {
+      // Size is aligned up to the next page size
+      for(size = alignPageUp<1>(size); size;) {
+        // At the time of writing this, you can't map anything above a level 3 page / 1GB :^(
+        mapMacro(3);
+        mapMacro(2);
+        mapMacro(1);
+        // This should be unreachable as running out of 1 level pages is a fatal error
       }
+
+      return std::nullopt;
     }
+#undef mapMacro
 
     template<bool reclaimPages, int Level>
     bool unmap(VirtualAddress &virt, u64 &size, PageTable<Level> &table) {
@@ -468,4 +487,29 @@ namespace flo {
       tracer(spaces(indent), (uptr) &pt, ": This table was empty :(");
     }
   };
+}
+
+namespace flo {
+#define consumeMacro(lvl) \
+  {auto constexpr pageSz = flo::Paging::PageSize<lvl>;\
+  if(size >= pageSz && addr % PhysicalAddress{pageSz} == PhysicalAddress{0}) { /* Is large enough, is page aligned */ \
+    addr += PhysicalAddress{pageSz};\
+    size -= pageSz;\
+    returnPhysicalPage(addr, lvl);\
+    continue;\
+  }}
+
+  void consumePhysicalMemory(PhysicalAddress addr, u64 size) {
+    while(1) {
+      consumeMacro(5);
+      consumeMacro(4);
+      consumeMacro(3);
+      consumeMacro(2);
+      consumeMacro(1);
+
+      // Not large enough for any page, finish
+      break;
+    }
+  }
+#undef consumeMacro
 }

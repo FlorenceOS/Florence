@@ -13,9 +13,25 @@
         unknownField:
 .8byte 0x0
 
-.global physFreeHead
-        physFreeHead:
-.ascii "PhysFree"
+.global physFreeHead1
+        physFreeHead1:
+.ascii "PhysFre1"
+
+.global physFreeHead2
+        physFreeHead2:
+.ascii "PhysFre2"
+
+.global physFreeHead3
+        physFreeHead3:
+.ascii "PhysFre3"
+
+.global physFreeHead4
+        physFreeHead4:
+.ascii "PhysFre4"
+
+.global physFreeHead5
+        physFreeHead5:
+.ascii "PhysFre5"
 
 .global physBase
         physBase:

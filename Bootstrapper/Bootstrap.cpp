@@ -78,8 +78,12 @@ namespace {
   // consume these to after we've enabled paging.
   flo::StaticVector<MemoryRange, 0x10> highMemRanges;
 
-  // Head of physical page freelist
-  flo::PhysicalAddress physicalFreeList = flo::PhysicalAddress{0};
+  // Head of physical page freelist, one for each page size
+  flo::PhysicalAddress physicalFreeList1 = flo::PhysicalAddress{0};
+  flo::PhysicalAddress physicalFreeList2 = flo::PhysicalAddress{0};
+  flo::PhysicalAddress physicalFreeList3 = flo::PhysicalAddress{0};
+  flo::PhysicalAddress physicalFreeList4 = flo::PhysicalAddress{0};
+  flo::PhysicalAddress physicalFreeList5 = flo::PhysicalAddress{0};
 
   // Base virtual address of physical memory
   flo::VirtualAddress physicalVirtBase;
@@ -360,8 +364,7 @@ void consumeMemory(MemoryRange &range) {
   pline(flo::spaces(1), "Consuming ", range.begin(), " to ", range.end(), " right now");
 
   // Consume the memory, nom nom
-  for(; range.begin < range.end; range.begin += flo::PhysicalAddress{flo::Paging::PageSize<1>})
-    *(u64*)range.begin() = std::exchange(physicalFreeList, range.begin);
+  flo::consumePhysicalMemory(range.begin, range.end() - range.begin());
 }
 
 extern "C" void setupMemory() {
@@ -392,7 +395,7 @@ extern "C" void doEarlyPaging() {
   using PageRoot = flo::Paging::PageTable<flo::Paging::PageTableLevels>;
 
   // Prepare the paging root
-  auto &pageRootPhys = *new ((PageRoot*) flo::getPhysicalPage()()) PageRoot();
+  auto &pageRootPhys = *new ((PageRoot*) flo::getPhysicalPage(1)()) PageRoot();
 
   // Set the paging root
   flo::CPU::cr3 = (uptr)&pageRootPhys;
@@ -455,7 +458,7 @@ namespace {
     perms.writethrough = 0;
     perms.disableCache = 0;
     perms.mapping.exectueDisable = 0;
-    u64 *physFreeWriteLoc = nullptr;
+    u64 *physFreeWriteLoc[5]{};
 
     auto rewriteLoaderHeader =
       [&, passedMagic = false, entryFound = false](u64 *mem) mutable {
@@ -464,7 +467,7 @@ namespace {
         if(std::exchange(passedMagic, true))
           ind += 2;
 
-        while(ind < flo::IO::Disk::SectorSize/8 && !entryFound) {
+        while(ind < flo::Paging::PageSize<1>/sizeof(*mem) && !entryFound) {
           switch(mem[ind]) {
             break; case flo::Util::genMagic("FLORKLOD"):
               // Calculate the virtual address this is loaded at
@@ -472,8 +475,20 @@ namespace {
               pline("Kernel loader entry: ", kernelLoaderEntry());
               entryFound = true;
 
-            break; case flo::Util::genMagic("PhysFree"):
-              physFreeWriteLoc = &mem[ind];
+            break; case flo::Util::genMagic("PhysFre1"):
+              physFreeWriteLoc[0] = &mem[ind];
+
+            break; case flo::Util::genMagic("PhysFre2"):
+              physFreeWriteLoc[1] = &mem[ind];
+
+            break; case flo::Util::genMagic("PhysFre3"):
+              physFreeWriteLoc[2] = &mem[ind];
+
+            break; case flo::Util::genMagic("PhysFre4"):
+              physFreeWriteLoc[3] = &mem[ind];
+
+            break; case flo::Util::genMagic("PhysFre5"):
+              physFreeWriteLoc[4] = &mem[ind];
 
             break; case flo::Util::genMagic("PhysBase"):
               (flo::VirtualAddress &)mem[ind] = kaslrBase;
@@ -503,12 +518,12 @@ namespace {
       };
 
     for(u32 i = 0; i < numPages; ++ i) {
-      auto ppage = flo::getPhysicalPage();
+      // Only get 4K pages for now, rewriting the data
+      // is kind of hard otherwise without paging.
+      auto ppage = flo::getPhysicalPage(1);
 
       for(u32 offs = 0; offs < flo::Paging::PageSize<1>; offs += flo::IO::Disk::SectorSize) {
         flo::Util::copymem(flo::getPhys<u8>(ppage) + offs, diskdata, flo::IO::Disk::SectorSize);
-
-        rewriteLoaderHeader((u64*)(ppage() + offs));
 
         readDisk(++startingSector);
       }
@@ -516,15 +531,25 @@ namespace {
       auto err = flo::Paging::map(ppage, outAddr, flo::Paging::PageSize<1>, perms);
       flo::checkMappingError(err, pline, flo::CPU::hang);
 
+      rewriteLoaderHeader(flo::getPhys<u64>(ppage));
+
       outAddr += flo::VirtualAddress{flo::Paging::PageSize<1>};
     }
 
     // We cannot use `getPhysicalPage()` after this point, that would invalidate the list given to the next stage.
-    if(physFreeWriteLoc) {
-      *physFreeWriteLoc = physicalFreeList();
-    } else {
-      pline("Physical base entry missing in kernel loader header!");
-    }
+    auto tryWrite = [](auto *loc, flo::PhysicalAddress listHead) {
+      if(loc) {
+         *loc = listHead();
+      } else {
+        pline("Physical base entry missing in kernel loader header!");
+      }
+    };
+
+    tryWrite(physFreeWriteLoc[0], physicalFreeList1);
+    tryWrite(physFreeWriteLoc[1], physicalFreeList2);
+    tryWrite(physFreeWriteLoc[2], physicalFreeList3);
+    tryWrite(physFreeWriteLoc[3], physicalFreeList4);
+    tryWrite(physFreeWriteLoc[4], physicalFreeList5);
 
     if(!kernelLoaderEntry) {
       pline("Could not find kernel loader entry, stopping!");
@@ -583,10 +608,61 @@ u8 *flo::getPtrVirt<sizeof(uptr)>(flo::VirtualAddress addr) {
 }
 */
 
-flo::PhysicalAddress flo::getPhysicalPage() {
-  if(!physicalFreeList()) {
-    pline("Ran out of physical pages!!!");
-    flo::CPU::hang();
+flo::PhysicalAddress flo::getPhysicalPage(int pageLevel) {
+  auto tryGet =
+    [pageLevel](flo::PhysicalAddress &currHead) {
+      // Fast path, try to get from current level
+      if(currHead())
+        return std::exchange(currHead, *(flo::PhysicalAddress *)currHead());
+
+      if(pageLevel == 5)
+        return PhysicalAddress{0};
+
+      // Slow path, try to get from next level
+      auto next = flo::getPhysicalPage(pageLevel + 1);
+
+      if(!next) {
+        if(pageLevel == 1) {
+          pline("Ran out of physical pages on level ", pageLevel);
+          flo::CPU::hang();
+        }
+
+        if(!next)
+          return PhysicalAddress{0};
+      }
+
+      // Woop we got one, let's split it.
+      auto stepSize = flo::Paging::pageSizes[pageLevel - 1]; // 0 indexed, we are 1 indexed
+
+      // Return all pages but one
+      for(int i = 0; i < flo::Paging::PageTableSize - 1; ++ i) {
+        flo::returnPhysicalPage(next, pageLevel);
+        next += PhysicalAddress{stepSize};
+      }
+
+      return next;
+    };
+
+  switch(pageLevel) {
+    case 1: return tryGet(physicalFreeList1);
+    case 2: return tryGet(physicalFreeList2);
+    case 3: return tryGet(physicalFreeList3);
+    case 4: return tryGet(physicalFreeList4);
+    case 5: return tryGet(physicalFreeList5);
+    default: pline("Unknown page level ", pageLevel); flo::CPU::hang();
   }
-  return std::exchange(physicalFreeList, *(flo::PhysicalAddress *)physicalFreeList());
+
+  // Unreachable
+  return PhysicalAddress{0};
+}
+
+void flo::returnPhysicalPage(flo::PhysicalAddress phys, int pageLevel) {
+  switch(pageLevel) {
+    case 1: *getPhys<PhysicalAddress>(phys) = std::exchange(physicalFreeList1, phys); return;
+    case 2: *getPhys<PhysicalAddress>(phys) = std::exchange(physicalFreeList2, phys); return;
+    case 3: *getPhys<PhysicalAddress>(phys) = std::exchange(physicalFreeList3, phys); return;
+    case 4: *getPhys<PhysicalAddress>(phys) = std::exchange(physicalFreeList4, phys); return;
+    case 5: *getPhys<PhysicalAddress>(phys) = std::exchange(physicalFreeList5, phys); return;
+    default: pline("Unkown paging level: ", Decimal{pageLevel}); flo::CPU::hang();
+  }
 }
