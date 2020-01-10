@@ -249,7 +249,7 @@ namespace flo {
       auto &currPTE = table.table[ind];
 
       auto trace = [&](auto ...vs) {
-        tracer("[", Decimal{(u8)Level}, "]@", &table, "[", Decimal{(u16)ind}, "]: v", virt(), " sz=", size, " ", std::forward<decltype(vs)>(vs)...);
+        tracer("[", Decimal{(u8)Level}, "]@", &table, "[", Decimal{(u16)ind}, "]: v", virt(), " ", std::forward<decltype(vs)>(vs)...);
       };
 
       MappingError err{};
@@ -268,7 +268,7 @@ namespace flo {
         }
         //This gets a little noisy
         if constexpr(flo::Paging::noisy) {
-          trace("Mapping to p", phys());
+          trace("Mapping!");
         }
         currPTE = Impl::mapping<Level>(perms, phys);
         if(size < PageSize<Level>)
@@ -297,7 +297,7 @@ namespace flo {
               // Get the existing table
               nextTable = getPhys<PageTable<Level - 1>>(currPTE.physaddr());
             }
-            trace("Existing PT @", nextTable);
+            trace("Existing PT");
           }
           else {
             // Make a new page table, none is present
@@ -309,7 +309,7 @@ namespace flo {
             auto pte = Impl::table<Level>();
             pte.setPhysaddr(pageTablePhys);
             currPTE = pte;
-            trace("New PT: ", pte.rep);
+            trace("New PT!");
           }
 
           constexpr auto step = PageSize<Level - 1>;
@@ -470,9 +470,9 @@ namespace flo {
 
       visitedAny = true;
       
-      if(!ent.isMapping() || flo::Paging::noisy)
-        tracer(spaces(indent), "Entry ", Decimal{i}, " (v", nextVirt, ", r", ent.rep, ")->", ent.isMapping() ? "p" : "PT @p", ent.physaddr()());
       if(!ent.isMapping()) {
+        tracer(spaces(indent), "Entry ", Decimal{i}, " v", nextVirt, " -> PT");
+
         if constexpr(ent.lvl < 2) {
           tracer(spaces(indent + 1), "Present level 1 mapping without mapping bit set!!");
           continue;
@@ -481,6 +481,9 @@ namespace flo {
           auto ptr = flo::getPhys<flo::Paging::PageTable<ent.lvl - 1>>(ent.physaddr());
           printPaging(*ptr, tracer, nextVirt, indent + 1);
         }
+      }
+      else if constexpr(flo::Paging::noisy) {
+        tracer(spaces(indent), "Entry ", Decimal{i}, " v", nextVirt, " -> r", ent.perms.writeEnable ? "w" : "-", ent.perms.mapping.exectueDisable ? "-" : "x");
       }
     }
     if(!visitedAny) {
