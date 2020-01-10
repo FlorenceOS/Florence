@@ -363,18 +363,7 @@ namespace flo {
 
     template<bool reclaimPages, int Level>
     bool unmap(VirtualAddress &virt, u64 &size, PageTable<Level> &table) {
-      auto advance = [&]() {
-        constexpr auto stepSize = PageSize<Level>;
-        if(size < stepSize) {
-          virt += VirtualAddress{size};
-          size = 0;
-          return true;
-        } else {
-          virt += VirtualAddress{stepSize};
-          size -= stepSize;
-          return false;
-        }
-      };
+      constexpr auto stepSize = PageSize<Level>;
 
       bool left = false;
       auto it = std::begin(table.table);
@@ -399,8 +388,14 @@ namespace flo {
             }
           }
         }
-        if(advance())
+        if(size <= stepSize) {
+          virt += VirtualAddress{size};
+          size = 0;
           break;
+        } else {
+          virt += VirtualAddress{stepSize};
+          size -= stepSize;
+        }
       }
 
       if(left)
