@@ -289,7 +289,7 @@ namespace flo {
               // Get the existing table
               nextTable = getPhys<PageTable<Level - 1>>(currPTE.physaddr());
             }
-            trace("Existing table Next table is located at ", nextTable);
+            trace("Existing PT @", nextTable);
           }
           else {
             // Make a new page table, none is present
@@ -301,7 +301,7 @@ namespace flo {
             auto pte = Impl::table<Level>();
             pte.setPhysaddr(pageTablePhys);
             currPTE = pte;
-            trace("Made new table with entry ", &currPTE, ": ", pte.rep);
+            trace("New PT: ", pte.rep);
           }
 
           constexpr auto step = PageSize<Level - 1>;
@@ -452,7 +452,7 @@ namespace flo {
       visitedAny = true;
       
       if(!ent.isMapping() || flo::Paging::noisy)
-        tracer(spaces(indent), "Entry ", Decimal{i}, " at ", &ent," (v", nextVirt, ", r", ent.rep, ") mapping to ", ent.isMapping() ? "p" : "page table at p", ent.physaddr()());
+        tracer(spaces(indent), "Entry ", Decimal{i}, " (v", nextVirt, ", r", ent.rep, ")->", ent.isMapping() ? "p" : "PT @p", ent.physaddr()());
       if(!ent.isMapping()) {
         if constexpr(ent.lvl < 2) {
           tracer(spaces(indent + 1), "Present level 1 mapping without mapping bit set!!");
