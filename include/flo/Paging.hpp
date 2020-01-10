@@ -451,7 +451,7 @@ namespace flo {
 
       visitedAny = true;
       
-      if constexpr(flo::Paging::noisy)
+      if(!ent.isMapping() || flo::Paging::noisy)
         tracer(spaces(indent), "Entry ", Decimal{i}, " at ", &ent," (v", nextVirt, ", r", ent.rep, ") mapping to ", ent.isMapping() ? "p" : "page table at p", ent.physaddr()());
       if(!ent.isMapping()) {
         if constexpr(ent.lvl < 2) {
