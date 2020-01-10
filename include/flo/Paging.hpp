@@ -376,6 +376,7 @@ namespace flo {
         }
       };
 
+      bool left = false;
       auto it = std::begin(table.table);
       for(; it != std::end(table.table); ++ it) {
         auto &currPTE = *it;
@@ -394,6 +395,7 @@ namespace flo {
                 returnPhysicalPage(currPTE.physaddr(), 1);
                 currPTE.present = 0;
               }
+              else left = true;
             }
           }
         }
@@ -401,7 +403,10 @@ namespace flo {
           break;
       }
 
-      for(; it != std::end(table.table); ++ it)
+      if(left)
+        return false;
+
+      for(; it != std::end(table.table); ++it)
         if(it->present)
           return false;
       return true;
