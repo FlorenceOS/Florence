@@ -6,8 +6,8 @@
 
 #define SYSREG(reg, type) \
 struct reg##_S { \
-  operator type() { type out; asm("mov %%"#reg", %0":"=r"(out)); return out; }\
-  reg##_S &operator=(type value) { asm("mov %0, %%"#reg :: "Nd"(value)); return *this; }\
+  operator type() { type out; asm("mov %0, %%"#reg:"=r"(out)); return out; }\
+  reg##_S &operator=(type value) { asm("mov %%"#reg ", %0":: "Nd"(value)); return *this; }\
   reg##_S &operator|=(type value) { return *this = static_cast<type>(*this) | value; }\
   reg##_S &operator&=(type value) { return *this = static_cast<type>(*this) & value; }\
 } reg;

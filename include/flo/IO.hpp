@@ -29,14 +29,14 @@ namespace flo {
     template<typename T>
     T in(u16 port) {
       T retval;
-      asm volatile("in %1, %0":"=a"(retval):"Nd"(port));
+      asm volatile("in %0, %1":"=a"(retval):"Nd"(port));
       return retval;
     }
 
     template<typename T, u16 port>
     T in() {
       T retval;
-      asm volatile("in %1, %0" : "=a"(retval):"Nd"(port));
+      asm volatile("in %0, %1":"=a"(retval):"Nd"(port));
       return retval;
     }
 
@@ -46,12 +46,12 @@ namespace flo {
 
     template<typename T>
     void out(u16 port, T value) {
-      asm volatile("out %0, %1"::"a"(value),"Nd"(port));
+      asm volatile("out %1, %0"::"a"(value),"Nd"(port));
     }
 
     template<u16 port, typename T>
     void out(T value) {
-      asm volatile("out %0, %1"::"a"(value),"Nd"(port));
+      asm volatile("out %1, %0"::"a"(value),"Nd"(port));
     }
 
     inline auto outb = [](auto port, auto value) { out<u8> (port, value); };

@@ -14,7 +14,7 @@ KVM := $(QEMU) -enable-kvm -cpu host
 CXXFlags := $(CXXFlags) -ffreestanding -g -Wall -fno-stack-protector\
 	-mno-red-zone -fno-exceptions -fno-rtti -Wno-sign-compare\
 	-std=c++17 -Os -mno-soft-float -Iinclude -ffunction-sections\
-	-fdata-sections -funsigned-char -mno-avx
+	-fdata-sections -funsigned-char -mno-avx -masm=intel
 
 CommonHeaders := $(wildcard include/**/*.hpp)
 
