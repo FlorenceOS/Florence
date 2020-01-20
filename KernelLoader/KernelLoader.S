@@ -65,17 +65,10 @@
 .code64
 .global _start
         _start:
-.extern doConstructors
-  call  doConstructors
-
-.extern assertAssumptions
-  call  assertAssumptions
-
-.extern consumeHighPhysicalMemory
-  call  consumeHighPhysicalMemory
-  
-.extern unmapLowMemory
-  call  unmapLowMemory
+  call doConstructors
+  call assertAssumptions
+  call consumeHighPhysicalMemory
+  call unmapLowMemory
 
 1:hlt
   jmp 1b
