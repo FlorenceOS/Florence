@@ -6,8 +6,8 @@
 
 #define SYSREG(reg, type) \
 struct reg##_S { \
-  operator type() { type out; asm("mov %0, %%"#reg:"=r"(out)); return out; }\
-  reg##_S &operator=(type value) { asm("mov %%"#reg ", %0":: "Nd"(value)); return *this; }\
+  operator type() { type out; asm volatile("mov %0, %%"#reg:"=r"(out)); return out; }\
+  reg##_S &operator=(type value) { asm volatile("mov %%"#reg ", %0":: "Nd"(value)); return *this; }\
   reg##_S &operator|=(type value) { return *this = static_cast<type>(*this) | value; }\
   reg##_S &operator&=(type value) { return *this = static_cast<type>(*this) & value; }\
 } reg;
@@ -31,8 +31,8 @@ namespace flo {
     namespace Impl {
       template<u32 regnum, typename type>
       struct MSR {
-        operator type() { type out; asm("rdmsr" : "=a"(out) : "c"(regnum)); return out; }
-        MSR &operator=(type value) { asm("wrmsr" :: "a"(value), "c"(regnum)); return *this; }
+        operator type() { type out; asm volatile("rdmsr" : "=a"(out) : "c"(regnum)); return out; }
+        MSR &operator=(type value) { asm volatile("wrmsr" :: "a"(value), "c"(regnum)); return *this; }
         MSR &operator|=(type value) { return *this = static_cast<type>(*this) | value; }
         MSR &operator&=(type value) { return *this = static_cast<type>(*this) & value; }
       };
