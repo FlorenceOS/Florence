@@ -1,3 +1,4 @@
+#include "flo/Containers/StaticVector.hpp"
 #include "flo/Florence.hpp"
 #include "flo/Paging.hpp"
 #include "flo/CPU.hpp"
@@ -25,7 +26,7 @@ extern "C" flo::PhysicalAddress physFreeHead3;
 extern "C" flo::PhysicalAddress physFreeHead4;
 extern "C" flo::PhysicalAddress physFreeHead5;
 extern "C" flo::VirtualAddress physBase;
-extern "C" u64 physMemRanges;
+extern "C" flo::StaticVector<flo::PhysicalMemoryRange, 0x10ull> *physMemRanges;
 extern "C" u64 displayWidth;
 extern "C" u64 displayHeight;
 extern "C" u64 displayPitch;
