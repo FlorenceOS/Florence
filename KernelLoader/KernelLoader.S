@@ -77,4 +77,5 @@
 .extern unmapLowMemory
   call  unmapLowMemory
 
-  jmp .
+1:hlt
+  jmp 1b
