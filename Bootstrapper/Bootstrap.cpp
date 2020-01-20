@@ -69,14 +69,9 @@ namespace {
 
   bool vgaDisabled = false;
 
-  struct MemoryRange {
-    flo::PhysicalAddress begin;
-    flo::PhysicalAddress end;
-  };
-
   // Memory ranges above the 4GB memory limit, we have to wait to
   // consume these to after we've enabled paging.
-  flo::StaticVector<MemoryRange, 0x10> highMemRanges;
+  flo::StaticVector<flo::PhysicalMemoryRange, 0x10ull> highMemRanges;
 
   // Head of physical page freelist, one for each page size
   flo::PhysicalAddress physicalFreeList1 = flo::PhysicalAddress{0};
@@ -326,7 +321,7 @@ extern "C" [[noreturn]] void printVideoModeError() {
   flo::CPU::hang();
 }
 
-void consumeMemory(MemoryRange &range) {
+void consumeMemory(flo::PhysicalMemoryRange &range) {
   // Make sure we're not taking any memory we're loaded into, we can't
   // use them for our free list as we need to write to them.
   range.begin = std::max(minMemory, range.begin);
@@ -341,7 +336,7 @@ void consumeMemory(MemoryRange &range) {
   // We'll consume the low memory (below 4 GB) before going to 64 bit.
   auto constexpr maxMemory = flo::PhysicalAddress{1} << 32ull;
 
-  auto processLater = [](MemoryRange &&mem) {
+  auto processLater = [](flo::PhysicalMemoryRange &&mem) {
     pline(" Saving ", mem.begin(), " to ", mem.end(), " for later");
     if(highMemRanges.size() < highMemRanges.max_size())
       highMemRanges.emplace_back(std::move(mem));
@@ -374,7 +369,7 @@ extern "C" void setupMemory() {
     bool use = shouldUse(mem);
     pline(use ? "U":"Not u", "sing memory of size ", mem.size(), " at ", mem.base());
     if(use) {
-      MemoryRange mr;
+      flo::PhysicalMemoryRange mr;
       mr.begin = mem.base;
       mr.end = mem.base + mem.size;
       consumeMemory(mr);

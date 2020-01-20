@@ -13,6 +13,11 @@ namespace flo {
     using flo::StrongTypedef<PhysicalAddress, u64>::StrongTypedef;
   };
 
+  struct PhysicalMemoryRange {
+    flo::PhysicalAddress begin;
+    flo::PhysicalAddress end;
+  };
+
   extern u8 *getPtrVirt(VirtualAddress);
   extern u8 *getPtrPhys(PhysicalAddress);
   extern PhysicalAddress getPhysicalPage(int pageLevel);
