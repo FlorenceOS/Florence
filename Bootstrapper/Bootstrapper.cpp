@@ -58,7 +58,7 @@ auto &dap = currentModeBuf.dap;
 auto const minMemory = flo::PhysicalAddress{(u64)&BootstrapEnd};
 
 namespace {
-  constexpr bool quiet = false;
+  constexpr bool quiet = true;
   constexpr bool disableKASLR = true;
 
   // 3 -> aligned to 1GB, 2 -> aligned to 2MB, 1 -> aligned to 4KB etc
