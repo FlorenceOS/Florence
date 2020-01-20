@@ -497,9 +497,9 @@ namespace flo {
 #define consumeMacro(lvl) \
   {auto constexpr pageSz = flo::Paging::PageSize<lvl>;\
   if(size >= pageSz && addr % PhysicalAddress{pageSz} == PhysicalAddress{0}) { /* Is large enough, is page aligned */ \
+    returnPhysicalPage(addr, lvl);\
     addr += PhysicalAddress{pageSz};\
     size -= pageSz;\
-    returnPhysicalPage(addr, lvl);\
     continue;\
   }}
 
