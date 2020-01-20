@@ -369,7 +369,7 @@ namespace flo {
     std::optional<MappingError> map(VirtualAddress virt, u64 size, Permissions perm) {
       // Size is aligned up to the next page size
       for(size = alignPageUp<1>(size); size;) {
-        // At the time of writing this, you can't map anything above a level 3 page / 1GB :^(
+        // At the time of writing this, you can't map anything above a level 3 page (1GB) :^(
         mapMacro(3);
         mapMacro(2);
         mapMacro(1);
