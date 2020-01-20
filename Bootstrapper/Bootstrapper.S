@@ -99,7 +99,6 @@
   call setupMemory
   call doEarlyPaging
   call loadKernelLoader
-  call doDestructors
 
   # Enable PAE
   mov eax, cr4
