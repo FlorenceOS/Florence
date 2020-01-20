@@ -36,7 +36,7 @@ clean:
 	@rm -rfv build out Tests/build/CMake*
 
 dbg: out/Disk.bin
-	$(KVM) -drive format=raw,file=$< -S -s &
+	$(QEMU) -drive format=raw,file=$< -S -s &
 	gdb-multiarch\
 		-ex 'shell sleep .2'\
 		-ex 'target remote :1234'\
