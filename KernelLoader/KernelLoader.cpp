@@ -72,8 +72,9 @@ namespace flo {
 extern "C" void assertAssumptions() {
   auto check =
     [](auto &value) {
-      if(unknownField == (u64)value) {
-        pline("Unset field!!", (u64)value);
+      auto v = *(u64*)&value;
+      if(unknownField == v) {
+        pline("Unset field ", v, "!!");
         flo::CPU::hang();
       }
     };
