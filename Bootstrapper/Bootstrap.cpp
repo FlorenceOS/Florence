@@ -491,7 +491,7 @@ namespace {
               physFreeWriteLoc[4] = &mem[ind];
 
             break; case flo::Util::genMagic("PhysBase"):
-              (flo::VirtualAddress &)mem[ind] = kaslrBase;
+              mem[ind] = kaslrBase();
 
             break; case flo::Util::genMagic("HighRang"):
               mem[ind] = (u64)&highMemRanges;
