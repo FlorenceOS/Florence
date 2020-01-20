@@ -175,8 +175,12 @@ namespace flo {
           return IO::in<T, hwport()>();
         }
 
+        char const *lastCol = "0";
         void setColor(Color c) {
-          auto col = [](char const *colorString) {
+          auto col = [this](char const *colorString) {
+            if(colorString == std::exchange(lastCol, colorString))
+              return;
+
             write('\x1b');
             write('[');
             while(*colorString)
