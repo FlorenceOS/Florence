@@ -135,6 +135,8 @@
   # Set stack pointer
   mov rsp, qword ptr[ebx]
 
+  mov rbp, rsp
+
   # Enable SSE
   mov rax, cr0
   and ax, 0xFFFB
