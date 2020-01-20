@@ -70,11 +70,11 @@
 
 .extern assertAssumptions
   call  assertAssumptions
-  
-.extern unmapLowMemory
-  call  unmapLowMemory
 
 .extern consumeHighPhysicalMemory
   call  consumeHighPhysicalMemory
+  
+.extern unmapLowMemory
+  call  unmapLowMemory
 
   jmp .
