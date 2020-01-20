@@ -423,7 +423,7 @@ extern "C" void doEarlyPaging() {
   permissions.mapping.exectueDisable = 0;
 
   // Identity map ourselves to be able to turn on paging
-  err = flo::Paging::map(flo::PhysicalAddress{0}, flo::VirtualAddress{0}, flo::Util::kilo(64), permissions, pline);
+  err = flo::Paging::map(flo::PhysicalAddress{0}, flo::VirtualAddress{0}, flo::Util::mega(2), permissions, pline);
   flo::checkMappingError(err, pline, flo::CPU::hang);
   pline("Identity mapped ourselves!");
 }
