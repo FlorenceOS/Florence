@@ -93,17 +93,14 @@ extern "C" void assertAssumptions() {
   check(driveNumber);
 }
 
+extern "C" void consumeHighPhysicalMemory() {
+  for(auto &r: *physMemRanges)
+    flo::consumePhysicalMemory(r.begin, r.end() - r.begin());
+}
+
 extern "C" void unmapLowMemory() {
   constexpr auto lowMemoryLimit = flo::Util::mega(512ull);
 
-  flo::printPaging(*flo::Paging::getPagingRoot(), pline);
-  pline("Unmapping everything below ", lowMemoryLimit, "...");
+  // Don't return the identity mapped pages, that sounds bad...
   flo::Paging::unmap<false>(flo::VirtualAddress{0}, lowMemoryLimit);
-  pline("Finished unmapping low memory!");
-  flo::printPaging(*flo::Paging::getPagingRoot(), pline);
-}
-
-extern "C" void consumeHighPhysicalMemory() {
-  pline("Woop, running at ", &consumeHighPhysicalMemory, "!");
-  flo::CPU::hang();
 }
