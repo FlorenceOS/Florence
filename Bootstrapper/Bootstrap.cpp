@@ -140,15 +140,20 @@ namespace {
     // We're currently running in 32 bit so we have to generate 32 bits at a time
     auto base = flo::VirtualAddress{((u64)flo::random32() << 32) | flo::random32()};
 
+    // Align the base
+    base = flo::Paging::alignPageDown<kaslrAlignmentLevel>(base);
+
+    // Mask away bits we can't use
+    base %= flo::Paging::maxUaddr;
+
     // Start at possible addresses at 8 GB, we don't wan't to map the lower 4 GB
     if(base < flo::VirtualAddress{flo::Util::giga(8ull)})
       goto redo;
 
-    // Make sure we're in the lower half of virtual memory, we want space for any amount of physical memory.
-    // Half of the virtual address space better be enough.
-    base %= (flo::Paging::maxUaddr) >> 1ull;
+    // End the possible addresses in such a way that we can fit all of our physical memory
+    if(base > flo::Paging::maxUaddr + flo::VirtualAddress{physHigh()})
+      goto redo;
 
-    base = flo::Paging::alignPageDown<kaslrAlignmentLevel>(base);
 
     // Make the pointer canonical
     base = flo::Paging::makeCanonical(base);
@@ -380,7 +385,7 @@ extern "C" void setupMemory() {
 extern "C" void doEarlyPaging() {
   // We will locate the physical memory at this point
   if constexpr(disableKASLR) {
-    kaslrBase = flo::VirtualAddress{flo::Util::giga(8ull)};
+    kaslrBase = flo::VirtualAddress{flo::Util::giga(1337ull)};
   } else {
     kaslrBase = randomizeKASLRBase();
   }
