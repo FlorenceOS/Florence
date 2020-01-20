@@ -430,6 +430,9 @@ namespace flo {
     // Don't reclaim the pages if they're not supposed to get reused :^)
     template<bool reclaimPages>
     void unmap(VirtualAddress virt, u64 size) {
+      struct CR3Resetter {
+        ~CR3Resetter() { flo::CPU::cr3 = flo::CPU::cr3; }
+      } reset;
       while(1) {
         unmap<reclaimPages>(virt, size, *getPagingRoot());
 
