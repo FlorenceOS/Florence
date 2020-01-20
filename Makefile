@@ -105,6 +105,6 @@ build/KernelLoader/KernelLoader.elf: KernelLoader/Linker.lds $(KernelLoaderObjec
 	@readelf -a $@ | grep 'KernelLoaderSize' | awk '{ print "Kernel loader size: " strtonum("0x" $$2)/(512 * 1024 * 1024) * 100 "%" }'
 
 # Literally just concat them lol
-out/Disk.bin: build/Bootsector/Bootsector.bin build/Bootstrapper/Bootstrapper.bin build/KernelLoader/KernelLoader.bin
+out/Disk.bin: build/Bootsector/Bootsector.bin build/Bootstrapper/Bootstrapper.bin build/KernelLoader/KernelLoader.bin Makefile
 	@mkdir -p $(@D)
-	cat $^ > $@
+	cat $(filter-out Makefile,$^) > $@
