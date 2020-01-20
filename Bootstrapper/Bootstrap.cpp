@@ -493,7 +493,8 @@ namespace {
             break; case flo::Util::genMagic("PhysBase"):
               (flo::VirtualAddress &)mem[ind] = kaslrBase;
 
-            break; case flo::Util::genMagic("HighFree"):
+            break; case flo::Util::genMagic("HighRang"):
+              mem[ind] = (u64)&highMemRanges;
 
             break; case flo::Util::genMagic("DispWide"):
               mem[ind] = pickedDisplay.width;

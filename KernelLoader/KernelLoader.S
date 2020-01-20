@@ -39,7 +39,7 @@
 
 .global physMemRanges
         physMemRanges:
-.ascii "HighFree"
+.ascii "HighRang"
 
 .global displayWidth
         displayWidth:
