@@ -251,9 +251,12 @@ namespace flo {
     return print(&*it);
   }
 
-  template <typename ...Ts>
-  auto makePline(char const *prefix) {
-    return
+  template <bool nopOut>
+  constexpr auto makePline(char const *prefix) {
+    if constexpr(nopOut)
+      return [](auto &&...vs) {};
+
+    else return
       [prefix](auto &&...vs) {
         auto p = [](auto &&val) {
           if constexpr(IsDecimal<std::decay_t<decltype(val)>>::value) {

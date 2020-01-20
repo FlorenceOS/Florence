@@ -34,8 +34,8 @@ extern "C" u64 framebuffer;
 extern "C" u64 driveNumber;
 
 namespace {
-  auto pline = flo::makePline("[FLORKLOAD] ");
   constexpr bool quiet = false;
+  auto pline = flo::makePline<quiet>("[FLORKLOAD] ");
 }
 
 namespace flo {

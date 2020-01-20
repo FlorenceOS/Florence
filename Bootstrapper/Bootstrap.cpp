@@ -83,7 +83,7 @@ namespace {
   // Base virtual address of physical memory
   flo::VirtualAddress physicalVirtBase;
 
-  auto pline = flo::makePline("[FBTS] ");
+  auto pline = flo::makePline<quiet>("[FBTS] ");
 
   // KASLR base for the kernel.
   // The kernel is loaded just below this and physical memory is mapped just above.
