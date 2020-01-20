@@ -374,6 +374,7 @@ namespace flo {
         mapMacro(2);
         mapMacro(1);
         // This should be unreachable as running out of 1 level pages is a fatal error
+        __builtin_unreachable();
       }
 
       return std::nullopt;
