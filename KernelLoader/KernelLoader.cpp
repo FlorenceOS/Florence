@@ -34,19 +34,23 @@ extern "C" u64 driveNumber;
 
 namespace {
   auto pline = flo::makePline("[FLORKLOAD] ");
+  constexpr bool quiet = false;
 }
 
 namespace flo {
   void putchar(char c) {
-    flo::IO::serial1.write(c);
+    if constexpr(!quiet)
+      flo::IO::serial1.write(c);
   }
 
   void feedLine() {
-    flo::IO::serial1.write('\n');
+    if constexpr(!quiet)
+      flo::IO::serial1.write('\n');
   }
 
   void setColor(flo::IO::Color col) {
-    flo::IO::serial1.setColor(col);
+    if constexpr(!quiet)
+      flo::IO::serial1.setColor(col);
   }
 
   u8 *getPtrPhys(flo::PhysicalAddress phys) {
