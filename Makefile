@@ -85,7 +85,7 @@ build/Bootstrapper/%.cpp.o: Bootstrapper/%.cpp $(BootstrapperHeaders) $(CommonHe
 
 build/Bootstrapper/Bootstrapper.elf: Bootstrapper/Linker.lds $(BootstrapperObjects)
 	ld -T $^ -o $@ --gc-sections
-	@readelf -a $@ | grep 'BootstrapSize' | awk '{ print "Bootstrapper size: " strtonum("0x" $$2)/(64*1024) * 100 "%" }'
+	@readelf -a $@ | grep 'BootstrapSize' | awk '{ print "Bootstrapper size: " strtonum("0x" $$2)/(0x10000 - 0x7E00) * 100 "%" }'
 
 # Kernel loader
 KernelLoaderSources := $(wildcard KernelLoader/*.S) $(wildcard KernelLoader/*.cpp)
