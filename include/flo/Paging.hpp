@@ -392,16 +392,17 @@ namespace flo {
           if(currPTE.isMapping()) {
             if constexpr(reclaimPages)
               returnPhysicalPage(currPTE.physaddr(), currPTE.lvl);
+            currPTE.rep = 0;
           } else {
             if constexpr (Level != 1) {
-              auto tempsz = size;
               // Is table, recurse
-              auto fullyUnmapped = unmap<reclaimPages>(virt, tempsz, *getPhys<PageTable<Level - 1>>(currPTE.physaddr()));
+              auto sizecpy = size;
+              auto fullyUnmapped = unmap<reclaimPages>(virt, sizecpy, *getPhys<PageTable<Level - 1>>(currPTE.physaddr()));
 
               // Then unmap current level if no children are left
               if(fullyUnmapped) {
                 returnPhysicalPage(currPTE.physaddr(), 1);
-                currPTE.present = 0;
+                currPTE.rep = 0;
               }
               else left = true;
             }
