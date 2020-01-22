@@ -190,6 +190,21 @@ namespace flo {
       return getPhys<PageTable<PageTableLevels>>(flo::PhysicalAddress{flo::CPU::cr3});
     }
 
+
+    struct MappingError {
+      enum {
+        AlreadyMapped,
+        NoAlignment,
+      } type;
+
+      PhysicalAddress phys;
+      VirtualAddress virt;
+      int level;
+    };
+
+    using oMappingError = std::optional<MappingError>;
+    inline constexpr auto noMappingError = std::nullopt;
+
     namespace Impl {
       template<int Level>
       auto mapping(Permissions perms, PhysicalAddress addr) {
@@ -222,25 +237,9 @@ namespace flo {
       u64 getIndex(VirtualAddress addr) {
         return (addr >> pageOffsetBits<Level>) % VirtualAddress{PageTableSize};
       }
-    }
 
-    struct MappingError {
-      enum {
-        AlreadyMapped,
-        NoAlignment,
-      } type;
 
-      PhysicalAddress phys;
-      VirtualAddress virt;
-      int level;
 
-      union {
-        struct {
-          void *pageTableWithMapping;
-          int mappingIndex;
-        } alreadyMapped;
-      };
-    };
 
     template<int Level, typename Tracer>
     [[nodiscard]]
