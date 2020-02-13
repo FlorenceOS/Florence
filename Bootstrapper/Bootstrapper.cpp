@@ -5,32 +5,8 @@
 #include "flo/Random.hpp"
 #include "flo/Florence.hpp"
 #include "flo/Bitfields.hpp"
-
+#include "flo/Algorithm.hpp"
 #include "flo/Containers/StaticVector.hpp"
-
-#include <algorithm>
-
-using Constructor = void(*)();
-
-extern "C" Constructor constructorsStart;
-extern "C" Constructor constructorsEnd;
-
-extern "C" void doConstructors() {
-  std::for_each(&constructorsStart, &constructorsEnd, [](Constructor c){
-    (*c)();
-  });
-}
-
-using Destructor = void(*)();
-
-extern "C" Constructor destructorsStart;
-extern "C" Constructor destructorsEnd;
-
-extern "C" void doDestructors() {
-  std::for_each(&constructorsStart, &constructorsEnd, [](Constructor c){
-    (*c)();
-  });
-}
 
 using flo::Decimal;
 using flo::spaces;

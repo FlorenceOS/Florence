@@ -16,8 +16,10 @@ SECTIONS {
     . = ALIGN(SectionAlign);
 
     constructorsStart = .;
-    KEEP(*( .init_array ));
-    KEEP(*(SORT_BY_INIT_PRIORITY( .init_array.* )));
+    KEEP(*(SORT_BY_INIT_PRIORITY(.ctors)));
+    KEEP(*(SORT_BY_INIT_PRIORITY(.ctors.*)));
+    KEEP(*(SORT_BY_INIT_PRIORITY(.init_array)));
+    KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*)));
     constructorsEnd = .;
 
     . = ALIGN(SectionAlign);

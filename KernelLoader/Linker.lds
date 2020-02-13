@@ -12,20 +12,11 @@ SECTIONS {
 
     . = ALIGN(8);
     constructorsStart = .;
-    KEEP(*( .init_array ));
-    . = ALIGN(8);
-    KEEP(*(SORT_BY_INIT_PRIORITY( .init_array.* )));
-    . = ALIGN(8);
+    KEEP(*(SORT_BY_INIT_PRIORITY(.ctors)));
+    KEEP(*(SORT_BY_INIT_PRIORITY(.ctors.*)));
+    KEEP(*(SORT_BY_INIT_PRIORITY(.init_array)));
+    KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*)));
     constructorsEnd = .;
-
-    /* Don't do these
-    destructorsStart = .;
-    KEEP(*( .fini_array ));
-    KEEP(*(SORT_BY_INIT_PRIORITY( .fini_array.* )));
-    destructorsEnd = .;
-
-    . = ALIGN(SectionAlign);
-    */
 
     . = ALIGN(8);
     *(.data*)

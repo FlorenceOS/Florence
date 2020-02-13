@@ -1,23 +1,13 @@
 #include "flo/Containers/StaticVector.hpp"
+#include "flo/Algorithm.hpp"
 #include "flo/Florence.hpp"
+#include "flo/Kernel.hpp"
 #include "flo/Paging.hpp"
 #include "flo/CPU.hpp"
+#include "flo/ELF.hpp"
 #include "flo/IO.hpp"
 
-#include <algorithm>
-
 using flo::Decimal;
-
-using Constructor = void(*)();
-
-extern "C" Constructor constructorsStart;
-extern "C" Constructor constructorsEnd;
-
-extern "C" void doConstructors() {
-  std::for_each(&constructorsStart, &constructorsEnd, [](Constructor c){
-    (*c)();
-  });
-}
 
 extern "C" u64 unknownField;
 extern "C" flo::PhysicalAddress physFreeHead1;

@@ -11,8 +11,10 @@ SECTIONS {
   . = ALIGN(4K);
   .data :{
     constructorsStart = .;
-    KEEP(*( .ctors* ));
-    KEEP(*( .init_array* ));
+    KEEP(*(SORT_BY_INIT_PRIORITY(.ctors)));
+    KEEP(*(SORT_BY_INIT_PRIORITY(.ctors.*)));
+    KEEP(*(SORT_BY_INIT_PRIORITY(.init_array)));
+    KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*)));
     constructorsEnd = .;
     *(.data*)
     *(.bss*)
