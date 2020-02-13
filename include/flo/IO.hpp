@@ -1,3 +1,5 @@
+#pragma once
+
 #include "Ints.hpp"
 
 #include "flo/Util.hpp"
