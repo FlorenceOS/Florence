@@ -14,16 +14,16 @@ namespace flo {
 
     template<typename DesiredType = result_type>
     [[nodiscard]]
-    static TyRes get() {
-      if constexpr(sizeof(TyRes) > sizeof(result_type)) {
+    static DesiredType get() {
+      if constexpr(sizeof(DesiredType) > sizeof(result_type)) {
         // We combine the results of more randomizations
         Array<u8, sizeof(DesiredType)> result;
         auto it = result.begin();
         while(it != result.end()) {
-          *reinterpret_cast<result_type>(&*it) = get();
+          *reinterpret_cast<result_type *>(&*it) = get();
           it += sizeof(result_type);
         }
-        return *reinterpret_cast<TyRes *>(result.data());
+        return *reinterpret_cast<DesiredType *>(result.data());
       }
       else {
         // Just a simple randomization
