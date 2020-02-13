@@ -93,7 +93,7 @@ namespace flo {
 
       union {
         flo::Bitfield<8, 1> global;
-        flo::Bitfield<63, 1> exectueDisable;
+        flo::Bitfield<63, 1> executeDisable;
       } mapping;
 
       u64 rep;
@@ -486,12 +486,8 @@ namespace flo {
           printPaging(*ptr, tracer, nextVirt, indent + 1);
         }
       }
-      else if constexpr(flo::Paging::noisy) {
-        tracer(spaces(indent), "Entry ", Decimal{i}, " v", nextVirt, " -> r", ent.perms.writeEnable ? "w" : "-", ent.perms.mapping.exectueDisable ? "-" : "x");
-      }
-    }
-    if(!visitedAny) {
-      tracer(spaces(indent), (uptr) &pt, ": This table was empty :(");
+      else
+        tracer(spaces(indent), "Entry ", Decimal{i}, " v", nextVirt, " (r", ent.perms.writeEnable ? "w" : "-", ent.perms.mapping.executeDisable ? "-" : "x", ") -> p", ent.physaddr()());
     }
   };
 }

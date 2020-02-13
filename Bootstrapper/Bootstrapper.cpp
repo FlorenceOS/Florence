@@ -410,7 +410,7 @@ extern "C" void doEarlyPaging() {
   permissions.writethrough = 0;
   permissions.disableCache = 0;
   permissions.mapping.global = 0;
-  permissions.mapping.exectueDisable = 1;
+  permissions.mapping.executeDisable = 1;
 
   auto err = flo::Paging::map(flo::PhysicalAddress{0}, kaslrBase, physHigh, permissions, pline);
 
@@ -420,7 +420,7 @@ extern "C" void doEarlyPaging() {
   pline("Successfully mapped physical memory!");
 
 
-  permissions.mapping.exectueDisable = 0;
+  permissions.mapping.executeDisable = 0;
 
   // Identity map ourselves to be able to turn on paging
   err = flo::Paging::map(flo::PhysicalAddress{0}, flo::VirtualAddress{0}, flo::Util::mega(2), permissions, pline);
@@ -457,7 +457,7 @@ namespace {
     perms.allowUserAccess = 0;
     perms.writethrough = 0;
     perms.disableCache = 0;
-    perms.mapping.exectueDisable = 0;
+    perms.mapping.executeDisable = 0;
     u64 *physFreeWriteLoc[5]{};
 
     auto rewriteLoaderHeader =
@@ -537,6 +537,22 @@ namespace {
       outAddr += flo::VirtualAddress{flo::Paging::PageSize<1>};
     }
 
+    if(!kernelLoaderEntry) {
+      pline("Could not find kernel loader entry, stopping!");
+      flo::CPU::hang();
+    }
+
+    perms.writeEnable = 1;
+    perms.allowUserAccess = 0;
+    perms.writethrough = 0;
+    perms.disableCache = 0;
+    perms.mapping.executeDisable = 1;
+
+    // Make a stack for the loader
+    auto constexpr loaderStackSize = flo::Util::kilo(4);
+    auto err = flo::Paging::map(loaderStack - flo::VirtualAddress{loaderStackSize}, loaderStackSize, perms);
+    flo::checkMappingError(err, pline, flo::CPU::hang);
+
     // We cannot use `getPhysicalPage()` after this point, that would invalidate the list given to the next stage.
     auto tryWrite = [](auto *loc, flo::PhysicalAddress listHead) {
       if(loc) {
@@ -551,23 +567,6 @@ namespace {
     tryWrite(physFreeWriteLoc[2], physicalFreeList3);
     tryWrite(physFreeWriteLoc[3], physicalFreeList4);
     tryWrite(physFreeWriteLoc[4], physicalFreeList5);
-
-    if(!kernelLoaderEntry) {
-      pline("Could not find kernel loader entry, stopping!");
-      flo::CPU::hang();
-    }
-
-    perms.writeEnable = 1;
-    perms.allowUserAccess = 0;
-    perms.writethrough = 0;
-    perms.disableCache = 0;
-    perms.mapping.exectueDisable = 1;
-
-    // Make a stack for the loader
-    auto constexpr loaderStackSize = flo::Util::kilo(64);
-    auto err = flo::Paging::map(loaderStack - flo::VirtualAddress{loaderStackSize}, loaderStackSize, perms);
-    flo::checkMappingError(err, pline, flo::CPU::hang);
-    pline("Mapped stack for loader");
   }
 }
 
