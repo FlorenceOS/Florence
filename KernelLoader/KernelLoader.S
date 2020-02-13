@@ -85,3 +85,10 @@ extern unmapLowMemory
 
 1:hlt
   jmp 1b
+
+section .kernel
+global bundledKernel
+       bundledKernel:
+  incbin "build/Kernel/Kernel.elf"
+global bundledKernelEnd
+       bundledKernelEnd:

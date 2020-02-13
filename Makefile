@@ -92,7 +92,7 @@ KernelLoaderSources := $(wildcard KernelLoader/*.S) $(wildcard KernelLoader/*.cp
 KernelLoaderObjects := $(patsubst %,build/%.o,$(KernelLoaderSources))
 KernelLoaderHeaders := $(wildcard KernelLoader/*.hpp)
 
-build/KernelLoader/%.S.o: KernelLoader/%.S Makefile
+build/KernelLoader/KernelLoader.S.o: KernelLoader/KernelLoader.S build/Kernel/Kernel.elf Makefile
 	@mkdir -p $(@D)
 	nasm -felf64 $< -o $@
 
@@ -103,6 +103,22 @@ build/KernelLoader/%.cpp.o: KernelLoader/%.cpp $(KernelLoaderHeaders) $(CommonHe
 build/KernelLoader/KernelLoader.elf: KernelLoader/Linker.lds $(KernelLoaderObjects)
 	ld -T $^ -o $@ --gc-sections
 	@readelf -a $@ | grep 'KernelLoaderSize' | awk '{ print "Kernel loader size: " strtonum("0x" $$2)/(512 * 1024 * 1024) * 100 "%" }'
+
+KernelSources := $(wildcard Kernel/*.S) Kernel/Kernel.cpp
+KernelObjects := $(patsubst %,build/%.o,$(KernelSources) LibFloPIC)
+
+build/Kernel/%.S.o: Kernel/%.S
+	@mkdir -p $(@D)
+	nasm -felf64 $< -o $@
+
+build/Kernel/Kernel.cpp.o: Kernel/Kernel.cpp $(CommonHeaders) Makefile
+	@mkdir -p $(@D)
+	clang++ -m64 -fpic -fpie $(CXXFlags) -c $< -o $@
+
+build/Kernel/Kernel.elf: Kernel/Kernel.lds $(KernelObjects)
+	@mkdir -p $(@D)
+	@# ld.lld here crashes :(
+	ld -T $^ -o $@ $(LDFlags) -pie -s
 
 # Literally just concat them lol
 out/Disk.bin: build/Bootsector/Bootsector.bin build/Bootstrapper/Bootstrapper.bin build/KernelLoader/KernelLoader.bin Makefile
