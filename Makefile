@@ -94,7 +94,7 @@ KernelLoaderHeaders := $(wildcard KernelLoader/*.hpp)
 
 build/KernelLoader/%.S.o: KernelLoader/%.S Makefile
 	@mkdir -p $(@D)
-	as $< -o $@ -64
+	nasm -felf64 $< -o $@
 
 build/KernelLoader/%.cpp.o: KernelLoader/%.cpp $(KernelLoaderHeaders) $(CommonHeaders) Makefile
 	@mkdir -p $(@D)

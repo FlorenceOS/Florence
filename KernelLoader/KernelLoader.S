@@ -1,73 +1,86 @@
-.intel_syntax noprefix
+; .intel_syntax noprefix
 
-.section .KernelLoaderHeader
-.byte 0x09, 0xF9, 0x11, 0x02
-.byte 0x9D, 0x74, 0xE3, 0x5B
-.byte 0xD8, 0x41, 0x56, 0xC5
-.byte 0x63, 0x56, 0x88, 0xC0
+section .KernelLoaderHeader
+db 0x09, 0xF9, 0x11, 0x02
+db 0x9D, 0x74, 0xE3, 0x5B
+db 0xD8, 0x41, 0x56, 0xC5
+db 0x63, 0x56, 0x88, 0xC0
 
-.extern KernelLoaderSize
-.8byte  KernelLoaderSize
+extern KernelLoaderPages
+dq     KernelLoaderPages
 
-.global unknownField
-        unknownField:
-.8byte 0x0
+global unknownField
+       unknownField:
+dq 0x0
 
-.global physFreeHead1
-        physFreeHead1:
-.ascii "PhysFre1"
+global physFreeHead1
+       physFreeHead1:
+db "PhysFre1"
 
-.global physFreeHead2
-        physFreeHead2:
-.ascii "PhysFre2"
+global physFreeHead2
+       physFreeHead2:
+db "PhysFre2"
 
-.global physFreeHead3
-        physFreeHead3:
-.ascii "PhysFre3"
+global physFreeHead3
+       physFreeHead3:
+db "PhysFre3"
 
-.global physFreeHead4
-        physFreeHead4:
-.ascii "PhysFre4"
+global physFreeHead4
+       physFreeHead4:
+db "PhysFre4"
 
-.global physFreeHead5
-        physFreeHead5:
-.ascii "PhysFre5"
+global physFreeHead5
+       physFreeHead5:
+db "PhysFre5"
 
-.global physBase
-        physBase:
-.ascii "PhysBase"
+global physBase
+       physBase:
+db "PhysBase"
 
-.global physMemRanges
-        physMemRanges:
-.ascii "HighRang"
+global physMemRanges
+       physMemRanges:
+db "HighRang"
 
-.global displayWidth
-        displayWidth:
-.ascii "DispWide"
+global displayWidth
+       displayWidth:
+db "DispWide"
 
-.global displayHeight
-        displayHeight:
-.ascii "DispHigh"
+global displayHeight
+       displayHeight:
+db "DispHigh"
 
-.global displayPitch
-        displayPitch:
-.ascii "DispPitc"
+global displayPitch
+       displayPitch:
+db "DispPitc"
 
-.global framebuffer
-        framebuffer:
-.ascii "FrameBuf"
+global framebuffer
+       framebuffer:
+db "FrameBuf"
 
-.global driveNumber
-        driveNumber:
-.ascii "DriveNum"
+global driveNumber
+       driveNumber:
+db "DriveNum"
 
-.ascii "FLORKLOD"
-.code64
-.global _start
-        _start:
-  call doConstructors
+db "FLORKLOD"
+
+global _start
+       _start:
+  ; Enable SSE
+  mov rax, cr0
+  and ax, 0xFFFB
+  or ax, 0x2
+  mov cr0, rax
+  mov rax, cr4
+  or ax, 3 << 9
+  mov cr4, rax
+
+extern callGlobalConstructors
+  call callGlobalConstructors
+extern assertAssumptions
   call assertAssumptions
+extern consumeHighPhysicalMemory
   call consumeHighPhysicalMemory
+extern unmapLowMemory
   call unmapLowMemory
 
 1:hlt
