@@ -380,51 +380,42 @@ namespace flo {
     }
 #undef mapMacro
 
+    // Returns if the table should remain present (still has children)
     template<bool reclaimPages, int Level>
-    bool unmap(VirtualAddress &virt, u64 &size, PageTable<Level> &table) {
-      constexpr auto stepSize = PageSize<Level>;
+    bool unmap(VirtualAddress virt, u64 size, PageTable<Level> &table) {
+      auto ind = Impl::getIndex<Level>(virt);
 
-      bool left = false;
-      auto it = std::begin(table.table);
-      for(; it != std::end(table.table); ++ it) {
-        auto &currPTE = *it;
-        if(currPTE.present) {
-          if(currPTE.isMapping()) {
-            if constexpr(reclaimPages)
-              returnPhysicalPage(currPTE.physaddr(), currPTE.lvl);
-            currPTE.rep = 0;
-          } else {
-            if constexpr (Level != 1) {
-              // Is table, recurse
-              auto sizecpy = size;
-              auto fullyUnmapped = unmap<reclaimPages>(virt, sizecpy, *getPhys<PageTable<Level - 1>>(currPTE.physaddr()));
+      bool left = anyOf(table.table.begin(), table.table.begin() + ind, [](auto &pte) { return pte.present; });
 
-              // Then unmap current level if no children are left
-              if(fullyUnmapped) {
-                returnPhysicalPage(currPTE.physaddr(), 1);
-                currPTE.rep = 0;
-              }
-              else left = true;
-            }
-          }
-        }
-        if(size <= stepSize) {
-          virt += VirtualAddress{size};
+      [[maybe_unused]]
+      auto step = [&]() {
+        ++ind;
+        if(size < PageSize<Level>) {
+          virt -= VirtualAddress{size};
           size = 0;
-          break;
-        } else {
-          virt += VirtualAddress{stepSize};
-          size -= stepSize;
         }
+        else {
+          virt += VirtualAddress{PageSize<Level>};
+          size -= PageSize<Level>;
+        }
+      };
+      
+      for(; size && ind < PageTableSize; step()) {
+        auto &pte = table.table[ind];
+
+        if(pte.present && pte.isMapping()) {
+          if constexpr (reclaimPages)
+            returnPhysicalPage(pte.physaddr(), Level);
+          pte.rep = 0;
+          continue;
+        }
+
+        if constexpr(Level > 1) if(pte.present)
+          if(unmap<reclaimPages>(virt, size, *getPhys<PageTable<Level - 1>>(pte.physaddr())))
+            left = true;
       }
 
-      if(left)
-        return false;
-
-      for(; it != std::end(table.table); ++it)
-        if(it->present)
-          return false;
-      return true;
+      return left || anyOf(table.table.begin() + ind, table.table.end(), [](auto &pte) { return pte.present; });
     }
 
     // Don't reclaim the pages if they're not supposed to get reused :^)
