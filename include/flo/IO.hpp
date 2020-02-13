@@ -180,7 +180,7 @@ namespace flo {
         char const *lastCol = "0";
         void setColor(Color c) {
           auto col = [this](char const *colorString) {
-            if(colorString == std::exchange(lastCol, colorString))
+            if(colorString == flo::exchange(lastCol, colorString))
               return;
 
             write('\x1b');

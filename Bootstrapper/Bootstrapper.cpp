@@ -298,7 +298,6 @@ extern "C" [[noreturn]] void printVideoModeError() {
 void consumeMemory(flo::PhysicalMemoryRange &range) {
   // Make sure we're not taking any memory we're loaded into, we can't
   // use them for our free list as we need to write to them.
-  range.begin = std::max(minMemory, range.begin);
   range.begin = flo::max(minMemory, range.begin);
 
   if(physHigh < range.end)
@@ -430,7 +429,7 @@ namespace {
       [&, passedMagic = false, entryFound = false](u64 *mem) mutable {
         u64 ind = 0;
 
-        if(std::exchange(passedMagic, true))
+        if(flo::exchange(passedMagic, true))
           ind += 2;
 
         while(ind < flo::Paging::PageSize<1>/sizeof(*mem) && !entryFound) {
@@ -579,7 +578,7 @@ flo::PhysicalAddress flo::getPhysicalPage(int pageLevel) {
     [pageLevel](flo::PhysicalAddress &currHead) {
       // Fast path, try to get from current level
       if(currHead())
-        return std::exchange(currHead, *(flo::PhysicalAddress *)currHead());
+        return flo::exchange(currHead, *getPhys<PhysicalAddress>(currHead));
 
       if(pageLevel == 5)
         return PhysicalAddress{0};
@@ -618,17 +617,17 @@ flo::PhysicalAddress flo::getPhysicalPage(int pageLevel) {
     default: pline("Unknown page level ", pageLevel); flo::CPU::hang();
   }
 
-  // Unreachable
+  __builtin_unreachable();
   return PhysicalAddress{0};
 }
 
 void flo::returnPhysicalPage(flo::PhysicalAddress phys, int pageLevel) {
   switch(pageLevel) {
-    case 1: *getPhys<PhysicalAddress>(phys) = std::exchange(physicalFreeList1, phys); return;
-    case 2: *getPhys<PhysicalAddress>(phys) = std::exchange(physicalFreeList2, phys); return;
-    case 3: *getPhys<PhysicalAddress>(phys) = std::exchange(physicalFreeList3, phys); return;
-    case 4: *getPhys<PhysicalAddress>(phys) = std::exchange(physicalFreeList4, phys); return;
-    case 5: *getPhys<PhysicalAddress>(phys) = std::exchange(physicalFreeList5, phys); return;
+    case 1: *getPhys<PhysicalAddress>(phys) = flo::exchange(physicalFreeList1, phys); return;
+    case 2: *getPhys<PhysicalAddress>(phys) = flo::exchange(physicalFreeList2, phys); return;
+    case 3: *getPhys<PhysicalAddress>(phys) = flo::exchange(physicalFreeList3, phys); return;
+    case 4: *getPhys<PhysicalAddress>(phys) = flo::exchange(physicalFreeList4, phys); return;
+    case 5: *getPhys<PhysicalAddress>(phys) = flo::exchange(physicalFreeList5, phys); return;
     default: pline("Unkown paging level: ", Decimal{pageLevel}); flo::CPU::hang();
   }
 }
