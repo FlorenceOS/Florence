@@ -77,7 +77,7 @@ BootstrapperHeaders := $(wildcard Bootstrapper/*.hpp)
 
 build/Bootstrapper/%.S.o: Bootstrapper/%.S Makefile
 	@mkdir -p $(@D)
-	as $< -o $@ -32
+	nasm -felf32 $< -o $@
 
 build/Bootstrapper/%.cpp.o: Bootstrapper/%.cpp $(BootstrapperHeaders) $(CommonHeaders) Makefile
 	@mkdir -p $(@D)

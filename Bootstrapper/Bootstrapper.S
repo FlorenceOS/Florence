@@ -1,142 +1,159 @@
-.intel_syntax noprefix
+; .intel_syntax noprefix
 
-.section .BootstrapHeader
-.long 0xb16d1cc5
-.word 0x6969, 0x1337
+section .BootstrapHeader
+dd 0xb16d1cc5
+dw 0x6969, 0x1337
 
-.byte   BootstrapSectors
-.global desiredWidth
-        desiredWidth: .word 1440
-.global desiredHeight
-        desiredHeight: .word 900
+extern BootstrapSectors
+db     BootstrapSectors
+global desiredWidth
+       desiredWidth: dw 1440
+global desiredHeight
+       desiredHeight: dw 900
 
-.section .BootstrapEntry
-.code16
+section .BootstrapEntry
+[bits 16]
 
-.macro dataSelDx
+%macro dataSelDx 0
   mov ds, dx
   mov ss, dx
   mov fs, dx
   mov es, dx
   mov gs, dx
-.endm
+%endmacro
 
-# Goes from 16 bit real mode to 32 bit protected mode, clobbers edx
-.macro go16to32
-  # Enable protected mode
+; Goes from 16 bit real mode to 32 bit protected mode, clobbers edx
+%macro go16to32 0
+  %push ctx16to32
+  ; Enable protected mode
   mov edx, cr0
   or edx, 1
   mov cr0, edx
 
-  # Far jump to 32 bit protected mode
-  jmp 0x18:1f
-.code32
-1:mov dx, 0x20
+  ; Far jump to 32 bit protected mode
+  jmp 0x18:%$nextmode
+[bits 32]
+%$nextmode:
+  mov dx, 0x20
   dataSelDx
-.endm
+  %pop ctx16to32
+%endmacro
 
-# Goes from 32 bit protected mode to 16 bit real mode, clobbers edx
-.macro go32to16
-  # Far jump to 16 bit protected mode
-  jmp 0x08:1f
-.code16
-1:
-  # Disable protected mode
+; Goes from 32 bit protected mode to 16 bit real mode, clobbers edx
+%macro go32to16 0
+  %push ctx32to16
+  ; Far jump to 16 bit protected mode
+  jmp 0x08:%$nextmode
+[bits 16]
+%$nextmode:
+  ; Disable protected mode
   mov edx, cr0
   and edx, ~1
   mov cr0, edx
 
-  # Far jump to real mode
-  jmp 0x00:2f
-
-2:xor dx, dx
+  ; Far jump to real mode
+  jmp 0x00:%$anothermode
+%$anothermode:
+  xor dx, dx
   dataSelDx
-.endm
+  %pop ctx32to16
+%endmacro
 
-.macro checkVESAError str
+%macro checkVESAError 1
   cmp ax, 0x004F
-  mov ax, offset \str
+  mov ax, %0
   jne vesaError
-.endm
+%endmacro
 
-.global bootstrapStart
-        bootstrapStart:
-  mov byte ptr[diskNum], dl
+global bootstrapStart
+       bootstrapStart:
+  mov byte[diskNum], dl
 
-  # WOHOOO WE MADE IT
+  ; WOHOOO WE MADE IT
 
-  # We just entered here in 16 bit mode
-  # but can switch to 32 and then 64 at any time.
+  ; We just entered here in 16 bit mode
+  ; but can switch to 32 and then 64 at any time.
 
-  # The problem is that there are a few things we want to do first
-  # First of all, we need to get ourself a VESA video mode, that's
-  # only possible from real mode/16 bit. So what we'll do is to
-  # have 16 bit code getting the related data structures then
-  # we'll pick a mode in 32 bits, jumping back and forth for each mode,
-  # because at least then we can write the structure parsing code in C++
-  # instead of asm.
+  ; The problem is that there are a few things we want to do first
+  ; First of all, we need to get ourself a VESA video mode, that's
+  ; only possible from real mode/16 bit. So what we'll do is to
+  ; have 16 bit code getting the related data structures then
+  ; we'll pick a mode in 32 bits, jumping back and forth for each mode,
+  ; because at least then we can write the structure parsing code in C++
+  ; instead of asm.
 
   go16to32
 
-  call  doConstructors
-  call  initializeDebug
+  ; Do the C++ global constructors
+extern callGlobalConstructors
+  call callGlobalConstructors
+  
+extern initializeDebug
+  call initializeDebug
 
   go32to16
 
-  # First let's get a list of video modes.
+  ; First let's get a list of video modes.
   mov ax, 0x4F00
-  mov di, offset biosBuf
+  mov di, biosBuf
   int 0x10
   checkVESAError getVideoModeListError
 
   go16to32
 
+extern setupVideo
   call setupVideo
 
-  # Clear ebx for memory map
-  mov dword ptr[biosBuf + 24], 0
+  ; Clear ebx for memory map
+  mov dword[biosBuf + 24], 0
 
+extern setupMemory
   call setupMemory
+extern doEarlyPaging
   call doEarlyPaging
+extern loadKernelLoader
   call loadKernelLoader
 
-  # Enable PAE
+  ; Enable PAE
   mov eax, cr4
   or  eax, 1 << 5
   mov cr4, eax
 
-  # Enable long mode and NX
-  mov ecx, 0xC0000080 # EFER MSR
+  ; Enable long mode and NX
+  mov ecx, 0xC0000080 ; EFER MSR
   rdmsr
-  or  eax, 1 << 8  # LM bit
-  or  eax, 1 << 11 # NX bit
+  or  eax, 1 << 8  ; LM bit
+  or  eax, 1 << 11 ; NX bit
   wrmsr
 
-  # Reload cr3
-  mov eax, cr3
-  mov cr3, eax
-
-  # Enable paging
+  ; Enable paging
   mov eax, cr0
   or  eax, 1 << 31
   mov cr0, eax
 
-  # We have to grab these pointers before the switch to 64 bits. Thanks ELF.
+  ; Reload cr3
+  ; mov eax, cr3
+  ; mov cr3, eax
+
+  ; We have to grab these pointers before the switch to 64 bits. Thanks ELF.
+extern loaderStack
   lea ebx, [loaderStack]
+extern kernelLoaderEntry
   lea ecx, [kernelLoaderEntry]
 
-  jmp 0x28:1f
-1:.code64
-  # Switch over to 64 bit segments
+  jmp 0x28:mode64
+mode64:
+  [bits 64]
+  ; Switch over to 64 bit segments
   mov dx, 0x30
   dataSelDx
 
-  # Set stack pointer
-  mov rsp, qword ptr[ebx]
+  ; Set stack pointer
+  mov rsp, qword[ebx]
 
   mov rbp, rsp
 
-  # Enable SSE
+  ; Enable SSE
   mov rax, cr0
   and ax, 0xFFFB
   or ax, 0x2
@@ -145,25 +162,22 @@
   or ax, 3 << 9
   mov cr4, rax
 
-  # Tailcall kernel loader
-  mov rcx, qword ptr[ecx]
+  ; Tailcall kernel loader
+  mov rcx, qword[ecx]
   jmp rcx
 
-getVideoModeListError:
-  .asciz "Could not get video mode list!"
-getVideoModeError:
-  .asciz "Could not get video mode!"
-setVideoModeError:
-  .asciz "Could not set video mode!"
+getVideoModeListError db "Could not get video mode list!", 0
+getVideoModeError     db "Could not get video mode!", 0
+setVideoModeError     db "Could not set video mode!", 0
 
-  # setupVideo will call these from 32 bits!
-.code32
-.global getVideoMode
-        getVideoMode:
+  ; setupVideo will call these from 32 bits!
+  [bits 32]
+global getVideoMode
+       getVideoMode:
   go32to16
 
   mov ax, 0x4F01
-  mov di, offset currentModeBuf
+  mov di, currentModeBuf
   int 0x10
 afterGetMode:
   checkVESAError getVideoModeError
@@ -171,12 +185,12 @@ afterGetMode:
   go16to32
   ret
 
-.global setVideoMode
-        setVideoMode:
+global setVideoMode
+       setVideoMode:
   go32to16
 
-  and bx, (1 << 14) - 1 # Use bits 0-13
-  or  bx,  1 << 14      # Linear framebuffer
+  and bx, (1 << 14) - 1 ; Use bits 0-13
+  or  bx,  1 << 14      ; Linear framebuffer
 
   mov ax, 0x4F02
   int 0x10
@@ -185,13 +199,13 @@ afterGetMode:
   go16to32
   ret
 
-.global getMemoryMap
-        getMemoryMap:
+global getMemoryMap
+      getMemoryMap:
   go32to16
 
   mov edx, 0x534D4150
   mov ebx, [biosBuf + 24]
-  mov di, offset biosBuf
+  mov di, biosBuf
   mov eax, 0xE820
   mov ecx, 24
   int 0x15
@@ -201,42 +215,40 @@ afterGetMode:
   go16to32
   ret
 
-.global readDisk
-        readDisk:
-  mov byte ptr[currentModeBuf],     0x10           # Size
-  mov byte ptr[currentModeBuf + 1], 0              # Reserved
-  mov word ptr[currentModeBuf + 2], 0x1            # Number of sectors to read
-  mov word ptr[currentModeBuf + 4], offset biosBuf # Destination offset
-  mov word ptr[currentModeBuf + 6], 0              # Destination segment
+global readDisk
+       readDisk:
+  mov byte[currentModeBuf],     0x10    ; Size
+  mov byte[currentModeBuf + 1], 0       ; Reserved
+  mov word[currentModeBuf + 2], 0x1     ; Number of sectors to read
+  mov word[currentModeBuf + 4], biosBuf ; Destination offset
+  mov word[currentModeBuf + 6], 0       ; Destination segment
 
   go32to16
-  lea si, currentModeBuf
-  mov dl, byte ptr[diskNum]
+  mov si, currentModeBuf
+  mov dl, byte[diskNum]
   mov ah, 0x42
   int 0x13
 
   go16to32
   ret
 
-.global diskNum
-        diskNum:
-  .byte 0
-diskReadCode:
-  .byte 0
-.balign 8
+global diskNum
+diskNum      db 0
+diskReadCode db 0
 
-.code16
+[bits 16]
 vesaError:
   go16to32
-  jmp printVideoModeError
 
-.balign 8
-.global biosBuf
-        biosBuf:
-  .ascii "VBE2"
-  .space 512 - (.-biosBuf)
+extern printVideoModeError
+  jmp  printVideoModeError
 
-.section .bss
-.global currentModeBuf
-        currentModeBuf:
-  .space 256
+align 8
+global biosBuf
+       biosBuf:
+  db "VBE2"
+  times 512 - ($-biosBuf) db 0
+
+global currentModeBuf
+       currentModeBuf:
+  times 256 db 0
