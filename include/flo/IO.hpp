@@ -1,15 +1,15 @@
 #include "Ints.hpp"
 
+#include "flo/Util.hpp"
 #include "flo/Florence.hpp"
-
-#include <limits>
-#include <array>
+#include "flo/TypeTraits.hpp"
+#include "flo/Containers/Array.hpp"
 
 namespace flo {
   template<typename T>
-  struct IsDecimal { static constexpr bool value = false; };
+  constexpr bool isDecimal = false;
   template<typename T>
-  struct IsDecimal<Decimal<T>> { static constexpr bool value = true; };
+  constexpr bool isDecimal<Decimal<T>> = true;
 
   namespace IO {
     enum struct Color {
@@ -210,11 +210,6 @@ namespace flo {
     inline Impl::Serial<4> serial4;
   }
 
-  template<typename T>
-  struct IsSpaces { static constexpr bool value = false; };
-  template<>
-  struct IsSpaces<Spaces> { static constexpr bool value = true; };
-
   inline void print(char const *str) {
     while(*str)
       putchar(*str++);
@@ -279,7 +274,7 @@ namespace flo {
             doColor(IO::Color::white);
             return print(val);
           }
-          else if constexpr(isSpaces<decay<decltype(val)>>) {
+          else if constexpr(isSame<decay<decltype(val)>, Spaces>) {
             doColor(IO::Color::white);
             for(int i = 0; i < val.numSpaces; ++ i)
               putchar(' ');
