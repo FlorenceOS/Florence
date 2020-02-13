@@ -1,7 +1,13 @@
 #pragma once
 
-#include <limits>
-#include <utility>
+#include "flo/Containers/Pair.hpp"
+#include "flo/Limits.hpp"
+
+// Placement new
+#if !__has_include(<memory>) // Arbitrary header
+inline void *operator new  (uSz, void *ptr) noexcept { return ptr; }
+inline void *operator new[](uSz, void *ptr) noexcept { return ptr; }
+#endif
 
 namespace flo {
   enum struct IterationDecision {
@@ -9,13 +15,36 @@ namespace flo {
     stop,
   };
 
-  namespace Util {
-    template<typename T>
-    auto constexpr binDigits = std::numeric_limits<T>::digits;
+  template<typename T>
+  constexpr T &&move(T &value) noexcept {
+    return static_cast<T &&>(value);
+  }
 
+  template<typename T>
+  constexpr T &&forward(removeRef<T> &t) noexcept {
+    return static_cast<T &&>(t);
+  }
+
+  template<typename T>
+  constexpr T &&forward(removeRef<T> &&t) noexcept {
+    static_assert(!isLValueReference<T>, "Can not forward an rvalue as an lvalue.");
+    return static_cast<T &&>(t);
+  }
+
+  template<uSz length, uSz align>
+  struct alignedStorage { alignas(align) u8 data[length]; };
+
+  template<typename T, typename Ty>
+  constexpr T exchange(T &val, Ty &&newVal) noexcept {
+    T copy = val;
+    val = forward<Ty>(newVal);
+    return copy;
+  }
+
+  namespace Util {
     template<typename T, typename F>
     constexpr void forEachBitLowToHigh(T num, F &&functor) {
-      for(int bitnum = 0; bitnum < binDigits<T>; ++ bitnum) {
+      for(int bitnum = 0; bitnum < flo::Limits<T>::bits; ++ bitnum) {
         IterationDecision decision = functor((num >> bitnum) & 1, bitnum);
         if(decision == IterationDecision::stop)
           break;
@@ -24,7 +53,7 @@ namespace flo {
 
     template<typename T, typename F>
     constexpr void forEachBitHighToLow(T num, F &&functor) {
-      for(int bitnum = binDigits<T>; bitnum --> 0;) {
+      for(int bitnum = flo::Limits<T>::bits; bitnum --> 0;) {
         IterationDecision decision = functor((num >> bitnum) & 1, bitnum);
         if(decision == IterationDecision::stop)
           break;
@@ -34,7 +63,7 @@ namespace flo {
     template<typename T>
     [[nodiscard]]
     constexpr int countLowerZeroes(T num) {
-      int result = binDigits<T>;
+      int result = flo::Limits<T>::bits;
 
       forEachBitLowToHigh(num, [&result](auto b, int bitnum) {
         if(b) {
@@ -50,7 +79,7 @@ namespace flo {
     template<typename T>
     [[nodiscard]]
     constexpr int countLowerOnes(T num) {
-      int result = binDigits<T>;
+      int result = flo::Limits<T>::bits;
 
       forEachBitLowToHigh(num, [&result](auto b, int bitnum) {
         if(!b) {
@@ -66,7 +95,7 @@ namespace flo {
     template<typename T>
     [[nodiscard]]
     constexpr int countHighZeroes(T num) {
-      int result = binDigits<T>;
+      int result = flo::Limits<T>::bits;
 
       forEachBitHighToLow(num, [&result](auto b, int bitnum) {
         if(b) {
@@ -82,7 +111,7 @@ namespace flo {
     template<typename T>
     [[nodiscard]]
     constexpr int countHighOnes(T num) {
-      int result = binDigits<T>;
+      int result = flo::Limits<T>::bits;
 
       forEachBitHighToLow(num, [&result](auto b, int bitnum) {
         if(!b) {
@@ -106,7 +135,7 @@ namespace flo {
     template<typename T>
     [[nodiscard]]
     constexpr int unsetCount(T num) {
-      return binDigits<T> - populationCount(num);
+      return flo::Limits<T>::bits - populationCount(num);
     }
 
     template<auto modulus, typename T>
@@ -125,7 +154,7 @@ namespace flo {
     [[nodiscard]]
     constexpr Val msb(Val value) {
       Val zeroes = countHighZeroes(value);
-      if(zeroes == binDigits<Val>)
+      if(zeroes == flo::Limits<Val>::bits)
         return 0;
       return ((Val)1) << zeroes;
     }
@@ -159,12 +188,9 @@ namespace flo {
       return pow2Down(v) << !isPow2(v);
     }
 
-    template<typename T>
-    using Two = std::pair<T, T>;
-
     template<typename Val, typename Compare>
     [[nodiscard]]
-    constexpr Two<Val *> smallerLarger(Val const &lhs, Val const &rhs, Compare &cmp) {
+    constexpr flo::Two<Val *> smallerLarger(Val const &lhs, Val const &rhs, Compare &cmp) {
       if(cmp(lhs, rhs))
         return { &lhs, &rhs };
       return { &rhs, &lhs };
@@ -172,7 +198,7 @@ namespace flo {
 
     template<typename Func>
     constexpr auto compareValueFunc(Func &&valueFunc) {
-      return [f = std::forward<Func>(valueFunc)](auto lhs, auto rhs) {
+      return [f = flo::forward<Func>(valueFunc)](auto lhs, auto rhs) {
         return f(lhs) < f(lhs);
       };
     }
@@ -197,8 +223,22 @@ namespace flo {
     }
 
     inline void copymem(u8 *dest, u8 const *src, uSz size) {
+      if(dest == src)
+        return;
+
       while(size--)
-      *dest++ = *src++;
+        *dest++ = *src++;
+    }
+
+    inline void movemem(u8 *dest, u8 const *src, uSz size) {
+      if(src == dest)
+        return;
+
+      if(src > dest) // Do forwards
+        copymem(dest, src, size);
+
+      while(size--) // Do backwards
+        dest[size] = src[size];
     }
 
     inline bool memeq(u8 const *lhs, u8 const *rhs, uSz size) {

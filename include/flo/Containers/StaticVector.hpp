@@ -1,11 +1,9 @@
 #pragma once
 
-#include <array>
-#include <iterator>
-
 #include "Ints.hpp"
 
 #include "flo/Containers/Impl/VectorBase.hpp"
+#include "flo/Containers/Array.hpp"
 
 namespace flo {
   // Setting doDestructor to false makes the StaticVector destructor a no-op.
@@ -22,7 +20,7 @@ namespace flo {
     // @TODO: = operators
     // @TODO: assign()
 
-    using Storage = std::array<T, cap>;
+    using Storage = Array<T, cap>;
 
     using value_type = T;
     using size_type = decltype(cap);
@@ -42,7 +40,7 @@ namespace flo {
 
     template<typename DoShrink, typename NoRealloc, typename Realloc>
     constexpr auto grow(size_type requestedCapacity, NoRealloc &&noRealloc, Realloc &&realloc) const {
-      std::forward<NoRealloc>(noRealloc)();
+      forward<NoRealloc>(noRealloc)();
     }
 
     constexpr auto adoptNewSize(size_type sz) { numElements = sz; }

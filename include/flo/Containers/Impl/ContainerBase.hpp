@@ -1,16 +1,18 @@
 #pragma once
 
+#include "flo/Containers/Iterator.hpp"
+
 namespace flo {
   template<typename Container>
   struct ContainerBase {
-    [[nodiscard]] constexpr auto rbegin()       { return std::make_reverse_iterator(cont().end()); }
-    [[nodiscard]] constexpr auto rbegin() const { return std::make_reverse_iterator(cont().end()); }
+    [[nodiscard]] constexpr auto rbegin()       { return makeReverseIterator(cont().end()); }
+    [[nodiscard]] constexpr auto rbegin() const { return makeReverseIterator(cont().end()); }
 
-    [[nodiscard]] constexpr auto rend()       { return std::make_reverse_iterator(cont().begin()); }
-    [[nodiscard]] constexpr auto rend() const { return std::make_reverse_iterator(cont().begin()); }
+    [[nodiscard]] constexpr auto rend()       { return makeReverseIterator(cont().begin()); }
+    [[nodiscard]] constexpr auto rend() const { return makeReverseIterator(cont().begin()); }
 
-    [[nodiscard]] constexpr auto crbegin() const { return std::make_reverse_iterator(cont().cend()); }
-    [[nodiscard]] constexpr auto crend()   const { return std::make_reverse_iterator(cont().cbegin()); }
+    [[nodiscard]] constexpr auto crbegin() const { return makeReverseIterator(cont().cend()); }
+    [[nodiscard]] constexpr auto crend()   const { return makeReverseIterator(cont().cbegin()); }
 
     [[nodiscard]] constexpr auto empty() const { return cont().size() == 0; }
   private:

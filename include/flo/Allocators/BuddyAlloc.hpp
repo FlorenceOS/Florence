@@ -27,7 +27,7 @@ namespace Flo {
       auto end()   const { Iterator{nullptr}; }
       auto empty() const { return next == nullptr; }
 
-      void *extract() { return std::exchange(next, next->next); }
+      void *extract() { return flo::exchange(next, next->next); }
     };
   }
 

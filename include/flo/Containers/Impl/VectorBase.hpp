@@ -1,9 +1,7 @@
 #pragma once
 
-#include <cstring>
-#include <algorithm>
-
 #include "flo/Util.hpp"
+#include "flo/Algorithm.hpp"
 #include "flo/Containers/Impl/ContainerBase.hpp"
 
 namespace flo {
@@ -32,8 +30,8 @@ namespace flo {
 
     using iterator = T *;
     using const_iterator = T const *;
-    using reverse_iterator = std::reverse_iterator<T *>;
-    using const_reverse_iterator = std::reverse_iterator<T const *>;
+    using reverse_iterator = ReverseIterator<T *>;
+    using const_reverse_iterator = ReverseIterator<T const *>;
     using value_type = T;
     using pointer = T *;
     using const_pointer = T const *;
@@ -59,7 +57,7 @@ namespace flo {
 
       // Let's make sure that if exactly one is inline, it's v().
       if(!v().isInline() && other.isInline()) {
-        other.swap(v);
+        other.swap(v());
         return v();
       }
 
@@ -70,7 +68,7 @@ namespace flo {
           itMoveDestruct(smaller->begin() + smaller->size(), larger->data() + smaller->size(), larger->data() + larger->size());
 
           for(uSz i = 0; i < smaller->size(); ++ i)
-            std::swap(v()[i], other[i]);
+            swap(v()[i], other[i]);
         }
         else { // If only v() is inline, we have to move the pointer to v() after moving all the inline elements
           auto outOfLineData = other.data();
@@ -126,7 +124,7 @@ namespace flo {
 
     template<typename InputBeg, typename InputEnd>
     constexpr auto insert(iterator pos, InputBeg ib, InputEnd ie) {
-      auto at = makeElementSpace(pos, std::distance(ib, ie));
+      auto at = makeElementSpace(pos, distance(ib, ie));
       while(ib != ie)
         new (&*at++) T(*ib++);
     }
@@ -134,13 +132,13 @@ namespace flo {
     template<typename ...Ty>
     constexpr auto emplace(iterator pos, Ty &&...vs) {
       if(pos == v().end())
-        return &emplace_back(std::forward<Ty>(vs)...);
-      return new (&*makeElementSpace(pos)) T(std::forward<Ty>(vs)...);
+        return &emplace_back(forward<Ty>(vs)...);
+      return new (&*makeElementSpace(pos)) T(forward<Ty>(vs)...);
     }
 
     template<typename ...Ty>
     constexpr T &emplace_back(Ty &&...vs) {
-      return *new (&*makeElementSpace()) T(std::forward<Ty>(vs)...);
+      return *new (&*makeElementSpace()) T(forward<Ty>(vs)...);
     }
 
     constexpr void pop_back() {
@@ -150,8 +148,8 @@ namespace flo {
 
     // Invalid for non-movable types
     template<typename Ty = void>
-    constexpr auto erase(iterator begin, iterator end) -> std::enable_if_t<std::is_move_assignable_v<T>, Ty>{
-      auto const elementsDestroyed = std::distance(begin, end);
+    constexpr auto erase(iterator begin, iterator end) -> enableIf<isMoveAssignable<T>, Ty>{
+      auto const elementsDestroyed = distance(begin, end);
       itMove<Forwards>(begin, end, v().end());
       destroyRange(v().end() - elementsDestroyed, v().end());
       v().adoptNewSize(v().size() - elementsDestroyed);
@@ -215,7 +213,7 @@ namespace flo {
 
     constexpr static void itMoveBytes(iterator dest, iterator begin, iterator end) {
       if(begin >= end) return;
-      std::memmove((u8 *)&*dest, (u8 const *)&*begin, (u8 const *)&*end - (u8 const *)&*begin);
+      Util::movemem((u8 *)&*dest, (u8 const *)&*begin, (u8 const *)&*end - (u8 const *)&*begin);
     }
 
     constexpr void swapSizes(Vector &other) {
@@ -226,24 +224,24 @@ namespace flo {
 
   protected:
     constexpr static void itMoveConstuct(iterator dest, iterator begin, iterator end) {
-      if constexpr(std::is_trivially_move_constructible_v<T>)
+      if constexpr(isTriviallyMoveConstructible<T>)
         itMoveBytes(dest, begin, end);
 
       // We can do this move in any direction, since we're moving
       // into non-overlapping storage, since it's not constructed
       else while(begin < end)
-        new(&*dest++) T(std::move(*begin++));
+        new(&*dest++) T(move(*begin++));
     }
 
     constexpr static void destroyRange(iterator begin, iterator end) {
-      if constexpr(!std::is_trivially_destructible_v<T>) {
-        std::for_each(begin, end, [](T &val) { val.~T(); });
+      if constexpr(!isTriviallyDestructible<T>) {
+        forEach(begin, end, [](T &val) { val.~T(); });
       }
     }
 
     constexpr static void itMoveConstuctDestroy(iterator dest, iterator begin, iterator end) {
       itMoveConstuct(dest, begin, end);
-      if constexpr(!std::is_trivially_move_assignable_v<T>) {
+      if constexpr(!isTriviallyMoveAssignable<T>) {
         destroyRange(begin, end);
       }
     }
@@ -256,17 +254,17 @@ namespace flo {
       if(end <= begin)
         return;
 
-      if constexpr(std::is_trivially_move_assignable_v<T>)
+      if constexpr(isTriviallyMoveAssignable<T>)
         itMoveBytes(dest, begin, end);
       else {
-        if constexpr(std::is_same_v<direction, Backwards>) {
-          dest += std::distance(begin, end);
+        if constexpr(isSame<direction, Backwards>) {
+          dest += distance(begin, end);
           while(begin != end)
-            *--dest = std::move(*--end);
+            *--dest = move(*--end);
         }
         else {
           while(begin != end)
-            *dest++ = std::move(*begin++);
+            *dest++ = move(*begin++);
         }
       }
     }
