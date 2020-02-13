@@ -257,28 +257,39 @@ namespace flo {
       return [](auto &&...vs) {};
 
     else return
-      [prefix](auto &&...vs) {
-        auto p = [](auto &&val) {
-          if constexpr(IsDecimal<std::decay_t<decltype(val)>>::value) {
-            setColor(IO::Color::yellow);
+      [prefix, colorOverride = false](auto &&...vs) mutable {
+        auto p = [&colorOverride](auto &&val) {
+          auto doColor =
+            [&colorOverride](IO::Color col) {
+              if(!exchange(colorOverride, false))
+                setColor(col);
+            };
+
+          if constexpr(isSame<decay<decltype(val)>, IO::Color>) {
+            setColor(val);
+            colorOverride = true;
+          }
+          else if constexpr(isDecimal<decay<decltype(val)>>) {
+            doColor(IO::Color::yellow);
             return printDec(val.val);
           }
-            setColor(IO::Color::white);
           else if constexpr(isSame<decay<decltype(val)>, char const *> ||
+                            isSame<decay<decltype(val)>, char *> ||
                             isArray<decay<decltype(val)>>) {
+            doColor(IO::Color::white);
             return print(val);
           }
-            setColor(IO::Color::white);
           else if constexpr(isSpaces<decay<decltype(val)>>) {
+            doColor(IO::Color::white);
             for(int i = 0; i < val.numSpaces; ++ i)
               putchar(' ');
           }
-            setColor(IO::Color::blue);
           else if constexpr(isPointer<decay<decltype(val)>>) {
+            doColor(IO::Color::blue);
             return printNum(reinterpret_cast<uptr>(val));
           }
           else {
-            setColor(IO::Color::cyan);
+            doColor(IO::Color::cyan);
             return printNum(val);
           }
         };
