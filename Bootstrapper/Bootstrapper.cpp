@@ -494,7 +494,7 @@ namespace {
         readDisk(++startingSector);
       }
 
-      auto err = flo::Paging::map(ppage, outAddr, flo::Paging::PageSize<1>, perms);
+      auto err = flo::Paging::map(ppage, outAddr, flo::Paging::PageSize<1>, perms, pline);
       flo::checkMappingError(err, pline, flo::CPU::hang);
 
       rewriteLoaderHeader(flo::getPhys<u64>(ppage));
