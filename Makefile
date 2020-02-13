@@ -8,15 +8,30 @@ ifndef QEMUFlags
 QEMUFlags := -serial stdio
 endif
 
-QEMU := $(QEMUExec) $(QEMUFlags) -m 128M
+QEMU := $(QEMUExec) $(QEMUFlags) -m 1M -no-reboot
 KVM := $(QEMU) -enable-kvm -cpu host
 
-CXXFlags := $(CXXFlags) -ffreestanding -g -Wall -fno-stack-protector\
-	-mno-red-zone -fno-exceptions -fno-rtti -Wno-sign-compare\
-	-std=c++17 -Os -mno-soft-float -Iinclude -ffunction-sections\
-	-fdata-sections -funsigned-char -mno-avx -masm=intel
+CXXFlags := $(CXXFlags) \
+	-ffreestanding -g -Wall -fno-stack-protector -nostdlib\
+	-fno-exceptions -nostdinc++ -nostdinc -fno-rtti -Wno-sign-compare\
+	-std=c++17 -Oz -mno-soft-float -Iinclude -ffunction-sections\
+	-fdata-sections -funsigned-char -mno-avx -mno-avx2 -fno-use-cxa-atexit\
+  -fno-builtin -fno-unwind-tables
+
+LDFlags := --gc-sections --no-dynamic-linker -static
+LinkingFlags :=  -flto -O2 -Wl,--gc-sections,--no-dynamic-linker,--icf=all -fuse-ld=lld -static -ffreestanding -nostdlib
 
 CommonHeaders := $(wildcard include/**/*.hpp)
+LibFloSources := LibFlo/LibFlo.cpp
+
+build/LibFlo32.o: $(LibFloSources) $(CommonHeaders) Makefile
+	clang++ -m32 -fno-pic -fno-pie $(CXXFlags) -c $(filter %.cpp,$^) -o $@
+
+build/LibFlo64.o: $(LibFloSources) $(CommonHeaders) Makefile
+	clang++ -m64 -fno-pic -fno-pie $(CXXFlags) -c $(filter %.cpp,$^) -o $@
+
+build/LibFloPIC.o: $(LibFloSources) $(CommonHeaders) Makefile
+	clang++ -m64 -fpic -fpie $(CXXFlags) -c $(filter %.cpp,$^) -o $@
 
 .PHONY: clean all dbg bochs test
 .SECONDARY:;
@@ -71,37 +86,35 @@ build/Bootsector/Bootsector.elf: Bootsector/Linker.lds build/Bootsector/Bootsect
 	@readelf -a $@ | grep 'loaderSize' | awk '{ print "MBR size: " strtonum("0x" $$2)/0x1FE * 100 "%" }'
 
 # Bootstrapper
-BootstrapperSources := $(wildcard Bootstrapper/*.S) $(wildcard Bootstrapper/*.cpp)
-BootstrapperObjects := $(patsubst %,build/%.o,$(BootstrapperSources))
-BootstrapperHeaders := $(wildcard Bootstrapper/*.hpp)
+BootstrapperSources := Bootstrapper/Bootstrapper.S Bootstrapper/Bootstrapper.cpp
+BootstrapperObjects := $(patsubst %,build/%.o,$(BootstrapperSources) LibFlo32)
 
-build/Bootstrapper/%.S.o: Bootstrapper/%.S Makefile
+build/Bootstrapper/Bootstrapper.S.o: Bootstrapper/Bootstrapper.S Makefile
 	@mkdir -p $(@D)
 	nasm -felf32 $< -o $@
 
-build/Bootstrapper/%.cpp.o: Bootstrapper/%.cpp $(BootstrapperHeaders) $(CommonHeaders) Makefile
+build/Bootstrapper/Bootstrapper.cpp.o: Bootstrapper/Bootstrapper.cpp $(CommonHeaders) Makefile
 	@mkdir -p $(@D)
-	g++ -m32 -fno-pic -fno-pie -march=i386 $(CXXFlags) -fno-use-cxa-atexit -IBootstrapper -c $< -o $@
+	clang++ -flto -m32 -fno-pic -fno-pie -march=i386 $(CXXFlags) -c $< -o $@
 
 build/Bootstrapper/Bootstrapper.elf: Bootstrapper/Linker.lds $(BootstrapperObjects)
-	ld -T $^ -o $@ --gc-sections
+	clang -Xlinker -T $^ -o $@ -m32 $(LinkingFlags)
 	@readelf -a $@ | grep 'BootstrapSize' | awk '{ print "Bootstrapper size: " strtonum("0x" $$2)/(0x10000 - 0x7E00) * 100 "%" }'
 
 # Kernel loader
-KernelLoaderSources := $(wildcard KernelLoader/*.S) $(wildcard KernelLoader/*.cpp)
-KernelLoaderObjects := $(patsubst %,build/%.o,$(KernelLoaderSources))
-KernelLoaderHeaders := $(wildcard KernelLoader/*.hpp)
+KernelLoaderSources := KernelLoader/KernelLoader.S KernelLoader/KernelLoader.cpp
+KernelLoaderObjects := $(patsubst %,build/%.o,$(KernelLoaderSources) LibFlo64)
 
 build/KernelLoader/KernelLoader.S.o: KernelLoader/KernelLoader.S build/Kernel/Kernel.elf Makefile
 	@mkdir -p $(@D)
 	nasm -felf64 $< -o $@
 
-build/KernelLoader/%.cpp.o: KernelLoader/%.cpp $(KernelLoaderHeaders) $(CommonHeaders) Makefile
+build/KernelLoader/KernelLoader.cpp.o: KernelLoader/KernelLoader.cpp $(CommonHeaders) Makefile
 	@mkdir -p $(@D)
-	g++ -m64 -fno-pic -fno-pie $(CXXFlags) -fno-use-cxa-atexit -IKernelLoader -c $< -o $@
+	clang++ -m64 -fno-pic -fno-pie $(CXXFlags) -c $< -o $@
 
 build/KernelLoader/KernelLoader.elf: KernelLoader/Linker.lds $(KernelLoaderObjects)
-	ld -T $^ -o $@ --gc-sections
+	clang -Xlinker -T $^ -o $@ $(LinkingFlags)
 	@readelf -a $@ | grep 'KernelLoaderSize' | awk '{ print "Kernel loader size: " strtonum("0x" $$2)/(512 * 1024 * 1024) * 100 "%" }'
 
 KernelSources := $(wildcard Kernel/*.S) Kernel/Kernel.cpp
@@ -117,10 +130,12 @@ build/Kernel/Kernel.cpp.o: Kernel/Kernel.cpp $(CommonHeaders) Makefile
 
 build/Kernel/Kernel.elf: Kernel/Kernel.lds $(KernelObjects)
 	@mkdir -p $(@D)
-	@# ld.lld here crashes :(
+	@# lld crashes here :(
+	@# If/when it stops, please use the bottom one :^)
 	ld -T $^ -o $@ $(LDFlags) -pie -s
+	@#clang -Xlinker -T $^ -o $@ $(LinkingFlags) -fpie -Xlinker -pie
 
 # Literally just concat them lol
 out/Disk.bin: build/Bootsector/Bootsector.bin build/Bootstrapper/Bootstrapper.bin build/KernelLoader/KernelLoader.bin Makefile
 	@mkdir -p $(@D)
-	cat $(filter-out Makefile,$^) > $@
+	cat $(filter %.bin,$^) > $@
