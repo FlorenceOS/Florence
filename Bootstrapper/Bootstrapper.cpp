@@ -379,18 +379,13 @@ extern "C" void doEarlyPaging() {
 
   auto err = flo::Paging::map(flo::PhysicalAddress{0}, kaslrBase, physHigh, permissions, pline);
 
-  flo::printPaging(pageRootPhys, pline);
   flo::checkMappingError(err, pline, flo::CPU::hang);
-
-  pline("Successfully mapped physical memory!");
-
 
   permissions.mapping.executeDisable = 0;
 
   // Identity map ourselves to be able to turn on paging
   err = flo::Paging::map(flo::PhysicalAddress{0}, flo::VirtualAddress{0}, flo::Util::mega(2), permissions, pline);
   flo::checkMappingError(err, pline, flo::CPU::hang);
-  pline("Identity mapped ourselves!");
 }
 
 namespace {
@@ -414,7 +409,6 @@ namespace {
   void doLoadLoader(u32 startingSector, u32 numPages) {
     auto outAddr = flo::VirtualAddress{flo::Util::giga(1ull)};
     loaderStack = outAddr;
-    pline("Kernel loader (", Decimal{numPages}, " page(s)) at ", outAddr());
 
     // RWX, supervisor only
     flo::Paging::Permissions perms;
@@ -550,8 +544,6 @@ extern "C" void loadKernelLoader() {
       pline("Kernel loader found at sector ", Decimal{loaderSector});
 
       u32 loaderPages = flo::Util::get<u32>(diskdata, sizeof(magic));
-      u64 loaderSize = loaderPages * flo::Paging::PageSize<1>;
-      pline("Kernel loader with size ", Decimal{loaderPages}, ", ", loaderSize);
 
       doLoadLoader(loaderSector, loaderPages);
       return;
