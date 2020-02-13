@@ -5,15 +5,11 @@
 #include "flo/Util.hpp"
 #include "flo/Bitfields.hpp"
 #include "flo/CPU.hpp"
-
-#include <array>
-#include <cstring>
-#include <optional>
+#include "flo/Containers/Array.hpp"
+#include "flo/Containers/Optional.hpp"
 
 namespace flo {
   namespace Paging {
-    constexpr inline bool noisy = false;
-
     // This is generally 4 but 5 is coming to the market...
     constexpr static u64 PageTableLevels = 4;
 
@@ -157,7 +153,7 @@ namespace flo {
           l(pageTable.physaddrPart);
       }
 
-      constexpr static auto lvl = Level;
+      constexpr static int lvl = Level;
 
       auto *virtaddr() const {
         return getPhys<PageTables::PointedTo<Level>>(physaddr());
@@ -173,7 +169,7 @@ namespace flo {
 
     template<int Level>
     union PageTable {
-      std::array<PageTableEntry<Level>, PageTableSize> table;
+      flo::Array<PageTableEntry<Level>, PageTableSize> table;
       PageTable() {
         flo::Util::setmem((u8 *)&table, 0x00, sizeof(table));
       }
@@ -190,7 +186,6 @@ namespace flo {
       return getPhys<PageTable<PageTableLevels>>(flo::PhysicalAddress{flo::CPU::cr3});
     }
 
-
     struct MappingError {
       enum {
         AlreadyMapped,
@@ -202,8 +197,8 @@ namespace flo {
       int level;
     };
 
-    using oMappingError = std::optional<MappingError>;
-    inline constexpr auto noMappingError = std::nullopt;
+    using oMappingError = flo::Optional<MappingError>;
+    inline constexpr auto noMappingError = flo::nullopt;
 
     namespace Impl {
       template<int Level>
@@ -238,112 +233,132 @@ namespace flo {
         return (addr >> pageOffsetBits<Level>) % VirtualAddress{PageTableSize};
       }
 
+      template<int Level, typename Conflicting, typename MakeMap, typename MapPred>
+      oMappingError doMap(VirtualAddress &virt, u64 &size, PageTable<Level> &table, Conflicting &&conflicting, MakeMap &&makeMap, MapPred &&mapPred) {
+        auto ind = Impl::getIndex<Level>(virt);
+        
+        for(; size && ind < PageTableSize; ++ind) {
+          auto &pte = table.table[ind];
 
-
-
-    template<int Level, typename Tracer>
-    [[nodiscard]]
-    std::optional<MappingError> map(PhysicalAddress phys, VirtualAddress virt, u64 &size, Permissions perms, PageTable<Level> &table, Tracer &&tracer) {
-      auto ind = Impl::getIndex<Level>(virt);
-      auto &currPTE = table.table[ind];
-
-      auto trace = [&](auto ...vs) {
-        tracer("[", Decimal{(u8)Level}, "]@", &table, "[", Decimal{(u16)ind}, "]: v", virt(), " ", std::forward<decltype(vs)>(vs)...);
-      };
-
-      MappingError err{};
-      err.phys = phys;
-      err.virt = virt;
-      err.level = Level;
-      if((Level == 1 || size >= PageSize<Level> - PageSize<Level - 1>) && // Don't map something which doesn't fill the lower level
-         phys == alignPageDown<Level>(phys) &&
-         virt == alignPageDown<Level>(virt)) {
-        if(currPTE.present) {
-          trace("Present mapping: ", currPTE.rep, " maps to ", currPTE.physaddr()());
-          err.type = MappingError::AlreadyMapped;
-          err.alreadyMapped.pageTableWithMapping = &table;
-          err.alreadyMapped.mappingIndex = ind;
-          return err;
-        }
-        //This gets a little noisy
-        if constexpr(flo::Paging::noisy) {
-          trace("Mapping!");
-        }
-        currPTE = Impl::mapping<Level>(perms, phys);
-        if(size < PageSize<Level>)
-          size = 0;
-        else
-          size -= PageSize<Level>;
-      } else {
-        if constexpr(Level == 1) {
-          // We can't map this as the pointers aren't aligned
-          err.type = MappingError::NoAlignment;
-          return err;
-        } else {
-          PageTable<Level - 1> *nextTable;
-
-          // Split the unaligned pointers up to the next level
-          if(currPTE.present) {
-            // Existing present entry
-            if(currPTE.isMapping()) {
-              // This is a mapping, bail out
-              err.type = MappingError::AlreadyMapped;
-              err.alreadyMapped.pageTableWithMapping = &table;
-              err.alreadyMapped.mappingIndex = ind;
-              return err;
+          [[maybe_unused]]
+          auto step = [&]() {
+            if(size < PageSize<Level>) {
+              virt -= VirtualAddress{size};
+              size = 0;
             }
             else {
-              // Get the existing table
-              nextTable = getPhys<PageTable<Level - 1>>(currPTE.physaddr());
+              virt += VirtualAddress{PageSize<Level>};
+              size -= PageSize<Level>;
             }
-            trace("Existing PT");
-          }
-          else {
-            // Make a new page table, none is present
-            auto pageTablePhys = getPhysicalPage(1);
-            nextTable = new (getPhys<PageTable<Level - 1>>(pageTablePhys)) PageTable<Level - 1>();
+          };
 
-            // Map this into the current table
-            //trace("Next level table missing, mapping to ", nextTable);
-            auto pte = Impl::table<Level>();
-            pte.setPhysaddr(pageTablePhys);
-            currPTE = pte;
-            trace("New PT!");
-          }
-
-          constexpr auto step = PageSize<Level - 1>;
-
-          while(size) {
-            auto err = map<Level - 1>(phys, virt, size, perms, *nextTable, tracer);
+          if(pte.present && pte.isMapping()) {
+            // Tell the caller about the present mapping
+            auto err = conflicting(virt, pte);
             if(err)
               return err;
+          }
 
-            if(ind++ == PageTableSize - 1)
-              break;
+          if constexpr(Level > 1) {
+            auto recurse = [&]() {
+              return doMap(virt, size,
+                *getPhys<PageTable<Level - 1>>(pte.physaddr()),
+                conflicting, makeMap, mapPred
+              );
+            };
 
-            phys += static_cast<PhysicalAddress>(step);
-            virt += static_cast<VirtualAddress>(step);
+            // If there already was an entry here
+            if(pte.present && !pte.isMapping()) { /* latter should always be true*/
+              // If it's present, just recurse
+              auto err = recurse();
+              if(err)
+                return err;
+
+              continue;
+            }
+
+            if constexpr(Level < 4) {
+              if(!pte.present && (virt & VirtualAddress{PageSize<Level> - 1})() == 0 && mapPred(virt, size, PageSize<Level>)) {
+                // Make a mapping
+                auto err = makeMap(virt, size, pte);
+                if(err)
+                  return err;
+
+                step();
+              }
+            }
+
+            if(!pte.present) {
+              // We didn't create a mapping at this level in the last if, we make a PT and recurse!
+
+              // Get a physical page for the table
+              auto pageTablePhys = getPhysicalPage(1);
+
+              // Construct page table
+              new (getPhys<PageTable<Level - 1>>(pageTablePhys)) PageTable<Level - 1>();
+
+              // Make a new PTE
+              auto npte = Impl::table<Level>();
+              npte.setPhysaddr(pageTablePhys);
+
+              // Map this into the current PTE
+              pte = npte;
+
+              auto err = recurse();
+              if(err)
+                return err;
+
+              continue;
+            }
+          }
+          else {
+            if(!pte.present) {
+              // If this should lead to a mapping
+              auto err = makeMap(virt, size, pte);
+              if(err)
+                return err;
+
+              step();
+            }
           }
         }
+
+        return noMappingError;
       }
-      return std::nullopt;
     }
 
     template<typename Tracer>
     [[nodiscard]]
     auto map(PhysicalAddress phys, VirtualAddress virt, u64 size, Permissions perm, Tracer &&tracer) {
-      while(1) {
-        auto err = map(phys, virt, size, perm, *getPagingRoot(), tracer);
-        if(err)
-          return err;
+      auto currPhys = [&](auto currVirt) {
+        return phys + PhysicalAddress{currVirt() - virt()};
+      };
 
-        // Advance to the next top level page
-        virt = alignPageUp<PageTableLevels>(virt + VirtualAddress {1ull});
-        phys = alignPageUp<PageTableLevels>(phys + PhysicalAddress{1ull});
+      // Currently, any conflicting pages are just a straight up error.
+      auto conflicting = [&](auto virtaddr, auto &pte) -> oMappingError {
+        MappingError err{};
+        err.phys = pte.physaddr();
+        err.virt = virtaddr;
+        err.level = decay<decltype(pte)>::lvl;
 
-        if(!size)
-          return err;
-      }
+        err.type = MappingError::AlreadyMapped;
+        return err;
+      };
+
+      // Calculate physical address to be mapped
+      auto makeMap = [&](auto currVirt, auto csize, auto &pte) -> oMappingError {
+        pte = Impl::mapping<decay<decltype(pte)>::lvl>(perm, currPhys(currVirt));
+        return noMappingError;
+      };
+ 
+      // Make sure the physical address is aligned and that the page is not twice as big as our mapping
+      auto mapPred = [&](auto currVirt, auto currSize, auto pageSize) -> bool {
+        bool allow = (currPhys(currVirt)() & (pageSize - 1)) == 0 && pageSize < size * 2;
+        return allow;
+      };
+      
+      auto virtcpy = virt;
+      return Impl::doMap(virtcpy, size, *getPagingRoot(), conflicting, makeMap, mapPred);
     }
 
     [[nodiscard]]
@@ -351,34 +366,33 @@ namespace flo {
       return map(phys, virt, size, perm, [](auto...) { });
     }
 
-#define mapMacro(lvl)\
-  {auto constexpr pageSz = PageSize<lvl>; \
-  if(size >= pageSz && virt % VirtualAddress{pageSz} == VirtualAddress{0}){ /* Large enough and aligned */\
-    PhysicalAddress page = getPhysicalPage(lvl);\
-    if(page) {\
-      auto err = map(page, virt, pageSz, perm);\
-      if(err) return err;\
-      virt += VirtualAddress{pageSz};\
-      size -= pageSz;\
-      continue;\
-    }\
-  }}
-
     [[nodiscard]]
-    std::optional<MappingError> map(VirtualAddress virt, u64 size, Permissions perm) {
-      // Size is aligned up to the next page size
-      for(size = alignPageUp<1>(size); size;) {
-        // At the time of writing this, you can't map anything above a level 3 page (1GB) :^(
-        mapMacro(3);
-        mapMacro(2);
-        mapMacro(1);
-        // This should be unreachable as running out of 1 level pages is a fatal error
-        __builtin_unreachable();
-      }
+    oMappingError map(VirtualAddress virt, u64 size, Permissions perm) {
+      size = alignPageUp<1>(size);
 
-      return std::nullopt;
+      // Currently, any conflicting pages are just a straight up error.
+      auto conflicting = [&](auto virtaddr, auto &pte) -> oMappingError {
+        MappingError err{};
+        err.phys = pte.physaddr();
+        err.virt = virtaddr;
+        err.level = decay<decltype(pte)>::lvl;
+        return err;
+      };
+
+      // Get physical page to be mapped
+      auto makeMap = [&](auto currVirt, auto csize, auto &pte) -> oMappingError {
+        if(auto ppage = getPhysicalPage(decay<decltype(pte)>::lvl); ppage)
+          pte = Impl::mapping<decay<decltype(pte)>::lvl>(perm, ppage);
+        return noMappingError;
+      };
+ 
+      // Make sure that the page is not twice as big
+      auto mapPred = [&](auto currVirt, auto currSize, auto pageSize) -> bool {
+        return pageSize/2 < currSize;
+      };
+      
+      return Impl::doMap(virt, size, *getPagingRoot(), conflicting, makeMap, mapPred);
     }
-#undef mapMacro
 
     // Returns if the table should remain present (still has children)
     template<bool reclaimPages, int Level>
@@ -418,38 +432,29 @@ namespace flo {
       return left || anyOf(table.table.begin() + ind, table.table.end(), [](auto &pte) { return pte.present; });
     }
 
-    // Don't reclaim the pages if they're not supposed to get reused :^)
     template<bool reclaimPages>
     void unmap(VirtualAddress virt, u64 size) {
-      struct CR3Resetter {
-        ~CR3Resetter() { flo::CPU::cr3 = flo::CPU::cr3; }
-      } reset;
-      while(1) {
-        unmap<reclaimPages>(virt, size, *getPagingRoot());
-
-        if(!size)
-          return;
-      }
+      unmap<reclaimPages>(virt, size, *getPagingRoot());
     }
   }
 
   template<typename Out, typename ErrorFunc>
-  void checkMappingError(std::optional<Paging::MappingError> err, Out &&out, ErrorFunc &&errf) {
+  void checkMappingError(flo::Paging::oMappingError err, Out &&out, ErrorFunc &&errf) {
     if(err) {
-      out("Error while mapping at paging level ", (u8)err->level);
+      out("Error while mapping ", err->virt(), " at paging level ", (u8)err->level);
       switch(err->type) {
         case flo::Paging::MappingError::AlreadyMapped:
-          std::forward<Out>(out)("  Already mapped, ", "PT: ", err->alreadyMapped.pageTableWithMapping, ", ind = ", (u16)err->alreadyMapped.mappingIndex);
+          forward<Out>(out)("  Already mapped! ");
           break;
         case flo::Paging::MappingError::NoAlignment:
-          std::forward<Out>(out)("  Misaligned pointers!");
+          forward<Out>(out)("  Misaligned pointers!");
           break;
         default:
-          std::forward<Out>(out)("  Unknown error!");
+          forward<Out>(out)("  Unknown error!");
           break;
       }
 
-      std::forward<ErrorFunc>(errf)();
+      forward<ErrorFunc>(errf)();
     }
   }
 
