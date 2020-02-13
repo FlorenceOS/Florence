@@ -75,7 +75,7 @@ namespace flo {
 
       u8 inline currentColor = 0x7;
 
-      void setColor(Color c) {
+      inline void setColor(Color c) {
         switch(c) {
           break; case Color::red:    currentColor = 0x4;
           break; case Color::cyan:   currentColor = 0x3;
@@ -86,23 +86,23 @@ namespace flo {
         }
       }
 
-      volatile u16 *charaddr(int x, int y) {
+      inline volatile u16 *charaddr(int x, int y) {
         return (volatile u16 *)flo::getPhys<u16>(flo::PhysicalAddress{0xB8000}) + (y * width + x);
       }
 
-      void setchar(int x, int y, char c) {
+      inline void setchar(int x, int y, char c) {
         *charaddr(x, y) = (currentColor << 8) | c;
       }
 
-      void setchar(int x, int y, u16 entireChar) {
+      inline void setchar(int x, int y, u16 entireChar) {
         *charaddr(x, y) = entireChar;
       }
 
-      u16 getchar(int x, int y) {
+      inline u16 getchar(int x, int y) {
         return *charaddr(x, y);
       }
 
-      void feedLine() {
+      inline void feedLine() {
         currX = 0;
         if(currY == height - 1) {
           // Scroll
@@ -117,14 +117,14 @@ namespace flo {
           ++currY;
       }
 
-      void putchar(char c) {
+      inline void putchar(char c) {
         if(currX == width) {
           feedLine();
         }
         setchar(currX++, currY, c);
       }
 
-      void clear() {
+      inline void clear() {
         for(int x = 0; x < width;  ++ x)
         for(int y = 0; y < height; ++ y)
           setchar(x, y, ' ');
@@ -215,7 +215,7 @@ namespace flo {
   template<>
   struct IsSpaces<Spaces> { static constexpr bool value = true; };
 
-  void print(char const *str) {
+  inline void print(char const *str) {
     while(*str)
       putchar(*str++);
   }

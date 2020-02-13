@@ -34,5 +34,5 @@ namespace flo {
   Decimal(T) -> Decimal<T>;
 
   struct Spaces { int numSpaces; };
-  auto spaces(int numSpaces) { return Spaces{numSpaces}; }
+  inline auto spaces(int numSpaces) { return Spaces{numSpaces}; }
 }
