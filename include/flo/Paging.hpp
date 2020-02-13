@@ -462,33 +462,36 @@ namespace flo {
     }
   }
 
-  template<typename PT, typename Tracer>
-  void printPaging(PT &pt, Tracer &&tracer, u64 virtaddr = 0, u8 indent = 0) {
+  template<int Level, typename Tracer>
+  void printPaging(Paging::PageTable<Level> &pt, Tracer &&tracer, u64 virtaddr = 0, u8 indent = 0) {
     bool visitedAny = false;
     for(int i = 0; i < flo::Paging::PageTableSize; ++ i) {
       auto &ent = pt.table[i];
-      [[maybe_unused]]
-      auto nextVirt = flo::Paging::makeCanonical(virtaddr | ((u64)i << flo::Paging::pageOffsetBits<ent.lvl>));
       if(!ent.present)
         continue;
+
+      [[maybe_unused]]
+      auto nextVirt = flo::Paging::makeCanonical(virtaddr | ((u64)i << flo::Paging::pageOffsetBits<Level>));
 
       visitedAny = true;
       
       if(!ent.isMapping()) {
         tracer(spaces(indent), "Entry ", Decimal{i}, " v", nextVirt, " -> PT");
 
-        if constexpr(ent.lvl < 2) {
+        if constexpr(Level < 2) {
           tracer(spaces(indent + 1), "Present level 1 mapping without mapping bit set!!");
           continue;
         }
         else {
-          auto ptr = flo::getPhys<flo::Paging::PageTable<ent.lvl - 1>>(ent.physaddr());
+          auto ptr = flo::getPhys<flo::Paging::PageTable<Level - 1>>(ent.physaddr());
           printPaging(*ptr, tracer, nextVirt, indent + 1);
         }
       }
       else
         tracer(spaces(indent), "Entry ", Decimal{i}, " v", nextVirt, " (r", ent.perms.writeEnable ? "w" : "-", ent.perms.mapping.executeDisable ? "-" : "x", ") -> p", ent.physaddr()());
     }
+    if(!visitedAny)
+      tracer(spaces(indent), &pt, ": This table was empty :(");
   };
 }
 
