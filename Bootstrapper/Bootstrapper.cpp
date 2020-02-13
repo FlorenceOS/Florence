@@ -372,8 +372,8 @@ extern "C" void setupMemory() {
     fetchMemoryRegion();
 
     bool use = shouldUse(mem);
-    pline(use ? "U":"Not u", "sing memory of size ", mem.size(), " at ", mem.base());
     if(use) {
+      pline("Using memory of size ", mem.size(), " at ", mem.base());
       flo::PhysicalMemoryRange mr;
       mr.begin = mem.base;
       mr.end = mem.base + mem.size;
