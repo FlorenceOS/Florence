@@ -1,8 +1,8 @@
 #pragma once
 
 #include "Ints.hpp"
-
-#include <array>
+#include "flo/Containers/Array.hpp"
+#include "flo/Bitfields.hpp"
 
 #define SYSREG(reg, type) \
 struct reg##_S { \

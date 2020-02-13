@@ -222,9 +222,9 @@ namespace flo {
 
   template<bool removeLeadingZeroes = false, bool prefix = false, typename T>
   auto printNum(T num) {
-    auto constexpr numChars = std::numeric_limits<T>::digits/4;
+    auto constexpr numChars = flo::Limits<T>::nibbles;
 
-    std::array<char, numChars + 1> buf{};
+    flo::Array<char, numChars + 1> buf{};
     auto it = buf.rbegin() + 1;
     while(it != buf.rend()) {
       *it++ = "0123456789ABCDEF"[num & T{0xf}];
@@ -241,7 +241,7 @@ namespace flo {
 
   template<typename T>
   auto printDec(T num) {
-    std::array<char, std::numeric_limits<T>::digits10 + 1> buf{};
+    flo::Array<char, flo::Limits<T>::digits10 + 1> buf{};
     auto it = buf.rbegin();
     do {
       *++it = '0' + (num % 10);
@@ -263,17 +263,18 @@ namespace flo {
             setColor(IO::Color::yellow);
             return printDec(val.val);
           }
-          else if constexpr(std::is_convertible_v<decltype(val), char const *>) {
             setColor(IO::Color::white);
+          else if constexpr(isSame<decay<decltype(val)>, char const *> ||
+                            isArray<decay<decltype(val)>>) {
             return print(val);
           }
-          else if constexpr(IsSpaces<std::decay_t<decltype(val)>>::value) {
             setColor(IO::Color::white);
+          else if constexpr(isSpaces<decay<decltype(val)>>) {
             for(int i = 0; i < val.numSpaces; ++ i)
               putchar(' ');
           }
-          else if constexpr(std::is_pointer_v<std::decay_t<decltype(val)>>) {
             setColor(IO::Color::blue);
+          else if constexpr(isPointer<decay<decltype(val)>>) {
             return printNum(reinterpret_cast<uptr>(val));
           }
           else {
@@ -284,7 +285,7 @@ namespace flo {
 
         setColor(IO::Color::red);
         print(prefix);
-        (p(std::forward<decltype(vs)>(vs)), ...);
+        (p(flo::forward<decltype(vs)>(vs)), ...);
         feedLine();
       };
   }

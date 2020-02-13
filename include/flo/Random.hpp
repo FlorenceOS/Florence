@@ -1,21 +1,23 @@
 #pragma once
 
 #include "Ints.hpp"
+#include "flo/TypeTraits.hpp"
+#include "flo/Limits.hpp"
 
 namespace flo {
   template<typename T>
   struct RandomDevice {
     using result_type = T;
-    static_assert(std::is_integral_v<T>);
-    static constexpr result_type min() { return std::numeric_limits<T>::min(); }
-    static constexpr result_type max() { return std::numeric_limits<T>::max(); }
+    static_assert(isIntegral<T>);
+    static constexpr result_type min() { return Limits<T>::min(); }
+    static constexpr result_type max() { return Limits<T>::max(); }
 
-    template<typename TyRes = result_type>
+    template<typename DesiredType = result_type>
     [[nodiscard]]
     static TyRes get() {
       if constexpr(sizeof(TyRes) > sizeof(result_type)) {
         // We combine the results of more randomizations
-        std::array<u8, sizeof(result_type)> result;
+        Array<u8, sizeof(DesiredType)> result;
         auto it = result.begin();
         while(it != result.end()) {
           *reinterpret_cast<result_type>(&*it) = get();
@@ -39,4 +41,7 @@ namespace flo {
 
   inline RandomDevice<u64> random64;
   inline RandomDevice<u32> random32;
+  inline flo::conditional<sizeof(void *) == 4, RandomDevice<u32>, RandomDevice<u64>> randomNative;
+
+  u64 getRand();
 }

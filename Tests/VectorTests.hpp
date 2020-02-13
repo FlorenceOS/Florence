@@ -1,5 +1,7 @@
 #pragma once
 
+#include "flo/Containers/Iterator.hpp"
+
 template<typename Vec, typename Ty>
 void expectElement(Vec const &v, uSz index, Ty const &value) {
   ASSERT_LT(index, v.size());
@@ -19,10 +21,10 @@ void expectElement(Vec const &v, uSz index, Ty const &value) {
 
 template<typename Vec>
 void vectorInvariant(Vec &vec) {
-  EXPECT_EQ(vec.size(), std::distance(vec.begin(),   vec.end()));
-  EXPECT_EQ(vec.size(), std::distance(vec.rbegin(),  vec.rend()));
-  EXPECT_EQ(vec.size(), std::distance(vec.crbegin(), vec.crend()));
-  EXPECT_EQ(vec.size(), std::distance(vec.cbegin(),  vec.cend()));
+  EXPECT_EQ(vec.size(), flo::distance(vec.begin(),   vec.end()));
+  EXPECT_EQ(vec.size(), flo::distance(vec.rbegin(),  vec.rend()));
+  EXPECT_EQ(vec.size(), flo::distance(vec.crbegin(), vec.crend()));
+  EXPECT_EQ(vec.size(), flo::distance(vec.cbegin(),  vec.cend()));
   EXPECT_LE(vec.size(), vec.capacity());
   EXPECT_EQ(vec.size() == 0, vec.empty());
 
