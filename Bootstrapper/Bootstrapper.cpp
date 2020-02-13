@@ -35,8 +35,6 @@ auto const minMemory = flo::PhysicalAddress{(u64)&BootstrapEnd};
 
 namespace {
   constexpr bool quiet = true;
-  constexpr bool disableKASLR = true;
-
   // 3 -> aligned to 1GB, 2 -> aligned to 2MB, 1 -> aligned to 4KB etc
   // Every level higher alignment means one factor of 512 less memory overhead
   // but also 9 less bits of entropy.
@@ -114,7 +112,7 @@ namespace {
   flo::VirtualAddress randomizeKASLRBase() {
   redo:
     // We're currently running in 32 bit so we have to generate 32 bits at a time
-    auto base = flo::VirtualAddress{((u64)flo::random32() << 32) | flo::random32()};
+    auto base = flo::VirtualAddress{flo::getRand()};
 
     // Align the base
     base = flo::Paging::alignPageDown<kaslrAlignmentLevel>(base);
@@ -129,7 +127,6 @@ namespace {
     // End the possible addresses in such a way that we can fit all of our physical memory
     if(base > flo::Paging::maxUaddr + flo::VirtualAddress{physHigh()})
       goto redo;
-
 
     // Make the pointer canonical
     base = flo::Paging::makeCanonical(base);
@@ -177,17 +174,13 @@ namespace {
   }
 
   void checkRDRAND() {
-    if constexpr(!disableKASLR) {
-      u32 ecx;
-      asm("cpuid" : "=c"(ecx) : "a"(1));
-      if(!(ecx & (1 << 30))) {
-        pline("ERROR: Your CPU is missing RDRAND support."),
-        pline("Please run Florence with a more modern CPU.");
-        pline("If using KVM, use flag \"-cpu host\".");
-        pline("If you don't have RDRAND, disable KASLR.");
-
-        flo::CPU::hang();
-      }
+    u32 ecx;
+    asm("cpuid" : "=c"(ecx) : "a"(1));
+    if(!(ecx & (1 << 30))) {
+      pline(flo::IO::Color::red, "Your CPU is missing RDRAND support."),
+      pline(flo::IO::Color::red, "Please run Florence with a more modern CPU.");
+      pline(flo::IO::Color::red, "If using KVM, use flag \"-cpu host\".");
+      pline(flo::IO::Color::red, "We are not able to provide good randomness.");
     }
   }
 
@@ -306,6 +299,7 @@ void consumeMemory(flo::PhysicalMemoryRange &range) {
   // Make sure we're not taking any memory we're loaded into, we can't
   // use them for our free list as we need to write to them.
   range.begin = std::max(minMemory, range.begin);
+  range.begin = flo::max(minMemory, range.begin);
 
   if(physHigh < range.end)
     physHigh = range.end;
@@ -320,7 +314,7 @@ void consumeMemory(flo::PhysicalMemoryRange &range) {
   auto processLater = [](flo::PhysicalMemoryRange &&mem) {
     pline(" Saving ", mem.begin(), " to ", mem.end(), " for later");
     if(highMemRanges.size() < highMemRanges.max_size())
-      highMemRanges.emplace_back(std::move(mem));
+      highMemRanges.emplace_back(flo::move(mem));
   };
 
   if(range.end > maxMemory) {
@@ -328,13 +322,13 @@ void consumeMemory(flo::PhysicalMemoryRange &range) {
 
     if(range.begin >= maxMemory)
       // It's entirely in 64 bit memory, just save it for later and ignore for now
-      return processLater(std::move(range));
+      return processLater(flo::move(range));
 
     // It's a little bit of both, split it.
     auto upper = range;
     upper.begin = maxMemory;
     range.end = maxMemory;
-    processLater(std::move(upper));
+    processLater(flo::move(upper));
   }
 
   pline(flo::spaces(1), "Consuming ", range.begin(), " to ", range.end(), " right now");
@@ -360,11 +354,7 @@ extern "C" void setupMemory() {
 
 extern "C" void doEarlyPaging() {
   // We will locate the physical memory at this point
-  if constexpr(disableKASLR) {
-    kaslrBase = flo::VirtualAddress{flo::Util::giga(1337ull)};
-  } else {
-    kaslrBase = randomizeKASLRBase();
-  }
+  kaslrBase = randomizeKASLRBase();
   pline("KASLR base: ", kaslrBase());
   physicalVirtBase = kaslrBase;
 
