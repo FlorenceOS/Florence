@@ -82,9 +82,21 @@ extern consumeHighPhysicalMemory
   call consumeHighPhysicalMemory
 extern unmapLowMemory
   call unmapLowMemory
+extern loadKernel
+  call loadKernel
 
-1:hlt
-  jmp 1b
+extern prepareKernelArgs
+  call prepareKernelArgs
+
+extern kernelArguments
+  lea rax, [kernelArguments]
+
+extern kernelEntry
+  mov rbx, [kernelEntry]
+  jmp rbx
+
+l:hlt
+  jmp l
 
 section .kernel
 global bundledKernel
