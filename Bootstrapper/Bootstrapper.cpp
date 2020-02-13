@@ -34,7 +34,7 @@ auto &dap = currentModeBuf.dap;
 auto const minMemory = flo::PhysicalAddress{(u64)&BootstrapEnd};
 
 namespace {
-  constexpr bool quiet = true;
+  constexpr bool quiet = false;
   // 3 -> aligned to 1GB, 2 -> aligned to 2MB, 1 -> aligned to 4KB etc
   // Every level higher alignment means one factor of 512 less memory overhead
   // but also 9 less bits of entropy.

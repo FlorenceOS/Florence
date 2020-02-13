@@ -26,7 +26,7 @@ extern "C" u8 bundledKernel[];
 extern "C" u8 bundledKernelEnd[];
 
 namespace {
-  constexpr bool quiet = true;
+  constexpr bool quiet = false;
   auto pline = flo::makePline<quiet>("[FLORKLOAD] ");
 
   flo::ELF64Image kernelELF{bundledKernel, bundledKernelEnd - bundledKernel};
