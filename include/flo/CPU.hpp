@@ -86,9 +86,9 @@ namespace flo {
     // CPUID funcs
     auto const inline cpuid0 = Impl::CPUID<Impl::CPUID0>(0);
 
-    auto const inline __attribute__((pure)) getMaxFunc()        { return cpuid0.maxFunc; }
-    auto const inline __attribute__((pure)) getManufacturerID() { return cpuid0.manufacturerID; }
-    auto const inline __attribute__((pure)) hasFunc(u32 func)   { return getMaxFunc() <= func; }
+    auto inline __attribute__((pure)) getMaxFunc()        { return cpuid0.maxFunc; }
+    auto inline __attribute__((pure)) getManufacturerID() { return cpuid0.manufacturerID; }
+    auto inline __attribute__((pure)) hasFunc(u32 func)   { return getMaxFunc() <= func; }
 
     namespace Impl {
       struct CPUID1 {
