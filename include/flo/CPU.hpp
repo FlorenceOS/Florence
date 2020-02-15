@@ -76,9 +76,7 @@ namespace flo {
             u32 edx;
             u32 ecx;
           };
-          struct {
-            flo::Array<char, 12> manufacturerID;
-          };
+          flo::Array<char, 12> manufacturerID;
         };
       };
     }
