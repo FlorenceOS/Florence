@@ -173,7 +173,7 @@ namespace flo {
     auto const inline cpuid70 = hasFunc(7) ? Impl::CPUID(7, 0) : Impl::CPUID();
     auto const inline cpuid71 = hasFunc(7) ? Impl::CPUID(7, 1) : Impl::CPUID();
 
-      // CPUID efuncs
+    // CPUID efuncs
     auto const inline cpuide0 = Impl::CPUID(0x80000000);
 
     auto inline __attribute__((pure)) getMaxEFunc()      { return cpuide0.eax - 0x80000000; }
