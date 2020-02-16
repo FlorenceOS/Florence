@@ -7,6 +7,7 @@ install:
 - sh: sudo update-alternatives --install /usr/bin/lld lld /usr/bin/lld-9 900
 - sh: make
 - sh: zip Florence.zip -r include
+- sh: zip build.zip -r build
 
 test_script:
 - sh: make autotest
@@ -16,5 +17,7 @@ test_script:
 artifacts:
 - path: Florence.zip
   name: Florence headers
+- path: build.zip
+  name: Florence build files
 - path: out/Disk.bin
   name: Florence bootable disk
