@@ -41,8 +41,6 @@ namespace {
     simpleRandState.b = t;
     return t + s;
   }
-
-  bool const RDRANDSupported = flo::CPUID::cpuid1.rdrand;
 }
 
 using Constructor = void(*)();
@@ -55,7 +53,7 @@ extern "C" void callGlobalConstructors() {
 }
 
 u64 flo::getRand() {
-  if(RDRANDSupported)
+  if(flo::cpuid.rdrand)
     return flo::randomNative.get<u64>();
   else
     return simpleRand();
@@ -113,7 +111,6 @@ flo::PhysicalAddress flo::PhysicalFreeList::getPhysicalPage(int pageLevel) {
 }
 
 void flo::PhysicalFreeList::returnPhysicalPage(flo::PhysicalAddress phys, int pageLevel) {
-  //pline("State: ", physFree.lvl1());
   switch(pageLevel) {
     case 1: *getPhys<PhysicalAddress>(phys) = exchange(physFree.lvl1, phys); return;
     case 2: *getPhys<PhysicalAddress>(phys) = exchange(physFree.lvl2, phys); return;

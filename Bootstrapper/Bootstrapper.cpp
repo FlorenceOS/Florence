@@ -169,9 +169,7 @@ namespace {
   }
 
   void checkRDRAND() {
-    u32 ecx;
-    asm("cpuid" : "=c"(ecx) : "a"(1));
-    if(!(ecx & (1 << 30))) {
+    if(!flo::cpuid.rdrand) {
       pline(flo::IO::Color::red, "Your CPU is missing RDRAND support."),
       pline(flo::IO::Color::red, "Please run Florence with a more modern CPU.");
       pline(flo::IO::Color::red, "If using KVM, use flag \"-cpu host\".");
@@ -211,7 +209,6 @@ namespace {
   void fetchMemoryRegion() {
     asm("call getMemoryMap" ::: "eax", "ebx", "ecx", "edx", "di", "memory");
   }
-}
 
 extern "C" void initializeDebug() {
   if constexpr(!quiet)
