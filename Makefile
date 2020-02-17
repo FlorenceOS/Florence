@@ -18,8 +18,8 @@ CXXFlags := $(CXXFlags) \
 	-fdata-sections -funsigned-char -mno-avx -mno-avx2 -fno-use-cxa-atexit\
   -fno-builtin -fno-unwind-tables
 
-LDFlags := --gc-sections --no-dynamic-linker -static
-LinkingFlags :=  -flto -O2 -Wl,--gc-sections,--no-dynamic-linker,--icf=all -fuse-ld=lld -static -ffreestanding -nostdlib
+LDFlags := --gc-sections --no-dynamic-linker -static --build-id=none
+LinkingFlags :=  -flto -O2 -Wl,--gc-sections,--no-dynamic-linker,--icf=all,--build-id=none -fuse-ld=lld -static -ffreestanding -nostdlib
 
 CommonHeaders := $(wildcard include/**/*.hpp)
 LibFloSources := LibFlo/LibFlo.cpp
