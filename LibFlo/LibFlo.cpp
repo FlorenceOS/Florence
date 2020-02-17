@@ -10,6 +10,22 @@ namespace LibFlo {
   namespace {
     constexpr bool quiet = false;
     auto pline = flo::makePline<quiet>("[LibFlo] ");
+
+    struct {
+      u64 a = 0x69FF1337ABCDEFAAULL;
+      u64 b = 0x420B16D1CCABC123ULL;
+    } simpleRandState;
+
+    u64 simpleRand() {
+      auto t = simpleRandState.a;
+      auto const s = simpleRandState.b;
+      simpleRandState.a = s;
+      t ^= t << 23;
+      t ^= t >> 17;
+      t ^= s ^ (s >> 26);
+      simpleRandState.b = t;
+      return t + s;
+    }
   }
 }
 
@@ -25,24 +41,6 @@ extern "C" int memcmp(const void *lhs, const void *rhs, uSz num) {
   return 0;
 }
 
-namespace {
-  struct {
-    u64 a = 0x69FF1337ABCDEFAAULL;
-    u64 b = 0x420B16D1CCABC123ULL;
-  } simpleRandState;
-
-  u64 simpleRand() {
-    auto t = simpleRandState.a;
-    auto const s = simpleRandState.b;
-    simpleRandState.a = s;
-    t ^= t << 23;
-    t ^= t >> 17;
-    t ^= s ^ (s >> 26);
-    simpleRandState.b = t;
-    return t + s;
-  }
-}
-
 using Constructor = void(*)();
 extern "C" Constructor constructorsStart;
 extern "C" Constructor constructorsEnd;
@@ -56,7 +54,7 @@ u64 flo::getRand() {
   if(flo::cpuid.rdrand)
     return flo::randomNative.get<u64>();
   else
-    return simpleRand();
+    return LibFlo::simpleRand();
 }
 
 extern "C" void atexit() { }
