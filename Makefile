@@ -72,7 +72,7 @@ kvm: out/Disk.bin
 	$(KVM) -drive format=raw,file=$<
 
 go: out/Disk.bin
-	$(QEMU) -d int -drive format=raw,file=$<
+	$(QEMU) -drive format=raw,file=$<
 
 test: Tests/build/CMakeCache.txt
 	make -j -C Tests/build
