@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Ints.hpp"
+
 namespace flo {
   template<typename Beg, typename End, typename F>
   constexpr bool allOf(Beg beg, End end, F &&f) {
