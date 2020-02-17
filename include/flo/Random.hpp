@@ -24,14 +24,18 @@ namespace flo {
   template<typename T>
   struct UniformInts {
     static_assert(isIntegral<T>);
+    // Nothing initialized!!
+    constexpr explicit UniformInts() {
+    }
+
     constexpr UniformInts(T min, T max) {
       this->set(min, max);
     }
 
-    constexpr void set(T min, T max) {
+    constexpr auto &set(T min, T max) {
       this->min = min;
       this->max = max;
-      update();
+      return update();
     }
 
     template<typename BitSource>
@@ -46,7 +50,7 @@ namespace flo {
 
   private:
     /* Must set bitmask */
-    constexpr void update() {
+    constexpr auto &update() {
       // Special case where entire range of type is specified, we can't do max - min + 1 since it will overflow
       if(min == flo::Limits<T>::min && max == flo::Limits<T>::max)
         bitmask = ~T{0};
@@ -59,6 +63,8 @@ namespace flo {
         else
           bitmask = (T{1} << desiredBits) - 1;
       }
+
+      return *this;
     }
 
     T bitmask;
