@@ -44,7 +44,7 @@ Tests/build/CMakeCache.txt: Tests/CMakeLists.txt $(TestSources) $(CommonHeaders)
 
 build/%.bin: build/%.elf
 	@mkdir -p $(@D)
-	objcopy -O binary $< $@
+	objcopy -O binary $< $@ -j .text
 
 # Phony targets
 clean:
