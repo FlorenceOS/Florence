@@ -541,9 +541,9 @@ extern "C" void loadKernelLoader() {
     readDisk(loaderSector);
 
     if(flo::Util::memeq(magic, diskdata, sizeof(magic))) {
-      pline("Kernel loader found at sector ", Decimal{loaderSector});
-
       u32 loaderPages = flo::Util::get<u32>(diskdata, sizeof(magic));
+
+      pline("Kernel loader found at sector ", Decimal{loaderSector}, " with size ", loaderPages * flo::Paging::PageSize<1>);
 
       doLoadLoader(loaderSector, loaderPages);
       return;
