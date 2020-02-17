@@ -292,7 +292,7 @@ namespace flo {
               // We didn't create a mapping at this level in the last if, we make a PT and recurse!
 
               // Get a physical page for the table
-              auto pageTablePhys = getPhysicalPage(1);
+              auto pageTablePhys = physFree.getPhysicalPage(1);
 
               // Construct page table
               new (getPhys<PageTable<Level - 1>>(pageTablePhys)) PageTable<Level - 1>();
@@ -381,7 +381,7 @@ namespace flo {
 
       // Get physical page to be mapped
       auto makeMap = [&](auto currVirt, auto csize, auto &pte) -> oMappingError {
-        if(auto ppage = getPhysicalPage(decay<decltype(pte)>::lvl); ppage)
+        if(auto ppage = physFree.getPhysicalPage(decay<decltype(pte)>::lvl); ppage)
           pte = Impl::mapping<decay<decltype(pte)>::lvl>(perm, ppage);
         return noMappingError;
       };
@@ -495,7 +495,7 @@ namespace flo {
 #define consumeMacro(lvl) \
   {auto constexpr pageSz = flo::Paging::PageSize<lvl>;\
   if(size >= pageSz && addr % PhysicalAddress{pageSz} == PhysicalAddress{0}) { /* Is large enough, is page aligned */ \
-    returnPhysicalPage(addr, lvl);\
+    physFree.returnPhysicalPage(addr, lvl);\
     addr += PhysicalAddress{pageSz};\
     size -= pageSz;\
     continue;\

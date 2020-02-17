@@ -16,22 +16,29 @@ CXXFlags := $(CXXFlags) \
 	-fno-exceptions -nostdinc++ -nostdinc -fno-rtti -Wno-sign-compare\
 	-std=c++17 -Oz -mno-soft-float -Iinclude -ffunction-sections\
 	-fdata-sections -funsigned-char -mno-avx -mno-avx2 -fno-use-cxa-atexit\
-  -fno-builtin -fno-unwind-tables
+  -fno-builtin -fno-unwind-tables -fuse-init-array
+
+CXXFlagsBootstrapper := $(CXXFlags) -mno-sse -mno-sse2 -m32 -fno-pic -fno-pie -march=i386
+
+CXXFlags64 := $(CXXFlags) -m64
+
+CXXFlagsKernel := $(CXXFlags64) -fpic -fpie
+CXXFlagsKernelLoader := $(CXXFlags64) -fno-pic -fno-pie
 
 LDFlags := --gc-sections --no-dynamic-linker -static --build-id=none
-LinkingFlags :=  -flto -O2 -Wl,--gc-sections,--no-dynamic-linker,--icf=all,--build-id=none -fuse-ld=lld -static -ffreestanding -nostdlib
+LinkingFlags := -flto -O2 -Wl,--gc-sections,--no-dynamic-linker,--icf=all,--build-id=none -fuse-ld=lld -static -ffreestanding -nostdlib
 
 CommonHeaders := $(wildcard include/**/*.hpp)
 LibFloSources := LibFlo/LibFlo.cpp
 
-build/LibFlo32.o: $(LibFloSources) $(CommonHeaders) Makefile
-	clang++ -m32 -fno-pic -fno-pie $(CXXFlags) -c $(filter %.cpp,$^) -o $@
+build/LibFloBootstrapper.o: $(LibFloSources) $(CommonHeaders) Makefile
+	clang++ $(CXXFlagsBootstrapper) -c $(filter %.cpp,$^) -o $@
 
-build/LibFlo64.o: $(LibFloSources) $(CommonHeaders) Makefile
-	clang++ -m64 -fno-pic -fno-pie $(CXXFlags) -c $(filter %.cpp,$^) -o $@
+build/LibFloKernelLoader.o: $(LibFloSources) $(CommonHeaders) Makefile
+	clang++ $(CXXFlagsKernelLoader) -c $(filter %.cpp,$^) -o $@
 
-build/LibFloPIC.o: $(LibFloSources) $(CommonHeaders) Makefile
-	clang++ -m64 -fpic -fpie $(CXXFlags) -c $(filter %.cpp,$^) -o $@
+build/LibFloKernel.o: $(LibFloSources) $(CommonHeaders) Makefile
+	clang++ $(CXXFlagsKernel) -c $(filter %.cpp,$^) -o $@
 
 .PHONY: clean all dbg bochs test
 .SECONDARY:;
@@ -65,7 +72,7 @@ kvm: out/Disk.bin
 	$(KVM) -drive format=raw,file=$<
 
 go: out/Disk.bin
-	$(QEMU) -drive format=raw,file=$<
+	$(QEMU) -d int -drive format=raw,file=$<
 
 test: Tests/build/CMakeCache.txt
 	make -j -C Tests/build
@@ -87,7 +94,7 @@ build/Bootsector/Bootsector.elf: Bootsector/Linker.lds build/Bootsector/Bootsect
 
 # Bootstrapper
 BootstrapperSources := Bootstrapper/Bootstrapper.S Bootstrapper/Bootstrapper.cpp
-BootstrapperObjects := $(patsubst %,build/%.o,$(BootstrapperSources) LibFlo32)
+BootstrapperObjects := $(patsubst %,build/%.o,$(BootstrapperSources) LibFloBootstrapper)
 
 build/Bootstrapper/Bootstrapper.S.o: Bootstrapper/Bootstrapper.S Makefile
 	@mkdir -p $(@D)
@@ -95,7 +102,7 @@ build/Bootstrapper/Bootstrapper.S.o: Bootstrapper/Bootstrapper.S Makefile
 
 build/Bootstrapper/Bootstrapper.cpp.o: Bootstrapper/Bootstrapper.cpp $(CommonHeaders) Makefile
 	@mkdir -p $(@D)
-	clang++ -flto -m32 -fno-pic -fno-pie -march=i386 $(CXXFlags) -c $< -o $@
+	clang++ -flto $(CXXFlagsBootstrapper) -c $< -o $@
 
 build/Bootstrapper/Bootstrapper.elf: Bootstrapper/Linker.lds $(BootstrapperObjects)
 	clang -Xlinker -T $^ -o $@ -m32 $(LinkingFlags)
@@ -103,7 +110,7 @@ build/Bootstrapper/Bootstrapper.elf: Bootstrapper/Linker.lds $(BootstrapperObjec
 
 # Kernel loader
 KernelLoaderSources := KernelLoader/KernelLoader.S KernelLoader/KernelLoader.cpp
-KernelLoaderObjects := $(patsubst %,build/%.o,$(KernelLoaderSources) LibFlo64)
+KernelLoaderObjects := $(patsubst %,build/%.o,$(KernelLoaderSources) LibFloKernelLoader)
 
 build/KernelLoader/KernelLoader.S.o: KernelLoader/KernelLoader.S build/Kernel/Kernel.elf Makefile
 	@mkdir -p $(@D)
@@ -111,14 +118,14 @@ build/KernelLoader/KernelLoader.S.o: KernelLoader/KernelLoader.S build/Kernel/Ke
 
 build/KernelLoader/KernelLoader.cpp.o: KernelLoader/KernelLoader.cpp $(CommonHeaders) Makefile
 	@mkdir -p $(@D)
-	clang++ -m64 -fno-pic -fno-pie $(CXXFlags) -c $< -o $@
+	clang++ -flto $(CXXFlagsKernelLoader) -c $< -o $@
 
 build/KernelLoader/KernelLoader.elf: KernelLoader/Linker.lds $(KernelLoaderObjects)
 	clang -Xlinker -T $^ -o $@ $(LinkingFlags)
 	@readelf -a $@ | grep 'KernelLoaderSize' | awk '{ print "Kernel loader size: " strtonum("0x" $$2)/(512 * 1024 * 1024) * 100 "%" }'
 
 KernelSources := $(wildcard Kernel/*.S) Kernel/Kernel.cpp
-KernelObjects := $(patsubst %,build/%.o,$(KernelSources) LibFloPIC)
+KernelObjects := $(patsubst %,build/%.o,$(KernelSources) LibFloKernel)
 
 build/Kernel/%.S.o: Kernel/%.S
 	@mkdir -p $(@D)
@@ -126,7 +133,7 @@ build/Kernel/%.S.o: Kernel/%.S
 
 build/Kernel/Kernel.cpp.o: Kernel/Kernel.cpp $(CommonHeaders) Makefile
 	@mkdir -p $(@D)
-	clang++ -m64 -fpic -fpie $(CXXFlags) -c $< -o $@
+	clang++ $(CXXFlagsKernel) -c $< -o $@
 
 build/Kernel/Kernel.elf: Kernel/Kernel.lds $(KernelObjects)
 	@mkdir -p $(@D)

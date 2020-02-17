@@ -6,11 +6,7 @@
 namespace flo {
   struct KernelArguments {
     flo::ELF64Image *elfImage;
-    flo::PhysicalAddress physFreeHead1;
-    flo::PhysicalAddress physFreeHead2;
-    flo::PhysicalAddress physFreeHead3;
-    flo::PhysicalAddress physFreeHead4;
-    flo::PhysicalAddress physFreeHead5;
+    flo::PhysicalFreeList *physFree;
     flo::VirtualAddress physBase;
     u64 displayWidth;
     u64 displayHeight;

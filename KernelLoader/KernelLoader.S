@@ -13,25 +13,9 @@ global unknownField
        unknownField:
 dq 0x0
 
-global physFreeHead1
-       physFreeHead1:
-db "PhysFre1"
-
-global physFreeHead2
-       physFreeHead2:
-db "PhysFre2"
-
-global physFreeHead3
-       physFreeHead3:
-db "PhysFre3"
-
-global physFreeHead4
-       physFreeHead4:
-db "PhysFre4"
-
-global physFreeHead5
-       physFreeHead5:
-db "PhysFre5"
+global physFree
+       physFree:
+db "PhysFree"
 
 global physBase
        physBase:
@@ -67,17 +51,6 @@ global _start
        _start:
 extern callGlobalConstructors
   call callGlobalConstructors
-extern assertAssumptions
-  call assertAssumptions
-extern consumeHighPhysicalMemory
-  call consumeHighPhysicalMemory
-extern unmapLowMemory
-  call unmapLowMemory
-extern loadKernel
-  call loadKernel
-
-extern prepareKernelArgs
-  call prepareKernelArgs
 
 extern kernelArguments
   lea rax, [kernelArguments]

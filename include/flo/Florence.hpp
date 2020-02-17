@@ -20,8 +20,6 @@ namespace flo {
 
   extern u8 *getPtrVirt(VirtualAddress);
   extern u8 *getPtrPhys(PhysicalAddress);
-  extern PhysicalAddress getPhysicalPage(int pageLevel);
-  extern void returnPhysicalPage(PhysicalAddress, int pageLevel);
 
   template<typename T>
   T *getPhys(PhysicalAddress addr) { return reinterpret_cast<T *>(getPtrPhys(addr)); }
@@ -35,4 +33,18 @@ namespace flo {
 
   struct Spaces { int numSpaces; };
   inline auto spaces(int numSpaces) { return Spaces{numSpaces}; }
+
+  struct PhysicalFreeList {
+    static PhysicalAddress getPhysicalPage(int pageLevel);
+    static void returnPhysicalPage(PhysicalAddress, int pageLevel);
+  private:
+    flo::PhysicalAddress lvl1 = PhysicalAddress{0};
+    flo::PhysicalAddress lvl2 = PhysicalAddress{0};
+    flo::PhysicalAddress lvl3 = PhysicalAddress{0};
+    flo::PhysicalAddress lvl4 = PhysicalAddress{0};
+    flo::PhysicalAddress lvl5 = PhysicalAddress{0};
+  };
+
+  // This instance is always the one used by the static members. Only define others for copying contents.
+  inline PhysicalFreeList physFree;
 }
