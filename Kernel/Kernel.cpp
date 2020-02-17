@@ -1,6 +1,8 @@
 #include "flo/IO.hpp"
 #include "flo/Kernel.hpp"
 
+#include "LibFlo.cpp"
+
 // Must be reachable from assembly
 extern "C" {
   flo::KernelArguments *kernelArgumentPtr = nullptr;

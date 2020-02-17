@@ -7,6 +7,8 @@
 #include "flo/ELF.hpp"
 #include "flo/IO.hpp"
 
+#include "LibFlo.cpp"
+
 using flo::Decimal;
 
 namespace {

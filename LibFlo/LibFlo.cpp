@@ -6,9 +6,11 @@
 #include "flo/Florence.hpp"
 #include "flo/Paging.hpp"
 
-namespace {
-  constexpr bool quiet = false;
-  auto pline = flo::makePline<quiet>("[LibFlo] ");
+namespace LibFlo {
+  namespace {
+    constexpr bool quiet = false;
+    auto pline = flo::makePline<quiet>("[LibFlo] ");
+  }
 }
 
 extern "C" int memcmp(const void *lhs, const void *rhs, uSz num) {
@@ -78,7 +80,7 @@ flo::PhysicalAddress flo::PhysicalFreeList::getPhysicalPage(int pageLevel) {
 
       if(!next) {
         if(pageLevel == 1) {
-          pline("Ran out of physical pages on level ", pageLevel);
+          LibFlo::pline("Ran out of physical pages on level ", pageLevel);
           flo::CPU::hang();
         }
 
@@ -104,7 +106,7 @@ flo::PhysicalAddress flo::PhysicalFreeList::getPhysicalPage(int pageLevel) {
     case 3: return tryGet(physFree.lvl3);
     case 4: return tryGet(physFree.lvl4);
     case 5: return tryGet(physFree.lvl5);
-    default: pline("Unknown paging level: ", pageLevel); flo::CPU::hang();
+    default: LibFlo::pline("Unknown paging level: ", pageLevel); flo::CPU::hang();
   }
 
   __builtin_unreachable();
@@ -118,6 +120,6 @@ void flo::PhysicalFreeList::returnPhysicalPage(flo::PhysicalAddress phys, int pa
     case 3: *getPhys<PhysicalAddress>(phys) = exchange(physFree.lvl3, phys); return;
     case 4: *getPhys<PhysicalAddress>(phys) = exchange(physFree.lvl4, phys); return;
     case 5: *getPhys<PhysicalAddress>(phys) = exchange(physFree.lvl5, phys); return;
-    default: pline("Unkown paging level: ", Decimal{pageLevel}); flo::CPU::hang();
+    default: LibFlo::pline("Unkown paging level: ", Decimal{pageLevel}); flo::CPU::hang();
   }
 }

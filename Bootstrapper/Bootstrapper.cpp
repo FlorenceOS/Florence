@@ -8,6 +8,8 @@
 #include "flo/Algorithm.hpp"
 #include "flo/Containers/StaticVector.hpp"
 
+#include "LibFlo.cpp"
+
 using flo::Decimal;
 using flo::spaces;
 
