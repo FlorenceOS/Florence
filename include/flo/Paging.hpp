@@ -182,7 +182,7 @@ namespace flo {
     static_assert(sizeof(PageTable<4>) == PageSize<1>);
     static_assert(sizeof(PageTable<5>) == PageSize<1>);
 
-    auto *getPagingRoot() {
+    inline auto *getPagingRoot() {
       return getPhys<PageTable<PageTableLevels>>(flo::PhysicalAddress{flo::CPU::cr3});
     }
 
@@ -362,12 +362,12 @@ namespace flo {
     }
 
     [[nodiscard]]
-    auto map(PhysicalAddress phys, VirtualAddress virt, u64 size, Permissions perm) {
+    inline auto map(PhysicalAddress phys, VirtualAddress virt, u64 size, Permissions perm) {
       return map(phys, virt, size, perm, [](auto...) { });
     }
 
     [[nodiscard]]
-    oMappingError map(VirtualAddress virt, u64 size, Permissions perm) {
+    inline oMappingError map(VirtualAddress virt, u64 size, Permissions perm) {
       size = alignPageUp<1>(size);
 
       // Currently, any conflicting pages are just a straight up error.
@@ -501,7 +501,7 @@ namespace flo {
     continue;\
   }}
 
-  void consumePhysicalMemory(PhysicalAddress addr, u64 size) {
+  inline void consumePhysicalMemory(PhysicalAddress addr, u64 size) {
     while(1) {
       consumeMacro(5);
       consumeMacro(4);

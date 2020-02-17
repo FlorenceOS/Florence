@@ -4,7 +4,7 @@
 
 namespace flo {
   struct nullopt_t { };
-  nullopt_t nullopt;
+  inline nullopt_t nullopt;
 
   template<typename T>
   struct Optional {
