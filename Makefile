@@ -132,7 +132,7 @@ build/Kernel/Kernel.elf: Kernel/Kernel.lds $(KernelObjects)
 	@mkdir -p $(@D)
 	@# lld crashes here :(
 	@# If/when it stops, please use the bottom one :^)
-	ld -T $^ -o $@ $(LDFlags) -pie -s
+	ld -T $^ -o $@ $(LDFlags) -pie -s -z max-page-size=0x1000
 	@#clang -Xlinker -T $^ -o $@ $(LinkingFlags) -fpie -Xlinker -pie
 
 # Literally just concat them lol
