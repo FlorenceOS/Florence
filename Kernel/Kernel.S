@@ -9,7 +9,7 @@ extern kernelArgumentPtr
   mov [rel kernelArgumentPtr], rax
 
   ; Set up a stack
-  lea rax, [rel stackBottom]
+  lea rax, [rel stack]
   mov rsp, rax
   mov rbp, rsp
 
