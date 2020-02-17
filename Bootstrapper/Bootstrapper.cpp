@@ -210,17 +210,19 @@ namespace {
     asm("call getMemoryMap" ::: "eax", "ebx", "ecx", "edx", "di", "memory");
   }
 
-extern "C" void initializeDebug() {
-  if constexpr(!quiet)
-    flo::IO::VGA::clear();
+  auto initializeDebug = []() {
+    if constexpr(!quiet)
+      flo::IO::VGA::clear();
 
-  // We always initialize serial as other parts could be non-quiet
-  flo::IO::serial1.initialize();
-  flo::IO::serial2.initialize();
-  flo::IO::serial3.initialize();
-  flo::IO::serial4.initialize();
+    // We always initialize serial as other bootloader stages could be non-quiet
+    flo::IO::serial1.initialize();
+    flo::IO::serial2.initialize();
+    flo::IO::serial3.initialize();
+    flo::IO::serial4.initialize();
 
-  assertAssumptions();
+    assertAssumptions();
+    return flo::nullopt;
+  }();
 }
 
 extern "C" void setupVideo() {

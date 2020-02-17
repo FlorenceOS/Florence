@@ -87,9 +87,6 @@ global bootstrapStart
   ; Do the C++ global constructors
 extern callGlobalConstructors
   call callGlobalConstructors
-  
-extern initializeDebug
-  call initializeDebug
 
   go32to16
 
