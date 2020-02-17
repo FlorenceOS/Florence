@@ -26,6 +26,20 @@ namespace LibFlo {
       simpleRandState.b = t;
       return t + s;
     }
+
+    u64 rdrand() {
+      if constexpr(sizeof(uptr) == 4) {
+        u32 val1, val2;
+        asm volatile("1:rdrand %0\njnc 1b\n":"=r"(val1));
+        asm volatile("1:rdrand %0\njnc 1b\n":"=r"(val2));
+        return (u64)val1 | (u64)val2 << 32;
+      }
+      else if constexpr(sizeof(uptr) == 8) {
+        u64 retval;
+        asm volatile("1:rdrand %0\njnc 1b\n":"=r"(retval));
+        return retval;
+      }
+    }
   }
 }
 
@@ -52,7 +66,7 @@ extern "C" void callGlobalConstructors() {
 
 u64 flo::getRand() {
   if(flo::cpuid.rdrand)
-    return flo::randomNative.get<u64>();
+    return LibFlo::rdrand();
   else
     return LibFlo::simpleRand();
 }
