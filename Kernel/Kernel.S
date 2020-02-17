@@ -16,9 +16,6 @@ extern kernelArgumentPtr
 extern callGlobalConstructors
   call callGlobalConstructors
 
-extern loadKernelArugments
-  call loadKernelArugments
-
 extern kernelMain
   call kernelMain
 
@@ -26,6 +23,5 @@ l:hlt
   jmp l
 
 section .bss
-stackTop:
-resb 2048
-stackBottom:
+resb 16 * 1024
+stack:
