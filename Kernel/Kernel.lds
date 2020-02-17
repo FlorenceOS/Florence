@@ -17,10 +17,8 @@ SECTIONS {
     KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*)));
     constructorsEnd = .;
     *(.data*)
-    *(.bss*)
   }
 
-  . = ALIGN(4K);
   .rodata :{
     *(.rodata*)
     *(.got*)
@@ -32,6 +30,10 @@ SECTIONS {
 
   .shstrtab :{
     *(.shstrtab*)
+  }
+
+  .bss :{
+    *(.bss*)
   }
 
   /DISCARD/ :{
