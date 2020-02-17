@@ -25,7 +25,7 @@ extern kernelMain
 l:hlt
   jmp l
 
-section .bss.stack
+section .bss
 stackTop:
 resb 2048
 stackBottom:
