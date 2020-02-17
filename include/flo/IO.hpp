@@ -259,7 +259,7 @@ namespace flo {
           auto doColor =
             [&colorOverride](IO::Color col) {
               if(!exchange(colorOverride, false))
-                setColor(col);
+                flo::setColor(col);
             };
 
           if constexpr(isSame<decay<decltype(val)>, IO::Color>) {
@@ -291,7 +291,7 @@ namespace flo {
           }
         };
 
-        setColor(IO::Color::red);
+        flo::setColor(IO::Color::red);
         print(prefix);
         (p(flo::forward<decltype(vs)>(vs)), ...);
         feedLine();
