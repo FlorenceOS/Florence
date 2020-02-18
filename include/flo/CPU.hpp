@@ -92,8 +92,6 @@ namespace flo {
         , cpuid1{conditionalCPUID<decltype(cpuid1)>(1)}
       { }
 
-      /* 8caf 8ce7*/
-
       /* CPUID 0 */
       union {
         Impl::CPUID<Impl::CPUIDOrderEaxEbxEdxEcx> cpuid0;
