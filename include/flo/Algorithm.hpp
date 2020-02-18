@@ -3,6 +3,39 @@
 #include "Ints.hpp"
 
 namespace flo {
+  template<typename T = void>
+  struct Less {
+    constexpr bool operator()(T const &lhs, T const &rhs) const { return lhs < rhs; }
+  };
+
+  template<>
+  struct Less<void> {
+    template<typename Lhs, typename Rhs>
+    constexpr bool operator()(Lhs const &lhs, Rhs const &rhs) const { return lhs < rhs; }
+  };
+
+  template<typename T = void>
+  struct Greater {
+    constexpr bool operator()(T const &lhs, T const &rhs) const { return lhs > rhs; }
+  };
+
+  template<>
+  struct Greater<void> {
+    template<typename Lhs, typename Rhs>
+    constexpr bool operator()(Lhs const &lhs, Rhs const &rhs) const { return lhs > rhs; }
+  };
+
+  template<typename T = void>
+  struct Equal {
+    constexpr bool operator()(T const &lhs, T const &rhs) const { return lhs == rhs; }
+  };
+
+  template<>
+  struct Equal<void> {
+    template<typename Lhs, typename Rhs>
+    constexpr bool operator()(Lhs const &lhs, Rhs const &rhs) const { return lhs == rhs; }
+  };
+
   template<typename Beg, typename End, typename F>
   constexpr bool allOf(Beg beg, End end, F &&f) {
     while(beg != end) if(!f(*beg++))
