@@ -12,7 +12,7 @@
 using flo::Decimal;
 
 namespace {
-  constexpr bool quiet = false;
+  constexpr bool quiet = true;
   auto pline = flo::makePline<quiet>("[FLORKLOAD] ");
 }
 

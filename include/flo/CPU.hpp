@@ -32,8 +32,26 @@ namespace flo {
     namespace Impl {
       template<u32 regnum, typename type>
       struct MSR {
-        operator type() { type out; asm volatile("rdmsr" : "=a"(out) : "c"(regnum)); return out; }
-        MSR &operator=(type value) { asm volatile("wrmsr" :: "a"(value), "c"(regnum)); return *this; }
+        operator type() {
+          if constexpr(sizeof(type) == 4) {
+            type out;
+            asm volatile("rdmsr" : "=eax"(out) : "ecx"(regnum));
+            return out;
+          }
+          else if constexpr(sizeof(type) == 8) {
+            type out1, out2;
+            asm volatile("rdmsr" : "=eax"(out1), "=edx"(out2) : "ecx"(regnum));
+            return (out1 & 0xFFFFFFFF) | ((out2 & 0xFFFFFFFF) << 32);
+          }
+        }
+
+        MSR &operator=(type value) {
+          if constexpr(sizeof(type) == 4)
+            asm volatile("wrmsr" :: "eax"(value), "ecx"(regnum));
+          else if constexpr(sizeof(type) == 8)
+            asm volatile("wrmsr" :: "eax"(value), "edx"(value >> 32), "ecx"(regnum));
+          return *this;
+        }
         MSR &operator|=(type value) { return *this = static_cast<type>(*this) | value; }
         MSR &operator&=(type value) { return *this = static_cast<type>(*this) & value; }
       };
