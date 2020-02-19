@@ -105,7 +105,7 @@ namespace flo {
       u16               phnum;
       u16               shentsize;
       u16               shnum;
-      u16               shstrndx;
+      u16               sectionNameIndex;
     };
 
     struct ProgramHeader {
@@ -288,6 +288,9 @@ namespace flo {
 
       if(header().shnum < 1)
         return forward<Fail>(fail)("Expecting at least one section header!");
+
+      if(header().shnum < header().sectionNameIndex)
+        return forward<Fail>(fail)("Invalid section name string table index");
 
       verify_inside_file(header().shoff, header().shentsize * header().shnum, move(fail));
 
