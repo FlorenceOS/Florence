@@ -14,12 +14,18 @@ namespace {
 
   flo::KernelArguments arguments = []() {
     flo::KernelArguments args;
-    args = *kernelArgumentPtr;
+    // Kill the pointer after using it, we shouldn't touch it.
+    args = flo::move(*flo::exchange(kernelArgumentPtr, nullptr));
     return args;
   }();
 
-  auto setPhysFree = []() {
-    flo::physFree = *arguments.physFree;
+  auto consumeKernelArguments = []() {
+    // Relocate physFree
+    flo::physFree = *flo::exchange(arguments.physFree, nullptr);
+
+    // @TODO: relocate ELF
+
+    // @TODO: initialize framebuffer
     return flo::nullopt;
   }();
 }
