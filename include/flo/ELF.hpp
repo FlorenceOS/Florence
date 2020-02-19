@@ -201,6 +201,36 @@ namespace flo {
     };
 
     static_assert(sizeof(RelocationEntry) == 24);
+
+    struct SymbolEntry {
+      u32 stringTableOffset;
+
+      enum struct SymbolType {
+        Local  = 0,
+        Global = 1,
+        Weak   = 2,
+      };
+
+      enum struct BindingAttributes {
+        None     = 0,
+        Object   = 1,
+        Function = 2,
+        Section  = 3,
+      };
+
+      union {
+        u8  info;
+        Bitfield<0, 4, u8> symbolType;
+        Bitfield<4, 4, u8> bindingAttributes;
+      };
+
+      u8  other; // Reserved
+      u16 sectionNum;
+      u64 address;
+      u64 size;
+    } __attribute__((packed));
+
+    static_assert(sizeof(SymbolEntry) == 24);
   }
 
   struct ELF64Image {
