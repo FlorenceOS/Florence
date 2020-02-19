@@ -375,6 +375,14 @@ namespace flo {
       return data + header.offset();
     }
 
+    u8 const *fileData(ELF64::SectionHeader const &header) const {
+      return data + header.offset();
+    }
+
+    u8 const *fileData(ELF64::foff off) const {
+      return data + off();
+    }
+
     template<typename F>
     void forEachSection(F &&f) const {
       for(uSz i = 1; i < header().shnum; ++ i)
@@ -393,7 +401,7 @@ namespace flo {
     template<typename F>
     void forEachRelocation(ELF64::SectionHeader const &shead, F &&f) const {
       for(uSz off = 0; off < shead.size; off += sizeof(ELF64::RelocationEntry))
-        f(*reinterpret_cast<ELF64::RelocationEntry const *>(data + shead.offset() + off));
+        f(*reinterpret_cast<ELF64::RelocationEntry const *>(fileData(shead) + off));
     }
 
     void applyAllRelocations() const {
