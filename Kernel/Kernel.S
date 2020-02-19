@@ -19,9 +19,15 @@ extern callGlobalConstructors
 extern kernelMain
   call kernelMain
 
+; To let the return address from kernelMain point to 
+; _start, for the sake of stack traces, we have a nop here
+  nop
+
 l:hlt
   jmp l
 
 section .bss
+; To terminate stack unwinding, stacks need to have 16 bytes at the end
 resb 16 * 1024
 stack:
+resb 16
