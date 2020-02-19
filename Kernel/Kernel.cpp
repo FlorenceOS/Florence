@@ -9,15 +9,15 @@ extern "C" {
 }
 
 namespace {
-  constexpr bool quiet = false;
-  auto pline = flo::makePline<quiet>("[FLORK] ");
-
   flo::KernelArguments arguments = []() {
     flo::KernelArguments args;
     // Kill the pointer after using it, we shouldn't touch it.
     args = flo::move(*flo::exchange(kernelArgumentPtr, nullptr));
     return args;
   }();
+
+  constexpr bool quiet = false;
+  auto pline = flo::makePline<quiet>("[FLORK]");
 
   auto consumeKernelArguments = []() {
     // Relocate physFree

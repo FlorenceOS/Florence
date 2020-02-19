@@ -13,7 +13,7 @@ using flo::Decimal;
 
 namespace {
   constexpr bool quiet = true;
-  auto pline = flo::makePline<quiet>("[FLORKLOAD] ");
+  auto pline = flo::makePline<quiet>("[FLORKLOAD]");
 }
 
 // Exists in assembly

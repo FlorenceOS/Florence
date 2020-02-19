@@ -293,6 +293,8 @@ namespace flo {
 
         flo::setColor(IO::Color::red);
         print(prefix);
+        flo::setColor(IO::Color::white);
+        print(" ");
         (p(flo::forward<decltype(vs)>(vs)), ...);
         feedLine();
       };
