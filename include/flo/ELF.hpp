@@ -312,6 +312,15 @@ namespace flo {
 
         if(section.type == ELF64::SectionHeader::Type::rel)
           return forward<Fail>(fail)("REL section handling not implemented yet.");
+
+        if(section.type == ELF64::SectionHeader::Type::strtab) {
+          if(section.size < 1)
+            return forward<Fail>(fail)("strtab section is too small to contain its required null byte!");
+          if(data[section.offset() + section.size - 1] != '\0')
+            return forward<Fail>(fail)("strtab section not null terminated!");
+          if(data[section.offset()] != '\0')
+            return forward<Fail>(fail)("strtab section doesn't start with a null char");
+        }
       });
 
       forEachProgramHeader([&](ELF64::ProgramHeader const &phdr) {
