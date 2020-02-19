@@ -240,6 +240,24 @@ namespace flo {
     // Assumed always 4K aligned
     uSz loadOffset = 0;
 
+    ELF64::SectionHeader const *symbolTable = nullptr;
+
+    bool initSymbols() {
+      symbolTable = nullptr;
+      bool failed = false;
+
+      forEachSection([&](ELF64::SectionHeader const &section) {
+        if(section.type == ELF64::SectionHeader::Type::strtab) {
+          // If this is not the section name string table
+          if(&section != &sectionHeader(header().sectionNameIndex))
+            if(flo::exchange(symbolTable, &section)) // Two possible symbol STRTABs
+              failed = true;
+        }
+      });
+
+      return !failed;
+    }
+
     template<typename Fail>
     void verify(Fail &&fail) {
       verify_inside_file(ELF64::foff{0}, sizeof(ELF64::Header), move(fail));
