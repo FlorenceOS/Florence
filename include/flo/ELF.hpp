@@ -297,20 +297,20 @@ namespace flo {
 
       verify_inside_file(header().shoff, header().shentsize * header().shnum, move(fail));
 
-      forEachSection([&](ELF64::SectionHeader const &header) {
+      forEachSection([&](ELF64::SectionHeader const &section) {
         // Nobits are zero initialized and don't have backing bytes in the image
-        if(header.type != ELF64::SectionHeader::Type::nobits)
-          verify_inside_file(header.offset, header.size, move(fail));
+        if(section.type != ELF64::SectionHeader::Type::nobits)
+          verify_inside_file(section.offset, section.size, move(fail));
 
-        if(header.type == ELF64::SectionHeader::Type::rela)
+        if(section.type == ELF64::SectionHeader::Type::rela)
           // There are relocations in this section, let's take a quick look at them.
-          forEachRelocation(header, [&](ELF64::RelocationEntry const &relent) {
+          forEachRelocation(section, [&](ELF64::RelocationEntry const &relent) {
             verify_inside_loaded(relent.address, relent.size(), move(fail));
             if(!relent.valid())
               return forward<Fail>(fail)("Invalid relocation type ", (u32)relent.type);
           });
 
-        if(header.type == ELF64::SectionHeader::Type::rel)
+        if(section.type == ELF64::SectionHeader::Type::rel)
           return forward<Fail>(fail)("REL section handling not implemented yet.");
       });
 
