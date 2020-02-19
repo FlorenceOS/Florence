@@ -49,7 +49,7 @@ clean:
 	@rm -rfv build out Tests/build/CMake*
 
 dbg: out/Disk.bin
-	$(QEMU) -drive format=raw,file=$< -S -s &
+	$(QEMU) -drive format=raw,file=$< -S -s | c++filt &
 	gdb-multiarch\
 		-ex 'shell sleep .2'\
 		-ex 'target remote :1234'\
@@ -60,10 +60,10 @@ dbg: out/Disk.bin
 	killall $(QEMUExec)
 
 kvm: out/Disk.bin
-	$(KVM) -drive format=raw,file=$<
+	$(KVM) -drive format=raw,file=$< | c++filt
 
 go: out/Disk.bin
-	$(QEMU) -d int -drive format=raw,file=$<
+	$(QEMU) -d int -drive format=raw,file=$< | c++filt
 
 test: Tests/build/CMakeCache.txt
 	make -j -C Tests/build
