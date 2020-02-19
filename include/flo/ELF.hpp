@@ -183,6 +183,7 @@ namespace flo {
       i64 addend;
 
       u64 size() const { return 8; }
+
       void apply(uSz loadOffset) const {
         auto at = (u64 *)(address() + loadOffset);
         switch(type) {
