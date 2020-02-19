@@ -292,6 +292,9 @@ namespace flo {
       if(header().shnum < header().sectionNameIndex)
         return forward<Fail>(fail)("Invalid section name string table index");
 
+      if(sectionHeader(header().sectionNameIndex).type != ELF64::SectionHeader::Type::strtab)
+        return forward<Fail>(fail)("Section name string table is not of type strtab");
+
       verify_inside_file(header().shoff, header().shentsize * header().shnum, move(fail));
 
       forEachSection([&](ELF64::SectionHeader const &header) {
