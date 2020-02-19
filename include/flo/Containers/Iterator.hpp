@@ -45,4 +45,14 @@ namespace flo {
   inline auto distance(Iterator a, Iterator b) {
     return b - a;
   }
+
+  template<typename Iterator>
+  inline auto next(Iterator const &a, uSz steps = 1) {
+    return a + steps;
+  }
+
+  template<typename Iterator>
+  inline auto advance(Iterator const &a, uSz steps = 1) {
+    return a = next(a, steps);
+  }
 }
