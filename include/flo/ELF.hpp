@@ -199,6 +199,8 @@ namespace flo {
         }
       }
     };
+
+    static_assert(sizeof(RelocationEntry) == 24);
   }
 
   struct ELF64Image {
