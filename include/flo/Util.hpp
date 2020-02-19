@@ -4,7 +4,7 @@
 #include "flo/Limits.hpp"
 
 // Placement new
-#if !__has_include(<memory>) // Arbitrary header
+#if !__has_include(<new>)
 inline void *operator new  (uSz, void *ptr) noexcept { return ptr; }
 inline void *operator new[](uSz, void *ptr) noexcept { return ptr; }
 #endif
