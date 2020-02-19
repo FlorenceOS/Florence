@@ -84,6 +84,13 @@ namespace flo {
     return rhs;
   }
 
+  template<typename T>
+  constexpr void swap(T &lhs, T &rhs) {
+    auto temp = lhs;
+    lhs = rhs;
+    rhs = temp;
+  }
+
   template<typename T> constexpr auto begin(T &&container) { return container.begin(); }
   template<typename T> constexpr auto end(T &&container)   { return container.end(); }
 
