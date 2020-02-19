@@ -314,9 +314,9 @@ namespace flo {
           return forward<Fail>(fail)("REL section handling not implemented yet.");
       });
 
-      forEachProgramHeader([&](ELF64::ProgramHeader const &header) {
-        verify_inside_file(header.offset, header.fileSz, move(fail));
-        if(header.memSz < header.fileSz)
+      forEachProgramHeader([&](ELF64::ProgramHeader const &phdr) {
+        verify_inside_file(phdr.offset, phdr.fileSz, move(fail));
+        if(phdr.memSz < phdr.fileSz)
           forward<Fail>(fail)("memSz < fileSz!!");
       });
     }
