@@ -79,7 +79,7 @@ namespace flo {
       using flo::StrongTypedef<foff, u64>::StrongTypedef;
     };
 
-    enum struct SectionIndex: u16 {
+    enum SectionIndex: u16 {
       Undef  = 0,
       Abs    = 0xFFF1,
       Common = 0xFFF2,
@@ -258,6 +258,7 @@ namespace flo {
       return !failed;
     }
 
+    // Also calls initSymbols
     template<typename Fail>
     void verify(Fail &&fail) {
       verify_inside_file(ELF64::foff{0}, sizeof(ELF64::Header), move(fail));
@@ -327,6 +328,34 @@ namespace flo {
         verify_inside_file(phdr.offset, phdr.fileSz, move(fail));
         if(phdr.memSz < phdr.fileSz)
           forward<Fail>(fail)("memSz < fileSz!!");
+      });
+
+      // Required for symbolTable below
+      if(!initSymbols())
+        return forward<Fail>(fail)("Could not deduce symbol name string table");
+
+      forEachSymbol([&](auto &sym) {
+        // Check symbol section
+        switch(sym.sectionNum) {
+        case ELF64::SectionIndex::Undef:
+        case ELF64::SectionIndex::Abs:
+        case ELF64::SectionIndex::Common:
+          break;
+        default:
+          // Make sure this is a valid section number
+          if(sym.sectionNum >= header().shnum)
+            forward<Fail>(fail)("Symbol string table index is too large: ", sym.sectionNum);
+          break;
+        }
+
+        // Symbol has a name
+        if(sym.stringTableOffset) {
+          if(!symbolTable)
+            forward<Fail>(fail)("Symbol has name but no symbol string table was found!");
+
+          if(symbolTable->size <= sym.stringTableOffset)
+            forward<Fail>(fail)("String offset ", sym.stringTableOffset, " is too large for string table size ", symbolTable->size);
+        }
       });
     }
 
