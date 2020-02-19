@@ -2,14 +2,14 @@ OUTPUT_FORMAT(elf64-x86-64)
 OUTPUT_ARCH(i386:x86-64)
 ENTRY(_start)
 
-Executable = 1 << 0;
-Writeable  = 1 << 1;
-Readable   = 1 << 2;
+HIDDEN(Executable = 1 << 0);
+HIDDEN(Writeable  = 1 << 1);
+HIDDEN(Readable   = 1 << 2);
 
 PHDRS {
-    text   PT_LOAD FLAGS(Readable | Executable);
-    data   PT_LOAD FLAGS(Readable | Writeable);
-    rodata PT_LOAD FLAGS(Readable);
+  text   PT_LOAD FLAGS(Readable | Executable);
+  data   PT_LOAD FLAGS(Readable | Writeable);
+  rodata PT_LOAD FLAGS(Readable);
 }
 
 SECTIONS {
