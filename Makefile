@@ -22,7 +22,8 @@ CXXFlagsBootstrapper := $(CXXFlags) -m32 -fno-pic -fno-pie -march=i386
 
 CXXFlags64 := $(CXXFlags) -m64
 
-CXXFlagsKernel := $(CXXFlags64) -fpic -fpie -fno-optimize-sibling-calls -fno-omit-frame-pointer
+CXXFlagsKernel := $(CXXFlags64) -fpic -fpie -fno-optimize-sibling-calls -fno-omit-frame-pointer  -mno-red-zone 
+# Kernel loader doesn't need -mno-red-zone since it has interrupts disabled
 CXXFlagsKernelLoader := $(CXXFlags64) -fno-pic -fno-pie
 
 LDFlags := --gc-sections --no-dynamic-linker -static --build-id=none
