@@ -22,7 +22,7 @@ CXXFlagsBootstrapper := $(CXXFlags) -m32 -fno-pic -fno-pie -march=i386
 
 CXXFlags64 := $(CXXFlags) -m64
 
-CXXFlagsKernel := $(CXXFlags64) -fpic -fpie
+CXXFlagsKernel := $(CXXFlags64) -fpic -fpie -fno-optimize-sibling-calls -fno-omit-frame-pointer
 CXXFlagsKernelLoader := $(CXXFlags64) -fno-pic -fno-pie
 
 LDFlags := --gc-sections --no-dynamic-linker -static --build-id=none
