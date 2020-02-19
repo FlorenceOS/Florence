@@ -79,6 +79,12 @@ namespace flo {
       using flo::StrongTypedef<foff, u64>::StrongTypedef;
     };
 
+    enum struct SectionIndex: u16 {
+      Undef  = 0,
+      Abs    = 0xFFF1,
+      Common = 0xFFF2,
+    };
+
     struct Header {
       u8                magic[0x4];
       ELF::ObjectClass  fileclass;
