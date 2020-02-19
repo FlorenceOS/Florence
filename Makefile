@@ -22,7 +22,7 @@ CXXFlagsBootstrapper := $(CXXFlags) -m32 -fno-pic -fno-pie -march=i386
 
 CXXFlags64 := $(CXXFlags) -m64
 
-CXXFlagsKernel := $(CXXFlags64) -fpic -fpie -fno-optimize-sibling-calls -fno-omit-frame-pointer  -mno-red-zone 
+CXXFlagsKernel := $(CXXFlags64) -fpic -fpie -fno-optimize-sibling-calls -fno-omit-frame-pointer -mno-red-zone
 # Kernel loader doesn't need -mno-red-zone since it has interrupts disabled
 CXXFlagsKernelLoader := $(CXXFlags64) -fno-pic -fno-pie
 
@@ -97,7 +97,7 @@ build/Bootstrapper/Bootstrapper.cpp.o: Bootstrapper/Bootstrapper.cpp LibFlo/LibF
 
 build/Bootstrapper/Bootstrapper.elf: Bootstrapper/Linker.lds $(BootstrapperObjects)
 	clang -Xlinker -T $^ -o $@ -m32 $(LinkingFlags)
-	@readelf -a $@ | grep 'BootstrapSize' | awk '{ print "Bootstrapper size: " strtonum("0x" $$2)/(0x10000 - 0x7E00) * 100 "%" }'
+	@readelf -a $@ | grep 'BootstrapSize' | awk '{ print "Bootstrapper size: " strtonum("0x" $$2)/0x8200 * 100 "%" }'
 
 # Kernel loader
 KernelLoaderSources := KernelLoader/KernelLoader.S KernelLoader/KernelLoader.cpp
