@@ -413,7 +413,7 @@ namespace flo {
             });
           break; case ELF64::SectionHeader::Type::rel:
             // Not implemented!
-          default: return;
+          break; default: return;
         }
       });
     }
