@@ -384,6 +384,52 @@ namespace flo {
     }
 
     template<typename F>
+    void forEachSymbol(F &&f) {
+      forEachSection([&](ELF64::SectionHeader const &shead) {
+        if(shead.type == ELF64::SectionHeader::Type::symtab)
+          for(uSz off = 0; off < shead.size; off += sizeof(ELF64::SymbolEntry))
+            f(*reinterpret_cast<ELF64::SymbolEntry const *>(fileData(shead) + off));
+      });
+    }
+
+    char const *symbolName(ELF64::SymbolEntry const &sym) {
+      if(symbolTable && sym.stringTableOffset)
+        return (char const *)fileData(*symbolTable) + sym.stringTableOffset;
+      return nullptr;
+    }
+
+    auto lookupSymbol(u64 addr) {
+      addr -= loadOffset;
+
+      ELF64::SymbolEntry const *result = nullptr, *betterThanNothing = nullptr;
+
+      forEachSymbol([&](auto &sym) {
+        if(addr < sym.address) // Not the right one
+          return;
+
+        if(addr < sym.address + sym.size) // Found, it's within this one
+          result = &sym;
+
+        if(sym.size)
+          return;
+
+        // Sometimes we can be within a symbol with size 0, as when inside assembly functions
+        if(!betterThanNothing)
+          betterThanNothing = &sym;
+
+        // Let's grab the last symbol before addr
+        else if(sym.address > betterThanNothing->address)
+          betterThanNothing = &sym;
+
+        // Prefer symbols with names
+        else if(!betterThanNothing->stringTableOffset)
+          betterThanNothing = &sym;
+      });
+
+      return result ?: betterThanNothing;
+    }
+
+    template<typename F>
     void forEachSection(F &&f) const {
       for(uSz i = 1; i < header().shnum; ++ i)
         f(sectionHeader(i));
