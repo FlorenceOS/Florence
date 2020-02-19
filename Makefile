@@ -16,9 +16,9 @@ CXXFlags := $(CXXFlags) \
 	-fno-exceptions -nostdinc++ -nostdinc -fno-rtti -Wno-sign-compare\
 	-std=c++17 -Oz -mno-soft-float -Iinclude -ffunction-sections\
 	-fdata-sections -funsigned-char -mno-avx -mno-avx2 -fno-use-cxa-atexit\
-  -fno-builtin -fno-unwind-tables -fuse-init-array -ILibFlo
+  -fno-builtin -fno-unwind-tables -fuse-init-array -ILibFlo -mno-sse -mno-sse2
 
-CXXFlagsBootstrapper := $(CXXFlags) -mno-sse -mno-sse2 -m32 -fno-pic -fno-pie -march=i386
+CXXFlagsBootstrapper := $(CXXFlags) -m32 -fno-pic -fno-pie -march=i386
 
 CXXFlags64 := $(CXXFlags) -m64
 
