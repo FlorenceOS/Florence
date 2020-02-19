@@ -47,4 +47,35 @@ namespace flo {
 
   // This instance is always the one used by the static members. Only define others for copying contents.
   inline PhysicalFreeList physFree;
+
+  namespace Impl {
+    struct StackFrame {
+      StackFrame *prev;
+      uptr retaddr;
+    };
+  }
+
+  // Invalidated on function return
+  Impl::StackFrame * __attribute__((always_inline)) getStackFrame() {
+    Impl::StackFrame *currentFrame;
+
+    if constexpr(sizeof(uptr) == 8)
+      asm("mov %%rbp, %0" : "=r"(currentFrame));
+
+    if constexpr(sizeof(uptr) == 4)
+      asm("mov %%ebp, %0" : "=r"(currentFrame));
+
+    return currentFrame;
+  }
+
+  template<typename Output>
+  void getStackTrace(Impl::StackFrame const *frame, Output &&out) {
+    while(frame->retaddr || frame->prev) {
+      out(*frame);
+      frame = frame->prev;
+    };
+  }
+
+  // return value invalidated on next call
+  char const *demangle(char const *mangled);
 }
