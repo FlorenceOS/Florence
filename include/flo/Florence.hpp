@@ -75,7 +75,4 @@ namespace flo {
       frame = frame->prev;
     };
   }
-
-  // return value invalidated on next call
-  char const *demangle(char const *mangled);
 }
