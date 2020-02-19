@@ -4,6 +4,10 @@
 #include "flo/Containers/Array.hpp"
 
 namespace flo {
+  // Should never be implemented!!
+  template<typename T>
+  constexpr T declval();
+
   // isSame
   template<typename T, typename U> constexpr bool isSame = false;
   template<typename T> constexpr bool isSame<T, T> = true;
