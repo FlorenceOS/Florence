@@ -35,21 +35,21 @@ namespace flo {
         operator type() {
           if constexpr(sizeof(type) == 4) {
             type out;
-            asm volatile("rdmsr" : "=eax"(out) : "ecx"(regnum));
+            asm volatile("rdmsr" : "=a"(out) : "c"(regnum));
             return out;
           }
           else if constexpr(sizeof(type) == 8) {
             type out1, out2;
-            asm volatile("rdmsr" : "=eax"(out1), "=edx"(out2) : "ecx"(regnum));
+            asm volatile("rdmsr" : "=a"(out1), "=d"(out2) : "c"(regnum));
             return (out1 & 0xFFFFFFFF) | ((out2 & 0xFFFFFFFF) << 32);
           }
         }
 
         MSR &operator=(type value) {
           if constexpr(sizeof(type) == 4)
-            asm volatile("wrmsr" :: "eax"(value), "ecx"(regnum));
+            asm volatile("wrmsr" :: "a"(value), "c"(regnum));
           else if constexpr(sizeof(type) == 8)
-            asm volatile("wrmsr" :: "eax"(value), "edx"(value >> 32), "ecx"(regnum));
+            asm volatile("wrmsr" :: "a"(value), "d"(value >> 32), "c"(regnum));
           return *this;
         }
         MSR &operator|=(type value) { return *this = static_cast<type>(*this) | value; }
