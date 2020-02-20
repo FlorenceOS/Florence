@@ -2,3 +2,4 @@ build/*
 out/*
 Tests/build/*
 tests.xml
+run-clang-format.py
