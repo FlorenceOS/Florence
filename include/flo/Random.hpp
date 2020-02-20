@@ -71,4 +71,12 @@ namespace flo {
     T min;
     T max;
   };
+
+  template <typename ItBegin, typename ItEnd, typename BitSource>
+  void shuffle(ItBegin begin, ItEnd end, BitSource &bitSource) {
+    auto const numElements = distance(begin, end);
+    UniformInts<uptr> randDist;
+    for(uptr i = 0; i < numElements - 1; ++i)
+      swap(*next(begin, i), *next(begin, randDist.set(i, numElements - 1)(bitSource)));
+  }
 }
