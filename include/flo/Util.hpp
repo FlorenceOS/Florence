@@ -157,7 +157,7 @@ namespace flo {
       Val zeroes = countHighZeroes(value);
       if(zeroes == flo::Limits<Val>::bits)
         return 0;
-      return ((Val)1) << zeroes;
+      return ((Val)1) << (flo::Limits<Val>::bits - zeroes - 1);
     }
 
     template<typename Val>
