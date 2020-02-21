@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Ints.hpp"
+
 #include "flo/TypeTraits.hpp"
 
 namespace flo {

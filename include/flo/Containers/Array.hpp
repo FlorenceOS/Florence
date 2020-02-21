@@ -1,8 +1,10 @@
 #pragma once
 
 #include "Ints.hpp"
-#include "flo/Containers/Iterator.hpp"
+
 #include "flo/Containers/Impl/ContainerBase.hpp"
+
+#include "flo/Containers/Iterator.hpp"
 
 namespace flo {
   template<typename T, uSz sz>

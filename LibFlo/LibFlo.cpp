@@ -1,10 +1,10 @@
 #include "Ints.hpp"
 
-#include "flo/Random.hpp"
-#include "flo/IO.hpp"
 #include "flo/CPU.hpp"
 #include "flo/Florence.hpp"
+#include "flo/IO.hpp"
 #include "flo/Paging.hpp"
+#include "flo/Random.hpp"
 
 namespace LibFlo {
   namespace {

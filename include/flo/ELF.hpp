@@ -1,11 +1,11 @@
 #pragma once
 
-#include "flo/Florence.hpp"
-#include "flo/TypeTraits.hpp"
-#include "flo/Bitfields.hpp"
-#include "flo/IO.hpp"
 #include "flo/Algorithm.hpp"
+#include "flo/Bitfields.hpp"
+#include "flo/Florence.hpp"
+#include "flo/IO.hpp"
 #include "flo/Paging.hpp"
+#include "flo/TypeTraits.hpp"
 
 namespace flo {
   namespace ELF {

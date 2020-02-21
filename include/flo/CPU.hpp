@@ -1,7 +1,9 @@
 #pragma once
 
 #include "Ints.hpp"
+
 #include "flo/Containers/Array.hpp"
+
 #include "flo/Bitfields.hpp"
 
 #define SYSREG(reg, type) \

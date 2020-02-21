@@ -1,9 +1,10 @@
 #pragma once
 
-#include <functional>
-#include <algorithm>
-#include <iterator>
-#include <cmath> // No idea why this has to be included, compiler freaks out if it isn't.
+#include "flo/Containers/Iterator.hpp"
+
+#include "flo/Algorithm.hpp"
+#include "flo/TypeTraits.hpp"
+#include "flo/Util.hpp"
 
 namespace flo {
   template<typename Storage, typename Compare = std::less<>>

@@ -1,9 +1,12 @@
 #pragma once
 
-#include <random>
-#include <chrono>
-
 #include "Ints.hpp"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+#include <chrono>
+#include <random>
 
 namespace Testing {
   inline static std::mt19937_64 rng(std::chrono::system_clock::now().time_since_epoch().count());
@@ -35,9 +38,6 @@ namespace Testing {
     constexpr static auto maxSize = 1ull << 38;
   };
 }
-
-#include "gtest/gtest.h"
-#include "gmock/gmock.h"
 
 using testing::Contains;
 using testing::ElementsAre;

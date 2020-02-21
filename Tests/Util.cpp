@@ -1,5 +1,6 @@
-#include "Testing.hpp"
 #include "flo/Util.hpp"
+
+#include "Testing.hpp"
 
 TEST(Util, populationCount) {
   EXPECT_EQ(flo::Util::populationCount(0), 0);

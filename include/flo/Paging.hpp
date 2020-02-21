@@ -1,12 +1,14 @@
 #pragma once
 
 #include "Ints.hpp"
-#include "flo/Florence.hpp"
-#include "flo/Util.hpp"
-#include "flo/Bitfields.hpp"
-#include "flo/CPU.hpp"
+
 #include "flo/Containers/Array.hpp"
 #include "flo/Containers/Optional.hpp"
+
+#include "flo/Bitfields.hpp"
+#include "flo/CPU.hpp"
+#include "flo/Florence.hpp"
+#include "flo/Util.hpp"
 
 namespace flo {
   namespace Paging {

@@ -1,11 +1,13 @@
 #pragma once
 
-#include <array>
-#include <memory>
-
 #include "Ints.hpp"
-#include "flo/Util.hpp"
+
 #include "flo/Containers/Impl/VectorBase.hpp"
+
+#include "flo/Containers/Array.hpp"
+
+#include "flo/TypeTraits.hpp"
+#include "flo/Util.hpp"
 
 namespace flo {
   // Small vector has a small inline capacity and doesn't allocate until it exceeds to extend it.

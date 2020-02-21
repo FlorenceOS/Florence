@@ -1,8 +1,9 @@
 #pragma once
 
 #include "Ints.hpp"
-#include "flo/TypeTraits.hpp"
+
 #include "flo/Limits.hpp"
+#include "flo/TypeTraits.hpp"
 #include "flo/Util.hpp"
 
 namespace flo {

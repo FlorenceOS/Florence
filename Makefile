@@ -31,7 +31,7 @@ LinkingFlags := -flto -O2 -Wl,--gc-sections,--no-dynamic-linker,--icf=all,--buil
 
 CommonHeaders := $(wildcard include/**/*.hpp)
 
-.PHONY: clean all dbg bochs test
+.PHONY: clean all dbg bochs test format
 .SECONDARY:;
 
 TestSources := $(wildcard Tests/*.?pp)
@@ -64,6 +64,9 @@ kvm: out/Disk.bin
 
 go: out/Disk.bin
 	$(QEMU) -d int -drive format=raw,file=$< | c++filt
+
+format:
+	./run-clang-format.py -r Bootstrapper KernelLoader Kernel include LibFlo Tests -e Tests/build --color always | most
 
 test: Tests/build/CMakeCache.txt
 	make -j -C Tests/build

@@ -1,11 +1,12 @@
 #include "flo/Containers/StaticVector.hpp"
+
 #include "flo/Algorithm.hpp"
-#include "flo/Florence.hpp"
-#include "flo/Kernel.hpp"
-#include "flo/Paging.hpp"
 #include "flo/CPU.hpp"
 #include "flo/ELF.hpp"
+#include "flo/Florence.hpp"
 #include "flo/IO.hpp"
+#include "flo/Kernel.hpp"
+#include "flo/Paging.hpp"
 
 #include "LibFlo.cpp"
 

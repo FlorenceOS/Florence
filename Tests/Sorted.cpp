@@ -1,4 +1,5 @@
 #include "flo/Containers/Sorted.hpp"
+
 #include "Testing.hpp"
 
 #include <vector>

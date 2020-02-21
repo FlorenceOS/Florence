@@ -3,6 +3,7 @@
 #include "Ints.hpp"
 
 #include "flo/Containers/Impl/VectorBase.hpp"
+
 #include "flo/Containers/Array.hpp"
 
 namespace flo {

@@ -1,6 +1,6 @@
-#include "Testing.hpp"
-
 #include "flo/Random.hpp"
+
+#include "Testing.hpp"
 
 TEST(UniformInts, NeverAbove) {
   Testing::forRandomInt([](uSz maxVal) {

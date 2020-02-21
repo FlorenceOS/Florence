@@ -1,12 +1,13 @@
-#include "flo/IO.hpp"
-#include "flo/CPU.hpp"
+#include "flo/Containers/StaticVector.hpp"
+
+#include "flo/Algorithm.hpp"
 #include "flo/Bios.hpp"
+#include "flo/Bitfields.hpp"
+#include "flo/CPU.hpp"
+#include "flo/Florence.hpp"
+#include "flo/IO.hpp"
 #include "flo/Paging.hpp"
 #include "flo/Random.hpp"
-#include "flo/Florence.hpp"
-#include "flo/Bitfields.hpp"
-#include "flo/Algorithm.hpp"
-#include "flo/Containers/StaticVector.hpp"
 
 #include "LibFlo.cpp"
 

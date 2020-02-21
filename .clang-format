@@ -1,0 +1,44 @@
+Language: Cpp
+Standard: Auto
+BasedOnStyle: Google
+ColumnLimit: 0
+ContinuationIndentWidth: 2
+SpaceBeforeParens: Never
+SpaceBeforeRangeBasedForLoopColon: false
+NamespaceIndentation: All
+SpaceAfterTemplateKeyword: false
+PointerAlignment: Right
+SpaceBeforeCtorInitializerColon: false
+SpaceBeforeInheritanceColon: false
+FixNamespaceComments: false
+AccessModifierOffset: -2
+IndentCaseLabels: false
+AllowShortCaseLabelsOnASingleLine: true
+BreakConstructorInitializers: BeforeComma
+SpacesBeforeTrailingComments: 1
+
+IncludeBlocks: Regroup
+
+IncludeCategories:
+- Regex:    '"Ints\.hpp"'
+  Priority: -3
+- Regex:    '"flo/Containers/Impl.*"'
+  Priority: -2
+- Regex:    '"flo/Containers.*"'
+  Priority: -1
+- Regex:    '"flo/.*\.hpp"'
+  Priority: 0
+- Regex:    '"LibFlo\.cpp"'
+  Priority: 1
+- Regex:    '".*\.hpp"'
+  Priority: 999
+# Things like standard library headers go down here
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterStruct: false
+  BeforeElse: true
+
+AlwaysBreakTemplateDeclarations: No
+AlignConsecutiveAssignments: true
+#AlignConsecutiveDeclarations: true
