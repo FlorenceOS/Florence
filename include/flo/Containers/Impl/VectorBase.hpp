@@ -148,11 +148,16 @@ namespace flo {
 
     // Invalid for non-movable types
     template<typename Ty = void>
-    constexpr auto erase(iterator begin, iterator end) -> enableIf<isMoveAssignable<T>, Ty>{
+    constexpr auto erase(iterator begin, iterator end) -> enableIf<isMoveAssignable<T>, Ty> {
       auto const elementsDestroyed = distance(begin, end);
       itMove<Forwards>(begin, end, v().end());
       destroyRange(v().end() - elementsDestroyed, v().end());
       v().adoptNewSize(v().size() - elementsDestroyed);
+    }
+
+    template<typename Ty = void>
+    constexpr auto erase(iterator element) -> enableIf<isMoveAssignable<T>, Ty> {
+      erase(element, element + 1);
     }
 
   private:

@@ -100,7 +100,7 @@ namespace flo {
 
       forEachBitHighToLow(num, [&result](auto b, int bitnum) {
         if(b) {
-          result = bitnum;
+          result = flo::Limits<T>::bits - bitnum - 1;
           return IterationDecision::stop;
         }
         return IterationDecision::keepGoing;
@@ -116,7 +116,7 @@ namespace flo {
 
       forEachBitHighToLow(num, [&result](auto b, int bitnum) {
         if(!b) {
-          result = bitnum;
+          result = flo::Limits<T>::bits - bitnum - 1;
           return IterationDecision::stop;
         }
         return IterationDecision::keepGoing;
