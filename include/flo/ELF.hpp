@@ -187,16 +187,17 @@ namespace flo {
       void apply(uSz loadOffset) const {
         auto at = (u64 *)(address() + loadOffset);
         switch(type) {
-          break; case RelocType::X86_64_RELATIVE:
-            *(at) = loadOffset + addend;
-          break; default: break;
+        case RelocType::X86_64_RELATIVE:
+          *(at) = loadOffset + addend;
+          break;
+        default: break;
         }
       }
 
       bool valid() const {
         switch(type) {
-          case RelocType::X86_64_RELATIVE: return true;
-          default: return false;
+        case RelocType::X86_64_RELATIVE: return true;
+        default: return false;
         }
       }
     };
@@ -432,13 +433,13 @@ namespace flo {
 
     template<typename F>
     void forEachSection(F &&f) const {
-      for(uSz i = 1; i < header().shnum; ++ i)
+      for(uSz i = 1; i < header().shnum; ++i)
         f(sectionHeader(i));
     }
 
     template<typename F>
     void forEachProgramHeader(F &&f) const {
-      for(uSz i = 0; i < header().phnum; ++ i) {
+      for(uSz i = 0; i < header().phnum; ++i) {
         auto &header = programHeader(i);
         if(header.type != ELF64::ProgramHeader::Type::Null && header.memSz)
           f(header);
@@ -454,13 +455,16 @@ namespace flo {
     void applyAllRelocations() const {
       forEachSection([&](ELF64::SectionHeader const &header) {
         switch(header.type) {
-          break; case ELF64::SectionHeader::Type::rela:
-            forEachRelocation(header, [&](ELF64::RelocationEntry const &ent) {
-              ent.apply(loadOffset);
-            });
-          break; case ELF64::SectionHeader::Type::rel:
-            // Not implemented!
-          break; default: return;
+        case ELF64::SectionHeader::Type::rela:
+          forEachRelocation(header, [&](ELF64::RelocationEntry const &ent) {
+            ent.apply(loadOffset);
+          });
+          break;
+        case ELF64::SectionHeader::Type::rel:
+          // Not implemented!
+          break;
+        default:
+          break;
         }
       });
     }
