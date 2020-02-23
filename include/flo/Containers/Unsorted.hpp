@@ -1,7 +1,6 @@
 #pragma once
 
-#include <functional>
-#include <cmath> // No idea why this has to be included, compiler freaks out if it isn't.
+#include "flo/Algorithm.hpp"
 
 namespace flo {
   template<typename Storage>
@@ -10,7 +9,7 @@ namespace flo {
 
     template<typename Ty>
     auto find(Ty const &v) const {
-      return std::find(this->begin(), this->end(), v);
+      return flo::find(this->begin(), this->end(), v);
     }
 
     template<typename Ty>
@@ -18,9 +17,9 @@ namespace flo {
       return this->find(v) != this->end();
     }
 
-    template<typename Ty, typename Compare = std::equal_to<>>
+    template<typename Ty, typename Compare = flo::Equal<>>
     auto count(Ty const &v, Compare comp = {}) const {
-      return std::count_if(this->begin(), this->end(), [&comp, &v](auto const &e) { return comp(v, e); });
+      return flo::countIf(this->begin(), this->end(), [&comp, &v](auto const &e) { return comp(v, e); });
     }
   };
 }
