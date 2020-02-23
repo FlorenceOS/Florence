@@ -156,7 +156,7 @@ namespace flo {
           }
         }
       public:
-        void initialize() {
+        static void initialize() {
           IO::out<hwport() + 1>('\x00');
           IO::out<hwport() + 3>('\x80');
           IO::out<hwport() + 0>('\x01');
@@ -177,9 +177,9 @@ namespace flo {
           return IO::in<T, hwport()>();
         }
 
-        char const *lastCol = "0";
-        void setColor(Color c) {
-          auto col = [this](char const *colorString) {
+        static inline char const *lastCol = "0";
+        static void setColor(Color c) {
+          auto col = [](char const *colorString) {
             if(colorString == flo::exchange(lastCol, colorString))
               return;
 
@@ -200,7 +200,7 @@ namespace flo {
           }
         }
 
-        void feedLine() {
+        static void feedLine() {
           write('\n');
         }
       };
