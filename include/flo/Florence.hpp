@@ -56,7 +56,7 @@ namespace flo {
   }
 
   // Invalidated on function return
-  Impl::StackFrame * __attribute__((always_inline)) getStackFrame() {
+  Impl::StackFrame *__attribute__((always_inline)) getStackFrame() {
     Impl::StackFrame *currentFrame;
 
     if constexpr(sizeof(uptr) == 8)
