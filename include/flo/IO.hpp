@@ -79,12 +79,12 @@ namespace flo {
 
       inline void setColor(Color c) {
         switch(c) {
-          break; case Color::red:    currentColor = 0x4;
-          break; case Color::cyan:   currentColor = 0x3;
-          break; case Color::yellow: currentColor = 0xE;
-          break; case Color::white:  currentColor = 0x7;
-          break; case Color::blue:   currentColor = 0x1;
-          break; default:            currentColor = 0xF;
+        case Color::red:    currentColor = 0x4; break;
+        case Color::cyan:   currentColor = 0x3; break;
+        case Color::yellow: currentColor = 0xE; break;
+        case Color::white:  currentColor = 0x7; break;
+        case Color::blue:   currentColor = 0x1; break;
+        default:            currentColor = 0xF; break;
         }
       }
 
@@ -191,12 +191,12 @@ namespace flo {
           };
 
           switch(c) {
-            break; case Color::red:    col("31");
-            break; case Color::cyan:   col("36");
-            break; case Color::yellow: col("33");
-            break; case Color::white:  col("37");
-            break; case Color::blue:   col("34");
-            break; default:            col("0");
+          case Color::red:    col("31"); break;
+          case Color::cyan:   col("36"); break;
+          case Color::yellow: col("33"); break;
+          case Color::white:  col("37"); break;
+          case Color::blue:   col("34"); break;
+          default:            col("0");  break;
           }
         }
 
@@ -248,7 +248,7 @@ namespace flo {
     return print(&*it);
   }
 
-  template <bool nopOut>
+  template<bool nopOut>
   constexpr auto makePline(char const *prefix) {
     if constexpr(nopOut)
       return [](auto &&...vs) {};
