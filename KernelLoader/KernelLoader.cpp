@@ -41,13 +41,13 @@ namespace {
         }
       };
 
-    check((u64*)&physFree, "physFree");
-    check((u64*)&physMemRanges, "physMemRanges");
-    check((u64*)&displayWidth, "displayWidth");
-    check((u64*)&displayHeight, "displayHeight");
-    check((u64*)&displayPitch, "displayPitch");
-    check((u64*)&framebuffer, "framebuffer");
-    check((u64*)&driveNumber, "driveNumber");
+    check((u64 *)&physFree,      "physFree");
+    check((u64 *)&physMemRanges, "physMemRanges");
+    check((u64 *)&displayWidth,  "displayWidth");
+    check((u64 *)&displayHeight, "displayHeight");
+    check((u64 *)&displayPitch,  "displayPitch");
+    check((u64 *)&framebuffer,   "framebuffer");
+    check((u64 *)&driveNumber,   "driveNumber");
     return flo::nullopt;
   }();
 
