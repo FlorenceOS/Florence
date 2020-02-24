@@ -89,8 +89,8 @@ namespace flo {
     using CPUIDBits = flo::Bitfield<startBit, numBits, u32>;
 
     struct CPUIDData {
-      CPUIDData():
-          cpuid0{0}
+      CPUIDData()
+        : cpuid0{0}
         , cpuid1{conditionalCPUID<decltype(cpuid1)>(1)}
       { }
 
