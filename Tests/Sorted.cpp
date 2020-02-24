@@ -62,12 +62,12 @@ TEST(Sorted, contains) {
 
 TEST(Sorted, count) {
   flo::Sorted<std::vector<uSz>> v;
-  for(int i = 0; i < 20; ++ i) {
+  for(int i = 0; i < 20; ++i) {
     v.insert(5);
     SortedInvariant(v);
   }
 
-  for(int i = 0; i < 5; ++ i) {
+  for(int i = 0; i < 5; ++i) {
     v.insert(4);
     SortedInvariant(v);
   }

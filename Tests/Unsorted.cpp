@@ -29,10 +29,10 @@ TEST(Unsorted, contains) {
 
 TEST(Unsorted, count) {
   flo::Unsorted<std::vector<uSz>> v;
-  for(int i = 0; i < 20; ++ i)
+  for(int i = 0; i < 20; ++i)
     v.emplace_back(5);
 
-  for(int i = 0; i < 5; ++ i)
+  for(int i = 0; i < 5; ++i)
     v.emplace_back(4);
 
   EXPECT_EQ(v.count(6), 0);

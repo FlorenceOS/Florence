@@ -29,7 +29,7 @@ TEST(SmallVector, push_back) {
 
     flo::SmallVector<int, 0x10, Testing::DefaultAllocator<int>> v;
 
-    for(uSz i = 0; i < numElements; ++ i) {
+    for(uSz i = 0; i < numElements; ++i) {
       auto val = Testing::urand(0x10000);
      
       v.push_back(val);
@@ -93,7 +93,8 @@ TEST(SmallVector, ModifySubscript) {
 
 TEST(SmallVector, DoCallDestructor) {
   struct S {
-    S(bool &tf): testFailed{tf} { }
+    S(bool &tf)
+      : testFailed{tf} { }
     ~S() { testFailed = false; }
   private:
     bool &testFailed;

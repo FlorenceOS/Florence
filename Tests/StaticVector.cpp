@@ -23,7 +23,7 @@ TEST(StaticVector, reserve) {
 
   StaticVectorInvariant(v);
 
-  EXPECT_GT(v.capacity(), 0); 
+  EXPECT_GT(v.capacity(), 0);
 }
 
 TEST(StaticVector, push_back) {
@@ -83,7 +83,8 @@ TEST(StaticVector, ModifySubscript) {
 
 TEST(StaticVector, DoCallDestructor) {
   struct S {
-    S(bool &tf): testFailed{tf} { }
+    S(bool &tf)
+      : testFailed{tf} { }
     ~S() { testFailed = false; }
   private:
     bool &testFailed;
@@ -111,11 +112,14 @@ TEST(StaticVector, DoNotCallDestructor) {
 
 TEST(StaticVector, CallDestructorEraseOnly) {
   struct S {
-    S(bool &testFailed, bool shouldDestruct):
-        shouldDestruct{shouldDestruct},
-        testFailed{testFailed} { }
+    S(bool &testFailed, bool shouldDestruct)
+      : shouldDestruct{shouldDestruct}
+      , testFailed{testFailed}
+    { }
 
-    ~S() { if(!shouldDestruct) testFailed = true; }
+    ~S() {
+      if(!shouldDestruct) testFailed = true;
+    }
   private:
     bool shouldDestruct;
     bool &testFailed;
