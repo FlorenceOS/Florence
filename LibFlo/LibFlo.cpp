@@ -60,7 +60,7 @@ extern "C" Constructor constructorsStart;
 extern "C" Constructor constructorsEnd;
 
 extern "C" void callGlobalConstructors() {
-  for(auto c = &constructorsStart; c < &constructorsEnd; ++ c)
+  for(auto c = &constructorsStart; c < &constructorsEnd; ++c)
     (**c)();
 }
 
@@ -102,7 +102,7 @@ flo::PhysicalAddress flo::PhysicalFreeList::getPhysicalPage(int pageLevel) {
       auto stepSize = flo::Paging::pageSizes[pageLevel - 1]; // 0 indexed, we are 1 indexed
 
       // Return all pages but one
-      for(int i = 0; i < flo::Paging::PageTableSize - 1; ++ i) {
+      for(int i = 0; i < flo::Paging::PageTableSize - 1; ++i) {
         physFree.returnPhysicalPage(next, pageLevel);
         next += PhysicalAddress{stepSize};
       }
@@ -111,12 +111,12 @@ flo::PhysicalAddress flo::PhysicalFreeList::getPhysicalPage(int pageLevel) {
     };
 
   switch(pageLevel) {
-    case 1: return tryGet(physFree.lvl1);
-    case 2: return tryGet(physFree.lvl2);
-    case 3: return tryGet(physFree.lvl3);
-    case 4: return tryGet(physFree.lvl4);
-    case 5: return tryGet(physFree.lvl5);
-    default: LibFlo::pline("Unknown paging level: ", pageLevel); flo::CPU::hang();
+  case 1: return tryGet(physFree.lvl1);
+  case 2: return tryGet(physFree.lvl2);
+  case 3: return tryGet(physFree.lvl3);
+  case 4: return tryGet(physFree.lvl4);
+  case 5: return tryGet(physFree.lvl5);
+  default: LibFlo::pline("Unknown paging level: ", pageLevel); flo::CPU::hang();
   }
 
   __builtin_unreachable();
@@ -124,11 +124,11 @@ flo::PhysicalAddress flo::PhysicalFreeList::getPhysicalPage(int pageLevel) {
 
 void flo::PhysicalFreeList::returnPhysicalPage(flo::PhysicalAddress phys, int pageLevel) {
   switch(pageLevel) {
-    case 1: *getPhys<PhysicalAddress>(phys) = exchange(physFree.lvl1, phys); return;
-    case 2: *getPhys<PhysicalAddress>(phys) = exchange(physFree.lvl2, phys); return;
-    case 3: *getPhys<PhysicalAddress>(phys) = exchange(physFree.lvl3, phys); return;
-    case 4: *getPhys<PhysicalAddress>(phys) = exchange(physFree.lvl4, phys); return;
-    case 5: *getPhys<PhysicalAddress>(phys) = exchange(physFree.lvl5, phys); return;
-    default: LibFlo::pline("Unkown paging level: ", Decimal{pageLevel}); flo::CPU::hang();
+  case 1: *getPhys<PhysicalAddress>(phys) = exchange(physFree.lvl1, phys); return;
+  case 2: *getPhys<PhysicalAddress>(phys) = exchange(physFree.lvl2, phys); return;
+  case 3: *getPhys<PhysicalAddress>(phys) = exchange(physFree.lvl3, phys); return;
+  case 4: *getPhys<PhysicalAddress>(phys) = exchange(physFree.lvl4, phys); return;
+  case 5: *getPhys<PhysicalAddress>(phys) = exchange(physFree.lvl5, phys); return;
+  default: LibFlo::pline("Unkown paging level: ", Decimal{pageLevel}); flo::CPU::hang();
   }
 }
