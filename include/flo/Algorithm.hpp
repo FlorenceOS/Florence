@@ -171,4 +171,48 @@ namespace flo {
   constexpr auto upperBound(Container &&cont, Value const &value, Compare cmp = Compare{}) {
     return upperBound(begin(cont), end(cont), value, cmp);
   }
+
+  template<typename Iterator, typename Value, typename Compare = flo::Less<>>
+  constexpr auto equalRange(Iterator begin, Iterator end, Value const &value, Compare cmp = Compare{}) {
+    struct {
+      Iterator begin{};
+      Iterator end{};
+    } result;
+
+    result.begin = begin;
+    result.end = end;
+
+    return [&result, &value, &cmp]() mutable {
+      auto &[begin, end] = result;
+
+      // Optimization instead of just returning lowerBound(), upperBound().
+      // Check if they're both in the same half
+      while(begin != end) {
+        auto count = flo::distance(begin, end);
+        auto mid = flo::next(begin, count/2);
+
+        // If *mid < value, equalRange has to be within the second half
+        if(cmp(*mid, value))
+          begin = flo::next(mid, 1);
+
+        // If value < *mid, equalRange has to be within the first half
+        else if(cmp(value, *mid))
+          end = mid;
+
+        // If value == *mid, we have to split into upper and lower bound
+        else {
+          begin = lowerBound(begin, mid, value, cmp);
+          end = upperBound(mid + 1, end, value, cmp);
+          break;
+        }
+      }
+
+      return result;
+    }();
+  }
+
+  template<typename Container, typename Value, typename Compare = flo::Less<>>
+  constexpr auto equalRange(Container &&cont, Value const &value, Compare cmp = Compare{}) {
+    return equalRange(begin(cont), end(cont), value, cmp);
+  }
 }
