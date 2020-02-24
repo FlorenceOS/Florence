@@ -8,7 +8,7 @@ namespace flo {
   private:
     constexpr static auto mask() {
       Container out{};
-      for(unsigned i = startBit; i < startBit + numBits; ++ i) {
+      for(unsigned i = startBit; i < startBit + numBits; ++i) {
         out |= Container{1} << i;
       }
       return out;
@@ -18,9 +18,10 @@ namespace flo {
     constexpr Bitfield() = default;
     constexpr Bitfield(Container_ val) { *this = val; }
     
-    static constexpr auto startBit = startBit_, numBits = numBits_;
     using Container = Container_;
-    static constexpr auto selfMask = mask();
+
+    static constexpr auto startBit  = startBit_, numBits = numBits_;
+    static constexpr auto selfMask  = mask();
     static constexpr auto otherMask = ~selfMask;
 
     static_assert(startBit + numBits <= sizeof(Container) * 8);
