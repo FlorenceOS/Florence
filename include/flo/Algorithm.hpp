@@ -233,4 +233,19 @@ namespace flo {
       swap(*begin++, *smallest);
     }
   }
+
+  template<typename Iterator, typename Compare = flo::Less<>>
+  constexpr bool isSorted(Iterator begin, Iterator end, Compare cmp = Compare{}) {
+    if(begin != end) {
+      auto next = begin + 1;
+      while(next != end) {
+        if(cmp(*next, *begin))
+          return false;
+
+        begin = next++;
+      }
+    }
+
+    return true;
+  }
 }
