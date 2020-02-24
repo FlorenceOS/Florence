@@ -248,4 +248,19 @@ namespace flo {
 
     return true;
   }
+
+  // Quicksort :^)
+  template<typename Iterator, typename Compare = flo::Less<>>
+  constexpr void sort(Iterator begin, Iterator end, Compare cmp = Compare{}) {
+    auto dist = flo::distance(begin, end);
+    if(dist <= 16)
+      return insertionSort(begin, end, cmp);
+
+    auto pivot = begin + dist/2;
+    auto mid1 = partition(begin, end, [&](auto &ele) { return  cmp(ele, *pivot); });
+    auto mid2 = partition(mid1,  end, [&](auto &ele) { return !cmp(*pivot, ele); });
+
+    sort(begin, mid1);
+    sort(mid2, end);
+  }
 }
