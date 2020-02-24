@@ -68,7 +68,7 @@ namespace flo {
     T max;
   };
 
-  template <typename ItBegin, typename ItEnd, typename BitSource>
+  template<typename ItBegin, typename ItEnd, typename BitSource>
   void shuffle(ItBegin begin, ItEnd end, BitSource &bitSource) {
     auto const numElements = distance(begin, end);
     UniformInts<uptr> randDist;
