@@ -31,7 +31,7 @@ namespace flo {
 
     static constexpr T calcSignedMax() {
       T result = 0;
-      for(int i = 0; i < bits - 1; ++ i) // Set all bits but the highests one (sign)
+      for(int i = 0; i < bits - 1; ++i) // Set all bits but the highests one (sign)
         result |= (T{1} << i);
       return result;
     }
