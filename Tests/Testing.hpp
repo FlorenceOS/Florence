@@ -18,7 +18,7 @@ namespace Testing {
   template<typename F>
   void runFor(F &&f, std::chrono::duration<double> duration = std::chrono::seconds(1)) {
     auto start = std::chrono::steady_clock::now();
-    while(std::chrono::steady_clock::now() - start < duration)
+    while(std::chrono::steady_clock::now() - start < duration && !testing::Test::HasFailure())
       f();
   }
 
