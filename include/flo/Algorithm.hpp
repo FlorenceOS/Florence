@@ -97,6 +97,17 @@ namespace flo {
     return begin;
   }
 
+  template<typename Iterator, typename Predicate>
+  constexpr auto countIf(Iterator begin, Iterator end, Predicate &&pred) {
+    uSz result = 0;
+
+    for(; begin != end; ++begin)
+      if(pred(*begin))
+        ++result;
+
+    return result;
+  }
+
   template<typename T>
   constexpr void swap(T &lhs, T &rhs) {
     auto temp = lhs;
