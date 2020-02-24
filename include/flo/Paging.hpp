@@ -297,7 +297,7 @@ namespace flo {
               auto pageTablePhys = physFree.getPhysicalPage(1);
 
               // Construct page table
-              new (getPhys<PageTable<Level - 1>>(pageTablePhys)) PageTable<Level - 1>();
+              new(getPhys<PageTable<Level - 1>>(pageTablePhys)) PageTable<Level - 1>();
 
               // Make a new PTE
               auto npte = Impl::table<Level>();
@@ -387,12 +387,12 @@ namespace flo {
           pte = Impl::mapping<decay<decltype(pte)>::lvl>(perm, ppage);
         return noMappingError;
       };
- 
+
       // Make sure that the page is not twice as big
       auto mapPred = [&](auto currVirt, auto currSize, auto pageSize) -> bool {
         return pageSize/2 < currSize;
       };
-      
+
       return Impl::doMap(virt, size, *getPagingRoot(), conflicting, makeMap, mapPred);
     }
 
@@ -420,7 +420,7 @@ namespace flo {
         auto &pte = table.table[ind];
 
         if(pte.present && pte.isMapping()) {
-          if constexpr (reclaimPages)
+          if constexpr(reclaimPages)
             returnPhysicalPage(pte.physaddr(), Level);
           pte.rep = 0;
           continue;
@@ -445,15 +445,15 @@ namespace flo {
     if(err) {
       out("Error while mapping ", err->virt(), " at paging level ", (u8)err->level);
       switch(err->type) {
-        case flo::Paging::MappingError::AlreadyMapped:
-          forward<Out>(out)("  Already mapped! ");
-          break;
-        case flo::Paging::MappingError::NoAlignment:
-          forward<Out>(out)("  Misaligned pointers!");
-          break;
-        default:
-          forward<Out>(out)("  Unknown error!");
-          break;
+      case flo::Paging::MappingError::AlreadyMapped:
+        forward<Out>(out)("  Already mapped! ");
+        break;
+      case flo::Paging::MappingError::NoAlignment:
+        forward<Out>(out)("  Misaligned pointers!");
+        break;
+      default:
+        forward<Out>(out)("  Unknown error!");
+        break;
       }
 
       forward<ErrorFunc>(errf)();
@@ -463,7 +463,7 @@ namespace flo {
   template<int Level, typename Tracer>
   void printPaging(Paging::PageTable<Level> &pt, Tracer &&tracer, u64 virtaddr = 0, u8 indent = 0) {
     bool visitedAny = false;
-    for(int i = 0; i < flo::Paging::PageTableSize; ++ i) {
+    for(int i = 0; i < flo::Paging::PageTableSize; ++i) {
       auto &ent = pt.table[i];
       if(!ent.present)
         continue;
