@@ -52,18 +52,13 @@ namespace flo {
   private:
     /* Must set bitmask */
     constexpr auto &update() {
-      // Special case where entire range of type is specified, we can't do max - min + 1 since it will overflow
-      if(min == flo::Limits<T>::min && max == flo::Limits<T>::max)
-        bitmask = ~T{0};
-      else {
-        auto desiredRange = max - min + 1;
-        auto desiredBits = flo::Limits<T>::bits - flo::Util::countHighZeroes(desiredRange);
+      auto desiredRange = max - min;
+      auto desiredBits = flo::Limits<T>::bits - flo::Util::countHighZeroes(desiredRange);
 
-        if(desiredBits == flo::Limits<T>::bits)
-          bitmask = ~T{0};
-        else
-          bitmask = (T{1} << desiredBits) - 1;
-      }
+      if(desiredBits == flo::Limits<T>::bits)
+        bitmask = ~T{0};
+      else
+        bitmask = (T{1} << desiredBits) - 1;
 
       return *this;
     }
