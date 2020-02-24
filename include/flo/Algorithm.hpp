@@ -135,4 +135,40 @@ namespace flo {
   constexpr auto equals(Container &&cont, Iter it) {
     return equals(begin(cont), end(cont), it);
   }
+
+  template<typename Iterator, typename Value, typename Compare = flo::Less<>>
+  constexpr Iterator lowerBound(Iterator begin, Iterator end, Value const &value, Compare cmp = Compare{}) {
+    while(begin != end) {
+      auto count = flo::distance(begin, end);
+      auto mid = flo::next(begin, count/2);
+      if(cmp(*mid, value))
+        begin = flo::next(mid, 1);
+      else
+        end = mid;
+    }
+    return begin;
+  }
+
+  template<typename Container, typename Value, typename Compare = flo::Less<>>
+  constexpr auto lowerBound(Container &&cont, Value const &value, Compare cmp = Compare{}) {
+    return lowerBound(begin(cont), end(cont), value, cmp);
+  }
+
+  template<typename Iterator, typename Value, typename Compare = flo::Less<>>
+  constexpr Iterator upperBound(Iterator begin, Iterator end, Value const &value, Compare cmp = Compare{}) {
+    while(begin != end) {
+      auto count = flo::distance(begin, end);
+      auto mid = flo::next(begin, count/2);
+      if(!cmp(value, *mid))
+        begin = flo::next(mid, 1);
+      else
+        end = mid;
+    }
+    return begin;
+  }
+
+  template<typename Container, typename Value, typename Compare = flo::Less<>>
+  constexpr auto upperBound(Container &&cont, Value const &value, Compare cmp = Compare{}) {
+    return upperBound(begin(cont), end(cont), value, cmp);
+  }
 }
