@@ -215,7 +215,6 @@ namespace flo {
   constexpr auto equalRange(Container &&cont, Value const &value, Compare cmp = Compare{}) {
     return equalRange(begin(cont), end(cont), value, cmp);
   }
-  }
 
   template<typename Iterator, typename Predicate>
   constexpr Iterator partition(Iterator begin, Iterator end, Predicate pred) {
