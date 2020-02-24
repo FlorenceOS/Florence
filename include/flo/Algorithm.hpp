@@ -88,6 +88,15 @@ namespace flo {
     return rhs;
   }
 
+  template<typename Value, typename Iterator>
+  constexpr Iterator find(Iterator begin, Iterator end, Value const &v) {
+    for(; begin != end; ++begin)
+      if(*begin == v)
+        return begin;
+
+    return begin;
+  }
+
   template<typename T>
   constexpr void swap(T &lhs, T &rhs) {
     auto temp = lhs;
