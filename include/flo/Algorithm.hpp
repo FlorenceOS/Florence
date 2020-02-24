@@ -223,4 +223,14 @@ namespace flo {
       swap(*it, *begin++);
     return begin;
   }
+
+  template<typename Iterator, typename Compare = flo::Less<>>
+  constexpr void insertionSort(Iterator begin, Iterator end, Compare cmp = Compare{}) {
+    while(begin != end) {
+      auto smallest = begin;
+      for(auto it = begin + 1; it != end; ++it) if(cmp(*it, *smallest))
+        smallest = it;
+      swap(*begin++, *smallest);
+    }
+  }
 }
