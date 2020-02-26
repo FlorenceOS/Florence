@@ -14,4 +14,6 @@ namespace flo {
     u64 framebuffer;
     u64 driveNumber;
   };
+
+  void printBacktrace();
 }

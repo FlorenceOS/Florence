@@ -57,14 +57,7 @@ u8 *flo::getPtrVirt(flo::VirtualAddress virt) {
 void panic(char const *reason) {
   pline(flo::IO::Color::red, "Kernel panic! Reason: ", flo::IO::Color::red, reason);
 
-  auto frame = flo::getStackFrame();
-
-  pline("Backtrace: ");
-  flo::getStackTrace(frame, [](auto &stackFrame) {
-    auto symbol = arguments.elfImage->lookupSymbol(stackFrame.retaddr);
-    auto symbolName = symbol ? arguments.elfImage->symbolName(*symbol) : nullptr;
-    pline(symbolName ?: "[NO NAME]", ": ", stackFrame.retaddr - arguments.elfImage->loadOffset);
-  });
+  flo::printBacktrace();
 
   flo::CPU::halt();
 }
@@ -83,4 +76,15 @@ void kernelMain() {
   pline("  Best regards, 0x", (void *)&kernelMain);
 
   Fun::things::foo();
+}
+
+void flo::printBacktrace() {
+  auto frame = flo::getStackFrame();
+
+  pline("Backtrace: ");
+  flo::getStackTrace(frame, [](auto &stackFrame) {
+    auto symbol = arguments.elfImage->lookupSymbol(stackFrame.retaddr);
+    auto symbolName = symbol ? arguments.elfImage->symbolName(*symbol) : nullptr;
+    pline(symbolName ?: "[NO NAME]", ": ", stackFrame.retaddr - arguments.elfImage->loadOffset);
+  });
 }
