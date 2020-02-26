@@ -61,6 +61,14 @@ namespace flo {
         return ptr;
     }
 
+    template<>
+    VirtualAddress makeCanonical<VirtualAddress>(VirtualAddress ptr) {
+      if(ptr & (VirtualAddress{maxUaddr} >> 1ull))
+        return ptr | ~(VirtualAddress{maxUaddr} - VirtualAddress{1});
+      else
+        return ptr;
+    }
+
     template<int level>
     union PageTableEntry;
 
