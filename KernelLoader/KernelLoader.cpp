@@ -8,8 +8,6 @@
 #include "flo/Kernel.hpp"
 #include "flo/Paging.hpp"
 
-#include "LibFlo.cpp"
-
 using flo::Decimal;
 
 namespace {

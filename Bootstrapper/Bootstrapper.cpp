@@ -9,8 +9,6 @@
 #include "flo/Paging.hpp"
 #include "flo/Random.hpp"
 
-#include "LibFlo.cpp"
-
 using flo::Decimal;
 using flo::spaces;
 

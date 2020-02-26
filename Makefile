@@ -30,6 +30,12 @@ LDFlags := --gc-sections --no-dynamic-linker -static --build-id=none
 LinkingFlags := -flto -O2 -Wl,--gc-sections,--no-dynamic-linker,--icf=all,--build-id=none -fuse-ld=lld -static -ffreestanding -nostdlib
 
 CommonHeaders := $(wildcard include/**/*.hpp)
+CommonSources := $(wildcard LibFlo/*.cpp)
+LibKernelSources := $(wildcard LibKernel/*.cpp)
+
+UserspaceCXXFlags :=\
+	-Oz -Wall -Werror -nostdlib -ILibFlo -Iinclude -fno-rtti -fno-exceptions -g\
+	-fdata-sections -ffunction-sections -std=c++17 -nostdinc++ -nostdinc -IUserspace/include
 
 .PHONY: clean all dbg bochs test format
 .SECONDARY:;
@@ -94,9 +100,10 @@ build/Bootstrapper/Bootstrapper.S.o: Bootstrapper/Bootstrapper.S Makefile
 	@mkdir -p $(@D)
 	nasm -felf32 $< -o $@
 
-build/Bootstrapper/Bootstrapper.cpp.o: Bootstrapper/Bootstrapper.cpp LibFlo/LibFlo.cpp $(CommonHeaders) Makefile
+build/Bootstrapper/Bootstrapper.cpp.o: Bootstrapper/Bootstrapper.cpp $(CommonSources) $(CommonHeaders) $(LibKernelSources) Makefile
 	@mkdir -p $(@D)
-	clang++ -flto $(CXXFlagsBootstrapper) -c $< -o $@
+	./MakeUnityBuild.py $(filter %.cpp,$^) > build/Bootstrapper/Bootstrapper.cpp
+	clang++ -flto $(CXXFlagsBootstrapper) -c build/Bootstrapper/Bootstrapper.cpp -I. -o $@
 
 build/Bootstrapper/Bootstrapper.elf: Bootstrapper/Linker.lds $(BootstrapperObjects)
 	clang -Xlinker -T $^ -o $@ -m32 $(LinkingFlags)
@@ -110,9 +117,10 @@ build/KernelLoader/KernelLoader.S.o: KernelLoader/KernelLoader.S build/Kernel/Ke
 	@mkdir -p $(@D)
 	nasm -felf64 $< -o $@
 
-build/KernelLoader/KernelLoader.cpp.o: KernelLoader/KernelLoader.cpp LibFlo/LibFlo.cpp $(CommonHeaders) Makefile
+build/KernelLoader/KernelLoader.cpp.o: KernelLoader/KernelLoader.cpp $(CommonSources) $(CommonHeaders) $(LibKernelSources) Makefile
 	@mkdir -p $(@D)
-	clang++ -flto $(CXXFlagsKernelLoader) -c $< -o $@
+	./MakeUnityBuild.py $(filter %.cpp,$^) > build/KernelLoader/KernelLoader.cpp
+	clang++ -flto $(CXXFlagsKernelLoader) -c build/KernelLoader/KernelLoader.cpp -I. -o $@
 
 build/KernelLoader/KernelLoader.elf: KernelLoader/Linker.lds $(KernelLoaderObjects)
 	clang -Xlinker -T $^ -o $@ $(LinkingFlags)
@@ -125,16 +133,41 @@ build/Kernel/%.S.o: Kernel/%.S
 	@mkdir -p $(@D)
 	nasm -felf64 $< -o $@
 
-build/Kernel/Kernel.cpp.o: Kernel/Kernel.cpp LibFlo/LibFlo.cpp $(CommonHeaders) Makefile
+build/Kernel/Kernel.cpp.o: Kernel/Kernel.cpp $(CommonSources) $(CommonHeaders) $(LibKernelSources) Makefile
 	@mkdir -p $(@D)
-	clang++ $(CXXFlagsKernel) -c $< -o $@
+	./MakeUnityBuild.py $(filter %.cpp,$^) > build/Kernel/Kernel.cpp
+	clang++ $(CXXFlagsKernel) -c build/Kernel/Kernel.cpp -I. -o $@
 
 build/Kernel/Kernel.elf: Kernel/Kernel.lds $(KernelObjects)
 	@mkdir -p $(@D)
 	@# lld crashes here :(
 	@# If/when it stops, please use the bottom one :^)
 	ld -T $^ -o $@ $(LDFlags) -pie -z max-page-size=0x1000
-	@#clang -Xlinker -T $^ -o $@ $(LinkingFlags) -fpie -Xlinker -pie
+	@#clang -flto -Xlinker -T $^ -o $@ $(LinkingFlags) -fpie -Xlinker -pie
+
+# Libuserspace
+UserspaceHeaders := $(wildcard Userspace/include/**/*.hpp)
+LibuserspaceSources := $(wildcard Userspace/Libuserspace/*.cpp) $(wildcard Userspace/Libuserspace/*.S) $(patsubst %,Userspace/%,$(CommonSources))
+LibuserspaceObjects := $(patsubst %,build/%.o,$(LibuserspaceSources))
+
+build/Userspace/Libuserspace/%.cpp.o: Userspace/Libuserspace/%.cpp $(CommonHeaders) $(UserspaceHeaders) Makefile
+	@mkdir -p $(@D)
+	clang++ $(UserspaceCXXFlags) -c $< -o $@
+
+build/Userspace/Libuserspace/%.S.o: Userspace/Libuserspace/%.S Makefile
+	@mkdir -p $(@D)
+	clang $(UserspaceAsmFlags) -c $< -o $@
+
+build/Userspace/LibFlo/%.cpp.o: LibFlo/%.cpp $(CommonHeaders) $(UserspaceHeaders) Makefile
+	@mkdir -p $(@D)
+	clang++ $(UserspaceCXXFlags) -c $< -o $@
+
+build/Libuserspace.o: $(LibuserspaceObjects)
+	@mkdir -p $(@D)
+	ar rcs $@ $^
+
+# Userspace applications
+# WIP lol
 
 # Literally just concat them lol
 out/Disk.bin: build/Bootsector/Bootsector.bin build/Bootstrapper/Bootstrapper.bin build/KernelLoader/KernelLoader.bin Makefile
