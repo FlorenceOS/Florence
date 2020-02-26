@@ -55,8 +55,8 @@ namespace flo {
 
     template<typename T>
     T makeCanonical(T ptr) {
-      if(ptr & (T{maxUaddr} >> 1ull))
-        return ptr | ~(T{maxUaddr} - T{1});
+      if((uptr)ptr & (maxUaddr() >> 1ull))
+        return reinterpret_cast<T>((uptr)ptr | ~((maxUaddr()) - 1ull));
       else
         return ptr;
     }
