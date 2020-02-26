@@ -56,7 +56,7 @@ namespace flo {
   }
 
   // Invalidated on function return
-  Impl::StackFrame *__attribute__((always_inline)) getStackFrame() {
+  inline Impl::StackFrame *__attribute__((always_inline)) getStackFrame() {
     Impl::StackFrame *currentFrame;
 
     if constexpr(sizeof(uptr) == 8)
@@ -69,7 +69,7 @@ namespace flo {
   }
 
   template<typename Output>
-  void getStackTrace(Impl::StackFrame const *frame, Output &&out) {
+  inline void getStackTrace(Impl::StackFrame const *frame, Output &&out) {
     while(frame->retaddr || frame->prev) {
       out(*frame);
       frame = frame->prev;
