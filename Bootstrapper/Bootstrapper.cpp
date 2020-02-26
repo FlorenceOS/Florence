@@ -171,7 +171,7 @@ namespace {
 
   void checkRDRAND() {
     if(!flo::cpuid.rdrand) {
-      pline(flo::IO::Color::red, "Your CPU is missing RDRAND support."),
+      pline(flo::IO::Color::red, "Your CPU is missing RDRAND support.");
       pline(flo::IO::Color::red, "Please run Florence with a more modern CPU.");
       pline(flo::IO::Color::red, "If using KVM, use flag \"-cpu host\".");
       pline(flo::IO::Color::red, "We are not able to provide good randomness.");
@@ -275,9 +275,9 @@ extern "C" void setupVideo() {
   for(int x = 0; x < pickedDisplay.width;  ++ x) {
     auto col = x % 8 == 0 || y % 8 == 0 ? 1 : 0;
     auto offset = y * pickedDisplay.pitch + x * pickedDisplay.bpp;
-    *(u8*)(pickedDisplay.framebuffer + offset + 0) = col ? 0x24 : 0;
-    *(u8*)(pickedDisplay.framebuffer + offset + 1) = col ? 0x3d : 0;
-    *(u8*)(pickedDisplay.framebuffer + offset + 2) = col ? 0xdc : 0;
+    *(u8 *)(pickedDisplay.framebuffer + offset + 0) = col ? 0x24 : 0;
+    *(u8 *)(pickedDisplay.framebuffer + offset + 1) = col ? 0x3d : 0;
+    *(u8 *)(pickedDisplay.framebuffer + offset + 2) = col ? 0xdc : 0;
   }
 }
 
@@ -355,7 +355,7 @@ extern "C" void doEarlyPaging() {
   using PageRoot = flo::Paging::PageTable<flo::Paging::PageTableLevels>;
 
   // Prepare the paging root
-  auto &pageRootPhys = *new ((PageRoot*) flo::physFree.getPhysicalPage(1)()) PageRoot();
+  auto &pageRootPhys = *new((PageRoot *)flo::physFree.getPhysicalPage(1)()) PageRoot();
 
   // Set the paging root
   flo::CPU::cr3 = (uptr)&pageRootPhys;
@@ -422,44 +422,54 @@ namespace {
 
         while(ind < flo::Paging::PageSize<1>/sizeof(*mem) && !entryFound) {
           switch(mem[ind]) {
-            break; case flo::Util::genMagic("FLORKLOD"):
-              // Calculate the virtual address this is loaded at
-              kernelLoaderEntry = outAddr + flo::VirtualAddress{(ind + 1) * 8};
-              pline("Kernel loader entry: ", kernelLoaderEntry());
-              entryFound = true;
+          case flo::Util::genMagic("FLORKLOD"):
+            // Calculate the virtual address this is loaded at
+            kernelLoaderEntry = outAddr + flo::VirtualAddress{(ind + 1) * 8};
+            pline("Kernel loader entry: ", kernelLoaderEntry());
+            entryFound = true;
+            break;
 
-            break; case flo::Util::genMagic("PhysFree"):
-              mem[ind] = (u64)&flo::physFree;
+          case flo::Util::genMagic("PhysFree"):
+            mem[ind] = (u64)&flo::physFree;
+            break;
 
-            break; case flo::Util::genMagic("PhysBase"):
-              mem[ind] = kaslrBase();
+          case flo::Util::genMagic("PhysBase"):
+            mem[ind] = kaslrBase();
+            break;
 
-            break; case flo::Util::genMagic("HighRang"):
-              mem[ind] = (u64)&highMemRanges;
+          case flo::Util::genMagic("HighRang"):
+            mem[ind] = (u64)&highMemRanges;
+            break;
 
-            break; case flo::Util::genMagic("DispWide"):
-              mem[ind] = pickedDisplay.width;
+          case flo::Util::genMagic("DispWide"):
+            mem[ind] = pickedDisplay.width;
+            break;
 
-            break; case flo::Util::genMagic("DispHigh"):
-              mem[ind] = pickedDisplay.height;
+          case flo::Util::genMagic("DispHigh"):
+            mem[ind] = pickedDisplay.height;
+            break;
 
-            break; case flo::Util::genMagic("DispPitc"):
-              mem[ind] = pickedDisplay.pitch;
+          case flo::Util::genMagic("DispPitc"):
+            mem[ind] = pickedDisplay.pitch;
+            break;
 
-            break; case flo::Util::genMagic("FrameBuf"):
-              mem[ind] = pickedDisplay.framebuffer;
+          case flo::Util::genMagic("FrameBuf"):
+            mem[ind] = pickedDisplay.framebuffer;
+            break;
 
-            break; case flo::Util::genMagic("DriveNum"):
-              mem[ind] = diskNum;
+          case flo::Util::genMagic("DriveNum"):
+            mem[ind] = diskNum;
+            break;
 
-            break; default: // Unknown magic
-              mem[ind] = flo::Util::genMagic("UNKNOMAG");
+          default: // Unknown magic
+            mem[ind] = flo::Util::genMagic("UNKNOMAG");
+            break;
           }
           ++ind;
         }
       };
 
-    for(u32 i = 0; i < numPages; ++ i) {
+    for(u32 i = 0; i < numPages; ++i) {
       // Only get 4K pages for now, rewriting the data
       // is kind of hard otherwise without paging.
       auto ppage = flo::physFree.getPhysicalPage(1);
