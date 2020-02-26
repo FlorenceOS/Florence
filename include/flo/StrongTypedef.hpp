@@ -47,3 +47,6 @@ namespace flo {
     ValueT val;
   };
 }
+
+#define FLO_STRONG_TYPEDEF(type, underlying) \
+struct type: flo::StrongTypedef<type, underlying> { using flo::StrongTypedef<type, underlying>::StrongTypedef; };
