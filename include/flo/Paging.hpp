@@ -5,6 +5,7 @@
 #include "flo/Containers/Array.hpp"
 #include "flo/Containers/Optional.hpp"
 
+#include "flo/Algorithm.hpp"
 #include "flo/Bitfields.hpp"
 #include "flo/CPU.hpp"
 #include "flo/Florence.hpp"
