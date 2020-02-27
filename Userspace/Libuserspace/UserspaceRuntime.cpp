@@ -1,5 +1,6 @@
 #include "Runtime.hpp"
 
+#include "flo/Assert.hpp"
 #include "flo/Util.hpp"
 
 extern int main();
