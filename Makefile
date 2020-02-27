@@ -44,7 +44,7 @@ TestSources := $(wildcard Tests/*.?pp)
 
 Tests/build/CMakeCache.txt: Tests/CMakeLists.txt $(TestSources) $(CommonHeaders) Makefile
 	@mkdir -p $(@D)
-	cd $(@D) && cmake ..
+	cd $(@D) && CXX=clang++ CC=clang cmake ..
 
 build/%.bin: build/%.elf
 	@mkdir -p $(@D)
