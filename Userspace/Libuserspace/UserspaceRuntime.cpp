@@ -12,7 +12,7 @@ extern "C" void runMain() {
 
 void flo::exit() {
   asm("syscall"::"rax"(0));
-  __builtin_unreachable();
+  assert_not_reached();
 }
 
 void flo::ping() {
@@ -28,7 +28,7 @@ void flo::crash(char const *filename, u64 line, char const *errorMessage) {
     "rdi"(errorMessage),
     "rsi"(Util::strlen(errorMessage))
   );
-  __builtin_unreachable();
+  assert_not_reached();
 }
 
 void flo::warn(char const *filename, u64 line, char const *errorMessage) {
