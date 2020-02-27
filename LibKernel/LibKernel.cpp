@@ -130,6 +130,7 @@ void flo::assertionFailure(char const *file, u64 line, char const *error) {
   flo::printBacktrace();
 
   flo::CPU::halt();
+  __builtin_unreachable();
 }
 
 
