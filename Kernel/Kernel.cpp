@@ -73,6 +73,11 @@ void kernelMain() {
   pline("Physical base is at ", (void *)arguments.physBase());
   pline("  Best regards, 0x", (void *)&kernelMain);
 
+  pline("PCI devices:");
+  flo::PCI::IterateDevices([](flo::PCI::Device const &dev) -> void {
+    pline(dev.bus(), ":", dev.dev(), ".", dev.func(), ": PCI device with vid ", dev.vid(), ", pid ", dev.pid());
+  });
+
   Fun::things::foo();
 }
 
