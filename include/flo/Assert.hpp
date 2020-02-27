@@ -9,6 +9,7 @@
 #define expect_not_reached()  do { if(!(cond)) flo::unexpected(__FILE__, __LINE__, "Should be unreachable!"); } while(0)
 
 namespace flo {
+  [[noreturn]]
   void assertionFailure(char const *file, u64 line, char const *error);
   void unexpected(char const *file, u64 line, char const *problem);
 }
