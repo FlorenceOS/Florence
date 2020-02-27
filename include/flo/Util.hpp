@@ -315,7 +315,7 @@ namespace flo {
       return *(T *)(ptr + offset);
     }
 
-    uSz strlen(char const *str) {
+    inline uSz strlen(char const *str) {
       auto copy = str;
       while(*copy) ++copy;
       return copy - str;
