@@ -32,26 +32,10 @@ namespace flo::PCI {
     }
 
     template<typename T>
-    T read(Bus bus, Dev device, Func func, u8 offset);
-
-    template<>
-    u32 read<u32>(Bus bus, Dev device, Func func, u8 offset) {
-      assert_err(offset % 4 == 0, "Misaligned u32 PCI read!");
+    T read(Bus bus, Dev device, Func func, u8 offset) {
+      assert_err(offset % sizeof(T) == 0, "Misaligned PCI read!");
       request(bus, device, func, offset);
-      return flo::IO::in<u32>(0xCFC);
-    }
-
-    template<>
-    u16 read<u16>(Bus bus, Dev device, Func func, u8 offset) {
-      assert_err(offset % 2 == 0, "Misaligned u16 PCI read!");
-      request(bus, device, func, offset);
-      return flo::IO::in<u16>(0xCFC + offset % 4);
-    }
-
-    template<>
-    u8 read<u8>(Bus bus, Dev device, Func func, u8 offset) { 
-      request(bus, device, func, offset);
-      return flo::IO::in<u8>(0xCFC + offset % 4);
+      return flo::IO::in<T>(0xCFC + offset % 4);
     }
 
     Vid getVendor(Bus bus, Dev device, Func function) {
