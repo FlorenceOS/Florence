@@ -52,7 +52,7 @@ TEST(IsSorted, SimpleCases) {
   }
 }
 
-TEST(Sort, RandomVectors) {
+/*TEST(Sort, RandomVectors) {
   Testing::runFor([]() {
     uSz elements[100];
     std::generate(elements, flo::end(elements), [](){ return Testing::rng(); });
@@ -60,4 +60,4 @@ TEST(Sort, RandomVectors) {
     EXPECT_TRUE(flo::isSorted(elements, flo::end(elements)));
     EXPECT_TRUE(std::is_sorted(elements, flo::end(elements)));
   });
-}
+}*/

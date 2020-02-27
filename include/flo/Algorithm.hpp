@@ -249,7 +249,7 @@ namespace flo {
   }
 
   // Quicksort :^)
-  template<typename Iterator, typename Compare = flo::Less<>>
+  /*template<typename Iterator, typename Compare = flo::Less<>>
   constexpr void sort(Iterator begin, Iterator end, Compare cmp = Compare{}) {
     auto dist = flo::distance(begin, end);
     if(dist <= 16)
@@ -261,5 +261,5 @@ namespace flo {
 
     sort(begin, mid1);
     sort(mid2, end);
-  }
+  }*/
 }
