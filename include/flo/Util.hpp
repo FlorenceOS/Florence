@@ -314,5 +314,16 @@ namespace flo {
     T &get(u8 *ptr, u64 offset) {
       return *(T *)(ptr + offset);
     }
+
+    uSz strlen(char const *str) {
+      auto copy = str;
+      while(*copy) ++copy;
+      return copy - str;
+    }
+
+    template<uSz sz>
+    uSz strlen(char const(&arr)[sz]) {
+      return sz;
+    }
   }
 }
