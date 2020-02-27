@@ -9,6 +9,8 @@ namespace flo {
   template<typename T>
   constexpr T declval();
 
+  using nullptr_t = decltype(nullptr);
+
   // isSame
   template<typename T, typename U> constexpr bool isSame = false;
   template<typename T> constexpr bool isSame<T, T> = true;
