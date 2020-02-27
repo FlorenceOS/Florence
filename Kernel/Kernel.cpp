@@ -1,5 +1,6 @@
 #include "flo/IO.hpp"
 #include "flo/Kernel.hpp"
+#include "flo/PCI.hpp"
 
 // Must be reachable from assembly
 extern "C" {
