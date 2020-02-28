@@ -33,7 +33,7 @@ namespace flo {
 
     ~Function() {
       // Do some cleanup
-      if(isFuncPtr) {
+      if(!isFuncPtr) {
         auto ptr = OwnPtr<Callable>::adopt(flo::Paging::makeCanonical(callable.release()));
         ptr.reset();
       }
