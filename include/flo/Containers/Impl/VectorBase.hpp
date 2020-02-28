@@ -119,7 +119,7 @@ namespace flo {
     constexpr auto &push_back(T const &value) { return emplace_back(value); }
 
     constexpr auto insert(iterator pos, T const &value) {
-      return &emplace(pos, value);
+      return emplace(pos, value);
     }
 
     template<typename InputBeg, typename InputEnd>
