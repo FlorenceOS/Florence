@@ -259,9 +259,9 @@ namespace flo {
       if(end <= begin)
         return;
 
-      if constexpr(isTriviallyMoveAssignable<T>)
+      /*if constexpr(isTriviallyMoveAssignable<T>)
         itMoveBytes(dest, begin, end);
-      else {
+      else {*/
         if constexpr(isSame<direction, Backwards>) {
           dest += distance(begin, end);
           while(begin != end)
@@ -271,7 +271,7 @@ namespace flo {
           while(begin != end)
             *dest++ = move(*begin++);
         }
-      }
+      //}
     }
   };
 }
