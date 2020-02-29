@@ -11,7 +11,7 @@ namespace flo {
     u64 displayWidth;
     u64 displayHeight;
     u64 displayPitch;
-    u64 framebuffer;
+    flo::PhysicalAddress framebuffer;
     u64 driveNumber;
   };
 

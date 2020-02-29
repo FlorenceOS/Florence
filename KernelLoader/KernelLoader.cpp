@@ -23,7 +23,7 @@ extern "C" flo::StaticVector<flo::PhysicalMemoryRange, 0x10ull> *physMemRanges;
 extern "C" u64 displayWidth;
 extern "C" u64 displayHeight;
 extern "C" u64 displayPitch;
-extern "C" u64 framebuffer;
+extern "C" flo::PhysicalAddress framebuffer;
 extern "C" u64 driveNumber;
 extern "C" u8 bundledKernel[];
 extern "C" u8 bundledKernelEnd[];
