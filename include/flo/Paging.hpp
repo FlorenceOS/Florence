@@ -59,7 +59,7 @@ namespace flo {
       if((uptr)ptr & (maxUaddr() >> 1ull))
         return reinterpret_cast<T>((uptr)ptr | ~((maxUaddr()) - 1ull));
       else
-        return ptr;
+        return reinterpret_cast<T>((uptr)ptr &  ((maxUaddr()) - 1ull));
     }
 
     template<>
@@ -67,7 +67,7 @@ namespace flo {
       if(ptr & (VirtualAddress{maxUaddr} >> 1ull))
         return ptr | ~(VirtualAddress{maxUaddr} - VirtualAddress{1});
       else
-        return ptr;
+        return ptr & (VirtualAddress{maxUaddr} - VirtualAddress{1});
     }
 
     template<int level>
