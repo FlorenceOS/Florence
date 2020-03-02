@@ -1,5 +1,6 @@
 #include "flo/IO.hpp"
 #include "flo/Kernel.hpp"
+#include "flo/Memory.hpp"
 #include "flo/PCI.hpp"
 
 // Must be reachable from assembly
@@ -28,6 +29,9 @@ namespace {
     return flo::nullopt;
   }();
 }
+
+extern "C" u8 kernelStart[];
+extern "C" u8 kernelEnd[];
 
 void flo::putchar(char c) {
   if constexpr(!quiet)
@@ -67,17 +71,48 @@ namespace Fun::things {
   }
 }
 
+namespace {
+  void initializeFreeVmm() {
+    auto giveVirtRange = [](u8 *begin, u8 *end) {
+      begin = (u8 *)flo::Paging::alignPageUp(flo::VirtualAddress{(u64)begin})();
+      end   = (u8 *)flo::Paging::alignPageDown(flo::VirtualAddress{(u64)end})();
+      flo::returnVirtualPages(begin, (end - begin)/flo::Paging::PageSize<1>);
+    };
+
+    if(kernelStart < flo::getVirt<u8>(flo::Paging::maxUaddr)) {
+      // Kernel is in bottom half
+      giveVirtRange((u8 *)flo::Util::giga(4ull), kernelStart);
+      giveVirtRange(kernelEnd, (u8 *)flo::Paging::maxUaddr());
+
+      giveVirtRange((u8 *)~(flo::Paging::maxUaddr() - 1), (u8 *)~(flo::Util::giga(4ull) - 1));
+    }
+    else {
+      giveVirtRange((u8 *)flo::Util::giga(4ull), (u8 *)flo::Paging::maxUaddr());
+
+      // Kernel is in top half
+      giveVirtRange((u8 *)~(flo::Paging::maxUaddr() - 1), kernelStart);
+      giveVirtRange(kernelEnd, (u8 *)~(flo::Util::giga(4ull) - 1));
+    }
+  }
+}
+
 extern "C"
 void kernelMain() {
   pline("Hello ELF kernel land");
   pline("My ELF is loaded at ", arguments.elfImage->data, " with size ", arguments.elfImage->size);
   pline("Physical base is at ", (void *)arguments.physBase());
+  pline("Kernel spans from ", (void *)kernelStart, " to ", (void *)kernelEnd);
   pline("  Best regards, 0x", (void *)&kernelMain);
 
   pline("PCI devices:");
   flo::PCI::IterateDevices([](flo::PCI::Device const &dev) -> void {
     pline(dev.bus(), ":", dev.dev(), ".", dev.func(), ": PCI device with vid ", dev.vid(), ", pid ", dev.pid());
   });
+
+  initializeFreeVmm();
+
+  auto page = flo::large_malloc(4096);
+  pline("Got dem pagezz at ", page);
 
   Fun::things::foo();
 }

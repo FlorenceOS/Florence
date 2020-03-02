@@ -8,8 +8,11 @@ PHDRS {
   rodata PT_LOAD FLAGS((1 << 2)            /* Readable */);
 }
 
+/* Start of kernel */
+. = 1M;
+kernelStart = .;
+
 SECTIONS {
-  . = 1M;
   /* X sections*/
   .text : { *(.text*) } :text
 
@@ -33,3 +36,7 @@ SECTIONS {
 
   /DISCARD/ :{ *(*) }
 }
+
+/* End of kernel */
+. = ALIGN(4K);
+kernelEnd = .;
