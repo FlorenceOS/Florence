@@ -430,7 +430,7 @@ namespace flo {
 
         if(pte.present && pte.isMapping()) {
           if constexpr(reclaimPages)
-            returnPhysicalPage(pte.physaddr(), Level);
+            physFree.returnPhysicalPage(pte.physaddr(), Level);
           pte.rep = 0;
           continue;
         }
