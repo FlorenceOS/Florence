@@ -8,20 +8,30 @@
 
 namespace flo {
   namespace PCI {
-    FLO_STRONG_TYPEDEF(Vid, u16);
-    FLO_STRONG_TYPEDEF(Pid, u16);
     FLO_STRONG_TYPEDEF(Bus, u8);
-    FLO_STRONG_TYPEDEF(Dev, u8);
-    FLO_STRONG_TYPEDEF(Func, u8);
+    FLO_STRONG_TYPEDEF(Slot, u8);
+    FLO_STRONG_TYPEDEF(DeviceFunction, u8);
 
-    struct Device {
-      Vid vid;
-      Pid pid;
+    struct Reference {
       Bus bus;
-      Dev dev;
-      Func func;
+      Slot slot;
+      DeviceFunction function;
     };
 
-    void IterateDevices(Function<void(Device const &)> const &);
+    void IterateDevices(Function<void(Reference const &)> const &);
+
+    FLO_STRONG_TYPEDEF(Vid, u16);
+    FLO_STRONG_TYPEDEF(Pid, u16);
+    FLO_STRONG_TYPEDEF(DeviceClass, u8);
+    FLO_STRONG_TYPEDEF(DeviceSubclass, u8);
+
+    struct Identifier {
+      Vid vid;
+      Pid pid;
+      DeviceClass deviceClass;
+      DeviceSubclass deviceSubclass;
+    };
+
+    Identifier getDeviceIdentifier(Reference const &);
   }
 }

@@ -11,20 +11,20 @@ namespace flo::PCI {
 
     auto noVid = flo::PCI::Vid{0xFFFF};
 
-    void request(Bus bus, Dev device, Func func, u8 offset) {
+    void request(Reference const &devRef, u8 offset) {
       union ReadPacket {
         u32 rep = 0;
         flo::Bitfield<0,  8, u32> offset;
         flo::Bitfield<8,  3, u32> function;
-        flo::Bitfield<11, 5, u32> device;
+        flo::Bitfield<11, 5, u32> slot;
         flo::Bitfield<16, 8, u32> bus;
         flo::Bitfield<31, 1, u32> enable;
       };
 
       ReadPacket packet;
-      packet.bus = bus();
-      packet.device = device();
-      packet.function = func();
+      packet.bus = devRef.bus();
+      packet.slot = devRef.slot();
+      packet.function = devRef.function();
       packet.offset = offset;
       packet.enable = 1;
 
@@ -32,58 +32,52 @@ namespace flo::PCI {
     }
 
     template<typename T>
-    T read(Bus bus, Dev device, Func func, u8 offset) {
+    T read(Reference const &devRef, u8 offset) {
       assert_err(offset % sizeof(T) == 0, "Misaligned PCI read!");
-      request(bus, device, func, offset);
+      request(devRef, offset);
       return flo::IO::in<T>(0xCFC + offset % 4);
     }
 
-    Vid getVendor(Bus bus, Dev device, Func function) {
-      return Vid{read<u16>(bus, device, function, 0)};
+    Vid getVendor(Reference const &devRef) {
+      return Vid{read<u16>(devRef, 0)};
     }
 
-    Pid getProduct(Bus bus, Dev device, Func function) {
-      return Pid{read<u16>(bus, device, function, 2)};
+    Pid getProduct(Reference const &devRef) {
+      return Pid{read<u16>(devRef, 2)};
     }
 
-    u8 getHeaderType(Bus bus, Dev device, Func function) {
-      return read<u8>(bus, device, function, 14);
+    u8 getHeaderType(Reference const &devRef) {
+      return read<u8>(devRef, 14);
     }
 
-    u8 getClass(Bus bus, Dev device, Func function) {
-      return read<u8>(bus, device, function, 11);
+    DeviceClass getClass(Reference const &devRef) {
+      return DeviceClass{read<u8>(devRef, 11)};
     }
 
-    u8 getSubclass(Bus bus, Dev device, Func function) {
-      return read<u8>(bus, device, function, 10);
+    DeviceSubclass getSubclass(Reference const &devRef) {
+      return DeviceSubclass{read<u8>(devRef, 10)};
     }
 
-    Bus getSecondaryBus(Bus bus, Dev device, Func function) {
-      return Bus{read<u8>(bus, device, function, 19)};
+    Bus getSecondaryBus(Reference const &devRef) {
+      return Bus{read<u8>(devRef, 19)};
     }
 
-    void busScan(Bus bus, Function<void(Device const &)> const &callback);
+    void busScan(Bus bus, Function<void(Reference const &)> const &callback);
 
-    void functionScan(Bus bus, Dev device, Func function, Function<void(Device const &)> const &callback) {
-      Device pcidev;
-      pcidev.vid = getVendor(bus, device, function);
+    void functionScan(Reference const &devRef, Function<void(Reference const &)> const &callback) {
+      auto vendor = getVendor(devRef);
 
-      if(pcidev.vid == noVid)
+      if(vendor == noVid)
         return;
 
-      pcidev.bus = bus;
-      pcidev.dev = device;
-      pcidev.pid = getProduct(bus, device, function);
-      pcidev.func = function;
+      callback(devRef);
 
-      callback(pcidev);
-
-      auto deviceClass = getClass(bus, device, function);
-      if(deviceClass == 0x06) {
-        auto deviceSubclass = getSubclass(bus, device, function);
-        if(deviceSubclass == 0x04) {
-          pline("PCI bridge at ", function(), " in ", bus(), ":", device(), " is a PCI to PCI bridge, recursing!");
-          busScan(getSecondaryBus(bus, device, function), callback);
+      auto deviceClass = getClass(devRef);
+      if(deviceClass() == 0x06) {
+        auto deviceSubclass = getSubclass(devRef);
+        if(deviceSubclass() == 0x04) {
+          pline("PCI bridge at ", devRef.bus(), ":", devRef.slot(), ".", devRef.function(), " is a PCI to PCI bridge, recursing!");
+          busScan(getSecondaryBus(devRef), callback);
         }
         else {
           pline("Device function is a PCI bridge, but not a PCI to PCI bridge.");
@@ -94,30 +88,43 @@ namespace flo::PCI {
       }
     }
 
-    void deviceScan(Bus bus, Dev device, Function<void(Device const &)> const &callback) {
-      auto vid = getVendor(bus, device, Func{0});
+    void deviceScan(Bus bus, Slot slot, Function<void(Reference const &)> const &callback) {
+      Reference ref{bus, slot, DeviceFunction{0}};
+
+      auto vid = getVendor(ref);
       if(vid == noVid)
         return;
 
-      functionScan(bus, device, Func{0}, callback);
+      functionScan(ref, callback);
 
-      if(getHeaderType(bus, device, Func{0}) & 0x80) {
-        for(u8 func = 1; func < 8; ++ func)
-          functionScan(bus, device, Func{func}, callback);
+      if(getHeaderType(ref) & 0x80) {
+        for(u8 func = 1; func < 8; ++ func) {
+          functionScan(Reference{bus, slot, DeviceFunction{func}}, callback);
+        }
       }
       else {
         pline("Device is not a multifunction device, no more functions to scan.");
       }
     }
 
-    void busScan(Bus bus, Function<void(flo::PCI::Device const &)> const &callback) {
+    void busScan(Bus bus, Function<void(flo::PCI::Reference const &)> const &callback) {
       pline("Scanning bus ", bus());
-      for(u8 i = 0; i < 32; ++ i)
-        deviceScan(bus, Dev{i}, callback);
+      for(u8 slot = 0; slot < 32; ++ slot)
+        deviceScan(bus, Slot{slot}, callback);
     }
   }
 }
 
-void flo::PCI::IterateDevices(flo::Function<void(flo::PCI::Device const &)> const &callback) {
+void flo::PCI::IterateDevices(flo::Function<void(flo::PCI::Reference const &)> const &callback) {
   flo::PCI::busScan(flo::PCI::Bus{0}, callback);
+}
+
+flo::PCI::Identifier flo::PCI::getDeviceIdentifier(flo::PCI::Reference const &ref) {
+  Identifier ident;
+  ident.vid = getVendor(ref);
+  ident.pid = getProduct(ref);
+  ident.deviceClass = getClass(ref);
+  ident.deviceSubclass = getSubclass(ref);
+
+  return ident;
 }

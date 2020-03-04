@@ -105,8 +105,10 @@ void kernelMain() {
   pline("  Best regards, 0x", (void *)&kernelMain);
 
   pline("PCI devices:");
-  flo::PCI::IterateDevices([](flo::PCI::Device const &dev) -> void {
-    pline(dev.bus(), ":", dev.dev(), ".", dev.func(), ": PCI device with vid ", dev.vid(), ", pid ", dev.pid());
+  flo::PCI::IterateDevices([](flo::PCI::Reference const &dev) -> void {
+    auto ident = flo::PCI::getDeviceIdentifier(dev);
+    pline(dev.bus(), ":", dev.slot(), ".", dev.function(), ": PCI device, ",
+      ident.vid(), ":", ident.pid(), " is ", ident.deviceClass(), ":", ident.deviceSubclass());
   });
 
   initializeFreeVmm();
