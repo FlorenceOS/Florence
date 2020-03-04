@@ -40,7 +40,7 @@ namespace flo {
       if(size <= 8336)
         return 8336;*/
 
-      return Util::roundUp<flo::Paging::PageSize<1>>(size + 8);
+      return Util::roundUp<flo::Paging::PageSize<1>>(size + 8) - 8;
     }
   }
 
