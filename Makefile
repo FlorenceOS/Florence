@@ -4,11 +4,7 @@ ifndef QEMUExec
 QEMUExec := qemu-system-x86_64
 endif
 
-ifndef QEMUFlags
-QEMUFlags := -serial stdio
-endif
-
-QEMU := $(QEMUExec) $(QEMUFlags) -m 1M -no-reboot
+QEMU := $(QEMUExec) $(QEMUFlags) -m 1M -no-reboot -serial stdio
 KVM := $(QEMU) -enable-kvm -cpu host
 
 CXXFlags := $(CXXFlags) \

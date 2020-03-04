@@ -12,7 +12,7 @@ install:
 test_script:
 - sh: make autotest
 - ps: (new-object net.webclient).UploadFile("https://ci.appveyor.com/api/testresults/junit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path .\tests.xml))
-- sh: QEMUFlags=-nographic timeout 5 make go || true
+- sh: QEMUFlags='-display none' timeout 5 make go || true
 
 artifacts:
 - path: Florence.zip
