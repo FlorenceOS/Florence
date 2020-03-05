@@ -14,6 +14,7 @@ SECTIONS {
     BootstrapStart = .;
     *(.BootstrapEntry)
 
+    . = ALIGN(4);
     constructorsStart = .;
     KEEP(*(.init_array));
     KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*)));

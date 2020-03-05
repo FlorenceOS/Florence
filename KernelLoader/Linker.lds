@@ -11,7 +11,6 @@ SECTIONS {
     KEEP(*(.KernelLoaderHeader))
 
     . = ALIGN(8);
-
     constructorsStart = .;
     KEEP(*(.init_array));
     KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*)));
