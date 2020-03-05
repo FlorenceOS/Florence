@@ -248,6 +248,12 @@ namespace flo {
       return true;
     }
 
+    __attribute__((always_inline))
+    inline bool memeq(void const *lhs, void const *rhs, uSz size) {
+      return memeq((u8 const *)lhs, (u8 const *)rhs, size);
+    }
+
+
     template<typename T>
     [[nodiscard]] constexpr inline T kilo(T val) {
       return T{1024} * val;
