@@ -4,7 +4,7 @@ ifndef QEMUExec
 QEMUExec := qemu-system-x86_64
 endif
 
-QEMU := $(QEMUExec) $(QEMUFlags) -m 1M -no-reboot -serial stdio
+QEMU := $(QEMUExec) $(QEMUFlags) -m 4G -no-reboot -serial stdio -drive format=raw,file=out/Disk.bin
 KVM := $(QEMU) -enable-kvm -cpu host
 
 CXXFlags := $(CXXFlags) \
@@ -12,7 +12,7 @@ CXXFlags := $(CXXFlags) \
 	-fno-exceptions -nostdinc++ -nostdinc -fno-rtti -Wno-sign-compare\
 	-std=c++17 -Oz -mno-soft-float -Iinclude -ffunction-sections\
 	-fdata-sections -funsigned-char -mno-avx -mno-avx2 -fno-use-cxa-atexit\
-  -fno-builtin -fno-unwind-tables -fuse-init-array -ILibFlo -mno-sse -mno-sse2
+	-fno-builtin -fno-unwind-tables -fuse-init-array -ILibFlo -mno-sse -mno-sse2
 
 CXXFlagsBootstrapper := $(CXXFlags) -m32 -fno-pic -fno-pie -march=i386
 
@@ -51,7 +51,7 @@ clean:
 	@rm -rfv build out Tests/build/CMake*
 
 dbg: out/Disk.bin
-	$(QEMU) -drive format=raw,file=$< -S -s | c++filt &
+	$(QEMU) -S -s | c++filt &
 	gdb-multiarch\
 		-ex 'shell sleep .2'\
 		-ex 'target remote :1234'\
@@ -62,10 +62,10 @@ dbg: out/Disk.bin
 	killall $(QEMUExec)
 
 kvm: out/Disk.bin
-	$(KVM) -drive format=raw,file=$< | c++filt
+	$(KVM) | c++filt
 
 go: out/Disk.bin
-	$(QEMU) -d int -drive format=raw,file=$< | c++filt
+	$(QEMU) | c++filt
 
 format:
 	./run-clang-format.py -r Bootstrapper KernelLoader Kernel include LibFlo Tests -e Tests/build --color always | most
@@ -165,7 +165,7 @@ build/Libuserspace.o: $(LibuserspaceObjects)
 # Userspace applications
 # WIP lol
 
-# Literally just concat them lol
+# Literally just concat boot stages to get a disk
 out/Disk.bin: build/Bootsector/Bootsector.bin build/Bootstrapper/Bootstrapper.bin build/KernelLoader/KernelLoader.bin Makefile
 	@mkdir -p $(@D)
 	cat $(filter %.bin,$^) > $@
