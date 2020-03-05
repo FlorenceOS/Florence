@@ -9,7 +9,7 @@ SECTIONS {
   . = 0x7E00;
 
   .text :{
-    *(.BootstrapHeader)
+    KEEP(*(.BootstrapHeader))
     . = ALIGN(SectorBytes);
     BootstrapStart = .;
     *(.BootstrapEntry)
