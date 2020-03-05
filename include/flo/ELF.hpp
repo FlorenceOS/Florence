@@ -386,7 +386,7 @@ namespace flo {
     }
 
     template<typename F>
-    void forEachSymbol(F &&f) {
+    void forEachSymbol(F &&f) const {
       forEachSection([&](ELF64::SectionHeader const &shead) {
         if(shead.type == ELF64::SectionHeader::Type::symtab)
           for(uSz off = 0; off < shead.size; off += sizeof(ELF64::SymbolEntry))
@@ -394,13 +394,13 @@ namespace flo {
       });
     }
 
-    char const *symbolName(ELF64::SymbolEntry const &sym) {
+    char const *symbolName(ELF64::SymbolEntry const &sym) const {
       if(symbolTable && sym.stringTableOffset)
         return (char const *)fileData(*symbolTable) + sym.stringTableOffset;
       return nullptr;
     }
 
-    auto lookupSymbol(u64 addr) {
+    auto lookupSymbol(u64 addr) const {
       addr -= loadOffset;
 
       ELF64::SymbolEntry const *result = nullptr, *betterThanNothing = nullptr;
