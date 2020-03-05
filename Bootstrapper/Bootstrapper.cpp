@@ -16,22 +16,17 @@ using flo::spaces;
 extern "C" {
   flo::VirtualAddress kernelLoaderEntry;
   flo::VirtualAddress loaderStack;
+
+  u8 diskdata[512];
+  flo::BIOS::MemmapEntry mem;
+  flo::BIOS::DAP dap;
+
+  u8 driveNumber;
 }
 
 // Data provided by asm
-extern "C" u16 desiredWidth;
-extern "C" u16 desiredHeight;
-extern "C" u8 diskNum;
-extern "C" union { struct flo::BIOS::VesaInfo vesa; struct flo::BIOS::MemmapEntry mem; } biosBuf;
-extern "C" union { struct flo::BIOS::DAP dap; struct flo::BIOS::VideoMode vm; } currentModeBuf;
 extern "C" char BootstrapEnd;
 
-// Typed references to the data provided just above
-auto &vesa = biosBuf.vesa;
-auto &mem  = biosBuf.mem;
-auto diskdata = (u8 *)&biosBuf;
-auto &vidmode = currentModeBuf.vm;
-auto &dap = currentModeBuf.dap;
 auto const minMemory = flo::PhysicalAddress{(u64)&BootstrapEnd};
 
 namespace {
@@ -44,8 +39,6 @@ namespace {
   // That means lower numbers are more secure but also take more memory.
   constexpr auto kaslrAlignmentLevel = 2;
 
-  bool vgaDisabled = false;
-
   // Memory ranges above the 4GB memory limit, we have to wait to
   // consume these to after we've enabled paging.
   flo::StaticVector<flo::PhysicalMemoryRange, 0x10ull> highMemRanges;
@@ -57,16 +50,6 @@ namespace {
   // The kernel is loaded just below this and physical memory is mapped just above.
   flo::VirtualAddress kaslrBase;
 
-  // Info about the display we've ended up picking goes in here
-  struct {
-    u64 framebuffer;
-    u32 width;
-    u32 height;
-    u32 bpp;
-    u32 pitch;
-    u16 mode; 
-  } pickedDisplay;
-
   // Highest memory address spotted
   auto physHigh = minMemory;
 }
@@ -76,8 +59,7 @@ void flo::feedLine() {
   if constexpr(quiet)
     return;
 
-  if(!vgaDisabled)
-    flo::IO::VGA::feedLine();
+  flo::IO::VGA::feedLine();
   flo::IO::serial1.feedLine();
 }
 
@@ -88,8 +70,7 @@ void flo::putchar(char c) {
   if(c == '\n')
     return feedLine();
 
-  if(!vgaDisabled)
-    flo::IO::VGA::putchar(c);
+  flo::IO::VGA::putchar(c);
   flo::IO::serial1.write(c);
 }
 
@@ -97,8 +78,7 @@ void flo::setColor(flo::IO::Color col) {
   if constexpr(quiet)
     return;
 
-  if(!vgaDisabled)
-    flo::IO::VGA::setColor(col);
+  flo::IO::VGA::setColor(col);
   flo::IO::serial1.setColor(col);
 }
 
@@ -195,97 +175,22 @@ namespace {
     checkRDRAND();
   }
 
-  // Sets `vidmode`
-  void fetchMode(i16 mode) {
-    asm("call getVideoMode" :: "c"(mode) : "ax", "edx", "di", "memory");
-  }
-
-  // Chose a mode
-  void setMode(i16 mode) {
-    asm("call setVideoMode" :: "b"(mode) : "ax", "edx");
-  }
-
   void fetchMemoryRegion() {
     asm("call getMemoryMap" ::: "eax", "ebx", "ecx", "edx", "di", "memory");
   }
 
   auto initializeDebug = []() {
-    if constexpr(!quiet)
-      flo::IO::VGA::clear();
-
-    // We always initialize serial as other bootloader stages could be non-quiet
+    // We always initialize as other bootloader stages could be non-quiet
     flo::IO::serial1.initialize();
     flo::IO::serial2.initialize();
     flo::IO::serial3.initialize();
     flo::IO::serial4.initialize();
 
+    flo::IO::VGA::clear();
+
     assertAssumptions();
     return flo::nullopt;
   }();
-}
-
-extern "C" void setupVideo() {
-  pline("Picking VBE2 mode");
-  pline("Adapter: ", vesa.product_name());
-  pline("Available 4bpp linear framebuffer modes:");
-
-  pickedDisplay.mode = 0xFFFF;
-
-  for(auto mode = vesa.video_modes(); *mode != 0xFFFF; ++mode) {
-    fetchMode(*mode);
-
-    // No linear framebuffer support, skip
-    if(!(vidmode.attributes & (1 << 7)))
-      continue;
-
-    // Verify bits per color is 4
-    if(vidmode.bpp != 32)
-      continue;
-
-    pline("Mode: ", *mode, ", ", Decimal{vidmode.width}, "x", Decimal{vidmode.height});
-
-    if(vidmode.width  == desiredWidth &&
-       vidmode.height == desiredHeight) {
-      pline("Found desired mode!");
-    }
-    else
-      continue;
-
-    pickedDisplay.mode   = *mode;
-    pickedDisplay.width  = vidmode.width;
-    pickedDisplay.height = vidmode.height;
-    pickedDisplay.pitch  = vidmode.pitch;
-    pickedDisplay.bpp    = vidmode.bpp / 8;
-    pickedDisplay.framebuffer = vidmode.framebuffer;
-    break;
-  }
-
-  if(pickedDisplay.mode == 0xFFFF) {
-    pline("Please set one of the above modes as your desired mode.");
-    flo::CPU::hang();
-  }
-
-  setMode(pickedDisplay.mode);
-  vgaDisabled = true;
-
-  // draw some test pattern on the screen
-  for(int y = 0; y < pickedDisplay.height; ++ y)
-  for(int x = 0; x < pickedDisplay.width;  ++ x) {
-    auto col = x % 8 == 0 || y % 8 == 0 ? 1 : 0;
-    auto offset = y * pickedDisplay.pitch + x * pickedDisplay.bpp;
-    *(u8 *)(pickedDisplay.framebuffer + offset + 0) = col ? 0x24 : 0;
-    *(u8 *)(pickedDisplay.framebuffer + offset + 1) = col ? 0x3d : 0;
-    *(u8 *)(pickedDisplay.framebuffer + offset + 2) = col ? 0xdc : 0;
-  }
-}
-
-extern "C" [[noreturn]] void printVideoModeError() {
-  char *error;
-  asm("":"=a"(error));
-  pline("There was an error initializing the display!");
-  pline("Error supplied: ", error);
-
-  flo::CPU::hang();
 }
 
 void consumeMemory(flo::PhysicalMemoryRange &range) {
@@ -439,24 +344,12 @@ namespace {
             mem[ind] = (u64)&highMemRanges;
             break;
 
-          case flo::Util::genMagic("DispWide"):
-            mem[ind] = pickedDisplay.width;
+          case flo::Util::genMagic("DispVGAX"):
+            mem[ind] = (u64)&flo::IO::VGA::currX;
             break;
 
-          case flo::Util::genMagic("DispHigh"):
-            mem[ind] = pickedDisplay.height;
-            break;
-
-          case flo::Util::genMagic("DispPitc"):
-            mem[ind] = pickedDisplay.pitch;
-            break;
-
-          case flo::Util::genMagic("FrameBuf"):
-            mem[ind] = pickedDisplay.framebuffer;
-            break;
-
-          case flo::Util::genMagic("DriveNum"):
-            mem[ind] = diskNum;
+          case flo::Util::genMagic("DispVGAY"):
+            mem[ind] = (u64)&flo::IO::VGA::currY;
             break;
 
           default: // Unknown magic

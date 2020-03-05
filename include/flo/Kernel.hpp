@@ -5,14 +5,11 @@
 
 namespace flo {
   struct KernelArguments {
-    flo::ELF64Image *elfImage;
-    flo::PhysicalFreeList *physFree;
+    flo::ELF64Image const *elfImage;
+    flo::PhysicalFreeList const *physFree;
     flo::VirtualAddress physBase;
-    u64 displayWidth;
-    u64 displayHeight;
-    u64 displayPitch;
-    flo::PhysicalAddress framebuffer;
-    u64 driveNumber;
+    u32 const *vgaX;
+    u32 const *vgaY;
   };
 
   void printBacktrace();

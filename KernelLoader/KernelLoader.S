@@ -25,25 +25,13 @@ global physMemRanges
        physMemRanges:
 db "HighRang"
 
-global displayWidth
-       displayWidth:
-db "DispWide"
+global vgaX
+       vgaX:
+db "DispVGAX"
 
-global displayHeight
-       displayHeight:
-db "DispHigh"
-
-global displayPitch
-       displayPitch:
-db "DispPitc"
-
-global framebuffer
-       framebuffer:
-db "FrameBuf"
-
-global driveNumber
-       driveNumber:
-db "DriveNum"
+global vgaY
+       vgaY:
+db "DispVGAY"
 
 db "FLORKLOD"
 

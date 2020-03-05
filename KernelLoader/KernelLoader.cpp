@@ -11,7 +11,7 @@
 using flo::Decimal;
 
 namespace {
-  constexpr bool quiet = true;
+  constexpr bool quiet = false;
   auto pline = flo::makePline<quiet>("[FLORKLOAD]");
 }
 
@@ -20,11 +20,8 @@ extern "C" u64 unknownField;
 extern "C" flo::PhysicalFreeList *physFree;
 extern "C" flo::VirtualAddress physBase;
 extern "C" flo::StaticVector<flo::PhysicalMemoryRange, 0x10ull> *physMemRanges;
-extern "C" u64 displayWidth;
-extern "C" u64 displayHeight;
-extern "C" u64 displayPitch;
-extern "C" flo::PhysicalAddress framebuffer;
-extern "C" u64 driveNumber;
+extern "C" u32 *vgaX;
+extern "C" u32 *vgaY;
 extern "C" u8 bundledKernel[];
 extern "C" u8 bundledKernelEnd[];
 
@@ -41,11 +38,14 @@ namespace {
 
     check((u64 *)&physFree,      "physFree");
     check((u64 *)&physMemRanges, "physMemRanges");
-    check((u64 *)&displayWidth,  "displayWidth");
-    check((u64 *)&displayHeight, "displayHeight");
-    check((u64 *)&displayPitch,  "displayPitch");
-    check((u64 *)&framebuffer,   "framebuffer");
-    check((u64 *)&driveNumber,   "driveNumber");
+    check((u64 *)&vgaX,          "vgaX");
+    check((u64 *)&vgaY,          "vgaY");
+    return flo::nullopt;
+  }();
+
+  auto initializeVGA = []() {
+    flo::IO::VGA::currX = *vgaX;
+    flo::IO::VGA::currY = *vgaY;
     return flo::nullopt;
   }();
 
@@ -80,11 +80,8 @@ extern "C" {
       result.elfImage = &kernelELF;
       result.physFree = &flo::physFree;
       result.physBase = physBase;
-      result.displayWidth = displayWidth;
-      result.displayHeight = displayHeight;
-      result.displayPitch = displayPitch;
-      result.framebuffer = framebuffer;
-      result.driveNumber = driveNumber;
+      result.vgaX = &flo::IO::VGA::currX;
+      result.vgaY = &flo::IO::VGA::currY;
       return result;
     }();
 }
@@ -119,19 +116,31 @@ namespace {
   }();
 }
 
-void flo::putchar(char c) {
-  if constexpr(!quiet)
-    flo::IO::serial1.write(c);
+void flo::feedLine() {
+  if constexpr(quiet)
+    return;
+
+  flo::IO::VGA::feedLine();
+  flo::IO::serial1.feedLine();
 }
 
-void flo::feedLine() {
-  if constexpr(!quiet)
-    flo::IO::serial1.write('\n');
+void flo::putchar(char c) {
+  if constexpr(quiet)
+    return;
+
+  if(c == '\n')
+    return feedLine();
+
+  flo::IO::VGA::putchar(c);
+  flo::IO::serial1.write(c);
 }
 
 void flo::setColor(flo::IO::Color col) {
-  if constexpr(!quiet)
-    flo::IO::serial1.setColor(col);
+  if constexpr(quiet)
+    return;
+
+  flo::IO::VGA::setColor(col);
+  flo::IO::serial1.setColor(col);
 }
 
 u8 *flo::getPtrPhys(flo::PhysicalAddress phys) {

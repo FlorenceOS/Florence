@@ -22,6 +22,8 @@ namespace {
   auto consumeKernelArguments = []() {
     // Relocate physFree
     flo::physFree = *flo::exchange(arguments.physFree, nullptr);
+    flo::IO::VGA::currX = *flo::exchange(arguments.vgaX, nullptr);
+    flo::IO::VGA::currY = *flo::exchange(arguments.vgaY, nullptr);
 
     // @TODO: relocate ELF
 
@@ -39,13 +41,30 @@ void flo::putchar(char c) {
 }
 
 void flo::feedLine() {
-  if constexpr(!quiet)
-    flo::IO::serial1.write('\n');
+  if constexpr(quiet)
+    return;
+
+  flo::IO::VGA::feedLine();
+  flo::IO::serial1.feedLine();
+}
+
+void flo::putchar(char c) {
+  if constexpr(quiet)
+    return;
+
+  if(c == '\n')
+    return feedLine();
+
+  flo::IO::VGA::putchar(c);
+  flo::IO::serial1.write(c);
 }
 
 void flo::setColor(flo::IO::Color col) {
-  if constexpr(!quiet)
-    flo::IO::serial1.setColor(col);
+  if constexpr(quiet)
+    return;
+
+  flo::IO::VGA::setColor(col);
+  flo::IO::serial1.setColor(col);
 }
 
 u8 *flo::getPtrPhys(flo::PhysicalAddress paddr) {

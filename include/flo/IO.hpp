@@ -72,8 +72,8 @@ namespace flo {
       auto constexpr width = 80;
       auto constexpr height = 25;
 
-      auto inline currX = 0;
-      auto inline currY = 0;
+      u32 inline currX = 0;
+      u32 inline currY = 0;
 
       u8 inline currentColor = 0x7;
 
