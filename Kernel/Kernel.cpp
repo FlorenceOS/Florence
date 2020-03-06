@@ -35,10 +35,6 @@ namespace {
 extern "C" u8 kernelStart[];
 extern "C" u8 kernelEnd[];
 
-void flo::putchar(char c) {
-  if constexpr(!quiet)
-    flo::IO::serial1.write(c);
-}
 
 void flo::feedLine() {
   if constexpr(quiet)
