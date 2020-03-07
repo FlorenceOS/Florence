@@ -134,7 +134,7 @@ namespace {
     asm("cpuid":"=c"(ecx):"a"(7),"c"(0));
     bool supports5lvls = ecx & (1 << 16);
 
-    pline("5 level paging is ", supports5lvls ? "" : "not", " supported by your CPU");
+    pline("5 level paging is ", supports5lvls ? "" : "not ", "supported by your CPU");
     if constexpr(flo::Paging::PageTableLevels == 4) if(supports5lvls) {
       pline("Please rebuild florence with 5 level paging support for security reasons");
       pline("You will gain an additional 9 bits of KASLR :)");
