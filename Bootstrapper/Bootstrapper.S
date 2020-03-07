@@ -161,12 +161,20 @@ global getMemoryMap
   mov eax, 0xE820
   mov ecx, 24
   int 0x15
+  jc pastEnd
   mov [mem + 24], ebx
   mov [mem + 28], cl
 
+finish_memmap:
   go16to32
   ret
 
+  [bits 16]
+pastEnd:
+  mov [mem + 28], word 0
+  jmp finish_memmap
+
+  [bits 32]
 global readDisk
        readDisk:
   mov byte[dap],     0x10    ; Size
