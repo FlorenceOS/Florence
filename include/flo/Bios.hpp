@@ -18,7 +18,7 @@ namespace flo::BIOS {
     } type;
 
     enum ExtendedAttribs : u32 {
-      Ignore = 1,
+      Usable = 1,
       NonVolatile = 2,
     };
 

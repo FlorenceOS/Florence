@@ -112,9 +112,13 @@ namespace {
     if(ent.type != flo::BIOS::MemmapEntry::RegionType::Usable)
       return false;
 
-    if(ent.bytesFetched > 20)
-      if(ent.attribs & (flo::BIOS::MemmapEntry::ExtendedAttribs::Ignore | flo::BIOS::MemmapEntry::ExtendedAttribs::NonVolatile))
+    if(ent.bytesFetched > 20) {
+      if(!(ent.attribs & (flo::BIOS::MemmapEntry::ExtendedAttribs::Usable)))
         return false;
+
+      if(ent.attribs & (flo::BIOS::MemmapEntry::ExtendedAttribs::NonVolatile))
+        return false;
+    }
 
     return true;
   }
