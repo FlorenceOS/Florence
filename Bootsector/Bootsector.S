@@ -24,7 +24,7 @@ GDT16Data: .quad 0x000F92000000FFFF # Present, Code / Data, NE, Write,  entire 2
 GDT32Code: .quad 0x00CF9A000000FFFF # Present, Code / Data, Executable, entire 32 bits address space
 GDT32Data: .quad 0x00CF92000000FFFF # Present, Code / Data, NE, Write,  entire 32 bits address space
 GDT64Code: .quad 0x00A09A0000000000 # Present, Code / Data, Executable, 64 bits
-GDT64Data: .quad 0x0000920000000000 # Present, Code / Data, Executable, 64 bits
+GDT64Data: .quad 0x0000920000000000 # Present, Code / Data, NE, Write,  64 bits
 GDTDesc:
 .word . - GDT - 1
 .long GDT
