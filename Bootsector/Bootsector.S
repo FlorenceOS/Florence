@@ -6,14 +6,7 @@
 .section .Bootloader
 .code16
 .global loaderStart
-        loaderStart: 
-  cli
-
-  # Disable NMIs
-  in al, 0x70
-  or al, 0x80
-  out 0x70, al
-
+        loaderStart:
   # Enable a20
   in al, 0x92
   or al, 2

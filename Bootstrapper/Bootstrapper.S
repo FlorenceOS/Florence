@@ -18,6 +18,10 @@ db     BootstrapSectors
 ; Goes from 16 bit real mode to 32 bit protected mode, clobbers edx
 %macro go16to32 0
   %push ctx16to32
+
+  ; Disable interrupts
+  cli
+
   ; Enable protected mode
   mov edx, cr0
   or edx, 1
@@ -49,6 +53,9 @@ db     BootstrapSectors
 %$anothermode:
   xor dx, dx
   dataSelDx
+  ; Reenable interrupts
+  sti
+
   %pop ctx32to16
 %endmacro
 
