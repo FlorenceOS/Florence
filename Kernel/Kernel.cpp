@@ -113,12 +113,6 @@ namespace {
 
 extern "C"
 void kernelMain() {
-  pline("Hello ELF kernel land");
-  pline("My ELF is loaded at ", arguments.elfImage->data, " with size ", arguments.elfImage->size);
-  pline("Physical base is at ", (void *)arguments.physBase());
-  pline("Kernel spans from ", (void *)kernelStart, " to ", (void *)kernelEnd);
-  pline("  Best regards, 0x", (void *)&kernelMain);
-
   pline("PCI devices:");
   flo::PCI::IterateDevices([](flo::PCI::Reference const &dev) -> void {
     auto ident = flo::PCI::getDeviceIdentifier(dev);
