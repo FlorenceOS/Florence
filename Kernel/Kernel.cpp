@@ -1,3 +1,4 @@
+#include "flo/ACPI.hpp"
 #include "flo/IO.hpp"
 #include "flo/Kernel.hpp"
 #include "flo/Memory.hpp"
