@@ -77,7 +77,7 @@ void panic(char const *reason) {
 
   flo::printBacktrace();
 
-  flo::CPU::halt();
+  flo::CPU::hang();
 }
 
 namespace Fun::things {
