@@ -55,16 +55,14 @@ namespace {
   }();
 
   auto consumeLowMemory = []() {
-    for(auto &r: *physMemRanges) {
-      pline("Consuming physical memory [", r.begin(), ", ", r.end(), ")");
+    for(auto &r: *physMemRanges)
       flo::consumePhysicalMemory(r.begin, r.end() - r.begin());
-    }
     return flo::nullopt;
   }();
 
   auto unmapLowMemory = []() {
     // Don't return the identity mapped pages
-    flo::Paging::unmap<false>(flo::VirtualAddress{0}, flo::Util::mega(512ull));
+    flo::Paging::unmap<false>(flo::VirtualAddress{0}, flo::Util::mega(2ull));
     return flo::nullopt;
   }();
 
@@ -106,7 +104,6 @@ namespace {
     addrHigh = flo::Paging::alignPageUp<1>(addrHigh);
 
     kernelELF.loadOffset = (physBase - flo::VirtualAddress{addrHigh})();
-    pline("Kernel needs to be offset by ", kernelELF.loadOffset);
 
     kernelELF.loadAll();
 
