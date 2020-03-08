@@ -115,6 +115,8 @@ namespace flo::PCI {
         ident.vid(), ":", ident.pid(), " is ", ident.deviceClass(), ":", ident.deviceSubclass());
 
       switch(ident.deviceClass()) {
+      case 0x03: // Display controller
+        switch(ident.deviceSubclass()) {
         default:
           pline("Unhandled display controller subclass: ", ident.deviceSubclass());
           break;
