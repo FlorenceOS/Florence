@@ -334,7 +334,10 @@ namespace flo {
 
     template<uSz sz>
     uSz strlen(char const(&arr)[sz]) {
-      return sz;
+      if(arr[sz - 1])
+        return sz;
+      else
+        return sz - 1;
     }
   }
 }
