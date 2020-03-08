@@ -242,6 +242,9 @@ extern "C" void setupMemory() {
   do {
     fetchMemoryRegion();
 
+    if(!mem.bytesFetched)
+      break;
+
     bool use = shouldUse(mem);
     if(use) {
       pline("Using memory of size ", mem.size(), " at ", mem.base());
