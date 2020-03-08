@@ -22,6 +22,9 @@ extern "C" {
   flo::BIOS::DAP dap;
 
   u8 driveNumber;
+  u8 diskReadCode = 0;
+
+  void readDisk();
 }
 
 // Data provided by asm
@@ -294,19 +297,17 @@ extern "C" void doEarlyPaging() {
 }
 
 namespace {
-  u8 diskReadCode;
-
   void checkReadError() {
-    char const *errstr = flo::BIOS::int0x13err(diskReadCode);
+    char const *errstr = flo::BIOS::int0x13err(flo::exchange(diskReadCode, 0));
     if(errstr) {
       pline("Disk read error: ", errstr);
       flo::CPU::hang();
     }
   }
 
-  u8 *readDisk(u64 sector) {
+  u8 *cppreadDisk(u64 sector) {
     dap.sectorToRead = sector;
-    asm volatile("call readDisk" :::  "eax", "ebx", "ecx", "edx", "si", "memory");
+    asm("call readDisk":::"eax", "ebx", "ecx", "edx", "edi", "esi", "ebp", "esp", "cc", "memory");
     checkReadError();
     return diskdata;
   }
@@ -372,10 +373,9 @@ namespace {
       // is kind of hard otherwise without paging.
       auto ppage = flo::physFree.getPhysicalPage(1);
 
-      for(u32 offs = 0; offs < flo::Paging::PageSize<1>; offs += flo::IO::Disk::SectorSize) {
+      for(u32 offs = 0; offs < flo::Paging::PageSize<1>; offs += flo::IO::Disk::SectorSize, startingSector += 1) {
+        cppreadDisk(startingSector);
         flo::Util::copymem(flo::getPhys<u8>(ppage) + offs, diskdata, flo::IO::Disk::SectorSize);
-
-        readDisk(++startingSector);
       }
 
       auto err = flo::Paging::map(ppage, outAddr, flo::Paging::PageSize<1>, perms, pline);
@@ -411,7 +411,7 @@ extern "C" void loadKernelLoader() {
   };
 
   for(u32 loaderSector = 0; loaderSector < 1000; ++loaderSector) {
-    readDisk(loaderSector);
+    cppreadDisk(loaderSector);
 
     if(flo::Util::memeq(magic, diskdata, sizeof(magic))) {
       u32 loaderPages = flo::Util::get<u32>(diskdata, sizeof(magic));

@@ -177,18 +177,21 @@ pastEnd:
   [bits 32]
 global readDisk
        readDisk:
-  mov byte[dap],     0x10    ; Size
-  mov byte[dap + 1], 0       ; Reserved
-  mov word[dap + 2], 0x1     ; Number of sectors to read
+  mov byte[dap],     0x10     ; Size
+  mov byte[dap + 1], 0        ; Reserved
+  mov word[dap + 2], 0x1      ; Number of sectors to read
   mov word[dap + 4], diskdata ; Destination offset
-  mov word[dap + 6], 0       ; Destination segment
+  mov word[dap + 6], 0        ; Destination segment
 
   go32to16
+  clc
   mov si, dap
   mov dl, byte[driveNumber]
   mov ah, 0x42
   int 0x13
-
+  jnc finish
+  mov byte[diskReadCode], ah
+finish:
   go16to32
   ret
 
@@ -196,3 +199,4 @@ extern dap
 extern diskdata
 extern driveNumber
 extern mem
+extern diskReadCode
