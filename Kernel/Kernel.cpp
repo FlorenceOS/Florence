@@ -128,6 +128,8 @@ void kernelMain() {
 
   initializeFreeVmm();
 
+  flo::ACPI::initialize();
+
   auto page = flo::large_malloc(4096);
   pline("Got dem pagezz at ", page);
 
