@@ -212,7 +212,15 @@ namespace flo {
     inline Impl::Serial<4> serial4;
   }
 
-  inline void print(char const *str) {
+  void printChrArr(char const *arr, uSz size) {
+    if(!arr[size - 1])
+      --size;
+
+    for(uSz ind = 0; ind < size; ++ ind)
+      putchar(arr[ind]);
+  }
+
+  void print(char const *str) {
     while(*str)
       putchar(*str++);
   }
@@ -270,9 +278,12 @@ namespace flo {
             doColor(IO::Color::yellow);
             return printDec(val.val);
           }
+          else if constexpr(isArray<decay<decltype(val)>>) {
+            doColor(IO::Color::white);
+            return printChrArr(val, Util::arrSz(val));
+          }
           else if constexpr(isSame<decay<decltype(val)>, char const *> ||
-                            isSame<decay<decltype(val)>, char *> ||
-                            isArray<decay<decltype(val)>>) {
+                            isSame<decay<decltype(val)>, char *>) {
             doColor(IO::Color::white);
             return print(val);
           }
