@@ -137,8 +137,8 @@ namespace {
     asm("cpuid":"=c"(ecx):"a"(7),"c"(0));
     bool supports5lvls = ecx & (1 << 16);
 
-    pline("5 level paging is ", supports5lvls ? "" : "not ", "supported by your CPU");
     if constexpr(flo::Paging::PageTableLevels == 4) if(supports5lvls) {
+      pline("5 level paging is supported by your CPU");
       pline("Please rebuild florence with 5 level paging support for security reasons");
       pline("You will gain an additional 9 bits of KASLR :)");
     }
@@ -216,7 +216,7 @@ void consumeMemory(flo::PhysicalMemoryRange &range) {
   auto constexpr maxMemory = flo::PhysicalAddress{1} << 32ull;
 
   auto processLater = [](flo::PhysicalMemoryRange &&mem) {
-    pline(" Saving ", mem.begin(), " to ", mem.end(), " for later");
+    pline("Saving ", mem.begin(), " to ", mem.end(), " for later");
     if(highMemRanges.size() < highMemRanges.max_size())
       highMemRanges.emplace_back(flo::move(mem));
   };
@@ -235,7 +235,7 @@ void consumeMemory(flo::PhysicalMemoryRange &range) {
     processLater(flo::move(upper));
   }
 
-  pline(flo::spaces(1), "Consuming ", range.begin(), " to ", range.end(), " right now");
+  pline("Consuming ", range.begin(), " to ", range.end(), " right now");
 
   // Consume the memory, nom nom
   flo::consumePhysicalMemory(range.begin, range.end() - range.begin());
@@ -250,7 +250,6 @@ extern "C" void setupMemory() {
 
     bool use = shouldUse(mem);
     if(use) {
-      pline("Using memory of size ", mem.size(), " at ", mem.base());
       flo::PhysicalMemoryRange mr;
       mr.begin = mem.base;
       mr.end = mem.base + mem.size;
@@ -262,7 +261,6 @@ extern "C" void setupMemory() {
 extern "C" void doEarlyPaging() {
   // We will locate the physical memory at this point
   kaslrBase = randomizeKASLRBase();
-  pline("KASLR base: ", kaslrBase());
   physicalVirtBase = kaslrBase;
 
   using PageRoot = flo::Paging::PageTable<flo::Paging::PageTableLevels>;
@@ -272,7 +270,6 @@ extern "C" void doEarlyPaging() {
 
   // Set the paging root
   flo::CPU::cr3 = (uptr)&pageRootPhys;
-  pline("New paging root: ", &pageRootPhys, ", ", flo::Paging::getPagingRoot());
 
   // Align the physical memory size
   physHigh = flo::Paging::alignPageUp<kaslrAlignmentLevel>(physHigh);
@@ -336,7 +333,6 @@ namespace {
           case flo::Util::genMagic("FLORKLOD"):
             // Calculate the virtual address this is loaded at
             kernelLoaderEntry = outAddr + flo::VirtualAddress{(ind + 1) * 8};
-            pline("Kernel loader entry: ", kernelLoaderEntry());
             entryFound = true;
             break;
 
@@ -415,8 +411,6 @@ extern "C" void loadKernelLoader() {
 
     if(flo::Util::memeq(magic, diskdata, sizeof(magic))) {
       u32 loaderPages = flo::Util::get<u32>(diskdata, sizeof(magic));
-
-      pline("Kernel loader found at sector ", Decimal{loaderSector}, " with size ", loaderPages * flo::Paging::PageSize<1>);
 
       doLoadLoader(loaderSector, loaderPages);
       return;
