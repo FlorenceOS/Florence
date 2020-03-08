@@ -18,7 +18,7 @@ namespace flo {
       DeviceFunction function;
     };
 
-    void IterateDevices(Function<void(Reference const &)> const &);
+    void initialize();
 
     FLO_STRONG_TYPEDEF(Vid, u16);
     FLO_STRONG_TYPEDEF(Pid, u16);
@@ -33,5 +33,11 @@ namespace flo {
     };
 
     Identifier getDeviceIdentifier(Reference const &);
+
+    template<typename T>
+    T read(Reference const &devRef, u8 offset);
+
+    template<typename T>
+    T write(Reference const &devRef, u8 offset);
   }
 }
