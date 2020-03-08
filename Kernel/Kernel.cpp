@@ -113,13 +113,6 @@ namespace {
 
 extern "C"
 void kernelMain() {
-  pline("PCI devices:");
-  flo::PCI::IterateDevices([](flo::PCI::Reference const &dev) -> void {
-    auto ident = flo::PCI::getDeviceIdentifier(dev);
-    pline(dev.bus(), ":", dev.slot(), ".", dev.function(), ": PCI device, ",
-      ident.vid(), ":", ident.pid(), " is ", ident.deviceClass(), ":", ident.deviceSubclass());
-  });
-
   initializeFreeVmm();
 
   flo::ACPI::initialize();
