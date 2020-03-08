@@ -327,6 +327,11 @@ namespace flo {
       return copy - str;
     }
 
+    template<typename T, uSz sz>
+    uSz arrSz(T (&arr)[sz]) {
+      return sz;
+    }
+
     template<uSz sz>
     uSz strlen(char const(&arr)[sz]) {
       return sz;
