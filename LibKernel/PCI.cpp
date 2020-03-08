@@ -1,5 +1,8 @@
 #include "flo/PCI.hpp"
 
+#include "flo/Drivers/Gfx/IntelGraphics.hpp"
+#include "flo/Drivers/Gfx/GenericVGA.hpp"
+
 #include "flo/Assert.hpp"
 #include "flo/Bitfields.hpp"
 #include "flo/IO.hpp"
@@ -117,6 +120,20 @@ namespace flo::PCI {
       switch(ident.deviceClass()) {
       case 0x03: // Display controller
         switch(ident.deviceSubclass()) {
+        case 0x00: // VGA controller
+          switch(ident.vid()) {
+            case 0x8086:
+              flo::IntelGraphics::initialize(dev);
+              break;
+              
+            default:
+              flo::GenericVGA::initialize(dev);
+              break;
+          }
+          break;
+        case 0x01:
+          pline("FIXME: XGA controller");
+          break;
         default:
           pline("Unhandled display controller subclass: ", ident.deviceSubclass());
           break;
