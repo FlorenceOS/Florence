@@ -12,7 +12,7 @@
   or al, 2
   out 0x92, al
 
-  mov sp, 0x600 # Make a small stack
+  mov sp, 0x7000 # Make a small stack
 
   jmp 0x0000:loadSectors - loaderStart + loadAddress
 
