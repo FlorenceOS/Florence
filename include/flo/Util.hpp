@@ -339,5 +339,15 @@ namespace flo {
       else
         return sz - 1;
     }
+
+    template<typename F>
+    void hexdump(void const *ptr, uSz size, F &&f) {
+      u8 const *p = (u8 const *)ptr;
+      while(size >= 8) {
+        f(p, ": ", p[0], " ", p[1], " ", p[2], " ", p[3], " ", p[4], " ", p[5], " ", p[6], " ", p[7]);
+        p += 8;
+        size -= 8;
+      }
+    }
   }
 }
