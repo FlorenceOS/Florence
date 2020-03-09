@@ -110,7 +110,7 @@ flo::PhysicalAddress flo::PhysicalFreeList::getPhysicalPage(int pageLevel) {
   default: LibKernel::pline("Unknown paging level: ", pageLevel); flo::CPU::hang();
   }
 
-  __builtin_unreachable();
+  assert_not_reached();
 }
 
 void flo::PhysicalFreeList::returnPhysicalPage(flo::PhysicalAddress phys, int pageLevel) {
