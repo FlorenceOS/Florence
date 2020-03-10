@@ -141,6 +141,26 @@ build/Kernel/Kernel.elf: Kernel/Kernel.lds $(KernelObjects)
 	ld -T $^ -o $@ $(LDFlags) -pie -z max-page-size=0x1000
 	@#clang -flto -Xlinker -T $^ -o $@ $(LinkingFlags) -fpie -Xlinker -pie
 
+# EFI loader
+EFILoaderHeaders := $(wildcard EFILoader/*.hpp)
+EFILoaderSources := $(wildcard EFILoader/*.cpp)
+EFILoaderObjects := $(patsubst %,build/%.o,$(EFILoaderSources))
+EFIFlags   := -target x86_64-unknown-windows
+EFILink    := $(EFIFlags) $(LinkingFlags) -nostdlib -Wl,entry:efi_main,-subsystem:efi_application
+EFICompile := $(EFIFlags) $(CXXFlags) -fshort-char -mno-red-zone
+
+build/EFILoader/%.cpp.o: EFILoader/%.cpp Makefile
+	mkdir -p $(@D)
+	clang++ $(EFIFlags) -c -o $@ $<
+
+build/EFILoader/%.S.o: EFILoader/%.S Makefile
+	mkdir -p $(@D)
+	nasm -fpe64 $< -o $@
+
+build/EFILoader/EFILoader.elf: $(EFILoaderObjects)
+	mkdir -p $(@D)
+	clang++ $(EFILink) -o $@ $^
+
 # Libuserspace
 UserspaceHeaders := $(wildcard Userspace/include/**/*.hpp)
 LibuserspaceSources := $(wildcard Userspace/Libuserspace/*.cpp) $(wildcard Userspace/Libuserspace/*.S) $(patsubst %,Userspace/%,$(CommonSources))
