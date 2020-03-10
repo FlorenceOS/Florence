@@ -142,11 +142,11 @@ build/Kernel/Kernel.elf: Kernel/Kernel.lds $(KernelObjects)
 	@#clang -flto -Xlinker -T $^ -o $@ $(LinkingFlags) -fpie -Xlinker -pie
 
 # Libuserspace
-UserspaceHeaders := $(wildcard Userspace/include/**/*.hpp)
+UserspaceHeaders := $(wildcard Userspace/include/**/*.hpp) $(CommonHeaders)
 LibuserspaceSources := $(wildcard Userspace/Libuserspace/*.cpp) $(wildcard Userspace/Libuserspace/*.S) $(patsubst %,Userspace/%,$(CommonSources))
 LibuserspaceObjects := $(patsubst %,build/%.o,$(LibuserspaceSources))
 
-build/Userspace/Libuserspace/%.cpp.o: Userspace/Libuserspace/%.cpp $(CommonHeaders) $(UserspaceHeaders) Makefile
+build/Userspace/Libuserspace/%.cpp.o: Userspace/Libuserspace/%.cpp $(UserspaceHeaders) Makefile
 	@mkdir -p $(@D)
 	clang++ $(UserspaceCXXFlags) -c $< -o $@
 
@@ -154,7 +154,7 @@ build/Userspace/Libuserspace/%.S.o: Userspace/Libuserspace/%.S Makefile
 	@mkdir -p $(@D)
 	clang $(UserspaceAsmFlags) -c $< -o $@
 
-build/Userspace/LibFlo/%.cpp.o: LibFlo/%.cpp $(CommonHeaders) $(UserspaceHeaders) Makefile
+build/Userspace/LibFlo/%.cpp.o: LibFlo/%.cpp $(UserspaceHeaders) Makefile
 	@mkdir -p $(@D)
 	clang++ $(UserspaceCXXFlags) -c $< -o $@
 
