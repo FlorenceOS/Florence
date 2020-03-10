@@ -218,6 +218,10 @@ namespace flo {
 
   template<typename Iterator, typename Predicate>
   constexpr Iterator partition(Iterator begin, Iterator end, Predicate pred) {
+    begin = findIfNot(begin, end, pred);
+    if(begin == end)
+      return begin;
+
     for(auto it = begin + 1; it != end; ++it) if(pred(*it))
       swap(*it, *begin++);
     return begin;
