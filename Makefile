@@ -8,7 +8,7 @@ QEMU := $(QEMUExec) $(QEMUFlags) -m 4G -no-reboot -serial stdio -drive format=ra
 KVM := $(QEMU) -enable-kvm -cpu host
 
 CXXFlags := $(CXXFlags) \
-	-ffreestanding -g -Wall -fno-stack-protector -nostdlib\
+	-ffreestanding -s -Wall -fno-stack-protector -nostdlib\
 	-fno-exceptions -nostdinc++ -nostdinc -fno-rtti -Wno-sign-compare\
 	-std=c++17 -Oz -mno-soft-float -Iinclude -ffunction-sections\
 	-fdata-sections -funsigned-char -mno-avx -mno-avx2 -fno-use-cxa-atexit\
@@ -22,8 +22,8 @@ CXXFlagsKernel := $(CXXFlags64) -fpic -fpie -fno-optimize-sibling-calls -fno-omi
 # Kernel loader doesn't need -mno-red-zone since it has interrupts disabled
 CXXFlagsKernelLoader := $(CXXFlags64) -fno-pic -fno-pie
 
-LDFlags := --gc-sections --no-dynamic-linker -static --build-id=none
-LinkingFlags := -flto -O2 -Wl,--gc-sections,--no-dynamic-linker,--icf=all,--build-id=none -fuse-ld=lld -static -ffreestanding -nostdlib
+LDFlags := --gc-sections --no-dynamic-linker -static --build-id=none -s
+LinkingFlags := -flto -O2 -Wl,--gc-sections,--no-dynamic-linker,--icf=all,--build-id=none -fuse-ld=lld -static -ffreestanding -nostdlib -s
 
 CommonHeaders := $(wildcard include/**/*.hpp)
 CommonSources := $(wildcard LibFlo/*.cpp)
@@ -65,7 +65,7 @@ kvm: out/Disk.bin
 	$(KVM) | c++filt
 
 go: out/Disk.bin
-	$(QEMU) | c++filt
+	$(QEMU) #| c++filt
 
 format:
 	./run-clang-format.py -r Bootstrapper KernelLoader Kernel include LibFlo Tests -e Tests/build --color always | most

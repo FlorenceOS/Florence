@@ -40,7 +40,7 @@ namespace {
   // Every level higher alignment means one factor of 512 less memory overhead
   // but also 9 less bits of entropy.
   // That means lower numbers are more secure but also take more memory.
-  constexpr auto kaslrAlignmentLevel = 2;
+  constexpr auto kaslrAlignmentLevel = 1;
 
   // Memory ranges above the 4GB memory limit, we have to wait to
   // consume these to after we've enabled paging.
@@ -261,6 +261,7 @@ extern "C" void setupMemory() {
 extern "C" void doEarlyPaging() {
   // We will locate the physical memory at this point
   kaslrBase = randomizeKASLRBase();
+  //pline("KASLR base: ", kaslrBase());
   physicalVirtBase = kaslrBase;
 
   using PageRoot = flo::Paging::PageTable<flo::Paging::PageTableLevels>;

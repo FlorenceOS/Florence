@@ -83,7 +83,142 @@ void panic(char const *reason) {
 
 namespace Fun::things {
   void foo() {
-    panic("Failed successfully");
+    pline("Oh come on! Whatever. Leave me. I will love you forever.");
+  }
+
+  void test_flag(char *flag_str) {
+    // [SSM{]
+    if(!flo::Util::memeq(flag_str, "SSM{", 4))
+      panic("Are you even trying?? I can't handle this, sorry. I'm panicking.");
+
+    auto bad_flag = []() {
+      pline("Instance of BadFlagException thrown. Nah, just kidding. But your flag is wrong.");
+      flo::CPU::hang(); // No panic. Just hang. No backtrace for you.
+    };
+
+    flag_str += 4;
+
+    // SSM{[w]
+    // This works only because KASLR uses a static seed in this configuration
+    if(*flag_str != 'a' + ((arguments.physBase() >> (6 * 4)) & 0xFF)) {
+      //pline("Failed on KASLR check which requires ", 'a' + ((arguments.physBase() >> (6 * 4)) & 0xFF));
+      bad_flag();
+    }
+
+    flag_str += 1;
+
+    {
+      int numCorrect = 0;
+      int numWrong = 0;
+
+      auto test = [&](uSz ind) {
+        if(numCorrect != ind)
+          ++numWrong;
+        else
+          ++numCorrect;
+        ++flag_str;
+      };
+
+      another_one:
+      switch(*flag_str) {
+      // SSM{w[e]
+      case 'e':
+        test(0);
+        goto another_one;
+      // SSM{we[_]
+      case '_':
+        test(1);
+        goto another_one;
+      // SSM{we_[m]
+      case 'm':
+        test(2);
+        goto another_one;
+      // SSM{we_m[u]
+      case 'u':
+        test(3);
+        goto another_one;
+      // SSM{we_mu[s]
+      case 's':
+        test(4);
+        goto another_one;
+      // SSM{we_mus[t]
+      case 't':
+        test(5);
+        break;
+      default:
+        ++numWrong;
+        break;
+      }
+
+      if(numCorrect != 6 || numWrong) {
+        //pline("Annoying check failed. Sucks to be you.");
+        bad_flag();
+      }
+    }
+
+    auto memfrobnicatornator = [](char *ptr, u8 sz) {
+      char val = 42;
+      for(int i = 0; i < sz; ++ i)
+        *ptr++ ^= val++;
+    };
+
+    // SSM{we_must[_go_deeeeeeeeee]
+    memfrobnicatornator(flag_str, 15);
+    if(!flo::Util::memeq(flag_str, "uLCrJJUTWVQPSR]", 15)) {
+      //pline("Aw, you failed the (almost) memfrob :(");
+      bad_flag();
+    }
+
+    flag_str += 15;
+
+    // SSM{we_must_go_deeeeeeeeee[_]
+    if(69 * (u64)*flag_str++ != 69 * (u64)'_') {
+      //pline("Failed the 69 check. Sad.");
+      bad_flag();
+    }
+
+    // SSM{we_must_go_deeeeeeeeee_[n]
+    if(420 * (u64)*flag_str++ != 420 * (u64)'n') {
+      //pline("Failed the 420 check. Sad.");
+      bad_flag();
+    }
+
+    // SSM{we_must_go_deeeeeeeeee_n[ope}]
+    if(1337 * (u64)*(u32 *)flag_str != 1337 * (u64)*(u32 const *)"ope}") {
+      //pline("Failed the 1337 check. Sad.");
+      bad_flag();
+    }
+
+    flag_str += 4;
+
+    if(*(flag_str))
+      bad_flag();
+
+    // Flag looks good to me, just return.
+  }
+
+  void request_flag() {
+    char flag[128]{};
+
+    pline("Give me your flag so that I have something to remember you by.");
+    auto it = flag;
+    while(1) {
+      auto input = flo::IO::serial1.read();
+
+      if(input == '\r' || input == '\n') {
+        *it = '\0';
+        flo::IO::serial1.write('\n');
+        break;
+      }
+
+      if(it != flo::end(flag) - 1) {
+        *it++ = input;
+        flo::IO::serial1.write(input);
+      }
+    }
+
+    pline("Oh my god, this flag: ", flag);
+    test_flag(flag);
   }
 }
 
@@ -117,7 +252,13 @@ void kernelMain() {
   initializeFreeVmm();
 
   flo::ACPI::initialize();
-  flo::PCI::initialize();
+  //flo::PCI::initialize();
+
+  Fun::things::request_flag();
+  //char str[] { "AAAA" };
+  //char str[] { "SSM{we_must_go_deeeeeeeeee_nope}" };
+  //char str[] { "SSM{}" };
+  //Fun::things::test_flag(str);
 
   Fun::things::foo();
 }

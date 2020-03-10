@@ -58,9 +58,9 @@ extern "C" int memcmp(const void *lhs, const void *rhs, uSz num) {
 }
 
 u64 flo::getRand() {
-  if(flo::cpuid.rdrand)
-    return LibKernel::rdrand();
-  else
+  //if(flo::cpuid.rdrand)
+  //  return LibKernel::rdrand();
+  //else
     return LibKernel::simpleRand();
 }
 
