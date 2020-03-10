@@ -88,10 +88,24 @@ namespace flo {
     return rhs;
   }
 
-  template<typename Value, typename Iterator>
-  constexpr Iterator find(Iterator begin, Iterator end, Value const &v) {
+  template<typename Iterator, typename Predicate>
+  constexpr Iterator findIf(Iterator begin, Iterator end, Predicate &&pred) {
     for(; begin != end; ++begin)
-      if(*begin == v)
+      if(pred(*begin))
+        return begin;
+
+    return begin;
+  }
+
+  template<typename Iterator, typename Value>
+  constexpr Iterator find(Iterator begin, Iterator end, Value const &v) {
+    return findIf(begin, end, [&](auto &ele) { return ele == v; });
+  }
+
+  template<typename Iterator, typename Predicate>
+  constexpr Iterator findIfNot(Iterator begin, Iterator end, Predicate &&pred) {
+    for(; begin != end; ++begin)
+      if(!pred(*begin))
         return begin;
 
     return begin;
