@@ -1,4 +1,5 @@
 #include "flo/ACPI.hpp"
+#include "flo/APIC.hpp"
 #include "flo/IO.hpp"
 #include "flo/Kernel.hpp"
 #include "flo/Memory.hpp"
@@ -36,6 +37,9 @@ namespace {
 extern "C" u8 kernelStart[];
 extern "C" u8 kernelEnd[];
 
+extern "C" u8 interruptStack[];
+extern "C" u8 pageFaultStack[];
+extern "C" u8 doubleFaultStack[];
 
 void flo::feedLine() {
   if constexpr(quiet)

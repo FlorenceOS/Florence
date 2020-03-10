@@ -60,6 +60,7 @@ namespace flo {
     }
 
     inline Impl::MSR<0xC0000080, u32> IA32_EFER;
+    inline Impl::MSR<0x0000001B, u64> IA32_APIC_BASE_MSR;
   }
 
   namespace Impl {

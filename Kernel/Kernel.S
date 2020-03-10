@@ -31,3 +31,12 @@ section .bss
 resb 16 * 1024
 stack:
 resb 16
+resb 16 * 1024
+interruptStack:
+resb 16
+resb 16 * 1024
+pageFaultStack:
+resb 16
+resb 16 * 1024
+doubleFaultStack:
+resb 16

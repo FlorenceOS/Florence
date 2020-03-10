@@ -1,0 +1,43 @@
+section .data
+irq_handlers:
+
+%macro gen_irq_handler 1
+section .text
+irq_%1:
+  mov al, %1
+  jmp isrtramp
+section .data
+dq irq_%1
+%endmacro
+
+%assign i 0
+%rep 256
+gen_irq_handler i
+%assign i i + 1
+%endrep
+
+section .text
+
+isrtramp:
+  ; Push interrupt number
+  mov bl, [rel intind]
+  lea rcx, [bl + rel intstack]
+  mov [rcx], al
+  inc bl
+  mov [rel intind], bl
+
+  ; Do interrupt itself
+extern isrHandler
+  call isrHandler
+
+  ; Pop interrupt number
+  mov bl, [rel intind]
+  dec bl
+  mov [rel intind], bl
+
+  mov
+  iretq
+
+section .data
+intind db 0
+intstack db rep 3 0x0
