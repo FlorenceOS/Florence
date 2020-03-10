@@ -273,9 +273,9 @@ namespace flo {
     if(dist <= 16)
       return insertionSort(begin, end, cmp);
 
-    auto pivot = begin + dist/2;
-    auto mid1 = partition(begin, end, [&](auto &ele) { return  cmp(ele, *pivot); });
-    auto mid2 = partition(mid1,  end, [&](auto &ele) { return !cmp(*pivot, ele); });
+    auto pivot = *begin;
+    auto mid1 = partition(begin, end, [&](auto &ele) { return  cmp(ele, pivot); });
+    auto mid2 = partition(mid1,  end, [&](auto &ele) { return !cmp(pivot, ele); });
 
     sort(begin, mid1);
     sort(mid2, end);
