@@ -216,7 +216,7 @@ namespace flo {
 
   // decay
   template<typename T>
-  using decay = conditional<isCArray<T>, removeExtent<T>*, removeCV<removeRef<T>>>;
+  using decay = conditional<isCArray<removeRef<T>>, removeExtent<T>*, removeCV<removeRef<T>>>;
 
   static_assert(isSame<decay<int const>, int>);
   static_assert(isSame<decay<int const volatile>, int>);
