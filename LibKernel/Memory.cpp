@@ -48,3 +48,14 @@ void *flo::large_malloc(uSz size) {
 
   return (void *)(pageBase() + 8);
 }
+
+void flo::large_free(void *ptr) {
+  auto i = (uptr)ptr;
+  assert((i & (flo::Paging::PageSize<1> - 1)) == 8);
+  auto allocationBase = (u64 *)(i - 8);
+  auto numPages = *allocationBase;
+
+  flo::Paging::unmap<true>(VirtualAddress{(u64)allocationBase}, numPages * flo::Paging::PageSize<1>);
+
+  flo::returnVirtualPages(allocationBase, numPages);
+}
