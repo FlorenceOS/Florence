@@ -8,6 +8,8 @@
 #if !__has_include(<new>)
 inline void *operator new  (uSz, void *ptr) noexcept { return ptr; }
 inline void *operator new[](uSz, void *ptr) noexcept { return ptr; }
+#else
+#include <new>
 #endif
 
 namespace flo {
