@@ -27,7 +27,7 @@ LinkingFlags := -flto -O2 -Wl,--gc-sections,--no-dynamic-linker,--icf=all,--buil
 
 CommonHeaders := $(wildcard include/**/*.hpp)
 CommonSources := $(wildcard LibFlo/*.cpp)
-LibKernelSources := $(wildcard LibKernel/**/*.cpp)
+LibKernelSources := $(shell find LibKernel -name "*.cpp")
 
 UserspaceCXXFlags :=\
 	-Oz -Wall -Werror -nostdlib -ILibFlo -Iinclude -fno-rtti -fno-exceptions -g\
