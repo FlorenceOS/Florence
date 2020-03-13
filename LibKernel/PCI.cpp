@@ -1,5 +1,6 @@
 #include "flo/PCI.hpp"
 
+#include "flo/Drivers/Disk/IDE.hpp"
 #include "flo/Drivers/Gfx/IntelGraphics.hpp"
 #include "flo/Drivers/Gfx/GenericVGA.hpp"
 
@@ -122,6 +123,20 @@ namespace flo::PCI {
         ident.vid(), ":", ident.pid(), " is ", ident.deviceClass(), ":", ident.deviceSubclass(), ".", ident.progIf());
 
       switch(ident.deviceClass()) {
+
+      case 0x01: // Mass storage controller
+        switch(ident.deviceSubclass()) {
+
+          case 0x01: // IDE controller
+            flo::IDE::initialize(dev, ident);
+            break;
+
+          default:
+            pline("Unhandled mass storage controller: ", ident.deviceSubclass());
+            break;
+
+        }
+        break;
 
       case 0x03: // Display controller
         switch(ident.deviceSubclass()) {
