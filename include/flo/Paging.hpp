@@ -63,7 +63,7 @@ namespace flo {
     }
 
     template<>
-    VirtualAddress makeCanonical<VirtualAddress>(VirtualAddress ptr) {
+    inline VirtualAddress makeCanonical<VirtualAddress>(VirtualAddress ptr) {
       if(ptr & (VirtualAddress{maxUaddr} >> 1ull))
         return ptr | ~(VirtualAddress{maxUaddr} - VirtualAddress{1});
       else
