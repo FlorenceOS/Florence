@@ -54,7 +54,7 @@ namespace flo::PCI {
       return DeviceSubclass{read<u8>(devRef, 10)};
     }
 
-    DeviceProgIf getProgIF(Reference const &devRef) {
+    DeviceProgIf getProgIf(Reference const &devRef) {
       return DeviceProgIf{read<u8>(devRef, 9)};
     }
 
@@ -119,13 +119,16 @@ namespace flo::PCI {
     void deviceHandler(Reference const &dev) {
       auto ident = getDeviceIdentifier(dev);
       pline(dev.bus(), ":", dev.slot(), ".", dev.function(), ": PCI device, ",
-        ident.vid(), ":", ident.pid(), " is ", ident.deviceClass(), ":", ident.deviceSubclass(), ".", ident.progIF);
+        ident.vid(), ":", ident.pid(), " is ", ident.deviceClass(), ":", ident.deviceSubclass(), ".", ident.progIf());
 
       switch(ident.deviceClass()) {
+
       case 0x03: // Display controller
         switch(ident.deviceSubclass()) {
+
         case 0x00: // VGA controller
           switch(ident.vid()) {
+
             case 0x8086:
               flo::IntelGraphics::initialize(dev, ident);
               break;
@@ -133,14 +136,18 @@ namespace flo::PCI {
             default:
               flo::GenericVGA::initialize(dev, ident);
               break;
+
           }
           break;
+
         case 0x01:
           pline("FIXME: XGA controller");
           break;
+
         default:
           pline("Unhandled display controller subclass: ", ident.deviceSubclass());
           break;
+
         }
       break;
 
@@ -162,7 +169,7 @@ flo::PCI::Identifier flo::PCI::getDeviceIdentifier(flo::PCI::Reference const &re
   ident.pid = getProduct(ref);
   ident.deviceClass = getClass(ref);
   ident.deviceSubclass = getSubclass(ref);
-  ident.progIF = getProgIF(ref);
+  ident.progIf = getProgIf(ref);
 
   return ident;
 }
