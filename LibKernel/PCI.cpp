@@ -123,11 +123,11 @@ namespace flo::PCI {
         case 0x00: // VGA controller
           switch(ident.vid()) {
             case 0x8086:
-              flo::IntelGraphics::initialize(dev);
+              flo::IntelGraphics::initialize(dev, ident);
               break;
               
             default:
-              flo::GenericVGA::initialize(dev);
+              flo::GenericVGA::initialize(dev, ident);
               break;
           }
           break;
