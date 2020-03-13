@@ -24,12 +24,14 @@ namespace flo {
     FLO_STRONG_TYPEDEF(Pid, u16);
     FLO_STRONG_TYPEDEF(DeviceClass, u8);
     FLO_STRONG_TYPEDEF(DeviceSubclass, u8);
+    FLO_STRONG_TYPEDEF(DeviceProgIf, u8);
 
     struct Identifier {
       Vid vid;
       Pid pid;
       DeviceClass deviceClass;
       DeviceSubclass deviceSubclass;
+      DeviceProgIf progIf;
     };
 
     Identifier getDeviceIdentifier(Reference const &);

@@ -54,6 +54,10 @@ namespace flo::PCI {
       return DeviceSubclass{read<u8>(devRef, 10)};
     }
 
+    DeviceProgIf getProgIF(Reference const &devRef) {
+      return DeviceProgIf{read<u8>(devRef, 9)};
+    }
+
     Bus getSecondaryBus(Reference const &devRef) {
       return Bus{read<u8>(devRef, 0x19)};
     }
@@ -115,7 +119,7 @@ namespace flo::PCI {
     void deviceHandler(Reference const &dev) {
       auto ident = getDeviceIdentifier(dev);
       pline(dev.bus(), ":", dev.slot(), ".", dev.function(), ": PCI device, ",
-        ident.vid(), ":", ident.pid(), " is ", ident.deviceClass(), ":", ident.deviceSubclass());
+        ident.vid(), ":", ident.pid(), " is ", ident.deviceClass(), ":", ident.deviceSubclass(), ".", ident.progIF);
 
       switch(ident.deviceClass()) {
       case 0x03: // Display controller
@@ -158,6 +162,7 @@ flo::PCI::Identifier flo::PCI::getDeviceIdentifier(flo::PCI::Reference const &re
   ident.pid = getProduct(ref);
   ident.deviceClass = getClass(ref);
   ident.deviceSubclass = getSubclass(ref);
+  ident.progIF = getProgIF(ref);
 
   return ident;
 }
