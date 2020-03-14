@@ -30,12 +30,40 @@ namespace Testing {
   }
 
   template<typename T>
+<<<<<<< Updated upstream
   struct DefaultAllocator: std::allocator<T> {
     constexpr static auto goodSize(uSz least) {
       return least;
     }
 
     constexpr static auto maxSize = 1ull << 38;
+=======
+  struct DefaultAllocator {
+    static T *allocate() {
+      return reinterpret_cast<T *>(malloc(sizeof(T)));
+    }
+
+    static void deallocate(T *ptr) {
+      return free(ptr);
+    }
+  };
+
+  template<typename T>
+  struct DefaultAllocator<T[]> {
+    static T *allocate(uSz num) {
+      if(!num)
+        return nullptr;
+      return reinterpret_cast<T *>(malloc(sizeof(T) * num));
+    }
+
+    static void deallocate(T *ptr) {
+      return free(ptr);
+    }
+
+    static constexpr auto goodSize(uSz least) {
+      return least;
+    }
+>>>>>>> Stashed changes
   };
 }
 

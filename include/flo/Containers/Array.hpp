@@ -9,19 +9,19 @@
 namespace flo {
   template<typename T, uSz sz>
   struct Array: ContainerBase<Array<T, sz>> {
-    T       *begin()       { return data_; }
-    T       *end()         { return data_ + sz; }
+    constexpr T       *begin()       { return data_; }
+    constexpr T       *end()         { return data_ + sz; }
 
-    T const *begin() const { return data_; }
-    T const *end()   const { return data_ + sz; }
+    constexpr T const *begin() const { return data_; }
+    constexpr T const *end()   const { return data_ + sz; }
 
-    T       *data()        { return data_; }
-    T const *data()  const { return data_; }
+    constexpr T       *data()        { return data_; }
+    constexpr T const *data()  const { return data_; }
 
-    T       &operator[](uSz index)       { return data_[index]; };
-    T const &operator[](uSz index) const { return data_[index]; };
+    constexpr T       &operator[](uSz index)       { return data_[index]; };
+    constexpr T const &operator[](uSz index) const { return data_[index]; };
 
-    uSz size() const { return sz; }
+    constexpr uSz size() const { return sz; }
     T data_[sz];
   };
 }
