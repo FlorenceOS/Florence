@@ -22,7 +22,6 @@ namespace flo {
     T const &operator[](uSz index) const { return data_[index]; };
 
     uSz size() const { return sz; }
-  private:
     T data_[sz];
   };
 }
