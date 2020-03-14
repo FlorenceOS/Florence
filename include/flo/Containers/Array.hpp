@@ -21,6 +21,9 @@ namespace flo {
     constexpr T       &operator[](uSz index)       { return data_[index]; };
     constexpr T const &operator[](uSz index) const { return data_[index]; };
 
+    constexpr T       &back()       { return data_[sz - 1]; }
+    constexpr T const &back() const { return data_[sz - 1]; }
+
     constexpr uSz size() const { return sz; }
     T data_[sz];
   };
