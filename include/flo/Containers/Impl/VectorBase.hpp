@@ -9,10 +9,7 @@ namespace flo {
   struct VectorBase: ContainerBase<Vector> {
     [[nodiscard]] constexpr auto       &operator[](size_type ind)       { return begin()[ind]; }
     [[nodiscard]] constexpr auto const &operator[](size_type ind) const { return begin()[ind]; }
-
-    [[nodiscard]] constexpr auto       &front()       { return begin()[0]; }
-    [[nodiscard]] constexpr auto const &front() const { return begin()[0]; }
-
+    
     [[nodiscard]] constexpr auto       &back()       { return begin()[v().size() - 1]; }
     [[nodiscard]] constexpr auto const &back() const { return begin()[v().size() - 1]; }
 

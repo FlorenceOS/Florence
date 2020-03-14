@@ -15,6 +15,9 @@ namespace flo {
     [[nodiscard]] constexpr auto crend()   const { return makeReverseIterator(cont().cbegin()); }
 
     [[nodiscard]] constexpr auto empty() const { return cont().size() == 0; }
+
+    [[nodiscard]] constexpr auto       &front()       { return *cont().begin(); }
+    [[nodiscard]] constexpr auto const &front() const { return *cont().begin(); }
   private:
     Container       &cont()       { return static_cast<Container       &>(*this); }
     Container const &cont() const { return static_cast<Container const &>(*this); }
