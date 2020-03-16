@@ -33,7 +33,6 @@ namespace flo {
     using difference_type = iSz;
 
     constexpr auto size() const { return numElements; }
-    constexpr auto max_size() const { return Alloc::maxSize; }
     constexpr auto capacity() const { return storageSize; }
 
     constexpr bool isInline() const {

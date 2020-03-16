@@ -36,8 +36,6 @@ void vectorInvariant(Vec &vec) {
     EXPECT_NE(vec.data(), nullptr);
   }
 
-  EXPECT_LE(vec.capacity(), vec.max_size());
-
   // All elements accessible, assume some address santization is running
   for(typename Vec::value_type &v: vec) {
     auto *t = reinterpret_cast<volatile char *>(&v);
