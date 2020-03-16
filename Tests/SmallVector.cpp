@@ -16,7 +16,7 @@ void SmallVectorInvariant(flo::SmallVector<T, inlineSize, Alloc> &v) {
 }
 
 TEST(SmallVector, emptySize) {
-  flo::SmallVector<int, 0x10, Testing::DefaultAllocator<int>> v;
+  flo::SmallVector<int, 0x10, Testing::DefaultAllocator<int[]>> v;
 
   SmallVectorInvariant(v);
 
@@ -27,7 +27,7 @@ TEST(SmallVector, push_back) {
   Testing::forRandomInt([](uSz numElements) {
     numElements %= 0x1000;
 
-    flo::SmallVector<int, 0x10, Testing::DefaultAllocator<int>> v;
+    flo::SmallVector<int, 0x10, Testing::DefaultAllocator<int[]>> v;
 
     for(uSz i = 0; i < numElements; ++i) {
       auto val = Testing::urand(0x10000);
@@ -43,7 +43,7 @@ TEST(SmallVector, push_back) {
 }
 
 TEST(SmallVector, emplace) {
-  flo::SmallVector<int, 0x10, Testing::DefaultAllocator<int>> v;
+  flo::SmallVector<int, 0x10, Testing::DefaultAllocator<int[]>> v;
   Testing::forRandomInt([&v](int val) {
     auto pos = v.empty() ? 0 : Testing::urand(v.size() - 1);
 
@@ -60,7 +60,7 @@ TEST(SmallVector, emplace) {
 
 TEST(SmallVector, emplace_back) {
   Testing::forRandomInt([](int val) {
-    flo::SmallVector<int, 0x10, Testing::DefaultAllocator<int>> v;
+    flo::SmallVector<int, 0x10, Testing::DefaultAllocator<int[]>> v;
 
     v.emplace_back(val);
 
@@ -72,7 +72,7 @@ TEST(SmallVector, emplace_back) {
 }
 
 TEST(SmallVector, ModifySubscript) {
-  flo::SmallVector<int, 0x10, Testing::DefaultAllocator<int>> v;
+  flo::SmallVector<int, 0x10, Testing::DefaultAllocator<int[]>> v;
   v.reserve(0x100);
 
   while(v.size() != v.capacity()) {
@@ -103,7 +103,7 @@ TEST(SmallVector, DoCallDestructor) {
   bool testFailed = true;
 
   {
-    flo::SmallVector<S, 0x10, Testing::DefaultAllocator<S>> v;
+    flo::SmallVector<S, 0x10, Testing::DefaultAllocator<S[]>> v;
     v.emplace_back(testFailed);
   }
 
@@ -113,7 +113,7 @@ TEST(SmallVector, DoCallDestructor) {
 
 TEST(SmallVector, Reserve) {
   Testing::forRandomInt([](uSz cap) {
-    flo::SmallVector<int, 0x10, Testing::DefaultAllocator<int>> v;
+    flo::SmallVector<int, 0x10, Testing::DefaultAllocator<int[]>> v;
 
     cap %= 0x10000;
 

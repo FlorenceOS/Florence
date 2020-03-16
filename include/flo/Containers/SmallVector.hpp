@@ -14,21 +14,21 @@ namespace flo {
   // Small vector has a small inline capacity and doesn't allocate until it exceeds to extend it.
   // It's locality friendly and can grow as much as needed. Kind of a mix of StaticVector and DynamicVector
   template<typename T, uSz inlineSize, typename Alloc>
-  struct SmallVector: flo::VectorBase<SmallVector<T, inlineSize, Alloc>, T, uSz>, Alloc {
+  struct SmallVector: flo::VectorBase<SmallVector<T, inlineSize, Alloc>, T, uSz> {
     friend struct flo::VectorBase<SmallVector<T, inlineSize, Alloc>, T, uSz>;
     ~SmallVector() {
       for(auto &v: *this)
         v.~T();
 
       if(!isInline())
-        alloc().deallocate(storage.outOfLine.release(), storageSize);
+        storage.outOfLine.reset();
     }
     // @TODO: = operators
     // @TODO: assign()
 
     using value_type = T;
     using InlineStorage = flo::Array<T, inlineSize>;
-    using OutOfLineStorage = flo::OwnPtr<T[]>;
+    using OutOfLineStorage = flo::OwnPtr<T[], Alloc>;
     using size_type = uSz;
     using difference_type = iSz;
 
@@ -67,17 +67,16 @@ namespace flo {
           flo::forward<NoRealloc>(noRealloc)();
         else {
           // Relocate out of line storage into inline
-          auto oldStorage = storage.outOfLine.release();
+          auto oldStorage = std::move(storage.outOfLine);
 
           // From here on inline storage is active
           flo::forward<Realloc>(realloc)(storage.inOfLine.begin(), storage.inOfLine.size());
-          alloc().deallocate(oldStorage, storageSize);
           makeInline();
         }
         return;
       }
       else {
-        auto newCapacity = alloc().goodSize(flo::Util::pow2Up(requestedCapacity));
+        auto newCapacity = Alloc::goodSize(requestedCapacity);
 
         if(!flo::isSame<DoShrink, void> && newCapacity >= storageSize) { // Small optimization for shrinking
           flo::forward<NoRealloc>(noRealloc)();
@@ -85,15 +84,14 @@ namespace flo {
         }
 
         else { // We have to allocate new memory
-          auto newStorage = alloc().allocate(newCapacity);
-          flo::forward<Realloc>(realloc)(newStorage, newCapacity);
-          if(!isInline()) {
-            alloc().deallocate(storage.outOfLine.release(), storageSize);
-            storage.outOfLine.reset(newStorage);
-          }
-          else {
-            new(&storage.outOfLine) OutOfLineStorage{OutOfLineStorage::adopt(newStorage)};
-          }
+          auto newStorage = OutOfLineStorage::make(newCapacity);
+          flo::forward<Realloc>(realloc)(newStorage.get(), newCapacity);
+
+          if(!isInline())
+            storage.outOfLine = std::move(newStorage);
+          else
+            new (&storage.outOfLine) OutOfLineStorage{std::move(newStorage)};
+
           storageSize = newCapacity;
         }
       }
@@ -103,8 +101,6 @@ namespace flo {
     constexpr auto makeInline() { storageSize = storage.inOfLine.size(); }
 
   private:
-    constexpr Alloc &alloc() { return static_cast<Alloc &>(*this); }
-
     uSz numElements = 0;
     union U {
       U() { }
