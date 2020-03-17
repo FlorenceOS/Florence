@@ -4,8 +4,6 @@
 
 #include "flo/StrongTypedef.hpp"
 
-#include "flo/Containers/Function.hpp"
-
 namespace flo {
   namespace PCI {
     FLO_STRONG_TYPEDEF(Bus, u8);
