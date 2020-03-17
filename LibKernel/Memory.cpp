@@ -13,6 +13,28 @@ namespace flo::Memory {
     auto pline = flo::makePline<quiet>("[MEMORY]");
 
     flo::RangeRandomizer<flo::Paging::PageSize<1>> pageRanges;
+
+    flo::VirtualAddress makePages(uSz numPages) {
+      auto pageBase = flo::VirtualAddress{(u64)getVirtualPages(numPages)};
+
+      assert(pageBase);
+
+      flo::Paging::Permissions kernelRW;
+      kernelRW.writeEnable = 1;
+      kernelRW.allowUserAccess = 0;
+      kernelRW.writethrough = 0;
+      kernelRW.disableCache = 0;
+      kernelRW.mapping.global = 0;
+      kernelRW.mapping.executeDisable = 1;
+
+      // @TODO: lock mapping
+      auto err = flo::Paging::map(pageBase, numPages * flo::Paging::PageSize<1>, kernelRW);
+      flo::checkMappingError(err, flo::Memory::pline, []() {
+        assert_not_reached();
+      });
+
+      return pageBase;
+    }
   }
 }
 
@@ -26,27 +48,12 @@ void flo::returnVirtualPages(void *at, uSz numPages) {
 
 void *flo::large_malloc(uSz size) {
   size = flo::Paging::alignPageUp<1, u64>(size + 8);
-  auto numPages = size/flo::Paging::PageSize<1>;
-  auto pageBase = flo::VirtualAddress{(u64)getVirtualPages(numPages)};
+  auto numPages = size / flo::Paging::PageSize<1>;
+  auto base = flo::Memory::makePages(numPages);
 
-  assert(pageBase);
+  *getVirt<u64>(base) = numPages;
 
-  flo::Paging::Permissions kernelRW;
-  kernelRW.writeEnable = 1;
-  kernelRW.allowUserAccess = 0;
-  kernelRW.writethrough = 0;
-  kernelRW.disableCache = 0;
-  kernelRW.mapping.global = 0;
-  kernelRW.mapping.executeDisable = 1;
-
-  auto err = flo::Paging::map(pageBase, size, kernelRW);
-  flo::checkMappingError(err, flo::Memory::pline, []() {
-    assert_not_reached();
-  });
-
-  *getVirt<u64>(pageBase) = numPages;
-
-  return (void *)(pageBase() + 8);
+  return (void *)(base() + 8);
 }
 
 void flo::large_free(void *ptr) {
