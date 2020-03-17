@@ -32,13 +32,6 @@ namespace flo {
       other.isFuncPtr = true;
     }
 
-    // Requires that Allocator::deallocate is a static function
-    /*template<typename Functor, template<typename T> typename Allocator>
-    Function(Functor &&func, Allocator<CallableImpl<Functor>> alloc = Allocator<CallableImpl<Functor>>{})
-        : callable{CustomFreeAlloc{&decltype(alloc)::deallocate}, std::move(func)} {
-      isFuncPtr = false;
-    }*/
-
   private:
     template<typename T>
     static constexpr bool isFreer = false;
@@ -59,6 +52,8 @@ namespace flo {
         static_assert(isFreer<Func>);
       }
 
+      // This will call some void (*)(T *) function as void (*)(void *)
+      __attribute__((no_sanitize("function")))
       void deallocate(void *ptr) {
         func(ptr);
       }
@@ -77,15 +72,20 @@ namespace flo {
     private:
       Functor callable;
     };
+
+    Function(OwnPtr<Callable, CustomFreeAlloc> &&ptr)
+        :callable{flo::move(ptr)}
+      {
+      isFuncPtr = false;
+    }
   public:
 
     template<template<typename T> typename Allocator, typename Functor>
     static Function make(Functor &&func) {
-      using alloc = Allocator<CallableImpl<Functor>>;
-      Function f;
-      f.callable.alloc() = CustomFreeAlloc{&alloc::deallocate};
-      f.isFuncPtr = false;
-      return flo::move(f);
+      using ci = CallableImpl<flo::removeRef<Functor>>;
+      auto heapFunctor = OwnPtr<ci, Allocator<ci>>::make(flo::move(func));
+      auto funcPtr = OwnPtr<Callable, CustomFreeAlloc>{{static_cast<Callable *>(heapFunctor.release()), CustomFreeAlloc{&Allocator<ci>::deallocate}}};
+      return {flo::move(funcPtr)};
     }
 
     ~Function() {
