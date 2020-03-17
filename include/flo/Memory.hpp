@@ -20,7 +20,7 @@ namespace flo {
         return 0;
 
       for(auto &slabSz: slabSizes)
-        if(slabSz <= size)
+        if(size <= slabSz)
           return slabSz;
 
       return largeGoodSize(size);
