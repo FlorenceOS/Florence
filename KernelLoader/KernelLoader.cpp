@@ -19,6 +19,7 @@ namespace {
 extern "C" u64 unknownField;
 extern "C" flo::PhysicalFreeList *physFree;
 extern "C" flo::VirtualAddress physBase;
+extern "C" flo::VirtualAddress physEnd;
 extern "C" flo::StaticVector<flo::PhysicalMemoryRange, 0x10ull> *physMemRanges;
 extern "C" u32 *vgaX;
 extern "C" u32 *vgaY;
@@ -37,6 +38,7 @@ namespace {
       };
 
     check((u64 *)&physFree,      "physFree");
+    check((u64 *)&physEnd,       "physEnd");
     check((u64 *)&physMemRanges, "physMemRanges");
     check((u64 *)&vgaX,          "vgaX");
     check((u64 *)&vgaY,          "vgaY");
@@ -78,6 +80,7 @@ extern "C" {
       result.elfImage = &kernelELF;
       result.physFree = &flo::physFree;
       result.physBase = physBase;
+      result.physEnd  = physEnd;
       result.vgaX = &flo::IO::VGA::currX;
       result.vgaY = &flo::IO::VGA::currY;
       return result;

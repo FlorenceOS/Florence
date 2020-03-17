@@ -8,6 +8,7 @@ namespace flo {
     flo::ELF64Image const *elfImage;
     flo::PhysicalFreeList const *physFree;
     flo::VirtualAddress physBase;
+    flo::VirtualAddress physEnd;
     u32 const *vgaX;
     u32 const *vgaY;
   };

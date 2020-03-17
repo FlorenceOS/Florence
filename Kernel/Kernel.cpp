@@ -98,7 +98,7 @@ namespace {
     if(kernelStart < flo::getVirt<u8>(flo::Paging::maxUaddr)) {
       // Kernel is in bottom half
       giveVirtRange((u8 *)flo::Util::giga(4ull), kernelStart);
-      giveVirtRange(kernelEnd, (u8 *)flo::Paging::maxUaddr());
+      giveVirtRange((u8 *)arguments.physEnd(), (u8 *)flo::Paging::maxUaddr());
 
       giveVirtRange((u8 *)~(flo::Paging::maxUaddr() - 1), (u8 *)~(flo::Util::giga(4ull) - 1));
     }
@@ -107,7 +107,7 @@ namespace {
 
       // Kernel is in top half
       giveVirtRange((u8 *)~(flo::Paging::maxUaddr() - 1), kernelStart);
-      giveVirtRange(kernelEnd, (u8 *)~(flo::Util::giga(4ull) - 1));
+      giveVirtRange((u8 *)arguments.physEnd(), (u8 *)~(flo::Util::giga(4ull) - 1));
     }
   }
 }

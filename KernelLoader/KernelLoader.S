@@ -21,6 +21,10 @@ global physBase
        physBase:
 db "PhysBase"
 
+global physEnd
+       physEnd:
+db "PhysEnd", 0
+
 global physMemRanges
        physMemRanges:
 db "HighRang"

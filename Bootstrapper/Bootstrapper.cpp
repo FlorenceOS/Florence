@@ -344,6 +344,10 @@ namespace {
             mem[ind] = kaslrBase();
             break;
 
+          case flo::Util::genMagic("PhysEnd\x00"):
+            mem[ind] = kaslrBase() + physHigh();
+            break;
+
           case flo::Util::genMagic("HighRang"):
             mem[ind] = (u64)&highMemRanges;
             break;
