@@ -86,16 +86,22 @@ struct MallocSlab {
   }
 
   static void *allocate() {
-    // Try to fetch one from freelist
+    flo::Memory::pline("Checking freelist for slab of size ", size);
+    
     if(next)
       return flo::exchange(next, next->next);
 
-    // Make new memory
+    flo::Memory::pline("No slab in freelist.");
+
     auto base = flo::Memory::makePages(1);
+
+    flo::Memory::pline("Made new memory at ", base());
 
     // Put other slabs in freelist
     for(uSz slab = 1; slab * size < flo::Paging::PageSize<1>; ++slab)
       deallocate((void *)(base() + slab * size));
+
+    flo::Memory::pline("Unused new memory added to freelist");
 
     // Return slab 0
     return flo::getVirt<void>(base);
