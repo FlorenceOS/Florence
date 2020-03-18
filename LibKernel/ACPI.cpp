@@ -2,6 +2,7 @@
 
 #include "flo/Assert.hpp"
 #include "flo/IO.hpp"
+#include "flo/Memory.hpp"
 #include "flo/PCI.hpp"
 
 namespace flo::ACPI {
@@ -28,6 +29,8 @@ namespace flo::ACPI {
     struct RSDT;
     struct XSDT;
 
+    inline void *SDT = nullptr;
+
     struct RSDPDesc {
       char signature[8];
       u8 checksum;
@@ -42,13 +45,13 @@ namespace flo::ACPI {
       u8 reserved[3];
 
       RSDT *rsdt() {
-        assert_err(revision == 0, "RSDT aquired with and XSDT available!");
-        return flo::getPhys<RSDT>(flo::PhysicalAddress{rdstAddr});
+        assert_err(revision == 0, "RSDT aquired with XSDT available!");
+        return reinterpret_cast<RSDT *>(SDT);
       }
 
       XSDT *xsdt() {
         assert_err(revision > 0, "No XSDT available!");
-        return flo::getPhys<XSDT>(xsdtAddr);
+        return reinterpret_cast<XSDT *>(SDT);
       }
 
       bool validate() const {
@@ -98,6 +101,13 @@ namespace flo::ACPI {
       u32 creatorRevision;
     };
 
+    void prepareSDT(RSDPDesc const *ptr) {
+      u8 const *byteArray = flo::getPhys<u8>(ptr->revision ? ptr->xsdtAddr : flo::PhysicalAddress{ptr->rdstAddr});
+      auto table_size = flo::Util::get<decltype(SDTHeader::length)>(byteArray, 4);
+      SDT = flo::malloc_eternal(table_size);
+      flo::Util::copymem((u8 *)SDT, byteArray, table_size);
+    }
+
     static_assert(sizeof(SDTHeader) == 36);
 
     struct RSDTHeader {
@@ -139,6 +149,8 @@ void flo::ACPI::initialize() {
   auto rsdptr = RSDPDesc::aquire();
   if(!rsdptr)
     return;
+
+  prepareSDT(rsdptr);
 
   flo::ACPI::pline("Got RSD PTR: ", rsdptr);
 
