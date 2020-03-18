@@ -114,6 +114,8 @@ namespace {
 
 extern "C"
 void kernelMain() {
+  pline("Starting drivers...");
+
   initializeFreeVmm();
 
   flo::ACPI::initialize();
