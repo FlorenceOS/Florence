@@ -66,3 +66,62 @@ void flo::large_free(void *ptr) {
 
   flo::returnVirtualPages(allocationBase, numPages);
 }
+
+template<uSz size>
+struct MallocSlab {
+  static_assert(size >= sizeof(void *));
+  static_assert(flo::Paging::PageSize<1> % size == 0);
+
+  struct FreeEntry {
+    FreeEntry *next;
+  };
+
+  // @TODO: lock this structure
+  inline static FreeEntry *next = nullptr;
+
+  static void deallocate(void *slab) {
+    auto freeSlab = reinterpret_cast<FreeEntry *>(slab);
+    freeSlab->next = next;
+    next = freeSlab;
+  }
+
+  static void *allocate() {
+    // Try to fetch one from freelist
+    if(next)
+      return flo::exchange(next, next->next);
+
+    // Make new memory
+    auto base = flo::Memory::makePages(1);
+
+    // Put other slabs in freelist
+    for(uSz slab = 1; slab * size < flo::Paging::PageSize<1>; ++slab)
+      deallocate((void *)(base() + slab * size));
+
+    // Return slab 0
+    return flo::getVirt<void>(base);
+  }
+};
+
+template<uSz size>
+void *flo::malloc_slab() {
+  return MallocSlab<size>::allocate();
+}
+
+template<uSz size>
+void flo::free_slab(void *ptr) {
+  return MallocSlab<size>::deallocate(ptr);
+}
+
+// Instatiate all the malloc/free functions for the slab sizes
+template<uSz ind = 0>
+struct Dummy {
+  static void dummy() {
+    if constexpr(ind < flo::Memory::slabSizes.size()) {
+      constexpr auto slabSize = flo::Memory::slabSizes[ind];
+      flo::free_slab<slabSize>(flo::malloc_slab<slabSize>());
+      Dummy<ind + 1>::dummy();
+    }
+  }
+};
+
+Dummy d;

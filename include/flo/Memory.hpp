@@ -51,12 +51,56 @@ namespace flo {
       return large_malloc(size);
   }
 
+  inline const flo::Array<void *(*)(), Memory::slabSizes.size()> malloc_funcs {{},{
+    malloc<Memory::slabSizes[0]>,
+    malloc<Memory::slabSizes[1]>,
+    malloc<Memory::slabSizes[2]>,
+    malloc<Memory::slabSizes[3]>,
+    malloc<Memory::slabSizes[4]>,
+    malloc<Memory::slabSizes[5]>,
+    malloc<Memory::slabSizes[6]>,
+    malloc<Memory::slabSizes[7]>,
+  }};
+
+  // You have to free() with the same size.
+  inline void *malloc_size(uSz sz) {
+    for(uSz i = 0; i < Memory::slabSizes.size(); ++ i)
+      if(sz <= Memory::slabSizes[i])
+        return malloc_funcs[i]();
+
+    return large_malloc(sz);
+  }
+
+  inline void *malloc_eternal(uSz sz) {
+    return malloc_size(sz);
+  }
+
   template<uSz size>
   inline void free(void *ptr) {
     if constexpr(size <= maxSlabSize)
       return free_slab<Memory::goodSize(size)>(ptr);
     else
       return large_free(ptr);
+  }
+
+  inline const flo::Array<void (*)(void *), Memory::slabSizes.size()> free_funcs {{},{
+    free<Memory::slabSizes[0]>,
+    free<Memory::slabSizes[1]>,
+    free<Memory::slabSizes[2]>,
+    free<Memory::slabSizes[3]>,
+    free<Memory::slabSizes[4]>,
+    free<Memory::slabSizes[5]>,
+    free<Memory::slabSizes[6]>,
+    free<Memory::slabSizes[7]>,
+  }};
+
+  // Free something aquired from malloc_size
+  inline void free_size(void *ptr, uSz sz) {
+    for(uSz i = 0; i < Memory::slabSizes.size(); ++ i)
+      if(sz <= Memory::slabSizes[i])
+        return free_funcs[i](ptr);
+
+    return large_free(ptr);
   }
 
   template<typename T>
