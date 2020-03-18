@@ -44,12 +44,12 @@ namespace flo::ACPI {
       u8 extendedChecksum;
       u8 reserved[3];
 
-      RSDT *rsdt() {
+      RSDT *rsdt() const {
         assert_err(revision == 0, "RSDT aquired with XSDT available!");
         return reinterpret_cast<RSDT *>(SDT);
       }
 
-      XSDT *xsdt() {
+      XSDT *xsdt() const {
         assert_err(revision > 0, "No XSDT available!");
         return reinterpret_cast<XSDT *>(SDT);
       }
