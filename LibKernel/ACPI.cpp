@@ -101,13 +101,6 @@ namespace flo::ACPI {
       u32 creatorRevision;
     };
 
-    void prepareSDT(RSDPDesc const *ptr) {
-      u8 const *byteArray = flo::getPhys<u8>(ptr->revision ? ptr->xsdtAddr : flo::PhysicalAddress{ptr->rdstAddr});
-      auto table_size = flo::Util::get<decltype(SDTHeader::length)>(byteArray, 4);
-      SDT = flo::malloc_eternal(table_size);
-      flo::Util::copymem((u8 *)SDT, byteArray, table_size);
-    }
-
     static_assert(sizeof(SDTHeader) == 36);
 
     struct RSDTHeader {
@@ -127,7 +120,7 @@ namespace flo::ACPI {
       void forEachSDT(F &&f) const {
         pline("RSDT: ", header.numEntries<4>(), " entries");
         for(uSz ind = 0; ind < header.numEntries<4>(); ++ ind)
-          f(*flo::getPhys<SDTHeader>(flo::PhysicalAddress{sdts[ind]}));
+          f(flo::getPhys<u8>(flo::PhysicalAddress{sdts[ind]}));
         pline("RSDT: Finished listing");
       }
     };
@@ -139,9 +132,46 @@ namespace flo::ACPI {
       template<typename F>
       void forEachSDT(F &&f) const {
         for(uSz ind = 0; ind < header.numEntries<8>(); ++ ind)
-          f(*flo::getPhys<SDTHeader>(sdts[ind]));
+          f(flo::getPhys<u8>(sdts[ind]));
       }
     } __attribute__((packed));
+
+    struct SDTArray {
+      uptr numEntries;
+      SDTHeader *sdts[];
+    };
+
+    inline SDTArray *sdtarr = nullptr;
+
+    void prepareSDTs(RSDPDesc const *ptr) {
+      u8 const *byteArray = flo::getPhys<u8>(ptr->revision ? ptr->xsdtAddr : flo::PhysicalAddress{ptr->rdstAddr});
+      auto table_bytes = flo::Util::get<u32>(byteArray, 4);
+      SDT = flo::malloc_eternal(table_bytes);
+      flo::Util::copymem((u8 *)SDT, byteArray, table_bytes);
+
+      auto numEntries = ptr->revision ? ptr->xsdt()->header.numEntries<8>() : ptr->rsdt()->header.numEntries<4>();
+
+      sdtarr = (SDTArray *)flo::malloc_eternal(sizeof(void *) * (numEntries + 1));
+      sdtarr->numEntries = 0;
+
+      auto copy_table = [&](u8 const *sdt) {
+        auto sdt_bytes = flo::Util::get<u32>(sdt, 4);
+        sdtarr->sdts[sdtarr->numEntries] = (SDTHeader *)flo::malloc_eternal(sdt_bytes);
+        flo::Util::copymem((u8 *)sdtarr->sdts[sdtarr->numEntries], sdt, sdt_bytes);
+        ++sdtarr->numEntries;
+      };
+
+      if(ptr->revision)
+        ptr->xsdt()->forEachSDT(copy_table);
+      else
+        ptr->rsdt()->forEachSDT(copy_table);
+    }
+
+    template<typename F>
+    void forEachSDT(F &&f) {
+      for(uptr i = 0; i < sdtarr->numEntries; ++ i)
+        f(*sdtarr->sdts[i]);
+    }
   }
 }
 
@@ -150,11 +180,11 @@ void flo::ACPI::initialize() {
   if(!rsdptr)
     return;
 
-  prepareSDT(rsdptr);
+  prepareSDTs(rsdptr);
 
   flo::ACPI::pline("Got RSD PTR: ", rsdptr);
 
-  auto sdtHandler = [&](SDTHeader const &sdt) {
+  forEachSDT([&](SDTHeader const &sdt) {
     switch(*(u32 const *)sdt.signature) {
     case signature("FACP"):
       flo::ACPI::pline("FADT at ", &sdt);
@@ -177,10 +207,5 @@ void flo::ACPI::initialize() {
       flo::ACPI::pline("Unknown SDT at ", &sdt, " with signature ", sdt.signature);
       break;
     }
-  };
-
-  if(rsdptr->revision > 0)
-    rsdptr->xsdt()->forEachSDT(sdtHandler);
-  else
-    rsdptr->rsdt()->forEachSDT(sdtHandler);
+  });
 }
