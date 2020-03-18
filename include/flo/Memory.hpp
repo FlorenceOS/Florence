@@ -7,7 +7,7 @@
 
 namespace flo {
   namespace Memory {
-    constexpr flo::Array<u64, 9> slabSizes {{}, {16, 24, 32, 64, 128, 256, 512, 1024, 2048}};
+    constexpr flo::Array<u64, 8> slabSizes {{}, {16, 32, 64, 128, 256, 512, 1024, 2048}};
 
     // If you ask for size # of bytes, you will get goodSize(size) bytes.
     // So you might as well allocate that many if you have a growing container.
