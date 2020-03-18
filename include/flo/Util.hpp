@@ -319,8 +319,10 @@ namespace flo {
     };
 
     template<typename T>
-    T &get(u8 *ptr, u64 offset) {
-      return *(T *)(ptr + offset);
+    T get(u8 const *ptr, u64 offset) {
+      T result;
+      copymem((u8 *)&result, ptr + offset, sizeof(T));
+      return result;
     }
 
     inline uSz strlen(char const *str) {
