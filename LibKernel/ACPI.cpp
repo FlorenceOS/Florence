@@ -118,19 +118,19 @@ namespace flo::ACPI {
 
       template<typename F>
       void forEachSDT(F &&f) const {
-        for(uSz ind = 0; ind < header.numEntries<4>(); ++ ind)
-          f(flo::getPhys<u8>(flo::PhysicalAddress{sdts[ind]}));
+        for(uSz i = 0; i < header.numEntries<4>(); ++ i)
+          f(flo::getPhys<u8>(flo::PhysicalAddress{sdts[i]}));
       }
     };
 
     struct XSDT {
       RSDTHeader header;
-      flo::PhysicalAddress sdts[];
+      u64 sdts[];
 
       template<typename F>
       void forEachSDT(F &&f) const {
-        for(uSz ind = 0; ind < header.numEntries<8>(); ++ ind)
-          f(flo::getPhys<u8>(sdts[ind]));
+        for(uSz i = 0; i < header.numEntries<8>(); ++ i)
+          f(flo::getPhys<u8>(flo::PhysicalAddress{sdts[i]}));
       }
     } __attribute__((packed));
 
