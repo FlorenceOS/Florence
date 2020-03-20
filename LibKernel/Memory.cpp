@@ -9,7 +9,7 @@
 
 namespace flo::Memory {
   namespace {
-    constexpr bool quiet = false;
+    constexpr bool quiet = true;
     auto pline = flo::makePline<quiet>("[MEMORY]");
 
     flo::RangeRandomizer<flo::Paging::PageSize<1>> pageRanges;
