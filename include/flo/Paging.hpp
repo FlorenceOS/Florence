@@ -44,7 +44,7 @@ namespace flo {
 
     template<int Level = 1, typename T>
     auto constexpr alignPageDown(T value) {
-      return value & T{~(PageSize<Level> - 1)};
+      return value & (T)~(PageSize<Level> - 1);
     }
 
     template<int Level = 1, typename T>
