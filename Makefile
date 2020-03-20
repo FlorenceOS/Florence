@@ -122,8 +122,8 @@ build/KernelLoader/KernelLoader.elf: KernelLoader/Linker.lds $(KernelLoaderObjec
 	clang -Xlinker -T $^ -o $@ $(LinkingFlags)
 	@readelf -a $@ | grep 'KernelLoaderSize' | awk '{ print "Kernel loader size: " strtonum("0x" $$2)/(512 * 1024 * 1024) * 100 "%" }'
 
-KernelAsm := $(wildcard Kernel/*.S) 
-KernelCpp := $(wildcard Kernel/*.cpp)
+KernelAsm := $(shell find Kernel -name "*.S")
+KernelCpp := $(shell find Kernel -name "*.cpp")
 KernelObjects := $(patsubst %,build/%.o,$(KernelAsm)) build/Kernel/Kernel.cpp.o
 
 build/Kernel/%.S.o: Kernel/%.S
