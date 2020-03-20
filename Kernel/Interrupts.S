@@ -1,7 +1,5 @@
 [bits 64]
 
-extern isrHandler
-
 section .rodata
 global exceptionHandlers
 exceptionHandlers:
