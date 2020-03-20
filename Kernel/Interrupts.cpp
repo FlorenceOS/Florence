@@ -127,7 +127,8 @@ extern "C" void exceptionHandler() {
     : "=r"(frame)
   );
 
-  flo::Interrupts::pline("CPU exception ", frame->interruptNumber, " (", flo::Interrupts::exceptionToString(frame->interruptNumber), ") at DIP=", flo::deslide(frame->rip));
+  flo::Interrupts::pline("CPU exception ", frame->interruptNumber, " (",
+    flo::Interrupts::exceptionToString(frame->interruptNumber), ") at DIP=", flo::deslide(frame->rip));
   flo::Interrupts::pline("RAX=", frame->rax, " RBX=", frame->rbx, " RCX=", frame->rcx, " RDX=", frame->rdx);
   flo::Interrupts::pline("RSI=", frame->rsi, " RDI=", frame->rdi, " RBP=", frame->rbp, " RSP=", frame->rsp);
   flo::Interrupts::pline("R8 =", frame->r8 , " R9 =", frame->r9 , " R10=", frame->r10, " R11=", frame->r11);
