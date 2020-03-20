@@ -2,7 +2,7 @@ image: Ubuntu1804
 build: off
 install:
 - sh: sudo apt update
-- sh: yes | sudo apt install gcc-9-multilib g++-9-multilib qemu nasm lld-9
+- sh: yes | sudo apt install gcc-9-multilib g++-9-multilib qemu nasm lld-9 qemu-kvm
 - sh: sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 900 --slave /usr/bin/g++ g++ /usr/bin/g++-9
 - sh: sudo update-alternatives --install /usr/bin/lld lld /usr/bin/lld-9 900
 - sh: make
@@ -13,6 +13,7 @@ test_script:
 - sh: make autotest
 - ps: (new-object net.webclient).UploadFile("https://ci.appveyor.com/api/testresults/junit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path .\tests.xml))
 - sh: QEMUFlags='-display none' timeout 5 make go || true
+- sh: QEMUFlags='-display none' timeout 5 make kvm || true
 
 artifacts:
 - path: Florence.zip
