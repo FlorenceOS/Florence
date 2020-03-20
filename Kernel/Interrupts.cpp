@@ -108,7 +108,7 @@ namespace flo::Interrupts {
       case 0x0D: return "General protection fault";
       case 0x0E: return "Page fault";
       case 0x10: return "x87 Floating-point exception";
-      case 0x11: return "Alignmnet check";
+      case 0x11: return "Alignment check";
       case 0x12: return "Machine check";
       case 0x13: return "SIMD Floating-point exception";
       case 0x14: return "Virtualization exception";
