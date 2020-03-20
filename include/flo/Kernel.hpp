@@ -14,4 +14,5 @@ namespace flo {
   };
 
   void printBacktrace();
+  uptr deslide(uptr addr);
 }

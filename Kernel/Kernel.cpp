@@ -124,6 +124,12 @@ void kernelMain() {
   Fun::things::foo();
 }
 
+uptr flo::deslide(uptr addr) {
+  if((uptr)kernelStart <= addr && addr < (uptr)kernelEnd)
+    return addr - arguments.elfImage->loadOffset;
+  return addr;
+}
+
 void flo::printBacktrace() {
   auto frame = flo::getStackFrame();
 
@@ -131,6 +137,6 @@ void flo::printBacktrace() {
   flo::getStackTrace(frame, [](auto &stackFrame) {
     auto symbol = arguments.elfImage->lookupSymbol(stackFrame.retaddr);
     auto symbolName = symbol ? arguments.elfImage->symbolName(*symbol) : nullptr;
-    pline(symbolName ?: "[NO NAME]", ": ", stackFrame.retaddr - arguments.elfImage->loadOffset);
+    pline(symbolName ?: "[NO NAME]", ": ", flo::deslide(stackFrame.retaddr));
   });
 }
