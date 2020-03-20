@@ -9,8 +9,7 @@ extern "C" void *exceptionHandlers[0x20];
 
 namespace flo::Interrupts {
   namespace {
-    constexpr bool quiet = false;
-    auto pline = flo::makePline<quiet>("[INTERRUPTS]");
+    auto pline = flo::makePline<false>("[INTERRUPTS]");
 
     struct IDTEntry {
       u16 addrLow = 0;
@@ -141,8 +140,6 @@ extern "C" void exceptionHandler() {
 void flo::Interrupts::initialize() {
   flo::Interrupts::idt = Allocator<flo::Interrupts::IDT>::allocate();
 
-  flo::Interrupts::pline("Allocated IDT at ", flo::Interrupts::idt);
-
   flo::Interrupts::IDTEntry::Attrib exceptionAttributes;
   exceptionAttributes.gateType = 0xf;
   exceptionAttributes.storage = 0;
@@ -157,9 +154,5 @@ void flo::Interrupts::initialize() {
     u64 base = (u64)flo::Interrupts::idt;
   } __attribute__((packed)) idtr;
 
-  flo::Interrupts::pline("Loading IDT");
-
   __asm__("lidt %0" : : "m"(idtr));
-
-  flo::Interrupts::pline("IDT loaded!");
 }
