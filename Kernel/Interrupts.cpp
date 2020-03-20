@@ -91,55 +91,101 @@ namespace flo::Interrupts {
       u64 ss;
     };
 
+    enum ExceptionNumber: u64 {
+      DivideZero = 0x00,
+      Debug = 0x01,
+      NMI = 0x02,
+      Breakpoint = 0x03,
+      Overflow = 0x04,
+      BoundRangeExceeded = 0x05,
+      InvalidOpcode = 0x06,
+      DeviceNotAvailable = 0x07,
+      DoubleFault = 0x08,
+      InvalidTSS = 0x0A,
+      SegmentNotPresent = 0x0B,
+      StackSegmentationFault = 0x0C,
+      GeneralProtectionFault = 0x0D,
+      PageFault = 0x0E,
+      x87FloatingPointException = 0x10,
+      AlignmentCheck = 0x11,
+      MachineCheck = 0x12,
+      SIMDFloatingPointException = 0x13,
+      VirtualizationException = 0x14,
+      SecurityException = 0x1E,
+    };
+
     char const *exceptionToString(u64 exceptionNumber) {
       switch(exceptionNumber) {
-      case 0x00: return "Divide by zero";
-      case 0x01: return "Debug";
-      case 0x02: return "NMI";
-      case 0x03: return "Breakpoint";
-      case 0x04: return "Overflow";
-      case 0x05: return "Bound range exceeded";
-      case 0x06: return "Invalid opcode";
-      case 0x07: return "Device not available";
-      case 0x08: return "Double fault";
-      case 0x0A: return "Invalid TSS";
-      case 0x0B: return "Segment not present";
-      case 0x0C: return "Stack-segment fault";
-      case 0x0D: return "General protection fault";
-      case 0x0E: return "Page fault";
-      case 0x10: return "x87 Floating-point exception";
-      case 0x11: return "Alignment check";
-      case 0x12: return "Machine check";
-      case 0x13: return "SIMD Floating-point exception";
-      case 0x14: return "Virtualization exception";
-      case 0x1E: return "Security exception";
-      default:   return "Unknown";
+      case DivideZero:
+        return "Divide by zero";
+      case Debug:
+        return "Debug";
+      case NMI:
+        return "NMI";
+      case Breakpoint:
+        return "Breakpoint";
+      case Overflow:
+        return "Overflow";
+      case BoundRangeExceeded:
+        return "Bound range exceeded";
+      case InvalidOpcode:
+        return "Invalid opcode";
+      case DeviceNotAvailable:
+        return "Device not available";
+      case DoubleFault:
+        return "Double fault";
+      case InvalidTSS:
+        return "Invalid TSS";
+      case SegmentNotPresent:
+        return "Segment not present";
+      case StackSegmentationFault:
+        return "Stack-segment fault";
+      case GeneralProtectionFault:
+        return "General protection fault";
+      case PageFault:
+        return "Page fault";
+      case x87FloatingPointException:
+        return "x87 Floating-point exception";
+      case AlignmentCheck:
+        return "Alignment check";
+      case MachineCheck:
+        return "Machine check";
+      case SIMDFloatingPointException:
+        return "SIMD Floating-point exception";
+      case VirtualizationException:
+        return "Virtualization exception";
+      case SecurityException:
+        return "Security exception";
+      default:
+        return "Unknown";
       }
     }
 
     bool isFatal(u64 exceptionNumber) {
       switch(exceptionNumber) {
-      case 0x00: return false;
-      case 0x01: return false;
-      case 0x02: return false;
-      case 0x03: return false;
-      case 0x04: return false;
-      case 0x05: return false;
-      case 0x06: return false;
-      case 0x07: return false;
-      case 0x08: return true;
-      case 0x0A: return true;
-      case 0x0B: return true;
-      case 0x0C: return true;
-      case 0x0D: return true;
-      case 0x0E: return true;
-      case 0x10: return false;
-      case 0x11: return false;
-      case 0x12: return true;
-      case 0x13: return false;
-      case 0x14: return true;
-      case 0x1E: return true;
-      default:   return true;
+      case DivideZero:
+      case Debug:
+      case NMI:
+      case Breakpoint:
+      case Overflow:
+      case BoundRangeExceeded:
+      case DeviceNotAvailable:
+      case x87FloatingPointException:
+      case AlignmentCheck:
+      case SIMDFloatingPointException:
+        return false;
+      case InvalidOpcode:
+      case DoubleFault:
+      case InvalidTSS:
+      case SegmentNotPresent:
+      case StackSegmentationFault:
+      case GeneralProtectionFault:
+      case PageFault:
+      case MachineCheck:
+      case VirtualizationException:
+      case SecurityException:
+      default:
+        return true;
       }
     }
   }
