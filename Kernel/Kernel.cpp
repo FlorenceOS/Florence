@@ -132,13 +132,17 @@ uptr flo::deslide(uptr addr) {
   return addr;
 }
 
+char const *flo::symbolName(uptr addr) {
+  auto symbol = arguments.elfImage->lookupSymbol(addr);
+  auto symbolName = symbol ? arguments.elfImage->symbolName(*symbol) : nullptr;
+  return symbolName ?: "[NO NAME]";
+}
+
 void flo::printBacktrace() {
   auto frame = flo::getStackFrame();
 
   pline("Backtrace: ");
   flo::getStackTrace(frame, [](auto &stackFrame) {
-    auto symbol = arguments.elfImage->lookupSymbol(stackFrame.retaddr);
-    auto symbolName = symbol ? arguments.elfImage->symbolName(*symbol) : nullptr;
-    pline(symbolName ?: "[NO NAME]", ": ", flo::deslide(stackFrame.retaddr));
+    pline(flo::symbolName(stackFrame.retaddr), ": ", flo::deslide(stackFrame.retaddr));
   });
 }

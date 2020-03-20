@@ -15,4 +15,5 @@ namespace flo {
 
   void printBacktrace();
   uptr deslide(uptr addr);
+  char const *symbolName(uptr addr);
 }
