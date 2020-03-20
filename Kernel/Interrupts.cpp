@@ -155,4 +155,6 @@ void flo::Interrupts::initialize() {
   } __attribute__((packed)) idtr;
 
   __asm__("lidt %0" : : "m"(idtr));
+
+  __asm__("int $3");
 }
