@@ -33,11 +33,11 @@ namespace Testing {
 
   struct DefaultAllocator {
     static T *allocate() {
-      return reinterpret_cast<T *>(malloc(sizeof(T)));
+      return reinterpret_cast<T *>(::malloc(sizeof(T)));
     }
 
     static void deallocate(T *ptr) {
-      return free(ptr);
+      return ::free(ptr);
     }
   };
 
@@ -46,11 +46,11 @@ namespace Testing {
     static T *allocate(uSz num) {
       if(!num)
         return nullptr;
-      return reinterpret_cast<T *>(malloc(sizeof(T) * num));
+      return reinterpret_cast<T *>(::malloc(sizeof(T) * num));
     }
 
     static void deallocate(T *ptr) {
-      return free(ptr);
+      return ::free(ptr);
     }
 
     static constexpr auto goodSize(uSz least) {
