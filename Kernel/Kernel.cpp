@@ -1,4 +1,5 @@
 #include "flo/ACPI.hpp"
+#include "flo/Interrupts.hpp"
 #include "flo/IO.hpp"
 #include "flo/Kernel.hpp"
 #include "flo/Memory.hpp"
@@ -118,6 +119,7 @@ void kernelMain() {
 
   initializeFreeVmm();
 
+  flo::Interrupts::initialize();
   flo::ACPI::initialize();
   flo::PCI::initialize();
 
