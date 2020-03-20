@@ -2,7 +2,7 @@ image: Ubuntu1804
 build: off
 install:
 - sh: sudo apt update
-- sh: yes | sudo apt install gcc-9-multilib g++-9-multilib qemu nasm lld-9 qemu-kvm
+- sh: sudo apt install gcc-9-multilib g++-9-multilib qemu nasm lld-9 qemu-kvm -y
 - sh: sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 900 --slave /usr/bin/g++ g++ /usr/bin/g++-9
 - sh: sudo update-alternatives --install /usr/bin/lld lld /usr/bin/lld-9 900
 - sh: make
