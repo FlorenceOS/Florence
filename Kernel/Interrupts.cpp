@@ -116,6 +116,32 @@ namespace flo::Interrupts {
       default:   return "Unknown";
       }
     }
+
+    bool isFatal(u64 exceptionNumber) {
+      switch(exceptionNumber) {
+      case 0x00: return false;
+      case 0x01: return false;
+      case 0x02: return false;
+      case 0x03: return false;
+      case 0x04: return false;
+      case 0x05: return false;
+      case 0x06: return false;
+      case 0x07: return false;
+      case 0x08: return true;
+      case 0x0A: return true;
+      case 0x0B: return true;
+      case 0x0C: return true;
+      case 0x0D: return true;
+      case 0x0E: return true;
+      case 0x10: return false;
+      case 0x11: return false;
+      case 0x12: return true;
+      case 0x13: return false;
+      case 0x14: return true;
+      case 0x1E: return true;
+      default:   return true;
+      }
+    }
   }
 }
 
@@ -135,7 +161,10 @@ extern "C" void exceptionHandler() {
   flo::Interrupts::pline("R12=", frame->r12, " R13=", frame->r13, " R14=", frame->r14, " R15=", frame->r15);
   flo::Interrupts::pline("SS =", frame->ss , " CS =", frame->cs,  " RIP=", frame->rip, " EC =", frame->errorCode);
 
-  assert_not_reached();
+  if(flo::Interrupts::isFatal(frame->interruptNumber))
+    assert_not_reached();
+  else
+    flo::printBacktrace();
 }
 
 void flo::Interrupts::initialize() {
