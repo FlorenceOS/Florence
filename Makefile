@@ -122,14 +122,15 @@ build/KernelLoader/KernelLoader.elf: KernelLoader/Linker.lds $(KernelLoaderObjec
 	clang -Xlinker -T $^ -o $@ $(LinkingFlags)
 	@readelf -a $@ | grep 'KernelLoaderSize' | awk '{ print "Kernel loader size: " strtonum("0x" $$2)/(512 * 1024 * 1024) * 100 "%" }'
 
-KernelSources := $(wildcard Kernel/*.S) Kernel/Kernel.cpp
-KernelObjects := $(patsubst %,build/%.o,$(KernelSources))
+KernelAsm := $(wildcard Kernel/*.S) 
+KernelCpp := $(wildcard Kernel/*.cpp)
+KernelObjects := $(patsubst %,build/%.o,$(KernelAsm)) build/Kernel/Kernel.cpp.o
 
 build/Kernel/%.S.o: Kernel/%.S
 	@mkdir -p $(@D)
 	nasm -felf64 $< -o $@
 
-build/Kernel/Kernel.cpp.o: Kernel/Kernel.cpp $(CommonSources) $(CommonHeaders) $(LibKernelSources) Makefile
+build/Kernel/Kernel.cpp.o: $(KernelCpp) $(CommonSources) $(CommonHeaders) $(LibKernelSources) Makefile
 	@mkdir -p $(@D)
 	./MakeUnityBuild.py $(filter %.cpp,$^) > build/Kernel/Kernel.cpp
 	clang++ $(CXXFlagsKernel) -c build/Kernel/Kernel.cpp -I. -o $@
