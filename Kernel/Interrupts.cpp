@@ -96,7 +96,7 @@ namespace flo::Interrupts {
       case 0x00: return "Divide by zero";
       case 0x01: return "Debug";
       case 0x02: return "NMI";
-      case 0x03: return "Divide by zero";
+      case 0x03: return "Breakpoint";
       case 0x04: return "Overflow";
       case 0x05: return "Bound range exceeded";
       case 0x06: return "Invalid opcode";
