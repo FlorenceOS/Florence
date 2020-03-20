@@ -1,3 +1,5 @@
+#ifdef FLO_UBSAN
+
 #include "flo/Assert.hpp"
 #include "flo/IO.hpp"
 
@@ -165,3 +167,5 @@ namespace __cxxabiv1 {
     assert_not_reached();
   }
 }
+
+#endif
