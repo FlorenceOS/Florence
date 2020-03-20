@@ -12,7 +12,7 @@ namespace flo {
     // If you ask for size # of bytes, you will get goodSize(size) bytes.
     // So you might as well allocate that many if you have a growing container.
     constexpr uSz largeGoodSize(uSz size) {
-      return Util::roundUp<flo::Paging::PageSize<1>>(size + 8) - 8;
+      return Util::roundUp<flo::Paging::PageSize<1>>(size);
     }
 
     constexpr uSz goodSize(uSz size) {
@@ -30,25 +30,21 @@ namespace flo {
   template<uSz size>
   void *malloc_slab();
 
+  void *large_malloc_size(uSz size);
+
   template<uSz size>
   void free_slab(void *);
 
+  void large_free_size(void *, uSz size);
+
   constexpr auto maxSlabSize = Memory::slabSizes.back();
-
-  // Hey, you don't wanna worry about anything? Just the C API? Can't store the size? Like slow functions?
-  // Don't wanna deal with non-canonical pointers? This is the API for you. It's simple,
-  // straightforward and slow. Good on you for using this. Oh, did I mention it's slow?
-  void *large_malloc(uSz size);
-
-  // Free a pointer aquired through large_malloc
-  void large_free(void *);
 
   template<uSz size>
   inline void *malloc() {
     if constexpr(size <= maxSlabSize)
       return malloc_slab<Memory::goodSize(size)>();
     else
-      return large_malloc(size);
+      return large_malloc_size(size);
   }
 
   inline const flo::Array<void *(*)(), Memory::slabSizes.size()> malloc_funcs {{},{
@@ -68,7 +64,14 @@ namespace flo {
       if(sz <= Memory::slabSizes[i])
         return malloc_funcs[i]();
 
-    return large_malloc(sz);
+    return large_malloc_size(sz);
+  }
+
+  inline void *malloc(uSz size) {
+    size = Memory::goodSize(size + 8);
+    auto base = (u64 *)malloc_size(size);
+    *base = size;
+    return base + 1;
   }
 
   inline void *malloc_eternal(uSz sz) {
@@ -80,7 +83,7 @@ namespace flo {
     if constexpr(size <= maxSlabSize)
       return free_slab<Memory::goodSize(size)>(ptr);
     else
-      return large_free(ptr);
+      return large_free_size(ptr, size);
   }
 
   inline const flo::Array<void (*)(void *), Memory::slabSizes.size()> free_funcs {{},{
@@ -100,7 +103,13 @@ namespace flo {
       if(sz <= Memory::slabSizes[i])
         return free_funcs[i](ptr);
 
-    return large_free(ptr);
+    return large_free_size(ptr, sz);
+  }
+
+  inline void free(void *ptr) {
+    auto pp = (u64 *)ptr;
+    auto sz = pp[-1];
+    return free_size(&pp[-1], sz);
   }
 
   template<typename T>
@@ -117,15 +126,15 @@ namespace flo {
   template<typename T>
   struct Allocator<T[]> {
     static T *allocate(uSz numElements) {
-      return reinterpret_cast<T *>(large_malloc(sizeof(T) * numElements));
+      return reinterpret_cast<T *>(malloc(sizeof(T) * numElements));
     }
 
     static void deallocate(T *ptr) {
-      large_free(ptr);
+      free(ptr);
     }
 
     static constexpr uSz goodSize(uSz numElements) {
-      return Memory::largeGoodSize(numElements * sizeof(T))/sizeof(T);
+      return Memory::goodSize(numElements * sizeof(T))/sizeof(T);
     }
   };
 

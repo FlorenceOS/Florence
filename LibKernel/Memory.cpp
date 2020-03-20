@@ -46,25 +46,16 @@ void flo::returnVirtualPages(void *at, uSz numPages) {
   flo::Memory::pageRanges.add((u64)at, numPages * flo::Paging::PageSize<1>);
 }
 
-void *flo::large_malloc(uSz size) {
-  size = flo::Paging::alignPageUp<1, u64>(size + 8);
-  auto numPages = size / flo::Paging::PageSize<1>;
+void *flo::large_malloc_size(uSz size) {
+  auto numPages = flo::Paging::alignPageUp<1>(size);
   auto base = flo::Memory::makePages(numPages);
-
-  *getVirt<u64>(base) = numPages;
-
-  return (void *)(base() + 8);
+  return flo::getVirt<void>(base);
 }
 
-void flo::large_free(void *ptr) {
-  auto i = (uptr)ptr;
-  assert((i & (flo::Paging::PageSize<1> - 1)) == 8);
-  auto allocationBase = (u64 *)(i - 8);
-  auto numPages = *allocationBase;
-
-  flo::Paging::unmap<true>(VirtualAddress{(u64)allocationBase}, numPages * flo::Paging::PageSize<1>);
-
-  flo::returnVirtualPages(allocationBase, numPages);
+void flo::large_free_size(void *ptr, uSz size) {
+  auto numPages = flo::Paging::alignPageUp<1>(size);
+  flo::Paging::unmap<true>(VirtualAddress{(u64)ptr}, numPages * flo::Paging::PageSize<1>);
+  flo::returnVirtualPages(ptr, numPages);
 }
 
 template<uSz size>
