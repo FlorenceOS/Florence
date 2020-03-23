@@ -63,7 +63,7 @@ void flo::feedLine() {
     return;
 
   flo::IO::VGA::feedLine();
-  flo::IO::serial1.feedLine();
+  flo::IO::Debugout::feedLine();
 }
 
 void flo::putchar(char c) {
@@ -74,7 +74,7 @@ void flo::putchar(char c) {
     return feedLine();
 
   flo::IO::VGA::putchar(c);
-  flo::IO::serial1.write(c);
+  flo::IO::Debugout::write(c);
 }
 
 void flo::setColor(flo::IO::Color col) {
@@ -82,7 +82,7 @@ void flo::setColor(flo::IO::Color col) {
     return;
 
   flo::IO::VGA::setColor(col);
-  flo::IO::serial1.setColor(col);
+  flo::IO::Debugout::setColor(col);
 }
 
 namespace {

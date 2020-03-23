@@ -68,6 +68,47 @@ namespace flo {
       auto constexpr SectorSize = 0x200;
     }
 
+    namespace Impl {
+      template<typename Putchar>
+      void puts(char const *str, Putchar &&pch) {
+        while(*str)
+          pch(*str++);
+      }
+
+      char const *colorString(Color c) {
+        switch(c) {
+        case Color::red:    return "31";
+        case Color::cyan:   return "36";
+        case Color::yellow: return "33";
+        case Color::white:  return "37";
+        case Color::blue:   return "34";
+        default:            return "0";
+        }
+      }
+    }
+
+    namespace Debugout {
+      inline void write(char c) {
+        IO::out<0xE9>(c);
+      }
+
+      inline void feedLine() {
+        write('\n');
+      }
+
+      static inline char const *lastCol = "0";
+      inline void setColor(Color c) {
+        auto str = Impl::colorString(c);
+
+        if(str != flo::exchange(lastCol, str)) {
+          write('\x1b');
+          write('[');
+          Impl::puts(str, &write);
+          write('m');
+        }
+      }
+    }
+
     namespace VGA {
       auto constexpr width = 80;
       auto constexpr height = 25;
@@ -179,24 +220,13 @@ namespace flo {
 
         static inline char const *lastCol = "0";
         static void setColor(Color c) {
-          auto col = [](char const *colorString) {
-            if(colorString == flo::exchange(lastCol, colorString))
-              return;
+          auto str = Impl::colorString(c);
 
+          if(flo::exchange(lastCol, str) != str) { // New color
             write('\x1b');
             write('[');
-            while(*colorString)
-              write(*colorString++);
+            Impl::puts(str, &write);
             write('m');
-          };
-
-          switch(c) {
-          case Color::red:    col("31"); break;
-          case Color::cyan:   col("36"); break;
-          case Color::yellow: col("33"); break;
-          case Color::white:  col("37"); break;
-          case Color::blue:   col("34"); break;
-          default:            col("0");  break;
           }
         }
 

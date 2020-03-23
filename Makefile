@@ -4,7 +4,7 @@ ifndef QEMUExec
 QEMUExec := qemu-system-x86_64
 endif
 
-QEMU := $(QEMUExec) $(QEMUFlags) -m 4G -no-reboot -serial stdio -drive format=raw,file=out/Disk.bin
+QEMU := $(QEMUExec) $(QEMUFlags) -m 4G -no-reboot -debugcon stdio -drive format=raw,file=out/Disk.bin
 KVM := $(QEMU) -enable-kvm -cpu host
 
 CXXFlags := $(CXXFlags) \
