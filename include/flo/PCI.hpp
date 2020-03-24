@@ -16,28 +16,34 @@ namespace flo {
       DeviceFunction function;
     };
 
-    void initialize();
-
     FLO_STRONG_TYPEDEF(Vid, u16);
     FLO_STRONG_TYPEDEF(Pid, u16);
     FLO_STRONG_TYPEDEF(DeviceClass, u8);
     FLO_STRONG_TYPEDEF(DeviceSubclass, u8);
     FLO_STRONG_TYPEDEF(DeviceProgIf, u8);
 
-    struct Identifier {
+    struct DeviceConfig {
       Vid vid;
       Pid pid;
-      DeviceClass deviceClass;
-      DeviceSubclass deviceSubclass;
+      u16 command;
+      u16 status;
+      u8 revision;
       DeviceProgIf progIf;
+      DeviceSubclass deviceSubclass;
+      DeviceClass deviceClass;
+      u8 cacheLineSize;
+      u8 latencyTimer;
+      u8 headerType;
+      u8 BIST;
     };
 
-    Identifier getDeviceIdentifier(Reference const &);
+    static_assert(sizeof(DeviceConfig) == 0x10);
 
-    template<typename T>
-    T read(Reference const &devRef, u8 offset);
+    DeviceConfig *getDevice(Reference const &);
 
-    template<typename T>
-    T write(Reference const &devRef, u8 offset);
+    void initialize();
+
+    // Called by ACPI when a MCFG table is found
+    void registerMMIO(void *base, u8 first, u8 last);
   }
 }

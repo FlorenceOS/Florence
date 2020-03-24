@@ -8,6 +8,7 @@
 #if !__has_include(<new>)
 inline void *operator new  (uSz, void *ptr) noexcept { return ptr; }
 inline void *operator new[](uSz, void *ptr) noexcept { return ptr; }
+#define offsetof(Type, Member) __builtin_offsetof(Type, Member)
 #else
 #include <new>
 #endif

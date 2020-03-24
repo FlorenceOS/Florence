@@ -211,6 +211,15 @@ void flo::ACPI::initialize() {
       flo::Util::hexdump(&sdt, sdt.length, flo::ACPI::pline);
       break;
 
+    case signature("MCFG"):
+      for(uSz bt = 44; bt + 16 <= sdt.length; bt += 16) {
+        auto ptr = flo::getPhys<void>(flo::Util::get<PhysicalAddress>((u8 const *)&sdt, bt));
+        auto first = flo::Util::get<u8>((u8 const *)&sdt, bt + 10);
+        auto last = flo::Util::get<u8>((u8 const *)&sdt, bt + 11);
+        flo::PCI::registerMMIO(ptr, first, last);
+      }
+      break;
+
     default:
       flo::ACPI::pline("Unknown SDT at ", &sdt, " with signature ", sdt.signature);
       break;

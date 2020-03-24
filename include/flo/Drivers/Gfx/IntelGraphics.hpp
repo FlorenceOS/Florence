@@ -3,5 +3,5 @@
 #include "flo/PCI.hpp"
 
 namespace flo::IntelGraphics {
-  void initialize(PCI::Reference const &ref, PCI::Identifier const &ident);
+  void initialize(PCI::Reference const &ref, PCI::DeviceConfig const &device);
 }

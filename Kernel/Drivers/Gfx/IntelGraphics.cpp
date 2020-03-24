@@ -9,6 +9,6 @@ namespace flo::IntelGraphics {
   }
 }
 
-void flo::IntelGraphics::initialize(PCI::Reference const &ref, PCI::Identifier const &ident) {
+void flo::IntelGraphics::initialize(PCI::Reference const &ref, PCI::DeviceConfig const &device) {
   flo::IntelGraphics::pline("Got Intel VGA at ", ref.bus(), ":", ref.slot(), ".", ref.function());
 }
