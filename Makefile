@@ -4,7 +4,7 @@ ifndef QEMUExec
 QEMUExec := qemu-system-x86_64
 endif
 
-QEMU := $(QEMUExec) $(QEMUFlags) -m 4G -no-reboot -debugcon stdio -drive format=raw,file=out/Disk.bin
+QEMU := $(QEMUExec) $(QEMUFlags) -m 4G -no-reboot -debugcon stdio -drive format=raw,file=out/Disk.bin -machine q35
 KVM := $(QEMU) -enable-kvm -cpu host
 
 CXXFlags := $(CXXFlags) \
@@ -174,3 +174,4 @@ build/Libuserspace.o: $(LibuserspaceObjects)
 out/Disk.bin: build/Bootsector/Bootsector.bin build/Bootstrapper/Bootstrapper.bin build/KernelLoader/KernelLoader.bin Makefile
 	@mkdir -p $(@D)
 	cat $(filter %.bin,$^) > $@
+	truncate $@ --size '>512K' # Don't ask me why. Q35 requires the image to be at least 512K to boot it.
