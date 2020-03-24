@@ -8,6 +8,8 @@ SECTIONS {
   .text : {
     textstart = .;
     *(.Bootloader)
+    . = textstart + 0x1BE;
+    *(.DummyPartitionTable)
     . = textstart + 0x200 - BootSignatureSize;
     *(.BootSignature)
   } = 0x00

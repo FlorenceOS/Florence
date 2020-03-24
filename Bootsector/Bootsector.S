@@ -175,6 +175,14 @@ loaderEnd:
 .global loaderSize
 .set    loaderSize, loaderEnd - loaderStart
 
+.section .DummyPartitionTable
+.byte 0x80
+.byte 0x01, 0x00, 0x00
+.byte 0x01
+.byte 0x01, 0x00, 0x00
+.long 0x00000001
+.long 0x00000001
+
 .section .BootSignature
 BootSignatureStart:
 .byte 0x55
