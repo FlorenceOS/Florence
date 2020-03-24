@@ -10,7 +10,7 @@ SECTIONS {
     *(.Bootloader)
     . = textstart + 0x1BE;
     *(.DummyPartitionTable)
-    . = textstart + 0x200 - BootSignatureSize;
+    . = textstart + 0x1FE;
     *(.BootSignature)
   } = 0x00
 }

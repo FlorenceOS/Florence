@@ -184,9 +184,5 @@ loaderEnd:
 .long 0x00000001
 
 .section .BootSignature
-BootSignatureStart:
 .byte 0x55
 .byte 0xAA
-BootSignatureEnd:
-.global BootSignatureSize
-.set    BootSignatureSize, BootSignatureEnd - BootSignatureStart
