@@ -146,12 +146,9 @@ namespace flo::ACPI {
 
       u8 const *byteArray = flo::getPhys<u8>(ptr->revision ? ptr->xsdtAddr : flo::PhysicalAddress{ptr->rdstAddr});
       auto table_bytes = flo::Util::get<u32>(byteArray, 4);
-      flo::ACPI::pline("Root table: ", table_bytes, " bytes at ", byteArray);
 
       SDT = flo::malloc_eternal(table_bytes);
-
       flo::Util::copymem((u8 *)SDT, byteArray, table_bytes);
-      flo::ACPI::pline("Root table copied to ", SDT);
 
       auto numEntries = ptr->revision ? ptr->xsdt()->header.numEntries<8>() : ptr->rsdt()->header.numEntries<4>();
 
@@ -160,12 +157,10 @@ namespace flo::ACPI {
 
       auto copy_table = [&](u8 const *sdt) {
         auto sdt_bytes = flo::Util::get<u32>(sdt, 4);
-        flo::ACPI::pline("Copying ", sdt_bytes, " bytes of sdt at ", sdt);
 
         sdtarr->sdts[sdtarr->numEntries] = (SDTHeader *)flo::malloc_eternal(sdt_bytes);
-        flo::ACPI::pline("SDT will live at ", sdtarr->sdts[sdtarr->numEntries], " from now on.");
-
         flo::Util::copymem((u8 *)sdtarr->sdts[sdtarr->numEntries], sdt, sdt_bytes);
+
         ++sdtarr->numEntries;
       };
 
