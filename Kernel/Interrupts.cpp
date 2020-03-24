@@ -230,7 +230,7 @@ void flo::Interrupts::initialize() {
     u64 base = (u64)flo::Interrupts::idt;
   } __attribute__((packed)) idtr;
 
-  __asm__("lidt %0" : : "m"(idtr));
+  asm("lidt %0" : : "m"(idtr));
 
-  __asm__("int $3");
+  asm("int $3");
 }
