@@ -22,12 +22,16 @@ CXXFlagsKernel := $(CXXFlags64) -fpic -fpie -mno-red-zone -fno-omit-frame-pointe
 # Kernel loader doesn't need -mno-red-zone since it has interrupts disabled
 CXXFlagsKernelLoader := $(CXXFlags64) -fno-pic -fno-pie
 
-ifndef OPTIMIZE
-CXXFlagsKernel := $(CXXFlagsKernel) -fsanitize=undefined -DFLO_UBSAN -fno-optimize-sibling-calls
-endif
-
 LDFlags := --gc-sections --no-dynamic-linker -static --build-id=none
 LinkingFlags := -flto -O2 -Wl,--gc-sections,--no-dynamic-linker,--icf=all,--build-id=none -fuse-ld=lld -static -ffreestanding -nostdlib
+
+# Define SMOL to get as small of an image as possible, otherwise you get all the 
+ifdef SMOL
+LDFlags := $(LDFlags) -s
+LinkingFlags := $(LinkingFlags) -s
+else
+CXXFlagsKernel := $(CXXFlagsKernel) -fsanitize=undefined -DFLO_UBSAN -fno-optimize-sibling-calls
+endif
 
 CommonHeaders := $(wildcard include/**/*.hpp)
 CommonSources := $(wildcard LibFlo/*.cpp)
