@@ -21,6 +21,7 @@ namespace flo {
     }
 
     [[noreturn]] inline void hang() {
+      asm("cli");
       while(1)
         halt();
       __builtin_unreachable();
