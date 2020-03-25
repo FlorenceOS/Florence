@@ -51,6 +51,8 @@ namespace flo {
 
       [[nodiscard]] Allocator &alloc() { return static_cast<Allocator &>(*this); }
 
+      operator bool() const { return ptr; }
+
     protected:
       T *ptr = nullptr;
 
