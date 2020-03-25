@@ -37,12 +37,8 @@ extern initializeVmm
 extern kernelMain
   call kernelMain
 
-; To let the return address from kernelMain point to 
-; _start, for the sake of stack traces, we have a nop here
-  nop
-
-l:hlt
-  jmp l
+  ; Exit task
+  int $31 ; This is hex but there is no way to make that clear :(
 
 section .rodata
 jmpdest:

@@ -117,8 +117,6 @@ void kernelMain() {
   flo::Interrupts::initialize();
   flo::ACPI::initialize();
   flo::PCI::initialize();
-
-  Fun::things::foo();
 }
 
 uptr flo::deslide(uptr addr) {
