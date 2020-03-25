@@ -33,9 +33,8 @@ else
 CXXFlagsKernel := $(CXXFlagsKernel) -fsanitize=undefined -DFLO_UBSAN -fno-optimize-sibling-calls
 endif
 
-CommonHeaders := $(wildcard include/**/*.hpp)
-CommonSources := $(wildcard LibFlo/*.cpp)
-LibKernelSources := $(shell find LibKernel -name "*.cpp")
+CommonHeaders := $(shell find LibKernel -name "*.hpp") $(shell find include -name "*.hpp")
+CommonSources := $(wildcard LibFlo/*.cpp) $(shell find LibKernel LibFlo -name "*.cpp")
 
 UserspaceCXXFlags :=\
 	-Oz -Wall -Werror -nostdlib -ILibFlo -Iinclude -fno-rtti -fno-exceptions -g\
@@ -104,7 +103,7 @@ build/Bootstrapper/Bootstrapper.S.o: Bootstrapper/Bootstrapper.S Makefile
 	@mkdir -p $(@D)
 	nasm -felf32 $< -o $@
 
-build/Bootstrapper/Bootstrapper.cpp.o: Bootstrapper/Bootstrapper.cpp $(CommonSources) $(CommonHeaders) $(LibKernelSources) Makefile
+build/Bootstrapper/Bootstrapper.cpp.o: Bootstrapper/Bootstrapper.cpp $(CommonSources) $(CommonHeaders) Makefile
 	@mkdir -p $(@D)
 	./MakeUnityBuild.py $(filter %.cpp,$^) > build/Bootstrapper/Bootstrapper.cpp
 	clang++ -flto $(CXXFlagsBootstrapper) -c build/Bootstrapper/Bootstrapper.cpp -I. -o $@
@@ -121,7 +120,7 @@ build/KernelLoader/KernelLoader.S.o: KernelLoader/KernelLoader.S build/Kernel/Ke
 	@mkdir -p $(@D)
 	nasm -felf64 $< -o $@
 
-build/KernelLoader/KernelLoader.cpp.o: KernelLoader/KernelLoader.cpp $(CommonSources) $(CommonHeaders) $(LibKernelSources) Makefile
+build/KernelLoader/KernelLoader.cpp.o: KernelLoader/KernelLoader.cpp $(CommonSources) $(CommonHeaders) Makefile
 	@mkdir -p $(@D)
 	./MakeUnityBuild.py $(filter %.cpp,$^) > build/KernelLoader/KernelLoader.cpp
 	clang++ -flto $(CXXFlagsKernelLoader) -c build/KernelLoader/KernelLoader.cpp -I. -o $@
@@ -138,7 +137,7 @@ build/Kernel/%.S.o: Kernel/%.S
 	@mkdir -p $(@D)
 	nasm -felf64 $< -o $@
 
-build/Kernel/Kernel.cpp.o: $(KernelCpp) $(CommonSources) $(CommonHeaders) $(LibKernelSources) Makefile
+build/Kernel/Kernel.cpp.o: $(KernelCpp) $(CommonSources) $(CommonHeaders) Makefile
 	@mkdir -p $(@D)
 	./MakeUnityBuild.py $(filter %.cpp,$^) > build/Kernel/Kernel.cpp
 	clang++ $(CXXFlagsKernel) -c build/Kernel/Kernel.cpp -I. -o $@
