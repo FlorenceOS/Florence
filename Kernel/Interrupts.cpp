@@ -390,6 +390,13 @@ extern "C" void interruptHandler() {
   }
 }
 
+template<int ind> u8 picPortBase;
+template<> u8 picPortBase<1> = 0x20;
+template<> u8 picPortBase<2> = 0xa0;
+
+template<int ind> u8 picPortCommand = picPortBase<ind>;
+template<int ind> u8 picPortData = picPortBase<ind> + 1;
+
 void flo::Interrupts::initialize() {
   flo::Interrupts::idt = flo::Allocator<flo::Interrupts::IDT>::allocate();
 
@@ -419,6 +426,21 @@ void flo::Interrupts::initialize() {
   new (mainTask) Task{"Main task"};
   mainTask->controlBlock.isRunnable = true;
   setCurrentTask(mainTask);
+
+  // https://wiki.osdev.org/PIC#Initialisation
+  flo::IO::outb(picPortCommand<1>, 0x11);
+  flo::IO::outb(picPortCommand<2>, 0x11);
+  flo::IO::outb(picPortData<1>, 0x20);
+  flo::IO::outb(picPortData<2>, 0x28);
+  flo::IO::outb(picPortData<1>, 0b0000'0100);
+  flo::IO::outb(picPortData<2>, 0b0000'0010);
+
+  flo::IO::outb(picPortData<1>, 0x01);
+  flo::IO::outb(picPortData<2>, 0x01);
+
+  // Mask out all interrupts
+  flo::IO::outb(picPortData<1>, 0xF);
+  flo::IO::outb(picPortData<2>, 0xF);
 
   // Enable interrupts
   struct {
