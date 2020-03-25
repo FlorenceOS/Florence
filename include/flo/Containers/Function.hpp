@@ -55,7 +55,7 @@ namespace flo {
       // This will call some void (*)(T *) function as void (*)(void *)
       __attribute__((no_sanitize("function")))
       void deallocate(void *ptr) {
-        func(ptr);
+        flo::Paging::makeCanonical(func)(ptr);
       }
 
     private:
@@ -112,7 +112,7 @@ namespace flo {
       if(isFuncPtr)
         return flo::Paging::makeCanonical(funcPtr)(flo::forward<Args>(args)...);
       else
-        return flo::Paging::makeCanonical(callable.get())->invoke(flo::forward<Args>(args)...);
+        return callable->invoke(flo::forward<Args>(args)...);
     }
 
     operator bool() const {
