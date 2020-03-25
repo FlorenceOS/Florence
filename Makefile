@@ -26,10 +26,7 @@ LDFlags := --gc-sections --no-dynamic-linker -static --build-id=none
 LinkingFlags := -flto -O2 -Wl,--gc-sections,--no-dynamic-linker,--icf=all,--build-id=none -fuse-ld=lld -static -ffreestanding -nostdlib
 
 # Define SMOL to get as small of an image as possible, otherwise you get all the 
-ifdef SMOL
-LDFlags := $(LDFlags) -s
-LinkingFlags := $(LinkingFlags) -s
-else
+ifndef SMOL
 CXXFlagsKernel := $(CXXFlagsKernel) -fsanitize=undefined -DFLO_UBSAN -fno-optimize-sibling-calls
 endif
 
