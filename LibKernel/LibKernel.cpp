@@ -66,6 +66,11 @@ u64 flo::getRand() {
 
 extern "C" void atexit() { }
 
+extern "C" void __cxa_pure_virtual() {
+  LibKernel::pline("Pure virtual function called!: ");
+  assert_not_reached();
+}
+
 flo::PhysicalAddress flo::PhysicalFreeList::getPhysicalPage(int pageLevel) {
   auto tryGet =
     [pageLevel](flo::PhysicalAddress &currHead) {
