@@ -35,6 +35,11 @@ namespace flo::Memory {
 
       return pageBase;
     }
+
+    struct Stack {
+      u8 data[4096 - 16];
+      u8 stackBase[16]{};
+    };
   }
 }
 
@@ -107,6 +112,19 @@ void *flo::malloc_slab() {
 template<uSz size>
 void flo::free_slab(void *ptr) {
   return MallocSlab<size>::deallocate(ptr);
+}
+
+extern "C"
+void *makeStack() {
+  auto stack = flo::Allocator<flo::Memory::Stack>::allocate();
+  flo::Util::setmem(stack->stackBase, 0, sizeof(stack->stackBase));
+  return stack->stackBase;
+}
+
+extern "C"
+void freeStack(void *ptr) {
+  auto stack = (flo::Memory::Stack *)((uptr)ptr & ~0xFFFull);
+  flo::Allocator<flo::Memory::Stack>::deallocate(stack);
 }
 
 // Instatiate all the malloc/free functions for the slab sizes

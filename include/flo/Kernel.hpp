@@ -17,3 +17,6 @@ namespace flo {
   uptr deslide(uptr addr);
   char const *symbolName(uptr addr);
 }
+
+extern "C" void *makeStack();
+extern "C" void freeStack(void *stack);
