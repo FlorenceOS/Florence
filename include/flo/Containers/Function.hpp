@@ -97,7 +97,9 @@ namespace flo {
     }
 
     Function &assign(Function &&other) {
-      funcPtr = flo::exchange(other.funcPtr, nullptr);
+      this->~Function();
+      callable = flo::move(other.callable);
+      other.funcPtr = nullptr;
       other.isFuncPtr = true;
       return *this;
     }
