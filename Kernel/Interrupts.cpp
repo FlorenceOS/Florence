@@ -6,6 +6,8 @@
 #include "flo/Memory.hpp"
 
 extern "C" void *exceptionHandlers[0x20];
+extern "C" void *irqHandlers[0x10];
+extern "C" void *schedulerCalls[0x2];
 
 namespace flo::Interrupts {
   namespace {
@@ -67,31 +69,31 @@ namespace flo::Interrupts {
     IDT *idt = nullptr;
 
     struct ErrorFrame {
-      u64 r15;
-      u64 r14;
-      u64 r13;
-      u64 r12;
-      u64 r11;
-      u64 r10;
-      u64 r9;
-      u64 r8;
-      u64 rdi;
-      u64 rsi;
-      u64 rbp;
-      u64 rdx;
-      u64 rcx;
-      u64 rbx;
-      u64 rax;
-      u64 interruptNumber;
-      u64 errorCode;
-      u64 rip;
-      u64 cs;
-      u64 eflags;
-      u64 rsp; 
-      u64 ss;
+      uptr r15;
+      uptr r14;
+      uptr r13;
+      uptr r12;
+      uptr r11;
+      uptr r10;
+      uptr r9;
+      uptr r8;
+      uptr rdi;
+      uptr rsi;
+      uptr rbp;
+      uptr rdx;
+      uptr rcx;
+      uptr rbx;
+      uptr rax;
+      uptr interruptNumber;
+      uptr errorCode;
+      uptr rip;
+      uptr cs;
+      uptr eflags;
+      uptr rsp; 
+      uptr ss;
     };
 
-    enum ExceptionNumber: u64 {
+    enum ExceptionNumber: uptr {
       DivideZero = 0x00,
       Debug = 0x01,
       NMI = 0x02,
@@ -188,49 +190,257 @@ namespace flo::Interrupts {
         return true;
       }
     }
+
+    void dumpFrame(flo::Interrupts::ErrorFrame *frame) {
+      flo::Interrupts::pline("RAX=", frame->rax, " RBX=", frame->rbx, " RCX=", frame->rcx, " RDX=", frame->rdx);
+      flo::Interrupts::pline("RSI=", frame->rsi, " RDI=", frame->rdi, " RBP=", frame->rbp, " RSP=", frame->rsp);
+      flo::Interrupts::pline("R8 =", frame->r8 , " R9 =", frame->r9 , " R10=", frame->r10, " R11=", frame->r11);
+      flo::Interrupts::pline("R12=", frame->r12, " R13=", frame->r13, " R14=", frame->r14, " R15=", frame->r15);
+      flo::Interrupts::pline("SS =", frame->ss , " CS =", frame->cs,  " RIP=", frame->rip, " EC =", frame->errorCode);
+    }
+
+    void exceptionHandler(flo::Interrupts::ErrorFrame *frame) {
+      flo::Interrupts::pline("CPU exception ", frame->interruptNumber, " (",
+        flo::Interrupts::exceptionToString(frame->interruptNumber), ") at DIP=", flo::deslide(frame->rip));
+      flo::Interrupts::pline("In function ", flo::symbolName(frame->rip));
+      dumpFrame(frame);
+
+      if(flo::Interrupts::isFatal(frame->interruptNumber))
+        assert_not_reached();
+      else
+        flo::printBacktrace();
+    }
+
+    struct Task {
+      ErrorFrame ef;
+      Task *next = nullptr;
+      flo::Function<void(TaskControlBlock &)> callable;
+
+      flo::TaskControlBlock controlBlock;
+
+
+      Task(char const *name) {
+        flo::Util::setmem((u8 *)&ef, 0, sizeof(ef));
+        controlBlock.name = name;
+      }
+
+      ~Task() {
+        freeStack((void *)ef.rbp);
+      }
+
+      void saveRegs(ErrorFrame *stackFrame) {
+        flo::Util::copymem((u8 *)&ef, (u8 *)stackFrame, sizeof(ef));
+      }
+
+      void restoreRegs(ErrorFrame *stackFrame) {
+        flo::Util::copymem((u8 *)stackFrame, (u8 *)&ef, sizeof(ef));
+      }
+    };
+
+    struct TaskQueue {
+      Task *front = nullptr;
+      Task *back = nullptr;
+
+      void assert_invariant() const {
+        assert(front ? !!back : !back);
+      }
+
+      Task *peek() const {
+        assert_invariant();
+        return front;
+      }
+
+      Task *yield(Task *task) {
+        assert_invariant();
+        insertBack(task);
+        return getAndPop();
+      }
+
+      Task *getAndPop() {
+        assert_invariant();
+        if(!front->next)
+          back = nullptr;
+        return flo::exchange(front, front->next);
+      }
+
+      void insertFront(Task *task) {
+        assert_invariant();
+
+        if(!front)
+          back = task;
+
+        task->next = flo::exchange(front, task);
+
+        assert(front && back);
+      }
+
+      void insertBack(Task *task) {
+        assert_invariant();
+
+        if(front)
+          flo::exchange(back, task)->next = task;
+        else
+          front = back = task;
+
+        task->next = nullptr;
+
+        assert(front && back);
+      }
+    };
+
+    inline TaskQueue taskQueue;
+
+    void setCurrentTask(Task *task) {
+      assert(task);
+      flo::CPU::KernelGSBase = (uptr)task;
+    }
+
+    Task *getCurrentTask() {
+      return (Task *)(uptr)flo::CPU::KernelGSBase;
+    }
+
+    void taskEntry() {
+      getCurrentTask()->callable(getCurrentTask()->controlBlock);
+      flo::Interrupts::pline("Task ", getCurrentTask()->controlBlock.name, " returned, killing.");
+      flo::exit();
+    }
+
+    void doYieldImpl(flo::Interrupts::ErrorFrame *frame) {
+      if(!taskQueue.peek()) // No other tasks to execute, just go back.
+        return;
+
+      auto task = getCurrentTask();
+
+      task->saveRegs(frame);
+
+      do {
+        task = taskQueue.yield(task);
+      } while(!task->controlBlock.isRunnable);
+
+      setCurrentTask(task);
+
+      task->restoreRegs(frame);
+
+      return;
+    }
+
+    void doKillTask(flo::Interrupts::ErrorFrame *frame) {
+      assert(taskQueue.peek()); // We have to have another task to execute. For now.
+
+      auto task = getCurrentTask();
+
+      task->~Task();
+      flo::Allocator<Task>::deallocate(task);
+
+      task = taskQueue.getAndPop();
+
+      while(!task->controlBlock.isRunnable)
+        task = taskQueue.yield(task);
+
+      setCurrentTask(task);
+
+      task->restoreRegs(frame);
+      return;      
+    }
+
+    flo::Array<flo::Function<void()>, 0x10> registeredHandlerFuncs;
+
+    void doEOI() {
+      pline("FIXME: EOI");
+    }
   }
 }
 
-extern "C" void exceptionHandler() {
+extern "C" void interruptHandler() {
   flo::Interrupts::ErrorFrame *frame;
   __asm__(
     "lea 16(%%rbp), %0\n"
     : "=r"(frame)
   );
 
-  flo::Interrupts::pline("CPU exception ", frame->interruptNumber, " (",
-    flo::Interrupts::exceptionToString(frame->interruptNumber), ") at DIP=", flo::deslide(frame->rip));
-  flo::Interrupts::pline("In function ", flo::symbolName(frame->rip));
-  flo::Interrupts::pline("RAX=", frame->rax, " RBX=", frame->rbx, " RCX=", frame->rcx, " RDX=", frame->rdx);
-  flo::Interrupts::pline("RSI=", frame->rsi, " RDI=", frame->rdi, " RBP=", frame->rbp, " RSP=", frame->rsp);
-  flo::Interrupts::pline("R8 =", frame->r8 , " R9 =", frame->r9 , " R10=", frame->r10, " R11=", frame->r11);
-  flo::Interrupts::pline("R12=", frame->r12, " R13=", frame->r13, " R14=", frame->r14, " R15=", frame->r15);
-  flo::Interrupts::pline("SS =", frame->ss , " CS =", frame->cs,  " RIP=", frame->rip, " EC =", frame->errorCode);
+  switch(frame->interruptNumber) {
+  case 0x00 ... 0x1F:
+    flo::Interrupts::exceptionHandler(frame);
+    break;
 
-  if(flo::Interrupts::isFatal(frame->interruptNumber))
+  case 0x30:
+    return flo::Interrupts::doYieldImpl(frame);
+
+  case 0x31:
+    return flo::Interrupts::doKillTask(frame);
+
+  case 0x20 ... 0x2F:
+    {
+      auto &handler = flo::Interrupts::registeredHandlerFuncs[frame->interruptNumber - 0x20];
+      if(handler)
+        return handler();
+      flo::Interrupts::doEOI();
+    }
+
+    [[fallthrough]];
+  default:
+    flo::Interrupts::pline("Unhandled IRQ ", frame->interruptNumber, "!!");
     assert_not_reached();
-  else
-    flo::printBacktrace();
+    break;
+  }
 }
 
 void flo::Interrupts::initialize() {
-  flo::Interrupts::idt = Allocator<flo::Interrupts::IDT>::allocate();
+  flo::Interrupts::idt = flo::Allocator<flo::Interrupts::IDT>::allocate();
 
-  flo::Interrupts::IDTEntry::Attrib exceptionAttributes;
-  exceptionAttributes.gateType = 0xf;
-  exceptionAttributes.storage = 0;
-  exceptionAttributes.privLevel = 0;
-  exceptionAttributes.present = 1;
+  // CPU exceptions
+  flo::Interrupts::IDTEntry::Attrib attributes;
+  attributes.gateType = 0xf;
+  attributes.storage = 0;
+  attributes.privLevel = 0;
+  attributes.present = 1;
 
-  for(uSz i = 0; i < flo::Util::arrSz(exceptionHandlers); ++i)
-    flo::Interrupts::idt->entries[i] = flo::Interrupts::encode(exceptionHandlers[i], exceptionAttributes);
+  uSz i = 0;
+  for(uSz j = 0; j < flo::Util::arrSz(exceptionHandlers); ++j, ++i)
+    flo::Interrupts::idt->entries[i] = flo::Interrupts::encode(exceptionHandlers[j], attributes);
 
+  // IRQs
+  attributes.gateType = 0xE;
+
+  for(uSz j = 0; j < flo::Util::arrSz(irqHandlers); ++j, ++i)
+    flo::Interrupts::idt->entries[i] = flo::Interrupts::encode(irqHandlers[j], attributes);
+
+  // Software yield
+  for(uSz j = 0; j < 0x10; ++j, ++i)
+    if(j < flo::Util::arrSz(schedulerCalls))
+      flo::Interrupts::idt->entries[i] = flo::Interrupts::encode(schedulerCalls[j], attributes);
+
+  auto mainTask = flo::Allocator<flo::Interrupts::Task>::allocate();
+  new (mainTask) Task{"Main task"};
+  mainTask->controlBlock.isRunnable = true;
+  setCurrentTask(mainTask);
+
+  // Enable interrupts
   struct {
     u16 limit = sizeof(flo::Interrupts::IDT) - 1;
     u64 base = (u64)flo::Interrupts::idt;
   } __attribute__((packed)) idtr;
 
   asm("lidt %0" : : "m"(idtr));
+}
 
-  asm("int $3");
+void flo::yield() {
+  asm("int $48");
+}
+
+void flo::exit() {
+  asm("int $49");
+}
+
+flo::TaskControlBlock &flo::makeTask(char const *taskName, flo::Function<void(TaskControlBlock &)> &&func) {
+  auto task = flo::Allocator<flo::Interrupts::Task>::allocate();
+  new (task) flo::Interrupts::Task{taskName};
+  task->callable = flo::move(func);
+  task->ef.rip = (uptr)&flo::Interrupts::taskEntry;
+  task->ef.rbp = task->ef.rsp = (uptr)makeStack();
+  task->ef.ss = 0x10;
+  task->ef.cs = 0x08;
+  flo::Interrupts::taskQueue.insertBack(task);
+
+  return task->controlBlock;
 }

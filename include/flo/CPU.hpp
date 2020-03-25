@@ -61,6 +61,7 @@ namespace flo {
     }
 
     inline Impl::MSR<0xC0000080, u32> IA32_EFER;
+    inline Impl::MSR<0xC0000102, uptr> KernelGSBase;
   }
 
   namespace Impl {

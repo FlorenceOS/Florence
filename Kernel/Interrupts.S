@@ -1,18 +1,35 @@
-[bits 64]
+; IRQs are allocated in the following manner:
+; 0   - 31  (0x00 - 0x1F) CPU exceptions
+; 32  - 47  (0x20 - 0x2F) IRQs
+; 48  - 63  (0x30 - 0x3F) Sheduler calls
 
-section .rodata
-global exceptionHandlers
-exceptionHandlers:
+[bits 64]
 
 %macro makeHandlerPtr 1
 dq handler%1
 %endmacro
 
+section .rodata
+global exceptionHandlers
+exceptionHandlers: ; Interrupt 
 %assign i 0
-%rep 32
+%rep 49
 makeHandlerPtr i
 %assign i i+1
 %endrep
+
+global irqHandlers
+irqHandlers: ; Standard IRQs
+%assign i 32
+%rep 16
+makeHandlerPtr i
+%assign i i+1
+%endrep
+
+global schedulerCalls
+schedulerCalls:
+makeHandlerPtr 48
+makeHandlerPtr 49
 
 section .text
 %macro noHandler 1
@@ -23,19 +40,25 @@ handler%1 :
 %macro exceptionHandlerWiCode 1
 handler%1 :
   push %1
-  jmp exceptionCommon
+  jmp interruptCommon
 %endmacro
 
 %macro exceptionHandlerNoCode 1
 handler%1 :
   push 0
   push %1
-  jmp exceptionCommon
+  jmp interruptCommon
 %endmacro
 
-extern exceptionHandler
+%macro irqHandler 1
+handler%1 :
+  push 0
+  push %1
+  jmp interruptCommon
+%endmacro
 
-exceptionCommon:
+extern interruptHandler
+interruptCommon:
   push rax
   push rbx
   push rcx
@@ -51,7 +74,7 @@ exceptionCommon:
   push r13
   push r14
   push r15
-  call exceptionHandler
+  call interruptHandler
   pop  r15
   pop  r14
   pop  r13
@@ -102,3 +125,21 @@ noHandler              28
 noHandler              29
 exceptionHandlerWiCode 30 ; Security exception
 noHandler              31
+irqHandler             32 ; IRQ 0
+irqHandler             33 ; IRQ 1
+irqHandler             34 ; IRQ 2
+irqHandler             35 ; IRQ 3
+irqHandler             36 ; IRQ 4
+irqHandler             37 ; IRQ 5
+irqHandler             38 ; IRQ 6
+irqHandler             39 ; IRQ 7
+irqHandler             40 ; IRQ 8
+irqHandler             41 ; IRQ 9
+irqHandler             42 ; IRQ a
+irqHandler             43 ; IRQ b
+irqHandler             44 ; IRQ c
+irqHandler             45 ; IRQ d
+irqHandler             46 ; IRQ e
+irqHandler             47 ; IRQ f
+irqHandler             48 ; Task yield
+irqHandler             49 ; Task exit
