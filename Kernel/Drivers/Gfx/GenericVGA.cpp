@@ -10,5 +10,5 @@ namespace flo::GenericVGA {
 }
 
 void flo::GenericVGA::initialize(PCI::Reference const &ref, PCI::DeviceConfig const &device) {
-  flo::GenericVGA::pline("Got generic VGA at ", ref.bus(), ":", ref.slot(), ".", ref.function());
+  flo::GenericVGA::pline("Got generic VGA!");
 }

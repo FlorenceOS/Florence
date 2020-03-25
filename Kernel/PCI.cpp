@@ -1,6 +1,7 @@
 #include "flo/PCI.hpp"
 
 #include "flo/Drivers/Disk/IDE.hpp"
+#include "flo/Drivers/Disk/AHCI.hpp"
 #include "flo/Drivers/Gfx/IntelGraphics.hpp"
 #include "flo/Drivers/Gfx/GenericVGA.hpp"
 
@@ -45,21 +46,11 @@ namespace flo::PCI {
 
     static_assert(offsetof(DeviceHeader1, secondaryBus) == 0x19);
 
-    void functionScan(Reference const &devRef, DeviceConfig *device) {
-      if(device->vid == noVid)
-        return;
-
-      deviceHandler(devRef, device);
-
-      if(device->headerType == 1 &&
-         device->deviceClass() == 0x06 &&
-         device->deviceSubclass() == 0x04) {
-        busScan(Bus{((DeviceHeader1 *)device)->secondaryBus});
-      }
-    }
-
     void functionScan(Reference const &devRef) {
-      return functionScan(devRef, getDevice(devRef));
+      auto device = getDevice(devRef);
+
+      if(device->vid != noVid)
+        deviceHandler(devRef, device);
     }
 
     void slotScan(Bus bus, Slot slot) {
@@ -84,21 +75,54 @@ namespace flo::PCI {
     }
 
     void deviceHandler(Reference const &ref, DeviceConfig *device) {
-      pline(ref.bus(), ":", ref.slot(), ".", ref.function(), ": PCI device, ",
-        device->vid(), ":", device->pid(), " is ", device->deviceClass(), ":", device->deviceSubclass(), ".", device->progIf());
+      auto trace = [&](auto &&...vals) {
+        pline(
+          ref.bus(), ":", ref.slot(), ".", ref.function(), " (",
+          device->vid(), ":", device->pid(), ", ",
+          device->deviceClass(), ":", device->deviceSubclass(), ".", device->progIf(), ") ",
+          flo::forward<decltype(vals)>(vals)...
+        );
+      };
 
       switch(device->deviceClass()) {
 
       case 0x01: // Mass storage controller
         switch(device->deviceSubclass()) {
 
-          case 0x01: // IDE controller
-            flo::IDE::initialize(ref, *device);
+        case 0x01: // IDE controller
+          flo::IDE::initialize(ref, *device);
+          break;
+
+        case 0x06: // SATA controller
+          switch(device->progIf()) {
+
+          case 0x01: // AHCI
+            flo::AHCI::initialize(ref, *device);
             break;
 
           default:
-            pline("Unhandled mass storage controller: ", device->deviceSubclass());
+            trace("Unhandled SATA controller: ", device->progIf());
             break;
+
+          }
+          break;
+
+        default:
+          trace("Unhandled mass storage controller: ", device->deviceSubclass());
+          break;
+
+        }
+        break;
+
+      case 0x02: // Network controller
+        switch(device->deviceSubclass()) {
+
+        case 0x00: // Ethernet controller
+          trace("FIXME: Ethernet controller");
+          break;
+
+        default:
+          trace("Unhandled network controller: ", device->deviceSubclass());
 
         }
         break;
@@ -109,31 +133,77 @@ namespace flo::PCI {
         case 0x00: // VGA controller
           switch(device->vid()) {
 
-            case 0x8086:
-              flo::IntelGraphics::initialize(ref, *device);
-              break;
-              
-            default:
-              flo::GenericVGA::initialize(ref, *device);
-              break;
+          case 0x8086:
+            flo::IntelGraphics::initialize(ref, *device);
+            break;
+            
+          default:
+            flo::GenericVGA::initialize(ref, *device);
+            break;
 
           }
           break;
 
         case 0x01:
-          pline("FIXME: XGA controller");
+          trace("FIXME: XGA controller");
           break;
 
         default:
-          pline("Unhandled display controller subclass: ", device->deviceSubclass());
+          trace("Unhandled display controller subclass: ", device->deviceSubclass());
           break;
 
         }
-      break;
+        break;
+
+      case 0x06: // Bridge
+        switch(device->deviceSubclass()) {
+
+        case 0x00: // Host bridge, we don't care.
+          break;
+
+        case 0x04: // PCI to PCI bridge
+          assert((device->headerType & 0x7F) == 1);
+          busScan(Bus{((DeviceHeader1 *)device)->secondaryBus});
+          break;
+
+        default:
+          trace("Unhandled bridge: ", device->deviceSubclass());
+          break;
+
+        }
+        break;
+
+      case 0x0C: // Serial bus controller
+        switch(device->deviceSubclass()) {
+
+        case 0x03: // USB controllers
+          switch(device->progIf()) {
+
+            case 0x20: // EHCI
+              trace("FIXME: EHCI USB2 controller");
+              break;
+
+            case 0x30: // XHCI
+              trace("FIXME: XHCI USB3 controller");
+              break;
+
+            default:
+              trace("Unhandled USB controller: ", device->progIf());
+
+          }
+          break;
+
+        default:
+          trace("Unhandled serial bus controller: ", device->deviceSubclass());
+          break;
+
+        }
+        break;
 
       default:
-        pline("Unhandled device class ", device->deviceClass());
+        trace("Unhandled device class ", device->deviceClass());
         break;
+
       }
     }
   }

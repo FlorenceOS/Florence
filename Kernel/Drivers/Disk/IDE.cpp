@@ -10,5 +10,5 @@ namespace flo::IDE {
 }
 
 void flo::IDE::initialize(PCI::Reference const &ref, PCI::DeviceConfig const &device) {
-  flo::IDE::pline("Found IDE controller");
+  //flo::IDE::pline("Found IDE controller");
 }
