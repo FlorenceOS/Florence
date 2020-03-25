@@ -10,6 +10,10 @@ extern "C" {
   flo::KernelArguments *kernelArgumentPtr = nullptr;
 }
 
+// Comes from linker
+extern "C" u8 kernelStart[];
+extern "C" u8 kernelEnd[];
+
 namespace {
   flo::KernelArguments arguments = []() {
     flo::KernelArguments args;
@@ -32,11 +36,32 @@ namespace {
     // @TODO: initialize framebuffer
     return flo::nullopt;
   }();
+
+  auto initializeFreeVmm = []() {
+    auto giveVirtRange = [](u8 *begin, u8 *end) {
+      begin = (u8 *)flo::Paging::alignPageUp(flo::VirtualAddress{(u64)begin})();
+      end   = (u8 *)flo::Paging::alignPageDown(flo::VirtualAddress{(u64)end})();
+      flo::returnVirtualPages(begin, (end - begin)/flo::Paging::PageSize<1>);
+    };
+
+    if(kernelStart < flo::getVirt<u8>(flo::Paging::maxUaddr)) {
+      // Kernel is in bottom half
+      giveVirtRange((u8 *)flo::Util::giga(4ull), kernelStart);
+      giveVirtRange((u8 *)arguments.physEnd(), (u8 *)(flo::Paging::maxUaddr() >> 1));
+
+      giveVirtRange((u8 *)~((flo::Paging::maxUaddr() >> 1) - 1), (u8 *)~(flo::Util::giga(4ull) - 1));
+    }
+    else {
+      giveVirtRange((u8 *)flo::Util::giga(4ull), (u8 *)(flo::Paging::maxUaddr() >> 1));
+
+      // Kernel is in top half
+      giveVirtRange((u8 *)~((flo::Paging::maxUaddr() >> 1) - 1), kernelStart);
+      giveVirtRange((u8 *)arguments.physEnd(), (u8 *)~(flo::Util::giga(4ull) - 1));
+    }
+
+    return flo::nullopt;
+  }();
 }
-
-extern "C" u8 kernelStart[];
-extern "C" u8 kernelEnd[];
-
 
 void flo::feedLine() {
   if constexpr(quiet)
@@ -73,7 +98,6 @@ u8 *flo::getPtrVirt(flo::VirtualAddress virt) {
   return (u8 *)virt();
 }
 
-
 void panic(char const *reason) {
   pline(flo::IO::Color::red, "Kernel panic! Reason: ", flo::IO::Color::red, reason);
 
@@ -88,36 +112,9 @@ namespace Fun::things {
   }
 }
 
-namespace {
-  void initializeFreeVmm() {
-    auto giveVirtRange = [](u8 *begin, u8 *end) {
-      begin = (u8 *)flo::Paging::alignPageUp(flo::VirtualAddress{(u64)begin})();
-      end   = (u8 *)flo::Paging::alignPageDown(flo::VirtualAddress{(u64)end})();
-      flo::returnVirtualPages(begin, (end - begin)/flo::Paging::PageSize<1>);
-    };
-
-    if(kernelStart < flo::getVirt<u8>(flo::Paging::maxUaddr)) {
-      // Kernel is in bottom half
-      giveVirtRange((u8 *)flo::Util::giga(4ull), kernelStart);
-      giveVirtRange((u8 *)arguments.physEnd(), (u8 *)(flo::Paging::maxUaddr() >> 1));
-
-      giveVirtRange((u8 *)~((flo::Paging::maxUaddr() >> 1) - 1), (u8 *)~(flo::Util::giga(4ull) - 1));
-    }
-    else {
-      giveVirtRange((u8 *)flo::Util::giga(4ull), (u8 *)(flo::Paging::maxUaddr() >> 1));
-
-      // Kernel is in top half
-      giveVirtRange((u8 *)~((flo::Paging::maxUaddr() >> 1) - 1), kernelStart);
-      giveVirtRange((u8 *)arguments.physEnd(), (u8 *)~(flo::Util::giga(4ull) - 1));
-    }
-  }
-}
-
 extern "C"
 void kernelMain() {
   pline("Starting drivers...");
-
-  initializeFreeVmm();
 
   flo::Interrupts::initialize();
   flo::ACPI::initialize();
