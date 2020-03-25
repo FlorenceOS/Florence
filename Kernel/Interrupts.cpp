@@ -311,11 +311,12 @@ namespace flo::Interrupts {
 
       auto task = getCurrentTask();
 
+      // We don't want any non-runnable tasks in the queue
+      assert(task->controlBlock.isRunnable);
+
       task->saveRegs(frame);
 
-      do {
-        task = taskQueue.yield(task);
-      } while(!task->controlBlock.isRunnable);
+      task = taskQueue.yield(task);
 
       setCurrentTask(task);
 
@@ -333,9 +334,6 @@ namespace flo::Interrupts {
       flo::Allocator<Task>::deallocate(task);
 
       task = taskQueue.getAndPop();
-
-      while(!task->controlBlock.isRunnable)
-        task = taskQueue.yield(task);
 
       setCurrentTask(task);
 
