@@ -305,9 +305,15 @@ namespace flo::Interrupts {
       flo::exit();
     }
 
+    void waitForInterrupt() {
+      asm("sti\nhlt\ncli");
+    }
+
     void doYieldImpl(flo::Interrupts::ErrorFrame *frame) {
-      if(!taskQueue.peek()) // No other tasks to execute, just go back.
+      if(!taskQueue.peek()) { // No other tasks to execute.
+        waitForInterrupt();
         return;
+      }
 
       auto task = getCurrentTask();
 
@@ -326,7 +332,8 @@ namespace flo::Interrupts {
     }
 
     void doKillTask(flo::Interrupts::ErrorFrame *frame) {
-      assert(taskQueue.peek()); // We have to have another task to execute. For now.
+      while(!taskQueue.peek()) // No other task to execute
+        waitForInterrupt();
 
       auto task = getCurrentTask();
 
