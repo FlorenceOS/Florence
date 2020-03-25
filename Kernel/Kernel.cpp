@@ -36,31 +36,29 @@ namespace {
     // @TODO: initialize framebuffer
     return flo::nullopt;
   }();
+}
 
-  auto initializeFreeVmm = []() {
-    auto giveVirtRange = [](u8 *begin, u8 *end) {
-      begin = (u8 *)flo::Paging::alignPageUp(flo::VirtualAddress{(u64)begin})();
-      end   = (u8 *)flo::Paging::alignPageDown(flo::VirtualAddress{(u64)end})();
-      flo::returnVirtualPages(begin, (end - begin)/flo::Paging::PageSize<1>);
-    };
+extern "C" void initializeVmm() {
+  auto giveVirtRange = [](u8 *begin, u8 *end) {
+    begin = (u8 *)flo::Paging::alignPageUp(flo::VirtualAddress{(u64)begin})();
+    end   = (u8 *)flo::Paging::alignPageDown(flo::VirtualAddress{(u64)end})();
+    flo::returnVirtualPages(begin, (end - begin)/flo::Paging::PageSize<1>);
+  };
 
-    if(kernelStart < flo::getVirt<u8>(flo::Paging::maxUaddr)) {
-      // Kernel is in bottom half
-      giveVirtRange((u8 *)flo::Util::giga(4ull), kernelStart);
-      giveVirtRange((u8 *)arguments.physEnd(), (u8 *)(flo::Paging::maxUaddr() >> 1));
+  if(kernelStart < flo::getVirt<u8>(flo::Paging::maxUaddr)) {
+    // Kernel is in bottom half
+    giveVirtRange((u8 *)flo::Util::giga(4ull), kernelStart);
+    giveVirtRange((u8 *)arguments.physEnd(), (u8 *)(flo::Paging::maxUaddr() >> 1));
 
-      giveVirtRange((u8 *)~((flo::Paging::maxUaddr() >> 1) - 1), (u8 *)~(flo::Util::giga(4ull) - 1));
-    }
-    else {
-      giveVirtRange((u8 *)flo::Util::giga(4ull), (u8 *)(flo::Paging::maxUaddr() >> 1));
+    giveVirtRange((u8 *)~((flo::Paging::maxUaddr() >> 1) - 1), (u8 *)~(flo::Util::giga(4ull) - 1));
+  }
+  else {
+    giveVirtRange((u8 *)flo::Util::giga(4ull), (u8 *)(flo::Paging::maxUaddr() >> 1));
 
-      // Kernel is in top half
-      giveVirtRange((u8 *)~((flo::Paging::maxUaddr() >> 1) - 1), kernelStart);
-      giveVirtRange((u8 *)arguments.physEnd(), (u8 *)~(flo::Util::giga(4ull) - 1));
-    }
-
-    return flo::nullopt;
-  }();
+    // Kernel is in top half
+    giveVirtRange((u8 *)~((flo::Paging::maxUaddr() >> 1) - 1), kernelStart);
+    giveVirtRange((u8 *)arguments.physEnd(), (u8 *)~(flo::Util::giga(4ull) - 1));
+  }
 }
 
 void flo::feedLine() {

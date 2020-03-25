@@ -31,6 +31,9 @@ f:
 extern callGlobalConstructors
   call callGlobalConstructors
 
+extern initializeVmm
+  call initializeVmm
+
 extern kernelMain
   call kernelMain
 
