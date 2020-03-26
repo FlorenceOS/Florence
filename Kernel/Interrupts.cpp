@@ -205,10 +205,10 @@ namespace flo::Interrupts {
       flo::Interrupts::pline("In function ", flo::symbolName(frame->rip));
       dumpFrame(frame);
 
-      if(flo::Interrupts::isFatal(frame->interruptNumber))
-        assert_not_reached();
-      else
+      if(flo::Interrupts::isFatal(frame->interruptNumber)) {
         flo::printBacktrace();
+        flo::CPU::hang();
+      }
     }
 
     struct Task {
