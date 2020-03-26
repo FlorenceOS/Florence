@@ -111,7 +111,6 @@ namespace {
     kernelELF.loadAll();
 
     kernelEntry = kernelELF.header().entry() + kernelELF.loadOffset;
-    pline("Entering kernel...");
     return flo::nullopt;
   }();
 }

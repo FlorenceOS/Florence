@@ -112,8 +112,6 @@ namespace Fun::things {
 
 extern "C"
 void kernelMain() {
-  pline("Starting drivers...");
-
   flo::Interrupts::initialize();
   flo::ACPI::initialize();
   flo::PCI::initialize();

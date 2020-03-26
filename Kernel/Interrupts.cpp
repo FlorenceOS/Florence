@@ -301,7 +301,6 @@ namespace flo::Interrupts {
 
     void taskEntry() {
       getCurrentTask()->callable(getCurrentTask()->controlBlock);
-      flo::Interrupts::pline("Task ", getCurrentTask()->controlBlock.name, " returned, killing.");
       flo::exit();
     }
 
