@@ -70,7 +70,7 @@ namespace flo {
 
   template<typename Output>
   inline void getStackTrace(Impl::StackFrame const *frame, Output &&out) {
-    while(frame->retaddr || frame->prev) {
+    for(int i = 0; i < 10 && (frame->retaddr || frame->prev); ++i) {
       out(*frame);
       frame = frame->prev;
     };
