@@ -55,7 +55,11 @@ namespace flo {
       // This will call some void (*)(T *) function as void (*)(void *)
       __attribute__((no_sanitize("function")))
       void deallocate(void *ptr) {
-        flo::Paging::makeCanonical(func)(ptr);
+        if(ptr) {
+          auto cf = flo::Paging::makeCanonical(func);
+          if(cf)
+            cf(ptr);
+        }
       }
 
     private:
@@ -91,8 +95,7 @@ namespace flo {
     ~Function() {
       // Do some cleanup
       if(!isFuncPtr) {
-        auto ptr = decltype(callable)::adopt(flo::Paging::makeCanonical(callable.release()), callable.alloc());
-        ptr.reset();
+        callable.reset();
       }
     }
 
