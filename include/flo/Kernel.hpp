@@ -25,7 +25,8 @@ namespace flo {
     char const *name;
   };
 
-  TaskControlBlock &makeTask(char const *taskName, flo::Function<void(TaskControlBlock &)> &&);
+  using TaskFunc = flo::Function<void(TaskControlBlock &)>;
+  TaskControlBlock &makeTask(char const *taskName, TaskFunc &&);
 }
 
 extern "C" void *makeStack();
