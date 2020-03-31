@@ -49,6 +49,8 @@ namespace flo::PCI {
     void functionScan(Reference const &devRef) {
       auto device = getDevice(devRef);
 
+      assert(device);
+
       if(device->vid != noVid)
         deviceHandler(devRef, device);
     }
@@ -56,6 +58,8 @@ namespace flo::PCI {
     void slotScan(Bus bus, Slot slot) {
       Reference ref{bus, slot, DeviceFunction{0}};
       auto device = getDevice(ref);
+
+      assert(device);
 
       if(device->vid == noVid)
         return;
