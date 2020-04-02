@@ -40,6 +40,30 @@ namespace flo::Memory {
       u8 data[4096 - 16];
       u8 stackBase[16]{};
     };
+
+    auto mmioPerms() {
+      flo::Paging::Permissions result;
+      result.writeEnable = 1;
+      result.allowUserAccess = 0;
+      result.disableCache = 1;
+      result.mapping.global = 0;
+      result.mapping.executeDisable = 1;
+      return result;
+    }
+
+
+    auto doMapMMIO(flo::PhysicalAddress phys, uSz size, flo::Paging::Permissions perms) {
+      size = flo::Paging::alignPageUp<1>(size);
+      auto virt = flo::VirtualAddress{(u64)getVirtualPages(size/flo::Paging::PageSize<1>)};
+
+      // @TODO: lock mapping
+      auto err = flo::Paging::map(phys, virt, size, perms);
+      flo::checkMappingError(err, flo::Memory::pline, []() {
+        assert_not_reached();
+      });
+
+      return virt;
+    }
   }
 }
 
@@ -112,6 +136,22 @@ void *flo::malloc_slab() {
 template<uSz size>
 void flo::free_slab(void *ptr) {
   return MallocSlab<size>::deallocate(ptr);
+}
+
+flo::VirtualAddress flo::mapMMIO(flo::PhysicalAddress addr, uSz size, WriteBack) {
+  auto perms = flo::Memory::mmioPerms();
+  perms.writethrough = 1;
+  return flo::Memory::doMapMMIO(addr, size, perms);
+}
+
+flo::VirtualAddress flo::mapMMIO(flo::PhysicalAddress addr, uSz size, WriteCombining) {
+  auto perms = flo::Memory::mmioPerms();
+  perms.writethrough = 0;
+  return flo::Memory::doMapMMIO(addr, size, perms);
+}
+
+void flo::freeMapMMIO(flo::VirtualAddress virt, uSz size) {
+  flo::Paging::unmap<false>(virt, flo::Paging::alignPageUp<1>(size));
 }
 
 extern "C"

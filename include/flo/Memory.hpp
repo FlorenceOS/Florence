@@ -140,4 +140,11 @@ namespace flo {
 
   void *getVirtualPages(uSz numPages);
   void returnVirtualPages(void *at, uSz numPages);
+
+  struct WriteBack {};
+  struct WriteCombining {};
+
+  flo::VirtualAddress mapMMIO(flo::PhysicalAddress addr, uSz size, WriteBack);
+  flo::VirtualAddress mapMMIO(flo::PhysicalAddress addr, uSz size, WriteCombining);
+  void freeMapMMIO(flo::VirtualAddress addr, uSz size);
 }
