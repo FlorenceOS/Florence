@@ -229,6 +229,7 @@ flo::PCI::DeviceConfig *flo::PCI::getDevice(Reference const &ref) {
 }
 
 void flo::PCI::registerMMIO(void *base, u8 first, u8 last) {
-  for(int i = 0; i <= last; ++i)
-    mmioBase[i] = (u8 *)base + (i << 20);
+  auto num = last - first + 1;
+  for(int i = 0; i < num; ++i)
+    mmioBase[first + i] = (u8 *)base + (i << 20);
 }
