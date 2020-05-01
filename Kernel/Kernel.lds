@@ -24,7 +24,7 @@ SECTIONS {
     KEEP(*(.init_array));
     KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*)));
     constructorsEnd = .;
-    *(.data* .got*)
+    *(.data*)
   } :data
 
   .rela.dyn : { *(.rela*) }
@@ -32,7 +32,7 @@ SECTIONS {
   .bss      : { *(.bss*) }
 
   /* R data sections*/
-  .rodata ALIGN(4K) : { *(.rodata*) } :rodata
+  .rodata ALIGN(4K) : { *(.rodata* .got*) } :rodata
 
   /DISCARD/ :{ *(*) }
 }
