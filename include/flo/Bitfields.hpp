@@ -30,21 +30,19 @@ namespace flo {
     static_assert(startBit + numBits <= sizeof(Container) * 8);
 
     constexpr operator nvContainer() const {
-      return (*reinterpret_cast<nvContainer const *>(this) & selfMask) >> startBit;
+      return (data & selfMask) >> startBit;
     }
 
     constexpr operator nvContainer() const volatile {
-      return (*reinterpret_cast<nvContainer const volatile *>(this) & selfMask) >> startBit;
+      return (data & selfMask) >> startBit;
     }
 
     constexpr auto operator=(Container val) {
-      return *reinterpret_cast<nvContainer *>(this) =
-            (*reinterpret_cast<nvContainer *>(this) & otherMask) | ((val << startBit) & selfMask);
+      return data = (data & otherMask) | ((val << startBit) & selfMask);
     }
 
     constexpr auto operator=(Container val) volatile {
-      return *reinterpret_cast<nvContainer volatile *>(this) =
-            (*reinterpret_cast<nvContainer volatile *>(this) & otherMask) | ((val << startBit) & selfMask);
+      return data = (data & otherMask) | ((val << startBit) & selfMask);
     }
 
     constexpr Bitfield &operator+= (nvContainer val) { return *this = *this + val; }
@@ -63,5 +61,7 @@ namespace flo {
     constexpr Container operator-- (int)            { Container save = *this; --(*this); return save; }
 
     constexpr Container operator()() const { return Container{*this}; }
+
+    Container data;
   };
 }
