@@ -7,7 +7,7 @@
 
 namespace flo {
   namespace Memory {
-    constexpr flo::Array<u64, 8> slabSizes {{}, {16, 32, 64, 128, 256, 512, 1024, 2048}};
+    constexpr flo::Array<u64, 8> slabSizes {16, 32, 64, 128, 256, 512, 1024, 2048};
 
     // If you ask for size # of bytes, you will get goodSize(size) bytes.
     // So you might as well allocate that many if you have a growing container.
@@ -47,7 +47,7 @@ namespace flo {
       return large_malloc_size(size);
   }
 
-  inline const flo::Array<void *(*)(), Memory::slabSizes.size()> malloc_funcs {{},{
+  inline const flo::Array<void *(*)(), Memory::slabSizes.size()> malloc_funcs {
     malloc<Memory::slabSizes[0]>,
     malloc<Memory::slabSizes[1]>,
     malloc<Memory::slabSizes[2]>,
@@ -56,7 +56,7 @@ namespace flo {
     malloc<Memory::slabSizes[5]>,
     malloc<Memory::slabSizes[6]>,
     malloc<Memory::slabSizes[7]>,
-  }};
+  };
 
   // You have to free() with the same size.
   inline void *malloc_size(uSz sz) {
@@ -86,7 +86,7 @@ namespace flo {
       return large_free_size(ptr, size);
   }
 
-  inline const flo::Array<void (*)(void *), Memory::slabSizes.size()> free_funcs {{},{
+  inline const flo::Array<void (*)(void *), Memory::slabSizes.size()> free_funcs {
     free<Memory::slabSizes[0]>,
     free<Memory::slabSizes[1]>,
     free<Memory::slabSizes[2]>,
@@ -95,7 +95,7 @@ namespace flo {
     free<Memory::slabSizes[5]>,
     free<Memory::slabSizes[6]>,
     free<Memory::slabSizes[7]>,
-  }};
+  };
 
   // Free something aquired from malloc_size
   inline void free_size(void *ptr, uSz sz) {
@@ -138,6 +138,25 @@ namespace flo {
     }
   };
 
+  template<typename T>
+  struct SizedAllocator: Allocator<T> {
+    SizedAllocator() { }
+
+    template<typename otherT>
+    SizedAllocator(SizedAllocator<otherT> &&other): allocatedSize{other.allocatedSize} { }
+
+    T *allocate() {
+      allocatedSize = sizeof(T);
+      return (T *)malloc<sizeof(T)>();
+    }
+
+    void deallocate(T *ptr) {
+      return free_size(ptr, allocatedSize);
+    }
+
+    uSz allocatedSize;
+  };
+
   void *getVirtualPages(uSz numPages);
   void returnVirtualPages(void *at, uSz numPages);
 
@@ -147,4 +166,18 @@ namespace flo {
   flo::VirtualAddress mapMMIO(flo::PhysicalAddress addr, uSz size, WriteBack);
   flo::VirtualAddress mapMMIO(flo::PhysicalAddress addr, uSz size, WriteCombining);
   void freeMapMMIO(flo::VirtualAddress addr, uSz size);
+
+  // Allocate uncached memory for use with MMIO
+  // Returns both virtual and physical addresses
+
+  // Same as above functions but makes a physical
+  // page instead of taking an existing range
+  struct VirtPhysPair {
+    flo::VirtualAddress virt;
+    flo::PhysicalAddress phys;
+  };
+
+  VirtPhysPair allocMMIO(uSz size, WriteBack);
+  VirtPhysPair allocMMIO(uSz size, WriteCombining);
+  void freeAllocMMIO(void *virt);
 }
