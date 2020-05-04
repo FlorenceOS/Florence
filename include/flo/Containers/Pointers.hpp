@@ -10,8 +10,8 @@ namespace flo {
   namespace Impl {
     template<typename T, typename Allocator, typename Derived>
     struct OwnPtrBase: Allocator {
-      OwnPtrBase(Allocator alloc = Allocator{})
-        : Allocator{alloc}
+      OwnPtrBase(Allocator allocator = Allocator{})
+        : Allocator{allocator}
         { }
       ~OwnPtrBase() { cleanup(); }
 
@@ -21,8 +21,8 @@ namespace flo {
         ptr = flo::exchange(other.ptr, nullptr);
       }
 
-      OwnPtrBase(T *ptr, Allocator alloc = Allocator{})
-        : Allocator{flo::move(alloc)}
+      OwnPtrBase(T *ptr, Allocator allocator = Allocator{})
+        : Allocator{flo::move(allocator)}
         , ptr{ptr}
         { }
 
@@ -33,13 +33,13 @@ namespace flo {
         return *this;
       }
 
+      template<typename OtherPtr>
+      OwnPtrBase(OtherPtr &&derived_ptr)
+        : OwnPtrBase{(T*)derived_ptr.get(), flo::move(derived_ptr.alloc())}
+        { }
+
       OwnPtrBase           (OwnPtrBase const &) = delete;
       OwnPtrBase &operator=(OwnPtrBase const &) = delete;
-
-      [[nodiscard]]
-      static Derived adopt(T *ptr, Allocator alloc = Allocator{}) {
-        return Derived{OwnPtrBase{ptr, flo::move(alloc)}};
-      }
 
       [[nodiscard]]
       T *release() { return flo::exchange(ptr, nullptr); }
@@ -63,19 +63,21 @@ namespace flo {
     };
   }
 
-  template<typename T, typename Allocator>
+  template<typename T, typename Allocator = flo::SizedAllocator<T>>
   struct OwnPtr: Impl::OwnPtrBase<T, Allocator, OwnPtr<T, Allocator>> {
+    using Impl::OwnPtrBase<T, Allocator, OwnPtr<T, Allocator>>::OwnPtrBase;
+
     template<typename ...Ts>
     static OwnPtr make(Ts &&...vs) {
       Allocator alloc{};
-      auto ptr{OwnPtr::adopt(alloc.allocate(), flo::move(alloc))};
+      auto ptr{OwnPtr(alloc.allocate(), flo::move(alloc))};
       new (ptr.get()) T(flo::forward<Ts>(vs)...);
       return ptr;
     }
 
     template<typename ...Ts>
     static OwnPtr make(Allocator alloc, Ts &&...vs) {
-      auto ptr{OwnPtr::adopt(alloc.allocate())};
+      auto ptr{OwnPtr(alloc.allocate())};
       new (ptr.get()) T(flo::forward<Ts>(vs)...);
       return ptr;
     }
@@ -90,8 +92,10 @@ namespace flo {
 
   template<typename T, typename Allocator>
   struct OwnPtr<T[], Allocator>: Impl::OwnPtrBase<T, Allocator, OwnPtr<T[], Allocator>> {
+    using Impl::OwnPtrBase<T, Allocator, OwnPtr<T[], Allocator>>::OwnPtrBase;
+
     static OwnPtr make(uSz numElements, Allocator alloc = Allocator{}) {
-      return OwnPtr::adopt(alloc.allocate(numElements), flo::move(alloc));
+      return OwnPtr(alloc.allocate(numElements), flo::move(alloc));
     }
 
     T &operator[](uSz ind) const { return this->get()[ind]; }

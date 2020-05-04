@@ -88,7 +88,7 @@ namespace flo {
     static Function make(Functor &&func) {
       using ci = CallableImpl<flo::removeRef<Functor>>;
       auto heapFunctor = OwnPtr<ci, Allocator<ci>>::make(flo::move(func));
-      auto funcPtr = OwnPtr<Callable, CustomFreeAlloc>{{static_cast<Callable *>(heapFunctor.release()), CustomFreeAlloc{&Allocator<ci>::deallocate}}};
+      auto funcPtr = OwnPtr<Callable, CustomFreeAlloc>{static_cast<Callable *>(heapFunctor.release()), CustomFreeAlloc{&Allocator<ci>::deallocate}};
       return {flo::move(funcPtr)};
     }
 
