@@ -82,7 +82,10 @@ pub fn make_handler(comptime intnum: u64) idt.InterruptHandler {
         );
       }
       asm volatile(
+        \\push [intnum]
         \\jmp interrupt_common
+        :
+        : [intnum] "N{dx}" (@as(u8, intnum))
       );
     }
   }.func;
