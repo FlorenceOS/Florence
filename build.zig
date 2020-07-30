@@ -134,14 +134,14 @@ fn qloader_target(b: *Builder, command: []const u8, desc: []const u8, image_path
           "echfs-utils -m -p0 ", image_path, " quick-format 32768 && ",
           "echfs-utils -m -p0 ", image_path, " import qloader_image/qloader2.cfg qloader2.cfg && ",
           "echfs-utils -m -p0 ", image_path, " import ", dep.getOutputPath(), " Zigger.elf && ",
-          "./qloader/qloader2-install ./qloader/qloader2.bin ", image_path,
+          "./qloader2/qloader2-install ./qloader2/qloader2.bin ", image_path,
         }
       ) catch unreachable
     };
   const image_step = b.addSystemCommand(image_params);
 
-  run_step.step.dependOn(&image_step.step);
   image_step.step.dependOn(&dep.step);
+  run_step.step.dependOn(&image_step.step);
   command_step.dependOn(&run_step.step);
 }
 
