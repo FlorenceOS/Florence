@@ -8,5 +8,5 @@ pub fn platform_init() !void {
 }
 
 pub fn debugputch(val: u8) void {
-  @intToPtr(*volatile u8, 0x9000000).* = val;
+  @intToPtr(*volatile u32, 0x9000000).* = val;
 }
