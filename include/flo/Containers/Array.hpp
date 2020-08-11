@@ -39,6 +39,13 @@ namespace flo {
 
     [[nodiscard]] constexpr uSz size() const { return sz; }
 
+    bool operator==(Array const &other) const {
+      for(decltype(sz) i = 0; i < size(); ++ i)
+        if(data_[i] != other[i])
+          return false;
+      return true;
+    }
+
     T data_[sz];
   };
 }
