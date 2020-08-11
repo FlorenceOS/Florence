@@ -16,6 +16,35 @@ struct reg##_S { \
 
 namespace flo {
   namespace CPU {
+    template<typename T>
+    inline T read_msr(u32 msr) {
+      if constexpr(sizeof(T) == 4) {
+        T out;
+        asm volatile("rdmsr" : "=a"(out) : "c"(msr) : "rdx");
+        return out;
+      }
+      else if constexpr(sizeof(T) == 8) {
+        T out1, out2;
+        asm volatile("rdmsr" : "=a"(out1), "=d"(out2) : "c"(msr));
+        return (out1 & 0xFFFFFFFF) | ((out2 & 0xFFFFFFFF) << 32);
+      }
+      else
+        static_assert(!isSame<T, T>);
+    }
+
+    template<typename T>
+    inline void write_msr(u32 msr, T value) {
+      if constexpr(sizeof(T) == 4) {
+        u64 new_value = read_msr<u64>(msr) & 0xFFFFFFFF00000000;
+        new_value |= value;
+        write_msr<u64>(msr, new_value);
+      }
+      else if constexpr(sizeof(T) == 8)
+        asm volatile("wrmsr" :: "a"(value), "d"(value >> 32), "c"(msr));
+      else
+        static_assert(!isSame<T, T>);
+    }
+
     inline void halt() {
       asm("hlt");
     }
@@ -35,26 +64,8 @@ namespace flo {
     namespace Impl {
       template<u32 regnum, typename type>
       struct MSR {
-        operator type() {
-          if constexpr(sizeof(type) == 4) {
-            type out;
-            asm volatile("rdmsr" : "=a"(out) : "c"(regnum));
-            return out;
-          }
-          else if constexpr(sizeof(type) == 8) {
-            type out1, out2;
-            asm volatile("rdmsr" : "=a"(out1), "=d"(out2) : "c"(regnum));
-            return (out1 & 0xFFFFFFFF) | ((out2 & 0xFFFFFFFF) << 32);
-          }
-        }
-
-        MSR &operator=(type value) {
-          if constexpr(sizeof(type) == 4)
-            asm volatile("wrmsr" :: "a"(value), "c"(regnum));
-          else if constexpr(sizeof(type) == 8)
-            asm volatile("wrmsr" :: "a"(value), "d"(value >> 32), "c"(regnum));
-          return *this;
-        }
+        operator type() { return read_msr<type>(regnum); }
+        MSR &operator=(type value) { write_msr<type>(regnum, value); return *this; }
         MSR &operator|=(type value) { return *this = static_cast<type>(*this) | value; }
         MSR &operator&=(type value) { return *this = static_cast<type>(*this) & value; }
       };
