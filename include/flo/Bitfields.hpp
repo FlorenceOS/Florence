@@ -12,7 +12,7 @@ namespace flo {
     constexpr static auto mask() {
       nvContainer out{};
       for(unsigned i = startBit; i < startBit + numBits; ++i) {
-        out |= Container{1} << i;
+        out |= nvContainer{1} << i;
       }
       return out;
     }
@@ -20,47 +20,49 @@ namespace flo {
   public:
     using Container = Container_;
 
-    constexpr Bitfield() = default;
-    constexpr Bitfield(nvContainer val) { *this = val; }
+    constexpr __attribute__((always_inline)) Bitfield() = default;
+    constexpr __attribute__((always_inline)) Bitfield(nvContainer val) { *this = val; }
 
     static constexpr auto startBit  = startBit_, numBits = numBits_;
     static constexpr auto selfMask  = mask();
     static constexpr auto otherMask = ~selfMask;
 
-    static_assert(startBit + numBits <= sizeof(Container) * 8);
+    static_assert(startBit + numBits <= sizeof(nvContainer) * 8);
 
-    constexpr operator nvContainer() const {
+    constexpr __attribute__((always_inline)) operator nvContainer() const {
       return (data & selfMask) >> startBit;
     }
 
-    constexpr operator nvContainer() const volatile {
+    constexpr __attribute__((always_inline)) operator nvContainer() const volatile {
       return (data & selfMask) >> startBit;
     }
 
-    constexpr auto operator=(Container val) {
-      return data = (data & otherMask) | ((val << startBit) & selfMask);
+    constexpr __attribute__((always_inline)) auto &operator=(nvContainer val) {
+      data = (data & otherMask) | ((val << startBit) & selfMask);
+      return *this;
     }
 
-    constexpr auto operator=(Container val) volatile {
-      return data = (data & otherMask) | ((val << startBit) & selfMask);
+    constexpr __attribute__((always_inline)) auto &operator=(nvContainer val) volatile {
+      data = (data & otherMask) | ((val << startBit) & selfMask);
+      return *this;
     }
 
-    constexpr Bitfield &operator+= (nvContainer val) { return *this = *this + val; }
-    constexpr Bitfield &operator-= (nvContainer val) { return *this = *this - val; }
-    constexpr Bitfield &operator*= (nvContainer val) { return *this = *this * val; }
-    constexpr Bitfield &operator/= (nvContainer val) { return *this = *this / val; }
-    constexpr Bitfield &operator%= (nvContainer val) { return *this = *this % val; }
-    constexpr Bitfield &operator^= (nvContainer val) { return *this = *this ^ val; }
-    constexpr Bitfield &operator&= (nvContainer val) { return *this = *this & val; }
-    constexpr Bitfield &operator|= (nvContainer val) { return *this = *this | val; }
-    constexpr Bitfield &operator>>=(nvContainer val) { return *this = *this >> val; }
-    constexpr Bitfield &operator<<=(nvContainer val) { return *this = *this << val; }
-    constexpr Bitfield &operator++ ()               { return *this = *this + 1; }
-    constexpr Container operator++ (int)            { Container save = *this; ++(*this); return save; }
-    constexpr Bitfield &operator-- ()               { return *this = *this - 1; }
-    constexpr Container operator-- (int)            { Container save = *this; --(*this); return save; }
+    constexpr __attribute__((always_inline)) Bitfield &operator+= (nvContainer val) { return *this = *this + val; }
+    constexpr __attribute__((always_inline)) Bitfield &operator-= (nvContainer val) { return *this = *this - val; }
+    constexpr __attribute__((always_inline)) Bitfield &operator*= (nvContainer val) { return *this = *this * val; }
+    constexpr __attribute__((always_inline)) Bitfield &operator/= (nvContainer val) { return *this = *this / val; }
+    constexpr __attribute__((always_inline)) Bitfield &operator%= (nvContainer val) { return *this = *this % val; }
+    constexpr __attribute__((always_inline)) Bitfield &operator^= (nvContainer val) { return *this = *this ^ val; }
+    constexpr __attribute__((always_inline)) Bitfield &operator&= (nvContainer val) { return *this = *this & val; }
+    constexpr __attribute__((always_inline)) Bitfield &operator|= (nvContainer val) { return *this = *this | val; }
+    constexpr __attribute__((always_inline)) Bitfield &operator>>=(nvContainer val) { return *this = *this >> val; }
+    constexpr __attribute__((always_inline)) Bitfield &operator<<=(nvContainer val) { return *this = *this << val; }
+    constexpr __attribute__((always_inline)) Bitfield &operator++ ()                { return *this = *this + 1; }
+    constexpr __attribute__((always_inline)) nvContainer operator++ (int)           { nvContainer save = *this; ++(*this); return save; }
+    constexpr __attribute__((always_inline)) Bitfield &operator-- ()                { return *this = *this - 1; }
+    constexpr __attribute__((always_inline)) nvContainer operator-- (int)           { nvContainer save = *this; --(*this); return save; }
 
-    constexpr Container operator()() const { return Container{*this}; }
+    constexpr __attribute__((always_inline)) nvContainer operator()() const { return nvContainer{*this}; }
 
     Container data;
   };
