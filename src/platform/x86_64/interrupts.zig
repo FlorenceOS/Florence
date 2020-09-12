@@ -1,13 +1,81 @@
+const std = @import("std");
+
 const log = @import("../../logger.zig").log;
+const panic = @import("../../panic.zig").panic;
+const debug = @import("../../debug.zig");
+const platform = @import("../../platform.zig");
+const range = @import("../../lib/range.zig").range;
 
 const idt = @import("idt.zig");
+const gdt = @import("gdt.zig");
+
+pub const num_handlers = 0x100;
+pub const handler_func = fn(*InterruptFrame)void;
+
+var handlers = [_]handler_func {unhandled_interrupt} ** num_handlers;
 
 pub fn init_interrupts() !void {
   disable_pic();
-  try idt.setup_idt();
+  var itable = try idt.setup_idt();
+
+  inline for(range(num_handlers)) |intnum| {
+    itable[intnum] = idt.entry(make_handler(intnum), true, 0);
+  }
+
+  handlers[0x0E] = page_fault_handler;
+  handlers[0x69] = startup_handler;
 
   log("Enabling interrupts...\n", .{});
+
   asm volatile("sti");
+}
+
+fn type_page_fault(error_code: usize) !platform.PageFaultAccess {
+  if(error_code & 0x8 != 0)
+    return error.ReservedWrite;
+  if(error_code & 0x10 != 0)
+    return .InstructionFetch;
+  if(error_code & 0x2 != 0)
+    return .Write;
+  return .Read;
+}
+
+fn startup_handler(frame: *InterruptFrame) void {
+  frame.cs = gdt.selector.code64;
+  frame.ss = gdt.selector.data64;
+}
+
+fn page_fault_handler(frame: *InterruptFrame) void {
+  const page_fault_addr = asm(
+    "mov %%cr2, %[addr]"
+    :[addr] "=r" (-> usize)
+  );
+  const page_fault_type = type_page_fault(frame.ec) catch |err| {
+    log("Page fault at addr 0x{x}, but we couldn't determine what type. (error code was 0x{x}).\nCaught error {}.\n", .{page_fault_addr, frame.ec, @errorName(err)});
+    dump_frame(frame);
+    while(true) { }
+  };
+
+  log("Page fault while {} at 0x{x}\n",
+    .{
+      switch(page_fault_type) {
+        .Read => @as([]const u8, "reading"),
+        .Write => "writing",
+        .InstructionFetch => "fetching instruction",
+      },
+      page_fault_addr,
+    }
+  );
+
+  platform.page_fault(page_fault_addr, frame.ec & 1 != 0, page_fault_type);
+  dump_frame(frame);
+  while(true) { }
+}
+
+fn unhandled_interrupt(frame: *InterruptFrame) void {
+  log("Unhandled interrupt: {}!\n", .{frame.intnum});
+  dump_frame(frame);
+  while(true) { }
 }
 
 fn disable_pic() void {
@@ -30,8 +98,16 @@ fn disable_pic() void {
   }
 }
 
+fn is_exception(intnum: u64) bool {
+  return switch(intnum) {
+    0x00 ... 0x1F => true,
+
+    else => false,
+  };
+}
+
 fn name(intnum: u64) []const u8 {
-  switch(intnum) {
+  return switch(intnum) {
     0x00 => "Divide by zero",
     0x01 => "Debug",
     0x02 => "Non-maskable interrupt",
@@ -57,20 +133,26 @@ fn name(intnum: u64) []const u8 {
     0x1E => "Security Exception",
 
     else => unreachable,
-  }
+  };
 }
 
 fn has_error_code(intnum: u64) bool {
-  switch(intnum) {
+  return switch(intnum) {
+    // Exceptions
+    0x00 ... 0x07 => false,
     0x08          => true,
+    0x09          => false,
     0x0A ... 0x0E => true,
+    0x0F ... 0x10 => false,
     0x11          => true,
+    0x12 ... 0x14 => false,
     0x15 ... 0x1D => unreachable,
     0x1E          => true,
     0x1F          => unreachable,
 
+    // Other interrupts
     else => false,
-  }
+  };
 }
 
 pub fn make_handler(comptime intnum: u64) idt.InterruptHandler {
@@ -82,7 +164,7 @@ pub fn make_handler(comptime intnum: u64) idt.InterruptHandler {
         );
       }
       asm volatile(
-        \\push [intnum]
+        \\push %[intnum]
         \\jmp interrupt_common
         :
         : [intnum] "N{dx}" (@as(u8, intnum))
@@ -156,8 +238,18 @@ export fn interrupt_common() callconv(.Naked) void {
   );
 }
 
+fn dump_frame(frame: *InterruptFrame) void {
+  log("FRAME DUMP:\n", .{});
+  log("RAX={x:0^16} RBX={x:0^16} RCX={x:0^16} RDX={x:0^16}\n", .{frame.rax, frame.rbx, frame.rcx, frame.rdx});
+  log("RSI={x:0^16} RDI={x:0^16} RBP={x:0^16} RSP={x:0^16}\n", .{frame.rsi, frame.rdi, frame.rbp, frame.rsp});
+  log("R8 ={x:0^16} R9 ={x:0^16} R10={x:0^16} R11={x:0^16}\n", .{frame.r8,  frame.r9,  frame.r10, frame.r11});
+  log("R12={x:0^16} R13={x:0^16} R14={x:0^16} R15={x:0^16}\n", .{frame.r12, frame.r13, frame.r14, frame.r15});
+  log("RIP={x:0^16} int={x:0^16} ec ={x:0^16}\n",              .{frame.rip, frame.intnum, frame.ec});
+}
+
 export fn interrupt_handler(frame: u64) void {
-  const int_frame = @intToPtr(*InterruptFrame, frame - @sizeOf(InterruptFrame));
-  log("Got interrupt {x}\n", .{int_frame.ec});
-  while(true) { }
+  const int_frame = @intToPtr(*InterruptFrame, frame);
+  if(int_frame.intnum < num_handlers) {
+    handlers[int_frame.intnum](int_frame);
+  }
 }

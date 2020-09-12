@@ -1,25 +1,48 @@
 const log = @import("../../logger.zig").log;
-const pmm = @import("../../pmm.zig");
+const vmm = @import("../../vmm.zig");
 const assert = @import("std").debug.assert;
+const interrupts = @import("interrupts.zig");
+const gdt = @import("gdt.zig");
 
-// struct IDTEntry {
-//   u16 addrLow = 0;
-//   u16 selector = 0;
-//   u8  ist = 0;
+const num_handlers = interrupts.num_handlers;
 
-//   union Attrib {
-//     u8 repr = 0;
-//     flo::Bitfield<0, 4, u8> gateType;
-//     flo::Bitfield<4, 1, u8> storage;
-//     flo::Bitfield<5, 2, u8> privLevel;
-//     flo::Bitfield<7, 1, u8> present;
-//   };
+const Idtr = packed struct {
+  limit: u16,
+  addr: u64,
+};
 
-//   Attrib attributes;
-//   u16 addrMid = 0;
-//   u32 addrHigh = 0;
-//   u32 zeroes = 0;
-// };
+pub const InterruptHandler = fn func() callconv(.Naked) void;
+
+pub fn setup_idt() !*[num_handlers]idt_entry {
+  log("Setting up IDT...\n", .{});
+
+  // Allocate IDT
+  const idt = (try vmm.alloc_eternal(idt_entry, num_handlers))[0..num_handlers];
+
+  const idtr = Idtr {
+    .addr = @ptrToInt(&idt[0]),
+    .limit = @sizeOf(idt_entry) * num_handlers - 1,
+  };
+
+  asm volatile(
+    \\  lidt (%[idt])
+    :
+    : [idt] "r" (&idtr)
+  );
+
+  return idt;
+}
+
+pub fn entry(handler: InterruptHandler, interrupt: bool, priv_level: u2) idt_entry {
+  return encode(
+    @ptrToInt(handler), // addr
+    0, // ist
+    if (interrupt) 0xE else 0xF, // gate_type
+    0, // storage
+    priv_level, // priv_level
+    1, // present
+  );
+}
 
 const idt_entry = packed struct {
   addr_low: u16,
@@ -34,15 +57,20 @@ const idt_entry = packed struct {
   zeroes: u32 = 0,
 };
 
-comptime {
-  assert(@sizeOf(idt_entry) == 16);
+pub fn encode(addr: u64, ist: u8, gate_type: u4, storage: u1, priv_level: u2, present: u1) idt_entry {
+  return idt_entry {
+    .addr_low = @intCast(u16, addr & 0xFFFF),
+    .addr_mid = @intCast(u16, (addr >> 16) & 0xFFFF),
+    .addr_high = @intCast(u32, (addr >> 32) & 0xFFFFFFFF),
+    .selector = gdt.selector.code64 | priv_level,
+    .ist = ist,
+    .gate_type = gate_type,
+    .storage = storage,
+    .priv_level = priv_level,
+    .present = present,
+  };
 }
 
-const num_handlers = 0x100;
-
-pub fn setup_idt() !void {
-  log("Setting up IDT...\n", .{});
-
-  // Allocate IDT
-  const pmm_phys = @intToPtr(*[num_handlers]idt_entry, pmm.alloc_phys(@sizeOf(idt_entry) * num_handlers) catch return);
+comptime {
+  assert(@sizeOf(idt_entry) == 16);
 }

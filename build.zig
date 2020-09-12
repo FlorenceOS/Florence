@@ -47,8 +47,8 @@ fn build_kernel(b: *Builder, arch: builtin.Arch, main: []const u8, name: []const
   const kernel = b.addExecutable(kernel_filename, main);
   kernel.setTarget(target(arch, .kernel));
   kernel.setLinkerScriptPath("src/linker.ld");
-  kernel.code_model = .large;
-  kernel.setBuildMode(.ReleaseSafe);
+  //kernel.code_model = .large;
+  kernel.setBuildMode(.ReleaseFast);
 
   for(asmfiles) |f| {
     kernel.addAssemblyFile(f);
@@ -93,6 +93,8 @@ fn qemu_target(b: *Builder, command: []const u8, desc: []const u8, dep: *std.bui
         "-kernel", dep.getOutputPath(),
         "-m", "4G",
         "-serial", "stdio",
+        //"-S", "-s",
+        "-d", "int",
       },
       else => unreachable,
     };
@@ -118,7 +120,12 @@ fn qloader_target(b: *Builder, command: []const u8, desc: []const u8, image_path
       "-debugcon", "stdio",
       "-m", "4G",
       "-no-reboot",
-      "-d", "int",
+      "-machine", "q35",
+      "-device", "qemu-xhci",
+      "-smp", "8",
+      //"-cpu", "host", "-enable-kvm",
+      //"-d", "int",
+      //"-s", "-S",
     };
   const run_step = b.addSystemCommand(run_params);
 
@@ -128,9 +135,10 @@ fn qloader_target(b: *Builder, command: []const u8, desc: []const u8, image_path
       std.mem.concat(b.allocator, u8,
         &[_][]const u8{
           "rm ", image_path, " || true && ",
-          "dd if=/dev/zero bs=1M count=0 seek=64 of=", image_path, " && ",
+          "dd if=/dev/zero bs=1M count=0 seek=4 of=", image_path, " && ",
           "parted -s ", image_path, " mklabel msdos && ",
           "parted -s ", image_path, " mkpart primary 1 100% && ",
+          "parted -s ", image_path, " set 1 boot on && ",
           "echfs-utils -m -p0 ", image_path, " quick-format 32768 && ",
           "echfs-utils -m -p0 ", image_path, " import qloader_image/qloader2.cfg qloader2.cfg && ",
           "echfs-utils -m -p0 ", image_path, " import ", dep.getOutputPath(), " Zigger.elf && ",

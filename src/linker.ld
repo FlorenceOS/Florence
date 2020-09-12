@@ -12,21 +12,46 @@ SECTIONS {
     KEEP(*(.stivalehdr))
   }: none
 
+  .rela.dyn : { KEEP(*(.rela*)) }
+
   . = 1M;
 
   .text : ALIGN(16K) {
-    *(.text)
+    __kernel_text_begin = .;
+    *(.text*)
+    __kernel_text_end = .;
   }:text
 
   .rodata : ALIGN(16K) {
-    *(.rodata)
+    __kernel_rodata_begin = .;
+    *(.rodata*)
+    /*__debug_info_start = .;
+    KEEP(*(.debug_info))
+    __debug_info_end = .;
+    __debug_abbrev_start = .;
+    KEEP(*(.debug_abbrev))
+    __debug_abbrev_end = .;
+    __debug_str_start = .;
+    KEEP(*(.debug_str))
+    __debug_str_end = .;
+    __debug_line_start = .;
+    KEEP(*(.debug_line))
+    __debug_line_end = .;
+    __debug_ranges_start = .;
+    KEEP(*(.debug_ranges))
+    __debug_ranges_end = .;*/
+    __kernel_rodata_end = .;
   }:rodata
 
   .data : ALIGN(16K) {
-    *(.data)
+    __kernel_data_begin = .;
+    *(.data*)
+    *(.bss*)
+    __kernel_data_end = .;
   }:data
 
-  .bss : ALIGN(16K) {
-    *(.bss)
-  }:data
+  __kernel_end = .;
+
+  . = 1024 * 1M; /* 1G */
+  __physical_base = .;
 }

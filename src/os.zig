@@ -1,1 +1,0 @@
-usingnamespace @import("panic.zig");
