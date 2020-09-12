@@ -3,6 +3,7 @@ const setup_gdt = @import("gdt.zig").setup_gdt;
 
 const pmm = @import("../../pmm.zig");
 const paging = @import("../../paging.zig");
+const pci = @import("../pci.zig");
 
 const range = @import("../../lib/range.zig");
 
@@ -214,9 +215,48 @@ pub fn msr(comptime T: type, comptime msr_num: u32) type {
   };
 }
 
+fn request(addr: pci.Addr, offset: pci.regoff) void {
+  const val = 1 << 31
+    | @as(u32, offset)
+    | @as(u32, addr.function) << 8
+    | @as(u32, addr.device) << 11
+    | @as(u32, addr.bus) << 16
+  ;
+
+  outl(0xCF8, val);
+}
+
+pub fn pci_read(comptime T: type, addr: pci.Addr, offset: pci.regoff) T {
+  request(addr, offset);
+  return in(T, 0xCFC + @as(u16, offset % 4));
+}
+
+pub fn pci_write(comptime T: type, addr: pci.Addr, offset: pci.regoff, value: T) void {
+  request(addr, offset);
+  out(T, 0xCFC + @as(u16, offset % 4), value);
+}
+
 pub const IA32_APIC_BASE = msr(u64, 0x0000001B);
 pub const IA32_EFER      = msr(u64, 0xC0000080);
 pub const KernelGSBase   = msr(u64, 0xC0000102);
+
+pub fn out(comptime T: type, port: u16, value: T) void {
+  switch(T) {
+    u8  => outb(port, value),
+    u16 => outw(port, value),
+    u32 => outw(port, value),
+    else => @compileError("No out instruction for this type"),
+  }
+}
+
+pub fn in(comptime T: type, port: u16) T {
+  return switch(T) {
+    u8  => inb(port),
+    u16 => inw(port),
+    u32 => inw(port),
+    else => @compileError("No in instruction for this type"),
+  };
+}
 
 pub fn outb(port: u16, val: u8) void {
   asm volatile (
@@ -226,10 +266,42 @@ pub fn outb(port: u16, val: u8) void {
   );
 }
 
+pub fn outw(port: u16, val: u16) void {
+  asm volatile (
+    "outw %[val], %[port]\n\t"
+    :
+    : [val] "{ax}"(val), [port] "N{dx}"(port)
+  );
+}
+
+pub fn outl(port: u16, val: u32) void {
+  asm volatile (
+    "outl %[val], %[port]\n\t"
+    :
+    : [val] "{eax}"(val), [port] "N{dx}"(port)
+  );
+}
+
 pub fn inb(port: u16) u8 {
   return asm volatile (
     "inb %[port], %[result]\n\t"
     : [result] "={al}" (-> u8)
+    : [port]   "N{dx}" (port)
+  );
+}
+
+pub fn inw(port: u16) u16 {
+  return asm volatile (
+    "inw %[port], %[result]\n\t"
+    : [result] "={ax}" (-> u16)
+    : [port]   "N{dx}" (port)
+  );
+}
+
+pub fn inl(port: u16) u32 {
+  return asm volatile (
+    "inl %[port], %[result]\n\t"
+    : [result] "={eax}" (-> u32)
     : [port]   "N{dx}" (port)
   );
 }

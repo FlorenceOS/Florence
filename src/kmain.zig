@@ -3,17 +3,19 @@ const arch = @import("builtin").arch;
 const platform = @import("platform.zig");
 
 const acpi = @import("platform/acpi.zig");
+const pci = @import("platform/pci.zig");
 
 pub fn kmain() noreturn {
   log("Hello, kmain!\n", .{});
-  acpi: {
-    log("Initializing ACPI!\n", .{});
-    acpi.init_acpi() catch |err| {
-      log("ACPI init failed: {}\n", .{@errorName(err)});
-      break :acpi;
-    };
-    log("ACPI init finished!\n", .{});
-  }
+
+  acpi.init_acpi() catch |err| {
+    log("ACPI init failed: {}\n", .{@errorName(err)});
+  };
+
+  pci.init_pci() catch |err| {
+    log("PCI init failed: {}\n", .{@errorName(err)});
+  };
+
   while(true) {
     asm volatile("pause");
   }

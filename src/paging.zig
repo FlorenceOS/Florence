@@ -187,6 +187,19 @@ pub fn map_phys_range(phys: usize, phys_end: usize, perm: perms) !void {
   }
 }
 
+pub fn map_phys_struct(comptime T: type, phys: usize, perm: perms) !*T {
+  const struct_size = @sizeOf(T);
+  try map_phys_size(phys, struct_size, perm);
+  return &pmm.access_phys(T, phys)[0];
+}
+
+pub fn map_phys_size(phys: usize, size: usize, perm: perms) !void {
+  const page_addr_low = libalign.align_down(usize, page_sizes[0], phys);
+  const page_addr_high = libalign.align_up(usize, page_sizes[0], phys + size);
+
+  try map_phys_range(page_addr_low, page_addr_high, perm);
+}
+
 pub fn finalize_kernel_paging(new_root: u64) !void {
   try platform.prepare_paging();
   try set_paging_root(new_root, @ptrToInt(&__physical_base));
