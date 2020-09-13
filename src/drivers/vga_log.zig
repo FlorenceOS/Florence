@@ -36,7 +36,23 @@ pub fn relocate_fb() void {
 }
 
 fn scroll_buffer() void {
-  unreachable;
+  {
+    var y: u64 = 1;
+    while(y < 25) {
+      @memcpy(pmm.access_phys(u8, 0xB8000) + (y-1) * 80 * 2, pmm.access_phys(u8, 0xB8000) + y * 80 * 2, 80 * 2);
+      y += 1;
+    }
+  }
+  {
+    var ptr = pmm.access_phys(u8, 0xB8000) + 24 * 80 * 2;
+    var x: u64 = 0;
+    while(x < 80) {
+      ptr[0] = ' ';
+      ptr[1] = 0x0F;
+      ptr += 2;
+      x += 1;
+    }
+  }
 }
 
 fn feed_line() void {

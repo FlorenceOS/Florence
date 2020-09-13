@@ -22,7 +22,6 @@ const char_height = 8;
 
 const Framebuffer = struct {
   addr: []u8,
-  char_buf: []u8,
   pitch: u64,
   width: u64,
   height: u64,
@@ -31,11 +30,11 @@ const Framebuffer = struct {
   pos_x: u64 = 0,
   pos_y: u64 = 0,
 
-  pub fn char_width(self: *@This()) u64 {
+  pub fn width_in_chars(self: *@This()) u64 {
     return self.width / char_width;
   }
 
-  pub fn char_height(self: *@This()) u64 {
+  pub fn height_in_chars(self: *@This()) u64 {
     return self.height / char_height;
   }
 };
@@ -88,7 +87,7 @@ pub fn relocate_fb(fb_phys: usize) void {
   const fb_page_low = libalign.align_down(usize, page_size, fb_phys);
   const fb_page_high = libalign.align_up(usize, page_size, fb_phys + fb_size);
 
-  paging.map_phys_range(fb_page_low, fb_page_high, paging.wc(paging.mmio())) catch |err| {
+  paging.map_phys_range(fb_page_low, fb_page_high, paging.wc(paging.data())) catch |err| {
     log(":/ rip couldn't map fb: {}\n", .{@errorName(err)});
     return;
   };
@@ -118,7 +117,7 @@ fn blit_impl(comptime bpp: u64, ch: u8) void {
         pixel[3] = 0xFF;
       }
 
-      const shift: u3 = char_width - x;
+      const shift: u3 = char_width - 1 - x;
       const has_pixel_set = ((chr_line >> shift) & 1) == 1;
 
       if(has_pixel_set) {
@@ -149,12 +148,20 @@ fn blit_char(ch: u8) void {
 }
 
 fn scroll_fb() void {
-  unreachable; // TODO
+  // Yes this is slow but I don't care, I love it.
+  var y: u64 = char_height;
+  while(y < (framebuffer.?.height/char_height) * char_height) {
+    const dst = @ptrCast([*]u8, framebuffer.?.addr) + framebuffer.?.pitch * (y - char_height);
+    const src = @ptrCast([*]u8, framebuffer.?.addr) + framebuffer.?.pitch * y;
+    @memcpy(dst, src, framebuffer.?.pitch);
+    y += 1;
+  }
+  @memset(@ptrCast([*]u8, framebuffer.?.addr) + framebuffer.?.pitch * (y - char_height), 0x00, framebuffer.?.pitch * char_height);
 }
 
 fn feed_line() void {
   framebuffer.?.pos_x = 0;
-  if(framebuffer.?.pos_y == framebuffer.?.char_height() - 1) {
+  if(framebuffer.?.pos_y == framebuffer.?.height_in_chars() - 1) {
     scroll_fb();
   }
   else {
@@ -169,7 +176,7 @@ pub fn putch(ch: u8) void {
       return;
     }
 
-    if(framebuffer.?.pos_x == framebuffer.?.char_width())
+    if(framebuffer.?.pos_x == framebuffer.?.width_in_chars())
       feed_line();
 
     if(!is_printable(ch)) {
