@@ -4,17 +4,13 @@ const assert = std.debug.assert;
 
 var parsed_dt: bool = false;
 
-pub fn parse_dt(dt_data: ?[*]u8) !void {
+pub fn parse_dt(dt_data: [*]u8) !void {
   if(parsed_dt)
     return;
 
   parsed_dt = true;
 
-  var p = Parser {
-    .data =
-      if(dt_data != null) dt_data.?
-      else @intToPtr([*]u8, 0x40000000)
-  };
+  var p = Parser { .data = dt_data };
 
   p.parse();
 }
@@ -77,11 +73,9 @@ const Parser = struct {
   fn parse_resrved_regions(self: *Parser) void {
     log("Parsing reserved regions\n", .{});
     while(true) {
-      log("aaaaaaa {}\n", .{self});
+      log("{}\n", .{self});
       const addr = self.read(u64);
-      log("bbbbbbb {}\n", .{self});
       const size = self.read(u64);
-      log("ccccccc {x} {x}\n", .{addr, size});
       if(addr == 0 and size == 0)
         return;
       log("ddddddd\n", .{});
@@ -101,6 +95,10 @@ const Parser = struct {
         else => unreachable,
       }
     }
+  }
+
+  pub fn format(self: *const Parser, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+    try writer.print("Parser{{.data={X}, .offset={X}, limit={X}}}", .{@ptrToInt(self.data), self.curr_offset, self.limit});
   }
 
   fn parse_node(self: *Parser) void {

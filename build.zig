@@ -38,10 +38,10 @@ fn target(arch: builtin.Arch, context: Context) std.zig.CrossTarget {
   };
 }
 
-fn build_kernel(b: *Builder, arch: builtin.Arch, main: []const u8, name: []const u8, asmfiles: [][]const u8) *std.build.LibExeObjStep {
+fn build_kernel(b: *Builder, arch: builtin.Arch, board_name: ?[]const u8, main: []const u8, name: []const u8, asmfiles: [][]const u8) *std.build.LibExeObjStep {
   const kernel_filename =
     std.mem.concat(b.allocator, u8,
-      &[_][]const u8{ "Zigger_", name, "_", @tagName(arch) }
+      &[_][]const u8{ "Zigger_", name, if(board_name==null) "" else "_", if(board_name==null) "" else board_name.?, "_", @tagName(arch) }
     ) catch unreachable;
 
   const kernel = b.addExecutable(kernel_filename, main);
@@ -62,7 +62,7 @@ fn build_kernel(b: *Builder, arch: builtin.Arch, main: []const u8, name: []const
 }
 
 fn stivale_kernel(b: *Builder, arch: builtin.Arch) *std.build.LibExeObjStep {
-  return build_kernel(b, arch, "src/boot/stivale.zig", "stivale",
+  return build_kernel(b, arch, null, "src/boot/stivale.zig", "stivale",
     &[_][]u8 {
       std.mem.concat(b.allocator, u8,
         &[_][]const u8{ "src/boot/stivale_", @tagName(arch), ".asm" }
@@ -71,24 +71,27 @@ fn stivale_kernel(b: *Builder, arch: builtin.Arch) *std.build.LibExeObjStep {
   );
 }
 
-fn baremetal_kernel(b: *Builder, arch: builtin.Arch) *std.build.LibExeObjStep {
-  return build_kernel(b, arch, "src/boot/baremetal.zig", "baremetal",
+fn baremetal_kernel(b: *Builder, board_name: []const u8, arch: builtin.Arch) *std.build.LibExeObjStep {
+  return build_kernel(b, arch, board_name,
+    std.mem.concat(b.allocator, u8,
+      &[_][]const u8{"src/boot/baremetal_", board_name, ".zig" }
+    ) catch unreachable, "baremetal",
     &[_][]u8 {
       std.mem.concat(b.allocator, u8,
-        &[_][]const u8{ "src/boot/baremetal_", @tagName(arch), ".asm" }
+        &[_][]const u8{ "src/boot/baremetal_", board_name, "_", @tagName(arch), ".asm" }
       ) catch unreachable
     }
   );
 }
 
-fn qemu_target(b: *Builder, command: []const u8, desc: []const u8, dep: *std.build.LibExeObjStep) void {
-  const command_step = b.step(command, desc);
+fn qemu_aarch64_baremetal_target(b: *Builder, board_name: []const u8, desc: []const u8, dep: *std.build.LibExeObjStep) void {
+  const command_step = b.step(board_name, desc);
 
   const params =
     switch(dep.target.cpu_arch.?) {
       builtin.Arch.aarch64 => &[_][]const u8 {
         "qemu-system-aarch64",
-        "-M", "virt",
+        "-M", board_name,
         "-cpu", "cortex-a57",
         "-kernel", dep.getOutputPath(),
         "-m", "4G",
@@ -157,7 +160,7 @@ pub fn build(b: *Builder) void {
   _ = stivale_kernel(b, builtin.Arch.aarch64);
   //_ = stivale_kernel(b, builtin.Arch.riscv64);
 
-  qemu_target(b, "arm", "Run aarch64 bare metal kernel in qemu", baremetal_kernel(b, builtin.Arch.aarch64));
+  qemu_aarch64_baremetal_target(b, "virt", "Run aarch64 bare metal virt board kernel in qemu", baremetal_kernel(b, "virt", builtin.Arch.aarch64));
   qloader_target(
     b,
     "ql2",

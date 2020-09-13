@@ -168,7 +168,7 @@ pub fn allowed_mapping_levels() usize {
 }
 
 pub fn platform_init() !void {
-  try @import("../devicetree.zig").parse_dt(null);
+  
 }
 
 pub fn debugputch(val: u8) void {
