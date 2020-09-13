@@ -5,6 +5,8 @@ const platform = @import("platform.zig");
 const acpi = @import("platform/acpi.zig");
 const pci = @import("platform/pci.zig");
 
+const arch = @import("builtin").arch;
+
 pub fn kmain() noreturn {
   log("Hello, kmain!\n", .{});
 
@@ -17,6 +19,8 @@ pub fn kmain() noreturn {
   };
 
   while(true) {
-    asm volatile("pause");
+    if(arch == .x86_64) {
+      asm volatile("pause");
+    }
   }
 }
