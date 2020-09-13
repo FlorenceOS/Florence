@@ -55,78 +55,72 @@ pub fn unmap(args: unmap_args) !void {
 }
 
 pub const perms = struct {
-  present: u1,
-  writable: u1,
-  executable: u1,
-  user: u1,
-  cacheable: u1,
-  writethrough: u1,
+  writable: bool,
+  executable: bool,
+  user: bool,
+  cacheable: bool,
+  writethrough: bool,
 };
 
 pub fn mmio() perms {
   return perms {
-    .present = 1,
-    .writable = 1,
-    .executable = 0,
-    .user = 0,
-    .cacheable = 0,
-    .writethrough = 1,
+    .writable = true,
+    .executable = false,
+    .user = false,
+    .cacheable = false,
+    .writethrough = true,
   };
 }
 
 pub fn code() perms {
   return perms {
-    .present = 1,
-    .writable = 0,
-    .executable = 1,
-    .user = 0,
-    .cacheable = 1,
-    .writethrough = 1,
+    .writable = false,
+    .executable = true,
+    .user = false,
+    .cacheable = true,
+    .writethrough = true,
   };
 }
 
 pub fn rodata() perms {
   return perms {
-    .present = 1,
-    .writable = 0,
-    .executable = 0,
-    .user = 0,
-    .cacheable = 1,
-    .writethrough = 1,
+    .writable = false,
+    .executable = false,
+    .user = false,
+    .cacheable = true,
+    .writethrough = true,
   };
 }
 
 pub fn data() perms {
   return perms {
-    .present = 1,
-    .writable = 1,
-    .executable = 0,
-    .user = 0,
-    .cacheable = 1,
-    .writethrough = 1,
+    .writable = true,
+    .executable = false,
+    .user = false,
+    .cacheable = true,
+    .writethrough = true,
   };
 }
 
 pub fn rwx() perms {
   return perms {
-    .present = 1,
-    .writable = 1,
-    .executable = 1,
-    .user = 0,
-    .cacheable = 1,
-    .writethrough = 1,
+    .writable = true,
+    .executable = true,
+    .user = false,
+    .cacheable = true,
+    .writethrough = true,
   };
 }
 
 pub fn wc(curr: perms) perms {
   var ret = curr;
-  ret.writethrough = 1;
+  ret.writethrough = true;
   return ret;
 }
 
 pub fn user(p: perms) perms {
   var ret = curr;
-  ret.writethrough = 1;
+  ret.writethrough = true;
   return ret;
 }
 

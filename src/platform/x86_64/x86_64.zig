@@ -76,12 +76,14 @@ pub const page_table_entry = packed struct {
 
     self.present = 1;
     self.is_mapping_bit = 0;
-    self.set_physaddr(addr);
-    self.writable        =  perms.writable;
-    self.user            =  perms.user;
-    self.execute_disable = ~perms.executable;
+    self.set_physaddr(level, addr);
+    self.writable = 0;
+    self.user = 0;
+    self.execute_disable = 1;
     self.writethrough    = 1;
     self.cache_disable   = 0;
+
+    self.add_table_perms(level, perms) catch unreachable;
   }
 
   pub fn set_mapping(self: *page_table_entry, comptime level: usize, addr: usize, perms: paging_perms) !void {
@@ -90,29 +92,25 @@ pub const page_table_entry = packed struct {
 
     self.present = 1;
     self.is_mapping_bit = 1;
-    self.set_physaddr(addr);
-    self.set_mapping_perms(perms) catch unreachable;
+    self.set_physaddr(level, addr);
+
+    self.writable        = if(perms.writable)     1 else 0;
+    self.execute_disable = if(perms.executable)   0 else 1;
+    self.user            = if(perms.user)         1 else 0;
+    self.writethrough    = if(perms.writethrough) 1 else 0;
+    self.cache_disable   = if(perms.cacheable)    0 else 1;
   }
 
   pub fn add_table_perms(self: *page_table_entry, comptime level: usize, perms: paging_perms) !void {
     if(!self.is_table(level))
       return error.IsNotTable;
     
-    self.writable        |=  perms.writable;
-    self.user            |=  perms.user;
-    self.execute_disable &= ~perms.executable;
-  }
-
-  pub fn set_mapping_perms(self: *page_table_entry, perms: paging_perms) !void {
-    if(!self.is_mapping())
-      return error.IsNotMapping;
-
-    self.present         =  perms.present;
-    self.writable        =  perms.writable;
-    self.user            =  perms.user;
-    self.writethrough    =  perms.writethrough;
-    self.cache_disable   = ~perms.cacheable;
-    self.execute_disable = ~perms.executable;
+    if(perms.writable)
+      self.writable = 1;
+    if(perms.user)
+      self.user = 1;
+    if(perms.executable)
+      self.execute_disable = 0;
   }
 
   pub fn format(self: *const page_table_entry, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
