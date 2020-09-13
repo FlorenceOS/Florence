@@ -20,5 +20,8 @@ pub fn kmain() noreturn {
     if(arch == .x86_64) {
       asm volatile("pause");
     }
+    if(arch == .aarch64) {
+      asm volatile("YIELD");
+    }
   }
 }
