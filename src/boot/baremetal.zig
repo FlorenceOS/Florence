@@ -5,5 +5,5 @@ pub const os = @import("../os/kernel.zig");
 
 export fn baremetal_main() void {
   platform_init() catch unreachable;
-  kmain() catch unreachable;
+  kmain();
 }
