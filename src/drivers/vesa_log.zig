@@ -17,8 +17,12 @@ const font_max_char: u8 = font_base + font.len/8;
 const bgcol = 0x00;
 const fgcol = 0xaa;
 
+const char_width = 8;
+const char_height = 8;
+
 const Framebuffer = struct {
   addr: []u8,
+  char_buf: []u8,
   pitch: u64,
   width: u64,
   height: u64,
@@ -26,6 +30,14 @@ const Framebuffer = struct {
 
   pos_x: u64 = 0,
   pos_y: u64 = 0,
+
+  pub fn char_width(self: *@This()) u64 {
+    return self.width / char_width;
+  }
+
+  pub fn char_height(self: *@This()) u64 {
+    return self.height / char_height;
+  }
 };
 
 var framebuffer: ?Framebuffer = null;
@@ -92,13 +104,13 @@ fn px(comptime bpp: u64, x: u64, y: u64) *[bpp]u8 {
 }
 
 fn blit_impl(comptime bpp: u64, ch: u8) void {
-  inline for(range.range(8)) |y| {
-    const chr_line = font[y + (@as(u64, ch) - font_base) * 8];
+  inline for(range.range(char_height)) |y| {
+    const chr_line = font[y + (@as(u64, ch) - font_base) * char_height * ((char_width + 7)/8)];
 
-    const ypx = framebuffer.?.pos_y * 8 + y;
+    const ypx = framebuffer.?.pos_y * char_height + y;
 
-    inline for(range.range(8)) |x| {
-      const xpx = framebuffer.?.pos_x * 8 + x;
+    inline for(range.range(char_width)) |x| {
+      const xpx = framebuffer.?.pos_x * char_width + x;
 
       const pixel = px(bpp, xpx, ypx);
 
@@ -106,7 +118,7 @@ fn blit_impl(comptime bpp: u64, ch: u8) void {
         pixel[3] = 0xFF;
       }
 
-      const shift: u3 = 7 - x;
+      const shift: u3 = char_width - x;
       const has_pixel_set = ((chr_line >> shift) & 1) == 1;
 
       if(has_pixel_set) {
@@ -142,7 +154,7 @@ fn scroll_fb() void {
 
 fn feed_line() void {
   framebuffer.?.pos_x = 0;
-  if(framebuffer.?.pos_y == framebuffer.?.height/8 - 1) {
+  if(framebuffer.?.pos_y == framebuffer.?.char_height() - 1) {
     scroll_fb();
   }
   else {
@@ -157,7 +169,7 @@ pub fn putch(ch: u8) void {
       return;
     }
 
-    if(framebuffer.?.pos_x == framebuffer.?.width / 8)
+    if(framebuffer.?.pos_x == framebuffer.?.char_width())
       feed_line();
 
     if(!is_printable(ch)) {
