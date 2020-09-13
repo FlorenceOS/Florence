@@ -142,17 +142,17 @@ pub fn index_into_table(table: *page_table, vaddr: usize, comptime level: usize)
 
 pub fn current_paging_root() u64 {
   return asm (
-    \\mrs TTBR0_ELx, %[result]\n\t
-    : [result] "=X" (-> u64)
+    \\mrs %[result], TTBR0_EL1
+    : [result] "=r" (-> u64)
   );
 }
 
 pub fn set_paging_root(val: u64) void {
   asm volatile(
-    \\msr TTBR0_ELx, %[value]
+    \\msr TTBR0_EL1, %[value]
     \\isb sy
     :
-    : [value] "=X" (val)
+    : [value] "r" (val)
   );
 }
 
