@@ -39,39 +39,39 @@ pub const page_table_entry = packed struct {
   physaddr_bits: u51,
   execute_disable: u1,
 
-  pub fn is_present(self: *const page_table_entry) bool {
+  pub fn is_present(self: *const page_table_entry, comptime level: usize) bool {
     return self.present != 0;
   }
 
-  pub fn clear(self: *page_table_entry) void {
+  pub fn clear(self: *page_table_entry, comptime level: usize) void {
     self.present = 0;
   }
 
-  pub fn is_mapping(self: *const page_table_entry) bool {
-    return self.is_present() and self.is_mapping_bit != 0;
+  pub fn is_mapping(self: *const page_table_entry, comptime level: usize) bool {
+    return self.is_present(level) and self.is_mapping_bit != 0;
   }
 
-  pub fn is_table(self: *const page_table_entry) bool {
-    return self.is_present() and !self.is_mapping();
+  pub fn is_table(self: *const page_table_entry, comptime level: usize) bool {
+    return self.is_present(level) and !self.is_mapping(level);
   }
 
-  pub fn physaddr(self: *const page_table_entry) u64 {
+  pub fn physaddr(self: *const page_table_entry, comptime level: usize) u64 {
     return self.physaddr_bits << 12;
   }
 
-  pub fn get_table(self: *const page_table_entry) !*page_table {
-    if(!self.is_table())
+  pub fn get_table(self: *const page_table_entry, comptime level: usize) !*page_table {
+    if(!self.is_table(level))
       return error.IsNotTable;
 
-    return &pmm.access_phys(page_table, self.physaddr())[0];
+    return &pmm.access_phys(page_table, self.physaddr(level))[0];
   }
 
-  fn set_physaddr(self: *page_table_entry, addr: u64) void {
+  fn set_physaddr(self: *page_table_entry, comptime level: usize, addr: u64) void {
     self.physaddr_bits = @intCast(u51, addr >> 12);
   }
 
-  pub fn set_table(self: *page_table_entry, addr: usize, perms: paging_perms) !void {
-    if(self.is_present())
+  pub fn set_table(self: *page_table_entry, comptime level: usize, addr: usize, perms: paging_perms) !void {
+    if(self.is_present(level))
       return error.AlreadyPresent;
 
     self.present = 1;
@@ -84,8 +84,8 @@ pub const page_table_entry = packed struct {
     self.cache_disable   = 0;
   }
 
-  pub fn set_mapping(self: *page_table_entry, addr: usize, perms: paging_perms) !void {
-    if(self.is_present())
+  pub fn set_mapping(self: *page_table_entry, comptime level: usize, addr: usize, perms: paging_perms) !void {
+    if(self.is_present(level))
       return error.AlreadyPresent;
 
     self.present = 1;
@@ -94,8 +94,8 @@ pub const page_table_entry = packed struct {
     self.set_mapping_perms(perms) catch unreachable;
   }
 
-  pub fn add_table_perms(self: *page_table_entry, perms: paging_perms) !void {
-    if(!self.is_table())
+  pub fn add_table_perms(self: *page_table_entry, comptime level: usize, perms: paging_perms) !void {
+    if(!self.is_table(level))
       return error.IsNotTable;
     
     self.writable        |=  perms.writable;
@@ -158,12 +158,7 @@ pub fn index_into_table(table: *page_table, vaddr: u64, level: usize) *page_tabl
 pub fn make_page_table() !u64 {
   const pt = try pmm.alloc_phys(0x1000);
   const pt_ptr = &pmm.access_phys(page_table, pt)[0];
-  var i: u64 = 0;
-  while(i < 512) {
-    const pte = table_index(pt_ptr, i);
-    pte.clear();
-    i += 1;
-  }
+  @memset(@ptrCast([*]u8, pt_ptr), 0x00, 0x1000);
   return pt;
 }
 

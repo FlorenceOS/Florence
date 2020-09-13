@@ -278,9 +278,9 @@ fn map_impl(virt: *usize, phys: ?*usize, size: *usize, root: *page_table, perm: 
   return error.map_impl;
 }
 
-fn map_at_level(level: usize, virt: usize, phys: usize, root: *page_table, perm: perms) !void {
+fn map_at_level(comptime level: usize, virt: usize, phys: usize, root: *page_table, perm: perms) !void {
   const pte = try make_pte(virt, level, perm, root);
-  try pte.set_mapping(phys, perm);
+  try pte.set_mapping(level, phys, perm);
 }
 
 fn make_pte(virt: usize, level: usize, perm: perms, root: *page_table) !*page_table_entry {
@@ -290,23 +290,23 @@ fn make_pte(virt: usize, level: usize, perm: perms, root: *page_table) !*page_ta
     if(level == current_level)
       return pte;
 
-    if(!pte.is_present()) {
+    if(!pte.is_present(current_level)) {
       const addr = try make_page_table();
 
-      pte.set_table(addr, perm) catch |err| switch(err) {
+      pte.set_table(current_level, addr, perm) catch |err| switch(err) {
         error.AlreadyPresent => unreachable,
       };
     }
     else {
-      if(pte.is_mapping())
+      if(pte.is_mapping(current_level))
         return error.AlreadyPresent;
 
-      pte.add_table_perms(perm) catch |err| switch(err) {
+      pte.add_table_perms(current_level, perm) catch |err| switch(err) {
         error.IsNotTable => unreachable,
       };
     }
 
-    current_table = pte.get_table() catch |err| switch(err) {
+    current_table = pte.get_table(current_level) catch |err| switch(err) {
       error.IsNotTable => unreachable,
     };
   }
@@ -323,16 +323,16 @@ fn unmap_impl(virt: *usize, size: *usize, reclaim_pages: bool, root_in: ?u64) !v
 fn unmap_at_level(virt: *usize, size: *usize, reclaim_pages: bool, table: *page_table, comptime level: usize) !void {
   const pte = index_into_table(table, virt.*, level);
 
-  if(pte.is_present()) {
-    if(pte.is_mapping()) {
+  if(pte.is_present(level)) {
+    if(pte.is_mapping(level)) {
       if(page_sizes[level] <= size.*) {
         size.* -= page_sizes[level];
         virt.* += page_sizes[level];
 
         if(reclaim_pages)
-          pmm.free_phys(pte.physaddr(), page_sizes[level]);
+          pmm.free_phys(pte.physaddr(level), page_sizes[level]);
 
-        pte.clear();
+        pte.clear(level);
         return;
       }
       else {
@@ -344,7 +344,7 @@ fn unmap_at_level(virt: *usize, size: *usize, reclaim_pages: bool, table: *page_
         return error.CorruptPageTables;
       }
       else {
-        return unmap_at_level(virt, size, reclaim_pages, pte.get_table() catch unreachable, level - 1);
+        return unmap_at_level(virt, size, reclaim_pages, pte.get_table(level) catch unreachable, level - 1);
       }
     }
   } else {
@@ -358,19 +358,20 @@ pub fn print_paging(root: u64) void {
   print_impl(&pmm.access_phys(page_table, root)[0], paging_levels - 1);
 }
 
-fn print_impl(root: *page_table, level: usize) void {
+fn print_impl(root: *page_table, comptime level: usize) void {
   var offset: u32 = 0;
   while(offset<0x1000) {
     const ent = @intToPtr(*page_table_entry, @ptrToInt(root) + offset);
-    if(ent.is_present()) {
+    if(ent.is_present(level)) {
       var cnt = paging_levels - level - 1;
       while(cnt != 0) {
         log(" ", .{});
         cnt -= 1;
       }
       log("Index {}: Raw: {x:0^16}: {}\n", .{offset/8, @ptrCast(*u64, @alignCast(8, ent)).*, ent});
-      if(ent.is_table())
-        print_impl(ent.get_table() catch unreachable, level - 1);
+      if(level != 0)
+        if(ent.is_table(level))
+          print_impl(ent.get_table() catch unreachable, level - 1);
     }
     offset += 8;
   }
