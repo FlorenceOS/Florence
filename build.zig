@@ -48,7 +48,7 @@ fn build_kernel(b: *Builder, arch: builtin.Arch, board_name: ?[]const u8, main: 
   kernel.setTarget(target(arch, .kernel));
   kernel.setLinkerScriptPath("src/linker.ld");
   //kernel.code_model = .large;
-  kernel.setBuildMode(.ReleaseFast);
+  kernel.setBuildMode(.ReleaseSafe);
 
   for(asmfiles) |f| {
     kernel.addAssemblyFile(f);
