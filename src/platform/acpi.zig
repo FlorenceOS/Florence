@@ -10,8 +10,6 @@ const pci = @import("pci.zig");
 const libalign = @import("../lib/align.zig");
 const range = @import("../lib/range.zig");
 
-const apic = @import("x86_64/apic.zig");
-
 const builtin = @import("builtin");
 const std = @import("std");
 
@@ -27,22 +25,6 @@ const RSDP = packed struct {
   extended_checksum: u8,
 };
 
-pub const SDT = struct {
-  signature: [4]u8,
-  length: u32,
-  revision: u8,
-  checksum: u8,
-  oem_id: [6]u8,
-  oem_table_id: [8]u8,
-  oem_revision: u32,
-  creator_id: u32,
-  creator_revision: u32,
-
-  fn signature_value(self: *const @This()) u32 {
-    return make_signature(self.signature[0..4]);
-  }
-};
-
 var rsdp_phys: usize = 0;
 var rsdp: *RSDP = undefined;
 
@@ -51,87 +33,81 @@ pub fn register_rsdp(rsdp_in: usize) void {
 }
 
 fn locate_rsdp() !void {
-  return error.todo;
+  return error.locate_rsdp;
 }
 
-fn make_signature(signature: []const u8) u32 {
-  var result: u32 = undefined;
-  const rp = @ptrCast(*[4]u8, &result);
-  for(signature) |c, i| {
-    rp[i] = c;
-  }
-  return result;
-}
+fn parse_MCFG(sdt: []u8) void {
+  var offset: usize = 44;
+  while(offset + 16 <= sdt.len): (offset += 16) {
+    var   addr   = std.mem.readInt(u64, sdt[offset..][0..8],  builtin.endian);
+    var   lo_bus = sdt[offset + 10];
+    const hi_bus = sdt[offset + 11];
 
-fn report_MCFG_pci_mmio(addr_in: u64, low: u8, high: u8) void {
-  var addr = addr_in;
+    while(true) {
+      //while(lo_bus == 254) { } // 0xbffde000
+      pci.register_mmio(lo_bus, addr) catch |err| {
+        log("Unable to register PCI mmio: {}\n", .{@errorName(err)});
+      };
 
-  var current_bus: u8 = 0;
+      if(lo_bus == hi_bus)
+        break;
 
-  while(true) {
-    pci.register_mmio(current_bus, addr) catch |err| {
-      log("Unable to register PCI mmio: {}\n", .{@errorName(err)});
-    };
-    // End condition is like this in case high == 255 and we overflow
-    if(current_bus == high)
-      break;
-    current_bus += 1;
-    addr += 1 << 20;
+      addr += 1 << 20;
+      lo_bus += 1;
+    }
   }
 }
 
-fn parse_MCFG_pci_mmio(sdt: *SDT, offset: usize) void {
-  const sdtp = @ptrCast([*]u8, sdt) + offset;
-  const addr = std.mem.readInt(u64, sdtp[0..8], builtin.endian);
-  //report_MCFG_pci_mmio(addr, sdtp[10], sdtp[11]);
+fn sdt_size(sdt: anytype) u64 {
+  return std.mem.readInt(u32, sdt[4..8], builtin.endian);
+}
+
+fn signature_value(sdt: anytype) u32 {
+  return std.mem.readInt(u32, sdt[0..4], builtin.endian);
+}
+
+fn map_sdt(addr: u64) ![]u8 {
+  const sdt = @ptrCast([*]u8, try paging.map_phys_struct([8]u8, addr, paging.data()));
+  const sz = sdt_size(sdt);
+  try paging.map_phys_size(addr, sz, paging.data());
+  return sdt[0..sz];
 }
 
 fn parse_sdt(addr: usize) !void {
-  const sdt = try paging.map_phys_struct(SDT, addr, paging.data());
-  try paging.map_phys_size(addr, sdt.length, paging.data());
-  
-  switch(sdt.signature_value()) {
-    make_signature("FACP") => { }, // Ignore for now
-    make_signature("SSDT") => { }, // Ignore for now
-    make_signature("DMAR") => { }, // Ignore for now
-    make_signature("ECDT") => { }, // Ignore for now
-    make_signature("SBST") => { }, // Ignore for now
-    make_signature("HPET") => { }, // Ignore for now
-    make_signature("APIC") => {
+  const sdt = try map_sdt(addr);
+
+  switch(signature_value(sdt)) {
+    signature_value("FACP") => { }, // Ignore for now
+    signature_value("SSDT") => { }, // Ignore for now
+    signature_value("DMAR") => { }, // Ignore for now
+    signature_value("ECDT") => { }, // Ignore for now
+    signature_value("SBST") => { }, // Ignore for now
+    signature_value("HPET") => { }, // Ignore for now
+    signature_value("APIC") => {
       if(builtin.arch == .x86_64) {
-        apic.handle_madt(sdt);
+        @import("x86_64/apic.zig").handle_madt(sdt);
       }
       else {
         log("ACPI: MADT found on non-x86 architecture!\n", .{});
       }
     },
-    make_signature("MCFG") => {
-      var offset: usize = 44;
-      while(offset + 16 <= sdt.length) {
-        parse_MCFG_pci_mmio(sdt, offset);
-        offset += 16;
-      }
+    signature_value("MCFG") => {
+      parse_MCFG(sdt);
     },
     else => {
-      log("ACPI: Unknown SDT: '{s}' with size {} bytes\n", .{sdt.signature, sdt.length});
-      hexdump(@ptrCast([*]u8, sdt)[0..sdt.length]);
-    }
+      log("ACPI: Unknown SDT: '{s}' with size {} bytes\n", .{sdt[0..4], sdt.len});
+      hexdump(sdt);
+    },
   }
 }
 
 fn parse_root_sdt(comptime T: type, addr: usize) !void {
-  const sdt = try paging.map_phys_struct(SDT, addr, paging.data());
-  try paging.map_phys_size(addr, sdt.length, paging.data());
+  const sdt = try map_sdt(addr);
 
-  const num_entries = (sdt.length - @sizeOf(SDT))/@sizeOf(T);
-  const table = @ptrCast([*]u8, sdt) + @sizeOf(SDT);
+  var offset: u64 = 36;
 
-  var entry_ind: u64 = 0;
-  while(entry_ind < num_entries) {
-    var entry: u64 = 0;
-    @memcpy(@ptrCast([*]u8, &entry), table + entry_ind * @sizeOf(T), @sizeOf(T));
-    try parse_sdt(entry);
-    entry_ind += 1;
+  while(offset + @sizeOf(T) <= sdt_size(sdt)): (offset += @sizeOf(T)) {
+    try parse_sdt(std.mem.readInt(T, sdt[offset..][0..@sizeOf(T)], builtin.endian));
   }
 }
 
@@ -146,8 +122,9 @@ pub fn init_acpi() !void {
 
   log("ACPI revision: {}\n", .{rsdp.revision});
 
-  if(rsdp.revision == 0)
-    try parse_root_sdt(u32, rsdp.rsdt_addr);
-  if(rsdp.revision == 2)
-    try parse_root_sdt(u64, rsdp.xsdt_addr);
+  switch(rsdp.revision) {
+    0 => try parse_root_sdt(u32, rsdp.rsdt_addr),
+    2 => try parse_root_sdt(u64, rsdp.xsdt_addr),
+    else => return error.UnknownACPIRevision,
+  }
 }
