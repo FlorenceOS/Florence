@@ -211,13 +211,18 @@ pub fn platform_init() !void {
 pub fn read_msr(comptime T: type, msr_num: u32) T {
   assert(T == u64);
 
-  return asm volatile("rdmsr" : [_]"=A"(-> T) : [_]"{ecx}"(msr_num));
+  var low: u32 = undefined;
+  var high: u32 = undefined;
+  asm volatile("rdmsr" : [_]"={eax}"(low), [_]"={edx}"(high) : [_]"{ecx}"(msr_num));
+  return (@as(u64, high) << 32) | @as(u64, low);
 }
 
 pub fn write_msr(comptime T: type, msr_num: u32, val: T) void {
   assert(T == u64);
 
-  asm volatile("wrmsr" :: [_]"A"(val), [_]"{ecx}"(msr_num));
+  const low = @intCast(u32, val & 0xFFFFFFFF);
+  const high = @intCast(u32, val >> 32);
+  asm volatile("wrmsr" :: [_]"{eax}"(low), [_]"{edx}"(high), [_]"{ecx}"(msr_num));
 }
 
 pub fn msr(comptime T: type, comptime msr_num: u32) type {
