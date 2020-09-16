@@ -21,8 +21,16 @@ pub fn alloc_size(comptime T: type, size: u64) ![]T {
   return @intToPtr([*]T, try alloc_size_impl(allocated_bytes(T, size)))[0..size];
 }
 
+pub fn alloc_single(comptime T: type) !*T {
+  return &(try alloc_size(T, 1))[0];
+}
+
 pub fn free_size(comptime T: type, data: []T) !void {
   return free_size_impl(@ptrToInt(&T[0]), allocated_bytes(T, data.size));
+}
+
+pub fn free_single(val: anytype) !void {
+  return free_size_impl(@ptrToInt(val), allocated_bytes(@TypeOf(val.*), 1));
 }
 
 pub fn good_size(comptime T: type, least: u64) u64 {
