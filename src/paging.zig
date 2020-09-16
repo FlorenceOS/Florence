@@ -354,7 +354,7 @@ pub fn print_paging(root: u64) void {
 
 fn print_impl(root: *page_table, comptime level: usize) void {
   var offset: u32 = 0;
-  while(offset<0x1000) {
+  while(offset<0x1000): (offset += 8) {
     const ent = @intToPtr(*page_table_entry, @ptrToInt(root) + offset);
     if(ent.is_present(level)) {
       var cnt = paging_levels - level - 1;
@@ -362,11 +362,10 @@ fn print_impl(root: *page_table, comptime level: usize) void {
         log(" ", .{});
         cnt -= 1;
       }
-      log("Index {}: Raw: {x:0^16}: {}\n", .{offset/8, @ptrCast(*u64, @alignCast(8, ent)).*, ent});
+      log("Index {}: {}\n", .{offset/8, ent});
       if(level != 0)
         if(ent.is_table(level))
-          print_impl(ent.get_table() catch unreachable, level - 1);
+          print_impl(ent.get_table(level) catch unreachable, level - 1);
     }
-    offset += 8;
   }
 }
