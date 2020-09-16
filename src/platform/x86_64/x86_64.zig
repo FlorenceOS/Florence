@@ -262,6 +262,10 @@ pub const IA32_APIC_BASE = msr(u64, 0x0000001B);
 pub const IA32_EFER      = msr(u64, 0xC0000080);
 pub const KernelGSBase   = msr(u64, 0xC0000102);
 
+pub fn spin_hint() void {
+  asm volatile("pause");
+}
+
 pub fn out(comptime T: type, port: u16, value: T) void {
   switch(T) {
     u8  => outb(port, value),

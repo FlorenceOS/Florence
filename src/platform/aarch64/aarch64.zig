@@ -156,6 +156,10 @@ pub fn set_paging_root(val: u64) void {
   );
 }
 
+pub fn spin_hint() void {
+  asm volatile("YIELD");
+}
+
 pub fn make_page_table() !u64 {
   const pt = try pmm.alloc_phys(0x1000);
   const pt_ptr = &pmm.access_phys(page_table, pt)[0];
