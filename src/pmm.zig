@@ -81,7 +81,6 @@ pub fn free_phys(phys: u64, size: u64) void {
     const i = page_sizes.len - ri - 1;
 
     if(size <= psz and lalign.is_aligned(u64, psz, phys)) {
-      log("fp\n", .{});
       return free_impl(phys, i);
     }
   }
