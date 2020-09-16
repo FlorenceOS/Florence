@@ -26,37 +26,61 @@ pub fn allowed_mapping_levels() u8 {
 
 const paging_perms = @import("../../paging.zig").perms;
 
+// https://github.com/ziglang/zig/issues/5451
+// Just straight up doesn't work, everything breaks as page table entries has size 9
+// according to the compiler
+// present: u1,
+// writable: u1,
+// user: u1,
+// writethrough: u1,
+// cache_disable: u1,
+// accessed: u1,
+// ignored_6: u1,
+// is_mapping_bit: u1,
+// ignored_8: u4,
+// physaddr_bits: u51,
+// execute_disable: u1,
+
+const phys_bitmask: u64 = ((@as(u64, 1) << 51) - 1) << 12;
+const present_bit: u64 = 0x1;
+const writable_bit: u64 = 0x2;
+const user_bit: u64 = 0x4;
+const writethrough_bit: u64 = 0x8;
+const cache_disable_bit: u64 = 0x10;
+const accessed_bit: u64 = 0x20;
+const is_mapping_bit: u64 = 0x80;
+const execute_disable_bit: u64 = 1 << 63;
+
 pub const page_table_entry = packed struct {
-  present: u1,
-  writable: u1,
-  user: u1,
-  writethrough: u1,
-  cache_disable: u1,
-  accessed: u1,
-  ignored_6: u1,
-  is_mapping_bit: u1,
-  ignored_8: u4,
-  physaddr_bits: u51,
-  execute_disable: u1,
+  raw: u64,
 
   pub fn is_present(self: *const page_table_entry, comptime level: usize) bool {
-    return self.present != 0;
+    return (self.raw & present_bit) != 0;
   }
 
   pub fn clear(self: *page_table_entry, comptime level: usize) void {
-    self.present = 0;
+    self.raw &= ~present_bit;
   }
 
   pub fn is_mapping(self: *const page_table_entry, comptime level: usize) bool {
-    return self.is_present(level) and self.is_mapping_bit != 0;
+    if(!self.is_present(level))
+      return false;
+
+    if(level == 0)
+      return true;
+
+    return (self.raw & is_mapping_bit) != 0;
   }
 
   pub fn is_table(self: *const page_table_entry, comptime level: usize) bool {
-    return self.is_present(level) and !self.is_mapping(level);
+    if(!self.is_present(level) or level == 0)
+      return false;
+
+    return (self.raw & is_mapping_bit) == 0;
   }
 
   pub fn physaddr(self: *const page_table_entry, comptime level: usize) u64 {
-    return self.physaddr_bits << 12;
+    return self.raw & phys_bitmask;
   }
 
   pub fn get_table(self: *const page_table_entry, comptime level: usize) !*page_table {
@@ -67,21 +91,25 @@ pub const page_table_entry = packed struct {
   }
 
   fn set_physaddr(self: *page_table_entry, comptime level: usize, addr: u64) void {
-    self.physaddr_bits = @intCast(u51, addr >> 12);
+    self.raw &= ~phys_bitmask;
+    self.raw |=  addr;
   }
 
   pub fn set_table(self: *page_table_entry, comptime level: usize, addr: usize, perms: paging_perms) !void {
+    assert(level != 0);
+
     if(self.is_present(level))
       return error.AlreadyPresent;
 
-    self.present = 1;
-    self.is_mapping_bit = 0;
+    self.raw |=  present_bit;
+    self.raw &= ~is_mapping_bit;
     self.set_physaddr(level, addr);
-    self.writable = 0;
-    self.user = 0;
-    self.execute_disable = 1;
-    self.writethrough    = 1;
-    self.cache_disable   = 0;
+
+    self.raw &= ~writable_bit;
+    self.raw &= ~user_bit;
+    self.raw |=  execute_disable_bit;
+    self.raw |=  writethrough_bit;
+    self.raw &= ~cache_disable_bit;
 
     self.add_table_perms(level, perms) catch unreachable;
   }
@@ -90,47 +118,44 @@ pub const page_table_entry = packed struct {
     if(self.is_present(level))
       return error.AlreadyPresent;
 
-    self.present = 1;
-    self.is_mapping_bit = 1;
+    self.raw |= present_bit;
+    self.raw |= is_mapping_bit;
     self.set_physaddr(level, addr);
 
-    self.writable        = if(perms.writable)     1 else 0;
-    self.execute_disable = if(perms.executable)   0 else 1;
-    self.user            = if(perms.user)         1 else 0;
-    self.writethrough    = if(perms.writethrough) 1 else 0;
-    self.cache_disable   = if(perms.cacheable)    0 else 1;
+    self.raw |=  if(perms.writable)     writable_bit else 0;
+    self.raw &= ~if(perms.executable)   execute_disable_bit else 0;
+    self.raw |=  if(perms.user)         user_bit else 0;
+    self.raw |=  if(perms.writethrough) writethrough_bit else 0;
+    self.raw &= ~if(perms.cacheable)    cache_disable_bit else 0;
   }
 
   pub fn add_table_perms(self: *page_table_entry, comptime level: usize, perms: paging_perms) !void {
     if(!self.is_table(level))
       return error.IsNotTable;
     
-    if(perms.writable)
-      self.writable = 1;
-    if(perms.user)
-      self.user = 1;
-    if(perms.executable)
-      self.execute_disable = 0;
+    if(perms.writable)   self.raw |= writable_bit;
+    if(perms.user)       self.raw |= user_bit;
+    if(perms.executable) self.raw &= ~execute_disable_bit;
   }
 
   pub fn format(self: *const page_table_entry, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
-    if(!self.is_present()) {
+    if(!self.is_present(0)) {
       try writer.writeAll("Empty");
       return;
     }
 
-    if(self.is_mapping()) {
-      try writer.print("Mapping{{.phys = 0x{x}, .writable={}, .executable={}, .cache_disable={}", .{self.physaddr(), self.writable, ~self.execute_disable, self.cache_disable});
+    if(self.is_mapping(0)) {
+      try writer.print("Mapping{{.phys = 0x{x}, .writable={}, .execute={}, .cacheable={}", .{self.physaddr(0), self.raw & writable_bit != 0, self.raw & execute_disable_bit == 0, self.raw & cache_disable_bit == 0});
 
-      if(self.writable != 0) {
-        try writer.print(", .write_combining={}", .{~self.writethrough});
+      if((self.raw & writable_bit) != 0) {
+        try writer.print(", .writethrough={}", .{self.raw & writethrough_bit != 0});
       }
 
       try writer.print("}}", .{});
       return;
     }
-    if(self.is_table()) {
-      try writer.print("Table{{.phys = 0x{x}, .writable={}, .executable={}}}", .{self.physaddr(), self.writable, ~self.execute_disable});
+    if(self.is_table(0)) {
+      try writer.print("Table{{.phys = 0x{x}, .writable={}, .execute={}}}", .{self.physaddr(0), self.raw & writable_bit != 0, self.raw & execute_disable_bit == 0});
       return;
     }
     unreachable;
@@ -139,13 +164,13 @@ pub const page_table_entry = packed struct {
 
 comptime {
   assert(@bitSizeOf(page_table_entry) == 64);
+  assert(@sizeOf(page_table_entry) == 8);
 }
 
-pub const page_table = [512]u64;
+pub const page_table = [512]page_table_entry;
 
 fn table_index(table: *page_table, ind: usize) *page_table_entry {
-  //return &table.*[ind]; NOPE OMEGALUL: https://github.com/ziglang/zig/issues/5451, for some reason it thinks page_table_entry is 9 bytes, not 8
-  return @intToPtr(*page_table_entry, @ptrToInt(&table.*[0]) + ind * 8);
+  return &table.*[ind];
 }
 
 pub fn index_into_table(table: *page_table, vaddr: u64, level: usize) *page_table_entry {
@@ -155,8 +180,7 @@ pub fn index_into_table(table: *page_table, vaddr: u64, level: usize) *page_tabl
 
 pub fn make_page_table() !u64 {
   const pt = try pmm.alloc_phys(0x1000);
-  const pt_ptr = &pmm.access_phys(page_table, pt)[0];
-  @memset(@ptrCast([*]u8, pt_ptr), 0x00, 0x1000);
+  @memset(pmm.access_phys(u8, pt), 0x00, 0x1000);
   return pt;
 }
 
