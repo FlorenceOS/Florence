@@ -1,6 +1,7 @@
 const log = @import("logger.zig").log;
 const arch = @import("builtin").arch;
 const platform = @import("platform.zig");
+const scheduler = @import("scheduler.zig");
 
 const acpi = @import("platform/acpi.zig");
 const pci = @import("platform/pci.zig");
