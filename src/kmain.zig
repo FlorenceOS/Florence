@@ -16,12 +16,5 @@ pub fn kmain() noreturn {
     log("PCI init failed: {}\n", .{@errorName(err)});
   };
 
-  while(true) {
-    if(arch == .x86_64) {
-      asm volatile("pause");
-    }
-    if(arch == .aarch64) {
-      asm volatile("YIELD");
-    }
-  }
+  scheduler.exit_task();
 }
