@@ -28,7 +28,7 @@ pub fn relocate_fb() void {
     const vga_page_low = libalign.align_down(usize, page_size, 0xB8000);
     const vga_page_high = libalign.align_up(usize, page_size, 0xB8000 + vga_size);
 
-    paging.map_phys_range(vga_page_low, vga_page_high, paging.wc(paging.mmio())) catch |err| {
+    paging.map_phys_range(vga_page_low, vga_page_high, paging.wc(paging.data())) catch |err| {
       log(":/ rip couldn't map vga: {}\n", .{@errorName(err)});
       return;
     };

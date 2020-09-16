@@ -53,7 +53,7 @@ fn function_scan(addr: Addr) void {
   if(vendor_id == 0xFFFF)
     return;
 
-  log("PCI[{x:0^2}:{x:0^2}:{x:0^2}] ", .{addr.bus, addr.device, addr.function});
+  log("PCI[{x:0^2}:{x:0^2}:{x:0^1}] ", .{addr.bus, addr.device, addr.function});
   log("{{{x:0^4}:{x:0^4}}} ", .{vendor_id, device_id});
   log("({x:0^2}:{x:0^2}:{x:0^2}): ", .{class, subclass, prog_if});
 

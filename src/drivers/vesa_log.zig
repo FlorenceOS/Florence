@@ -53,7 +53,7 @@ pub fn register_fb(fb_phys: usize, fb_pitch: u16, fb_width: u16, fb_height: u16,
   const fb_page_low = libalign.align_down(usize, page_size, fb_phys);
   const fb_page_high = libalign.align_up(usize, page_size, fb_phys + fb_size);
 
-  paging.map_phys_range(fb_page_low, fb_page_high, paging.wc(paging.mmio())) catch |err| {
+  paging.map_phys_range(fb_page_low, fb_page_high, paging.wc(paging.data())) catch |err| {
     log(":/ rip couldn't map fb: {}\n", .{@errorName(err)});
     return;
   };
