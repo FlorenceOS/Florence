@@ -32,7 +32,6 @@ pub fn setup_gdt() void {
     \\  mov %%ax, %%es
     :
     : [data64] "X" (@as(u16, selector.data64))
-    , [code64] "X" (@as(u16, selector.code64))
     , [p] "X" (&gdt_ptr)
     : "rax"
   );
