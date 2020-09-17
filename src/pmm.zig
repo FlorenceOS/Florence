@@ -96,3 +96,7 @@ pub fn set_phys_base(base: u64) void {
 pub fn access_phys(comptime t: type, phys: u64) [*]t {
   return @intToPtr([*]t, phys + phys_base);
 }
+
+pub fn access_phys_single(comptime t: type, phys: u64) *t {
+  return &access_phys(t, phys)[0];
+}
