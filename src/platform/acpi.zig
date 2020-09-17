@@ -44,9 +44,8 @@ fn parse_MCFG(sdt: []u8) void {
     const hi_bus = sdt[offset + 11];
 
     while(true) {
-      //while(lo_bus == 254) { } // 0xbffde000
       pci.register_mmio(lo_bus, addr) catch |err| {
-        log("Unable to register PCI mmio: {}\n", .{@errorName(err)});
+        log("ACPI: Unable to register PCI mmio: {}\n", .{@errorName(err)});
       };
 
       if(lo_bus == hi_bus)
@@ -120,7 +119,7 @@ pub fn init_acpi() !void {
 
   rsdp = try paging.map_phys_struct(RSDP, rsdp_phys, paging.data());
 
-  log("ACPI revision: {}\n", .{rsdp.revision});
+  log("ACPI: Revision: {}\n", .{rsdp.revision});
 
   switch(rsdp.revision) {
     0 => try parse_root_sdt(u32, rsdp.rsdt_addr),
