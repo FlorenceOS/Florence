@@ -54,7 +54,7 @@ pub fn register_fb(fb_phys: usize, fb_pitch: u16, fb_width: u16, fb_height: u16,
   const fb_page_high = libalign.align_up(usize, page_size, fb_phys + fb_size);
 
   paging.map_phys_range(fb_page_low, fb_page_high, paging.wc(paging.data())) catch |err| {
-    log(":/ rip couldn't map fb: {}\n", .{@errorName(err)});
+    log("VESAlog: Couldn't map fb: {}\n", .{@errorName(err)});
     return;
   };
 
@@ -69,13 +69,13 @@ pub fn register_fb(fb_phys: usize, fb_pitch: u16, fb_width: u16, fb_height: u16,
   // Clear the screen
   @memset(@ptrCast([*]u8, framebuffer.?.addr), bgcol, fb_size);
 
-  log("Screen cleared.\n", .{});
+  log("VESAlog: Screen cleared.\n", .{});
 
-  log("Registered fb @0x{X} with size 0x{X}\n", .{fb_phys, fb_size});
-  log(" Width:  {}\n", .{fb_width});
-  log(" Height: {}\n", .{fb_height});
-  log(" Pitch:  {}\n", .{fb_pitch});
-  log(" BPP:    {}\n", .{fb_bpp});
+  log("VESAlog: Registered fb @0x{X} with size 0x{X}\n", .{fb_phys, fb_size});
+  log("VESAlog:  Width:  {}\n", .{fb_width});
+  log("VESAlog:  Height: {}\n", .{fb_height});
+  log("VESAlog:  Pitch:  {}\n", .{fb_pitch});
+  log("VESAlog:  BPP:    {}\n", .{fb_bpp});
 }
 
 pub fn relocate_fb(fb_phys: usize) void {
@@ -88,7 +88,7 @@ pub fn relocate_fb(fb_phys: usize) void {
   const fb_page_high = libalign.align_up(usize, page_size, fb_phys + fb_size);
 
   paging.map_phys_range(fb_page_low, fb_page_high, paging.wc(paging.data())) catch |err| {
-    log(":/ rip couldn't map fb: {}\n", .{@errorName(err)});
+    log("VESAlog: Couldn't map fb: {}\n", .{@errorName(err)});
     return;
   };
 
@@ -148,13 +148,15 @@ fn blit_char(ch: u8) void {
 }
 
 fn scroll_fb() void {
+  // Speeds this up by like 8x, and I don't think there are bugs here
+  @setRuntimeSafety(false);
+
   // Yes this is slow but I don't care, I love it.
   var y: u64 = char_height;
-  while(y < (framebuffer.?.height/char_height) * char_height) {
+  while(y < (framebuffer.?.height/char_height) * char_height): (y += 1) {
     const dst = @ptrCast([*]u8, framebuffer.?.addr) + framebuffer.?.pitch * (y - char_height);
     const src = @ptrCast([*]u8, framebuffer.?.addr) + framebuffer.?.pitch * y;
     @memcpy(dst, src, framebuffer.?.pitch);
-    y += 1;
   }
   @memset(@ptrCast([*]u8, framebuffer.?.addr) + framebuffer.?.pitch * (y - char_height), 0x00, framebuffer.?.pitch * char_height);
 }
