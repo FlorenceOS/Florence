@@ -73,7 +73,7 @@ fn page_fault_handler(frame: *InterruptFrame) void {
     }
   );
 
-  platform.page_fault(page_fault_addr, frame.ec & 1 != 0, page_fault_type);
+  platform.page_fault(page_fault_addr, (frame.ec & 1) != 0, page_fault_type);
   dump_frame(frame);
   while(true) { }
 }
