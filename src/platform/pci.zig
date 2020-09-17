@@ -12,6 +12,25 @@ pub const Addr = struct {
   bus: u8,
   device: u5,
   function: u3,
+
+  pub fn format(self: *const Addr, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+    try writer.print("[{x:0^2}:{x:0^2}:{x:0^1}]", .{self.bus, self.device, self.function});
+  }
+};
+
+pub const Device = struct {
+  addr: Addr,
+  vendor_id: u16,
+  device_id: u16,
+  class: u8,
+  subclass: u8,
+  prog_if: u8,
+
+  pub fn format(self: *const Device, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+    try writer.print("{} ", .{self.addr});
+    try writer.print("{{{x:0^4}:{x:0^4}}} ", .{self.vendor_id, self.device_id});
+    try writer.print("({x:0^2}:{x:0^2}:{x:0^2})", .{self.class, self.subclass, self.prog_if});
+  }
 };
 
 pub const regoff = u8;
@@ -53,9 +72,16 @@ fn function_scan(addr: Addr) void {
   if(vendor_id == 0xFFFF)
     return;
 
-  log("PCI[{x:0^2}:{x:0^2}:{x:0^1}] ", .{addr.bus, addr.device, addr.function});
-  log("{{{x:0^4}:{x:0^4}}} ", .{vendor_id, device_id});
-  log("({x:0^2}:{x:0^2}:{x:0^2}): ", .{class, subclass, prog_if});
+  const dev = Device {
+    .addr = addr,
+    .vendor_id = vendor_id,
+    .device_id = device_id,
+    .class = class,
+    .subclass = subclass,
+    .prog_if = prog_if,
+  };
+
+  log("PCI: {} ", .{dev});
 
   switch(class) {
     else => { log("Unknown class!\n", .{}); },
@@ -112,8 +138,8 @@ fn function_scan(addr: Addr) void {
         0x03 => {
           switch(prog_if) {
             else => { log("Unknown USB controller!\n", .{}); },
-            0x20 => { log("EHCI controller\n", .{}); },
-            0x30 => { log("XHCI controller\n", .{}); },
+            0x20 => { log("USB2 EHCI controller\n", .{}); },
+            0x30 => { log("USB3 XHCI controller\n", .{}); },
           }
         },
       }
