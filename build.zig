@@ -10,6 +10,7 @@ const Context = enum {
 
 fn target(arch: builtin.Arch, context: Context) std.zig.CrossTarget {
   var disabled_features = std.Target.Cpu.Feature.Set.empty;
+  var enabled_feautres  = std.Target.Cpu.Feature.Set.empty;
 
   if(arch == .aarch64) { // This is equal to -mgeneral-regs-only
     const features = std.Target.aarch64.Feature;
@@ -23,11 +24,11 @@ fn target(arch: builtin.Arch, context: Context) std.zig.CrossTarget {
     // Disable SIMD registers
     disabled_features.addFeature(@enumToInt(features.mmx));
     disabled_features.addFeature(@enumToInt(features.sse));
+    disabled_features.addFeature(@enumToInt(features.sse2));
     disabled_features.addFeature(@enumToInt(features.avx));
     disabled_features.addFeature(@enumToInt(features.avx2));
 
-    // If we do this one, the stdlib freaks out. For now we just enable the fpu in the kernel instead.
-    //disabled_features.addFeature(@enumToInt(features.sse2));
+    enabled_feautres.addFeature(@enumToInt(features.soft_float));
   }
 
   return std.zig.CrossTarget {
@@ -35,6 +36,7 @@ fn target(arch: builtin.Arch, context: Context) std.zig.CrossTarget {
     .os_tag = std.Target.Os.Tag.freestanding,
     .abi = std.Target.Abi.none,
     .cpu_features_sub = disabled_features,
+    .cpu_features_add = enabled_feautres,
   };
 }
 

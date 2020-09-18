@@ -15,7 +15,7 @@
 _start:
   lea rsp, stack_top
   mov rax, cr4
-  bts eax, 9   // OSFXSR
+  //bts eax, 9   // OSFXSR
   //bts eax, 20  // SMEP
   //bts eax, 21  // SMAP
   mov cr4, rax
