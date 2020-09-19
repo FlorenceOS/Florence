@@ -12,7 +12,14 @@ const Printer = struct {
     log(format, args);
   }
 
-  pub const Error = error{};
+  pub fn writeByteNTimes(self: *const Printer, val: u8, num: usize) !void {
+    var i: usize = 0;
+    while(i < num): (i += 1) {
+      putch(val);
+    }
+  }
+
+  pub const Error = anyerror;
 };
 
 pub fn log(comptime format: []const u8, args: anytype) void {
