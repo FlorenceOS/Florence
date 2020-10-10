@@ -320,12 +320,14 @@ pub fn new_task_call(new_task: *scheduler.Task, func: anytype, args: anytype) !v
     //   .modifier = .always_inline,
     //   .stack = @alignCast(16, new_task.platform_data.stack.?)[0..task_stack_size - 16],
     // }, new_task_call_part_2, .{func, args_ptr});
+    var args_ptr = &args;
     asm volatile(
       ""
-      :
+      : [_] "={rax}" (args_ptr)
       : [_] "{rsp}" (@ptrToInt(&new_task.platform_data.stack.?[task_stack_size - 16]))
+      , [_] "{rax}" (args_ptr)
     );
-    @call(.{.modifier = .always_inline}, new_task_call_part_2, .{func, &args});
+    @call(.{.modifier = .always_inline}, new_task_call_part_2, .{func, args_ptr});
   }
 }
 
