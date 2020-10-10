@@ -4,3 +4,6 @@
 [submodule "limine"]
 	path = limine
 	url = https://github.com/limine-bootloader/limine.git
+[submodule "Sabaton"]
+	path = Sabaton
+	url = git@github.com:N00byEdge/Sabaton.git

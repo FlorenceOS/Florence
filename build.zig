@@ -40,31 +40,44 @@ fn target(arch: builtin.Arch, context: Context) std.zig.CrossTarget {
   };
 }
 
-fn build_kernel(b: *Builder, arch: builtin.Arch, board_name: ?[]const u8, main: []const u8, name: []const u8, asmfiles: [][]const u8) *std.build.LibExeObjStep {
+fn build_kernel(b: *Builder, arch: builtin.Arch, main: []const u8, name: []const u8, asmfiles: [][]const u8) *std.build.LibExeObjStep {
   const kernel_filename =
     std.mem.concat(b.allocator, u8,
-      &[_][]const u8{ "Zigger_", name, if(board_name==null) "" else "_", if(board_name==null) "" else board_name.?, "_", @tagName(arch) }
+      &[_][]const u8{ "Zigger_", name, "_", @tagName(arch) }
     ) catch unreachable;
 
   const kernel = b.addExecutable(kernel_filename, main);
   kernel.setTarget(target(arch, .kernel));
   kernel.setLinkerScriptPath("src/linker.ld");
-  //kernel.code_model = .large;
   kernel.setBuildMode(.ReleaseSafe);
 
   for(asmfiles) |f| {
     kernel.addAssemblyFile(f);
   }
 
+  switch(arch) {
+    .x86_64 => {
+      //kernel.addAssemblyFile("src/platform/x86_64/ap_boot.asm");
+      kernel.code_model = .kernel;
+    },
+    .aarch64 => {
+
+    },
+    else => { }
+  }
+
   kernel.setMainPkgPath("src/");
   kernel.setOutputDir(b.cache_root);
+
+  kernel.disable_stack_probing = true;
+
   kernel.install();
 
   return kernel;
 }
 
 fn stivale_kernel(b: *Builder, arch: builtin.Arch) *std.build.LibExeObjStep {
-  return build_kernel(b, arch, null, "src/boot/stivale.zig", "stivale",
+  return build_kernel(b, arch, "src/boot/stivale.zig", "stivale",
     &[_][]u8 {
       std.mem.concat(b.allocator, u8,
         &[_][]const u8{ "src/boot/stivale_", @tagName(arch), ".asm" }
@@ -73,55 +86,53 @@ fn stivale_kernel(b: *Builder, arch: builtin.Arch) *std.build.LibExeObjStep {
   );
 }
 
-fn baremetal_kernel(b: *Builder, board_name: []const u8, arch: builtin.Arch) *std.build.LibExeObjStep {
-  return build_kernel(b, arch, board_name,
-    std.mem.concat(b.allocator, u8,
-      &[_][]const u8{"src/boot/baremetal_", board_name, ".zig" }
-    ) catch unreachable, "baremetal",
+fn stivale2_kernel(b: *Builder, arch: builtin.Arch) *std.build.LibExeObjStep {
+  return build_kernel(b, arch, "src/boot/stivale2.zig", "stivale2",
     &[_][]u8 {
       std.mem.concat(b.allocator, u8,
-        &[_][]const u8{ "src/boot/baremetal_", board_name, "_", @tagName(arch), ".asm" }
+        &[_][]const u8{ "src/boot/stivale2_", @tagName(arch), ".asm" }
       ) catch unreachable
     }
   );
 }
 
-fn qemu_aarch64_baremetal_target(b: *Builder, board_name: []const u8, desc: []const u8, dep: *std.build.LibExeObjStep) void {
+fn qemu_run_aarch64_sabaton(b: *Builder, board_name: []const u8, desc: []const u8, dep: *std.build.LibExeObjStep) void {
   const command_step = b.step(board_name, desc);
 
   const params =
-    switch(dep.target.cpu_arch.?) {
-      builtin.Arch.aarch64 => &[_][]const u8 {
-        "qemu-system-aarch64",
-        "-M", board_name,
-        "-cpu", "cortex-a57",
-        "-kernel", dep.getOutputPath(),
-        "-m", "4G",
-        "-serial", "stdio",
-        //"-S", "-s",
-        "-d", "int",
-      },
-      else => unreachable,
+    &[_][]const u8 {
+      "qemu-system-aarch64",
+      "-M", board_name,
+      "-cpu", "cortex-a57",
+      "-drive", "if=pflash,format=raw,file=Sabaton/out/virt.bin,readonly=on",
+      "-drive",
+      std.mem.concat(b.allocator, u8, &[_][]const u8{
+        "if=pflash,format=raw,file=", dep.getOutputPath(), ",readonly=on"
+      }) catch unreachable,
+      "-m", "4G",
+      "-serial", "stdio",
+      //"-S", "-s",
+      //"-d", "int",
     };
 
-  const run_step = b.addSystemCommand(params);
-  run_step.step.dependOn(&dep.step);
+  const pad_step = b.addSystemCommand(
+    &[_][]const u8 {
+      "truncate", "-s", "64M", dep.getOutputPath(),
+    },
+  );
 
+  const run_step = b.addSystemCommand(params);
+  pad_step.step.dependOn(&dep.step);
+  run_step.step.dependOn(&pad_step.step);
   command_step.dependOn(&run_step.step);
 }
 
-fn qloader_target(b: *Builder, command: []const u8, desc: []const u8, image_path: []const u8, dep: *std.build.LibExeObjStep) void {
-  assert(dep.target.cpu_arch.? == .x86_64);
-
-  const command_step = b.step(command, desc);
-
+fn qemu_run_image_x86_64(b: *Builder, image_path: []const u8) *std.build.RunStep {
   const run_params =
     &[_][]const u8 {
       "qemu-system-x86_64",
       "-drive",
-      std.mem.concat(b.allocator, u8,
-        &[_][]const u8{ "format=raw,file=", image_path }
-      ) catch unreachable,
+      std.mem.concat(b.allocator, u8, &[_][]const u8{ "format=raw,file=", image_path }) catch unreachable,
       "-debugcon", "stdio",
       "-m", "4G",
       "-no-reboot",
@@ -132,26 +143,54 @@ fn qloader_target(b: *Builder, command: []const u8, desc: []const u8, image_path
       //"-d", "int",
       //"-s", "-S",
     };
-  const run_step = b.addSystemCommand(run_params);
+  return b.addSystemCommand(run_params);
+}
 
+fn echfs_image(b: *Builder, image_path: []const u8, kernel_path: []const u8, install_command: []const u8) *std.build.RunStep {
   const image_params =
     &[_][]const u8 {
       "/bin/sh", "-c",
-      std.mem.concat(b.allocator, u8,
-        &[_][]const u8{
-          "rm ", image_path, " || true && ",
-          "dd if=/dev/zero bs=1M count=0 seek=4 of=", image_path, " && ",
-          "parted -s ", image_path, " mklabel msdos && ",
-          "parted -s ", image_path, " mkpart primary 1 100% && ",
-          "parted -s ", image_path, " set 1 boot on && ",
-          "echfs-utils -m -p0 ", image_path, " quick-format 32768 && ",
-          "echfs-utils -m -p0 ", image_path, " import qloader_image/qloader2.cfg qloader2.cfg && ",
-          "echfs-utils -m -p0 ", image_path, " import ", dep.getOutputPath(), " Zigger.elf && ",
-          "./qloader2/qloader2-install ./qloader2/qloader2.bin ", image_path,
-        }
-      ) catch unreachable
+      std.mem.concat(b.allocator, u8, &[_][]const u8{
+        "rm ", image_path, " || true && ",
+        "dd if=/dev/zero bs=1M count=0 seek=4 of=", image_path, " && ",
+        "parted -s ", image_path, " mklabel msdos && ",
+        "parted -s ", image_path, " mkpart primary 1 100% && ",
+        "parted -s ", image_path, " set 1 boot on && ",
+        "echfs-utils -m -p0 ", image_path, " quick-format 32768 && ",
+        "echfs-utils -m -p0 ", image_path, " import '", kernel_path, "' Zigger.elf && ",
+        install_command,
+      }) catch unreachable,
     };
-  const image_step = b.addSystemCommand(image_params);
+  return b.addSystemCommand(image_params);
+}
+
+fn qloader_target(b: *Builder, command: []const u8, desc: []const u8, image_path: []const u8, dep: *std.build.LibExeObjStep) void {
+  assert(dep.target.cpu_arch.? == .x86_64);
+
+  const command_step = b.step(command, desc);
+  const run_step = qemu_run_image_x86_64(b, image_path);
+  const image_step = echfs_image(b, image_path, dep.getOutputPath(),
+    std.mem.concat(b.allocator, u8, &[_][]const u8{
+      "echfs-utils -m -p0 ", image_path, " import qloader_image/qloader2.cfg qloader2.cfg && ",
+      "./qloader2/qloader2-install ./qloader2/qloader2.bin ", image_path
+    }) catch unreachable);
+
+  image_step.step.dependOn(&dep.step);
+  run_step.step.dependOn(&image_step.step);
+  command_step.dependOn(&run_step.step);
+}
+
+fn limine_target(b: *Builder, command: []const u8, desc: []const u8, image_path: []const u8, dep: *std.build.LibExeObjStep) void {
+  assert(dep.target.cpu_arch.? == .x86_64);
+
+  const command_step = b.step(command, desc);
+  const run_step = qemu_run_image_x86_64(b, image_path);
+  const image_step = echfs_image(b, image_path, dep.getOutputPath(),
+    std.mem.concat(b.allocator, u8, &[_][]const u8{
+      "make -C limine limine-install && ",
+      "echfs-utils -m -p0 ", image_path, " import limine_image/limine.cfg limine.cfg && ",
+      "./limine/limine-install ./limine/limine.bin ", image_path
+    }) catch unreachable);
 
   image_step.step.dependOn(&dep.step);
   run_step.step.dependOn(&image_step.step);
@@ -159,10 +198,13 @@ fn qloader_target(b: *Builder, command: []const u8, desc: []const u8, image_path
 }
 
 pub fn build(b: *Builder) void {
-  _ = stivale_kernel(b, builtin.Arch.aarch64);
-  //_ = stivale_kernel(b, builtin.Arch.riscv64);
+  qemu_run_aarch64_sabaton(b,
+    "virt",
+    "Run aarch64 kernel with Sabaton stivale2 on the virt board",
+    stivale2_kernel(b, builtin.Arch.aarch64),
+  );
+  //_ = stivale2_kernel(b, builtin.Arch.riscv64);
 
-  qemu_aarch64_baremetal_target(b, "virt", "Run aarch64 bare metal virt board kernel in qemu", baremetal_kernel(b, "virt", builtin.Arch.aarch64));
   qloader_target(
     b,
     "ql2",
@@ -173,5 +215,17 @@ pub fn build(b: *Builder) void {
         "/ql2.img",
       }) catch unreachable,
     stivale_kernel(b, builtin.Arch.x86_64)
+  );
+
+  limine_target(
+    b,
+    "limine",
+    "Run x86_64 kernel with limine stivale2",
+    std.mem.concat(b.allocator, u8,
+      &[_][]const u8{
+        b.cache_root,
+        "/limine.img",
+      }) catch unreachable,
+    stivale2_kernel(b, builtin.Arch.x86_64)
   );
 }

@@ -13,18 +13,10 @@
 .section .text
 .global _start
 _start:
-  lea rsp, stack_top
-  mov rax, cr4
-  //bts eax, 9   // OSFXSR
-  //bts eax, 20  // SMEP
-  //bts eax, 21  // SMAP
-  mov cr4, rax
+  xor rbp, rbp
 
 .extern stivale_main
-  call stivale_main
-1:
-  pause
-  jmp 1b
+  jmp   stivale_main
 
 .section .rodata
 .global stivale_flags

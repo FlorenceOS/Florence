@@ -3,18 +3,52 @@ const arch = @import("builtin").arch;
 const vmm = @import("vmm.zig");
 const log = @import("logger.zig").log;
 
+const std = @import("std");
+
 pub const Task = struct {
   registers: platform.InterruptFrame,
   platform_data: platform.TaskData,
   next_task: ?*Task,
 };
 
+// A simple lock which can be taken by any execution flow, across task switches.
+pub const MultitaskingLock = struct {
+  taken: bool = false,
+
+  pub fn try_lock(self: *MultitaskingLock) bool {
+    return !@atomicRmw(bool, &self.taken, .Xchg, true, .AcqRel);
+  }
+
+  pub fn lock(self: *MultitaskingLock) void {
+    while(!self.try_lock()) { platform.spin_hint(); }
+  }
+
+  pub fn unlock(self: *MultitaskingLock) void {
+    std.debug.assert(self.taken);
+    @atomicStore(bool, &self.taken, false, .Release);
+  }
+};
+
+// Lock something to a specific task
+// Cannot be used by the scheduler as it might be switching tasks
+// pub const Mutex = struct {
+//   owner: ?*Task = null,
+
+//   pub fn try_lock(self: *Mutex) bool {
+
+//   }
+// };
+
 // Just a simple round robin implementation
 const TaskQueue = struct {
   first_task: ?*Task = null,
   last_task: ?*Task = null,
+  lock: MultitaskingLock = .{},
 
   pub fn choose_next_task(self: *@This()) *Task {
+    self.lock.lock();
+    defer self.lock.unlock();
+
     while(self.first_task == null) {
       platform.spin_hint();
     }
@@ -34,6 +68,9 @@ const TaskQueue = struct {
   }
 
   pub fn enqueue_task_front(self: *@This(), task: *Task) void {
+    self.lock.lock();
+    defer self.lock.unlock();
+
     if(self.first_task) |ft| {
       task.next_task = ft;
     } else {
@@ -43,6 +80,9 @@ const TaskQueue = struct {
   }
 
   pub fn enqueue_task(self: *@This(), task: *Task) void {
+    self.lock.lock();
+    defer self.lock.unlock();
+
     task.next_task = null;
 
     if(self.first_task == null)
@@ -108,4 +148,10 @@ pub fn exit_task() noreturn {
 
 pub fn yield() void {
   platform.yield();
+}
+
+pub fn loop() noreturn {
+  while(true) {
+    platform.yield();
+  }
 }

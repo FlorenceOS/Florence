@@ -82,6 +82,7 @@ fn parse_sdt(addr: usize) !void {
     signature_value("ECDT") => { }, // Ignore for now
     signature_value("SBST") => { }, // Ignore for now
     signature_value("HPET") => { }, // Ignore for now
+    signature_value("WAET") => { }, // Ignore for now
     signature_value("APIC") => {
       if(builtin.arch == .x86_64) {
         @import("x86_64/apic.zig").handle_madt(sdt);

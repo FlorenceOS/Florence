@@ -26,7 +26,7 @@ pub fn alloc_single(comptime T: type) !*T {
 }
 
 pub fn free_size(comptime T: type, data: []T) !void {
-  return free_size_impl(@ptrToInt(&T[0]), allocated_bytes(T, data.size));
+  return free_size_impl(@ptrToInt(&data[0]), allocated_bytes(T, data.len));
 }
 
 pub fn free_single(val: anytype) !void {
@@ -63,10 +63,9 @@ fn make_slab_space() u64 {
   errdefer pmm.free_phys(phys, page_size);
 }
 
-const heap_base = 0xFFFFFF8000000000;
 const heap_size = 0x8000000;
 
-var heap_alloc: buddy_alloc(heap_size, page_size, heap_base) = undefined;
+var heap_alloc: buddy_alloc(heap_size, page_size) = undefined;
 
 fn free_size_impl(ptr: u64, size: u64) !void {
   const round_up_sz = libalign.align_up(u64, page_size, size);
@@ -122,7 +121,8 @@ pub fn free_virt(size: u64, value: u64) !void {
   return heap_alloc.free_size(size, value);
 }
 
-pub fn init() !void {
-  try heap_alloc.init();
+pub fn init(phys_high: u64) !void {
+  log("Initializing vmm with base 0x{X}\n", .{phys_high});
+  try heap_alloc.init(phys_high);
   errdefer heap_alloc.deinit() catch unreachable;
 }

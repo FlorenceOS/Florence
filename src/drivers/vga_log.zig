@@ -16,19 +16,19 @@ var framebuffer: ?Framebuffer = null;
 
 pub fn register() void {
   if(arch == .x86_64) {
-    relocate_fb();
+    map_fb(null);
     framebuffer = Framebuffer{};
     log("vga_log ready!\n", .{});
   }
 }
 
-pub fn relocate_fb() void {
+pub fn map_fb(paging_root: ?u64) void {
   if(arch == .x86_64) {
     const vga_size = 80 * 25 * 2;
     const vga_page_low = libalign.align_down(usize, page_size, 0xB8000);
     const vga_page_high = libalign.align_up(usize, page_size, 0xB8000 + vga_size);
 
-    paging.map_phys_range(vga_page_low, vga_page_high, paging.wc(paging.data())) catch |err| {
+    paging.map_phys_range(vga_page_low, vga_page_high, paging.wc(paging.data()), paging_root) catch |err| {
       log(":/ rip couldn't map vga: {}\n", .{@errorName(err)});
       return;
     };
@@ -48,7 +48,7 @@ fn scroll_buffer() void {
     var x: u64 = 0;
     while(x < 80) {
       ptr[0] = ' ';
-      ptr[1] = 0x0F;
+      ptr[1] = 0x07;
       ptr += 2;
       x += 1;
     }
@@ -78,7 +78,7 @@ pub fn putch(ch: u8) void {
     if(framebuffer.?.x_pos == 80)
       feed_line();
 
-    pmm.access_phys(u8, 0xB8000)[(framebuffer.?.y_pos * 80 + framebuffer.?.x_pos) * 2] = ch;
+    pmm.access_phys(u16, 0xB8000)[(framebuffer.?.y_pos * 80 + framebuffer.?.x_pos)] = 0x0700 | @as(u16, ch);
     framebuffer.?.x_pos += 1;
   }
 }

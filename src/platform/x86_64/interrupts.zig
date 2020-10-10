@@ -29,7 +29,7 @@ pub fn init_interrupts() !void {
   handlers[0x6B] = scheduler.yield_handler;
   handlers[0x6C] = scheduler.exit_handler;
 
-  log("Enabling interrupts...\n", .{});
+  log("Interrupts: Enabling interrupts...\n", .{});
 
   asm volatile("sti");
 }
@@ -57,12 +57,12 @@ fn page_fault_handler(frame: *InterruptFrame) void {
     :[addr] "=r" (-> usize)
   );
   const page_fault_type = type_page_fault(frame.ec) catch |err| {
-    log("Page fault at addr 0x{x}, but we couldn't determine what type. (error code was 0x{x}).\nCaught error {}.\n", .{page_fault_addr, frame.ec, @errorName(err)});
+    log("Interrupts: Page fault at addr 0x{x}, but we couldn't determine what type. (error code was 0x{x}).\nCaught error {}.\n", .{page_fault_addr, frame.ec, @errorName(err)});
     dump_frame(frame);
     while(true) { }
   };
 
-  log("Page fault while {} at 0x{x}\n",
+  log("Interrupts: Page fault while {} at 0x{x}\n",
     .{
       switch(page_fault_type) {
         .Read => @as([]const u8, "reading"),
@@ -79,13 +79,13 @@ fn page_fault_handler(frame: *InterruptFrame) void {
 }
 
 fn unhandled_interrupt(frame: *InterruptFrame) void {
-  log("Unhandled interrupt: {}!\n", .{frame.intnum});
+  log("Interrupts: Unhandled interrupt: {}!\n", .{frame.intnum});
   dump_frame(frame);
   while(true) { }
 }
 
 fn disable_pic() void {
-  log("Disabling PIC...\n", .{});
+  log("Interrupts: Disabling PIC...\n", .{});
   {
     const outb = @import("x86_64.zig").outb;
     outb(0x20, 0x11);

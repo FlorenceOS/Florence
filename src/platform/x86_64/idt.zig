@@ -14,7 +14,7 @@ const Idtr = packed struct {
 pub const InterruptHandler = fn func() callconv(.Naked) void;
 
 pub fn setup_idt() !*[num_handlers]idt_entry {
-  log("Setting up IDT...\n", .{});
+  log("IDT: Setting up IDT...\n", .{});
 
   // Allocate IDT
   const idt = (try vmm.alloc_eternal(idt_entry, num_handlers))[0..num_handlers];

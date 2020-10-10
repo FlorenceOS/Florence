@@ -20,6 +20,8 @@ const fgcol = 0xaa;
 const char_width = 8;
 const char_height = 8;
 
+const clear_screen = false;
+
 const Framebuffer = struct {
   addr: []u8,
   pitch: u64,
@@ -53,7 +55,7 @@ pub fn register_fb(fb_phys: usize, fb_pitch: u16, fb_width: u16, fb_height: u16,
   const fb_page_low = libalign.align_down(usize, page_size, fb_phys);
   const fb_page_high = libalign.align_up(usize, page_size, fb_phys + fb_size);
 
-  paging.map_phys_range(fb_page_low, fb_page_high, paging.wc(paging.data())) catch |err| {
+  paging.map_phys_range(fb_page_low, fb_page_high, paging.wc(paging.data()), null) catch |err| {
     log("VESAlog: Couldn't map fb: {}\n", .{@errorName(err)});
     return;
   };
@@ -66,10 +68,10 @@ pub fn register_fb(fb_phys: usize, fb_pitch: u16, fb_width: u16, fb_height: u16,
     .bpp = fb_bpp,
   };
 
-  // Clear the screen
-  @memset(@ptrCast([*]u8, framebuffer.?.addr), bgcol, fb_size);
-
-  log("VESAlog: Screen cleared.\n", .{});
+  if(clear_screen) {
+    @memset(@ptrCast([*]u8, framebuffer.?.addr), bgcol, fb_size);
+    log("VESAlog: Screen cleared.\n", .{});
+  }
 
   log("VESAlog: Registered fb @0x{X} with size 0x{X}\n", .{fb_phys, fb_size});
   log("VESAlog:  Width:  {}\n", .{fb_width});
@@ -78,28 +80,20 @@ pub fn register_fb(fb_phys: usize, fb_pitch: u16, fb_width: u16, fb_height: u16,
   log("VESAlog:  BPP:    {}\n", .{fb_bpp});
 }
 
-pub fn relocate_fb(fb_phys: usize) void {
-  // Please don't print during this lol
-  const fb = framebuffer;
-  framebuffer = null;
+pub fn map_fb(paging_root: u64) void {
+  const fb_size = @as(u64, framebuffer.?.pitch) * @as(u64, framebuffer.?.height);
+  const fb_page_low = libalign.align_down(usize, page_size, @ptrToInt(&framebuffer.?.addr[0]));
+  const fb_page_high = libalign.align_up(usize, page_size, @ptrToInt(&framebuffer.?.addr[0]) + fb_size);
 
-  const fb_size = fb.?.pitch * fb.?.height;
-  const fb_page_low = libalign.align_down(usize, page_size, fb_phys);
-  const fb_page_high = libalign.align_up(usize, page_size, fb_phys + fb_size);
-
-  paging.map_phys_range(fb_page_low, fb_page_high, paging.wc(paging.data())) catch |err| {
+  paging.map_phys_range(fb_page_low, fb_page_high, paging.wc(paging.data()), paging_root) catch |err| {
     log("VESAlog: Couldn't map fb: {}\n", .{@errorName(err)});
     return;
   };
-
-  framebuffer = fb;
-  framebuffer.?.addr = pmm.access_phys(u8, fb_phys)[0..fb_size];
 }
 
-fn px(comptime bpp: u64, x: u64, y: u64) *[bpp]u8 {
-  std.debug.assert(framebuffer.?.bpp == bpp);
+fn px(comptime bpp: u64, x: u64, y: u64) *[3]u8 {
   const offset = framebuffer.?.pitch * y + x * bpp;
-  return framebuffer.?.addr[offset .. offset + bpp][0..bpp];
+  return framebuffer.?.addr[offset .. offset + 3][0..3];
 }
 
 fn blit_impl(comptime bpp: u64, ch: u8) void {
@@ -112,10 +106,6 @@ fn blit_impl(comptime bpp: u64, ch: u8) void {
       const xpx = framebuffer.?.pos_x * char_width + x;
 
       const pixel = px(bpp, xpx, ypx);
-
-      if(bpp == 4) {
-        pixel[3] = 0xFF;
-      }
 
       const shift: u3 = char_width - 1 - x;
       const has_pixel_set = ((chr_line >> shift) & 1) == 1;

@@ -47,11 +47,17 @@ pub const unmap_args = struct {
 pub fn unmap(args: unmap_args) !void {
   var argc = args;
   try unmap_impl(&argc.virt, &argc.size, argc.reclaim_pages, argc.root);
-  if(argc.root != null and argc.root.? != get_current_paging_root())
+
+  if(argc.root != null)
+    return;
+
+  const current_root = get_current_paging_root();
+
+  if(argc.root != current_root)
     return;
 
   // Flush page tables
-  platform.set_paging_root(get_current_paging_root());
+  platform.set_paging_root(current_root);
 }
 
 pub const perms = struct {
@@ -130,7 +136,7 @@ pub fn get_current_paging_root() u64 {
 
 pub fn set_paging_root(pt_phys: u64, phys_base: u64) !void {
   platform.set_paging_root(pt_phys);
-  pmm.set_phys_base(phys_base);
+  //pmm.set_phys_base(phys_base);
 }
 
 extern var __kernel_text_begin: u8;
@@ -162,22 +168,19 @@ pub fn add_physical_mapping(new_root: usize, phys: usize, size: usize) !void {
   });
 }
 
-pub fn map_phys_range(phys: usize, phys_end: usize, perm: perms) !void {
+pub fn map_phys_range(phys: usize, phys_end: usize, perm: perms, paging_root: ?u64) !void {
   var beg = phys;
-  while(beg != phys_end) {
+  while(beg != phys_end): (beg += page_sizes[0]) {
     map_phys(.{
       .virt = @ptrToInt(&__physical_base) + beg,
       .phys = beg,
       .size = page_sizes[0],
       .perm = perm,
+      .root = paging_root,
     }) catch |err| switch(err) {
-      error.AlreadyPresent => {
-        beg += page_sizes[0];
-        continue;
-      },
-      else => { return err; }
+      error.AlreadyPresent => continue,
+      else => return err,
     };
-    beg += page_sizes[0];
   }
 }
 
@@ -191,7 +194,7 @@ pub fn map_phys_size(phys: usize, size: usize, perm: perms) !void {
   const page_addr_low = libalign.align_down(usize, page_sizes[0], phys);
   const page_addr_high = libalign.align_up(usize, page_sizes[0], phys + size);
 
-  try map_phys_range(page_addr_low, page_addr_high, perm);
+  try map_phys_range(page_addr_low, page_addr_high, perm, null);
 }
 
 pub fn finalize_kernel_paging(new_root: u64) !void {
@@ -203,7 +206,7 @@ fn map_kernel_section(new_paging_root: u64, start: *u8, end: *u8, perm: perms) !
   const section_size = libalign.align_up(usize, platform.page_sizes[0], @ptrToInt(end) - @ptrToInt(start));
   try map_phys(.{
     .virt = @ptrToInt(start),
-    .phys = @ptrToInt(start),
+    .phys = @ptrToInt(start) - 0xffffffff80000000,
     .size = section_size,
     .perm = perm,
     .root = new_paging_root,
@@ -362,7 +365,7 @@ fn print_impl(root: *page_table, comptime level: usize) void {
         log(" ", .{});
         cnt -= 1;
       }
-      log("Index {}: {}\n", .{offset/8, ent});
+      log("Index {x:0^3}: {}\n", .{offset/8, ent});
       if(level != 0)
         if(ent.is_table(level))
           print_impl(ent.get_table(level) catch unreachable, level - 1);

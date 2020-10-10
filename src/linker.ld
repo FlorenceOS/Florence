@@ -8,22 +8,30 @@ PHDRS {
 }
 
 SECTIONS {
+  . = 0;
+  __physical_base = .;
+
   .stivalehdr : {
     KEEP(*(.stivalehdr))
   }: none
 
+  .stivale2hdr : {
+    KEEP(*(.stivale2hdr))
+  }: none
+
   .rela.dyn : { KEEP(*(.rela*)) }
 
-  . = 1M;
+  . = 0xFFFFFFFF80100000;
 
-  .text : ALIGN(16K) {
+  .text : ALIGN(64K) {
     __kernel_text_begin = .;
     *(.text*)
     __kernel_text_end = .;
   }:text
 
-  .rodata : ALIGN(16K) {
+  .rodata : ALIGN(64K) {
     __kernel_rodata_begin = .;
+    KEEP(*(.rodata.stivale))
     *(.rodata*)
     /*__debug_info_start = .;
     KEEP(*(.debug_info))
@@ -43,7 +51,7 @@ SECTIONS {
     __kernel_rodata_end = .;
   }:rodata
 
-  .data : ALIGN(16K) {
+  .data : ALIGN(64K) {
     __kernel_data_begin = .;
     *(.data*)
     *(.bss*)
@@ -51,7 +59,4 @@ SECTIONS {
   }:data
 
   __kernel_end = .;
-
-  . = 1024 * 1M; /* 1G */
-  __physical_base = .;
 }

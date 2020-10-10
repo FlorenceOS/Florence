@@ -87,16 +87,18 @@ pub fn free_phys(phys: u64, size: u64) void {
   unreachable;
 }
 
-var phys_base: u64 = 0;
-
-pub fn set_phys_base(base: u64) void {
-  phys_base = base;
+pub fn access_phys(comptime t: type, phys: u64) [*]t {
+  return @intToPtr([*]t, phys);
 }
 
-pub fn access_phys(comptime t: type, phys: u64) [*]t {
-  return @intToPtr([*]t, phys + phys_base);
+pub fn access_phys_volatile(comptime t: type, phys: u64) [*]volatile t {
+  return @ptrCast([*]volatile t, access_phys(t, phys));
 }
 
 pub fn access_phys_single(comptime t: type, phys: u64) *t {
   return &access_phys(t, phys)[0];
+}
+
+pub fn access_phys_single_volatile(comptime t: type, phys: u64) *volatile t {
+  return @ptrCast(*volatile t, access_phys_single(t, phys));
 }

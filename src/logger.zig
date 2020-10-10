@@ -2,6 +2,7 @@ const fmt = @import("std").fmt;
 const platform = @import("platform.zig");
 const serial = @import("serial.zig");
 const range = @import("lib/range.zig");
+const arch = @import("builtin").arch;
 
 const Printer = struct {
   pub fn writeAll(self: *const Printer, str: []const u8) !void {
@@ -37,7 +38,9 @@ fn putch(ch: u8) void {
   platform.debugputch(ch);
   serial.putch(ch);
   @import("drivers/vesa_log.zig").putch(ch);
-  @import("drivers/vga_log.zig").putch(ch);
+  if(arch == .x86_64) {
+    @import("drivers/vga_log.zig").putch(ch);
+  }
 }
 
 pub fn hexdump(in_bytes: []u8) void {

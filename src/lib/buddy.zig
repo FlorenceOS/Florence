@@ -22,7 +22,7 @@ const free_node = struct {
   }
 };
 
-pub fn buddy_alloc(comptime allocator_size: usize, comptime minsize: usize, comptime base: usize) type {
+pub fn buddy_alloc(comptime allocator_size: usize, comptime minsize: usize) type {
   var curr_size = minsize;
   var allocator_levels = 1;
 
@@ -40,18 +40,20 @@ pub fn buddy_alloc(comptime allocator_size: usize, comptime minsize: usize, comp
     bs: bitset(bitset_sz) = .{},
     freelists: [allocator_levels]free_node = [_]free_node{free_node{}} ** allocator_levels,
     inited: bool = false,
+    base: usize,
 
-    pub fn init(self: *@This()) !void {
+    pub fn init(self: *@This(), base: usize) !void {
       if(self.inited)
         return error.AlreadyInited;
 
       self.inited = true;
+      self.base = base;
 
       // Making up a new address here, need to make sure it's mapped
-      const root_node = @intToPtr(*free_node, base);
+      const root_node = @intToPtr(*free_node, self.base);
 
       try paging.map(.{
-        .virt = base,
+        .virt = self.base,
         .size = page_size,
         .perm = paging.data(),
       });
@@ -66,7 +68,7 @@ pub fn buddy_alloc(comptime allocator_size: usize, comptime minsize: usize, comp
       if(!self.inited)
         return error.NotInited;
 
-      if(!self.freelists[allocator_levels - 1].next != @intToPtr(*free_node, base))
+      if(!self.freelists[allocator_levels - 1].next != @intToPtr(*free_node, self.base))
         return error.CannotRollback;
 
       self.inited = false;
@@ -96,7 +98,7 @@ pub fn buddy_alloc(comptime allocator_size: usize, comptime minsize: usize, comp
       return addr ^ level_size(level);
     }
 
-    fn addr_bitset_index(comptime level: usize, addr: usize) usize {
+    fn addr_bitset_index(self: @This(), comptime level: usize, addr: usize) usize {
       var curr_step = num_entries_at_bottom_level;
       var idx: usize = 0;
       var block_size = minsize;
@@ -107,7 +109,7 @@ pub fn buddy_alloc(comptime allocator_size: usize, comptime minsize: usize, comp
         block_size *= 2;
       }
 
-      return idx + (addr - base) / block_size;
+      return idx + (addr - self.base) / block_size;
     }
 
     fn alloc(self: *@This(), comptime level: usize) !usize {
@@ -158,7 +160,7 @@ pub fn buddy_alloc(comptime allocator_size: usize, comptime minsize: usize, comp
       self.freelists[level].next = node;
 
       // Set bit in bitset
-      self.bs.set(addr_bitset_index(level, ptr));
+      self.bs.set(self.addr_bitset_index(level, ptr));
     }
 
     fn free(self: *@This(), comptime level: usize, addr: usize) !void {
@@ -170,7 +172,7 @@ pub fn buddy_alloc(comptime allocator_size: usize, comptime minsize: usize, comp
 
       else {
         const buddy = buddy_addr(level, addr);
-        const buddy_index = addr_bitset_index(level, buddy);
+        const buddy_index = self.addr_bitset_index(level, buddy);
 
         // Is buddy free??
         if(!self.bs.is_set(buddy_index)) {

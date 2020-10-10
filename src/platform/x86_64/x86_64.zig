@@ -30,7 +30,7 @@ pub fn allowed_mapping_levels() u8 {
 
 const paging_perms = @import("../../paging.zig").perms;
 
-// https://github.com/ziglang/zig/issues/5451
+// https://github.com/ziglang/zig/issues/2627
 // Just straight up doesn't work, everything breaks as page table entries has size 9
 // according to the compiler
 // present: u1,
@@ -149,7 +149,7 @@ pub const page_table_entry = packed struct {
     }
 
     if(self.is_mapping(0)) {
-      try writer.print("Mapping{{.phys = 0x{x}, .writable={}, .execute={}, .cacheable={}", .{self.physaddr(0), @boolToInt(self.raw & writable_bit != 0), @boolToInt(self.raw & execute_disable_bit == 0), @boolToInt(self.raw & cache_disable_bit == 0)});
+      try writer.print("Mapping{{.phys = 0x{x:0^16}, .writable={}, .execute={}, .cacheable={}", .{self.physaddr(0), @boolToInt(self.raw & writable_bit != 0), @boolToInt(self.raw & execute_disable_bit == 0), @boolToInt(self.raw & cache_disable_bit == 0)});
 
       if((self.raw & writable_bit) != 0) {
         try writer.print(", .writethrough={}", .{@boolToInt(self.raw & writethrough_bit != 0)});
@@ -159,7 +159,7 @@ pub const page_table_entry = packed struct {
       return;
     }
     if(self.is_table(0)) {
-      try writer.print("Table{{.phys = 0x{x}, .writable={}, .execute={}}}", .{self.physaddr(0), @boolToInt(self.raw & writable_bit != 0), @boolToInt(self.raw & execute_disable_bit == 0)});
+      try writer.print("Table{{.phys = 0x{x:0^16}, .writable={}, .execute={}}}", .{self.physaddr(0), @boolToInt(self.raw & writable_bit != 0), @boolToInt(self.raw & execute_disable_bit == 0)});
       return;
     }
     unreachable;
@@ -334,7 +334,10 @@ fn new_task_call_part_2(func: anytype, args_ptr: anytype) noreturn {
   // Let our parent task resume now that we've safely copied
   // the function arguments onto our stack
   scheduler.yield();
-  @call(.{}, func, new_args);
+  @call(.{}, func, new_args) catch |err| {
+    log("Task exited with error: {}\n", .{@errorName(err)});
+    while(true) { }
+  };
   scheduler.exit_task();
 }
 

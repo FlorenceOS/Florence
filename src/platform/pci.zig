@@ -46,7 +46,7 @@ pub fn pci_read(comptime T: type, addr: Addr, offset: regoff) T {
   if(@hasDecl(platform, "pci_read"))
     return platform.pci_read(T, addr, offset);
 
-  unreachable;
+  @panic("No pci_read method!");
 }
 
 pub fn pci_write(comptime T: type, addr: Addr, offset: regoff, value: T) void {
@@ -58,7 +58,7 @@ pub fn pci_write(comptime T: type, addr: Addr, offset: regoff, value: T) void {
   if(@hasDecl(platform, "pci_write"))
     return platform.write(T, addr, offset, value);
 
-  unreachable;
+  @panic("No pci_write method!");
 }
 
 fn function_scan(addr: Addr) void {
