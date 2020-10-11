@@ -31,13 +31,23 @@ pub const MultitaskingLock = struct {
 
 // Lock something to a specific task
 // Cannot be used by the scheduler as it might be switching tasks
-// pub const Mutex = struct {
-//   owner: ?*Task = null,
+pub const Mutex = struct {
+  owner: ?*Task = null,
 
-//   pub fn try_lock(self: *Mutex) bool {
+  pub fn try_lock(self: *Mutex) bool {
+    return @atomicRmw(?*Task, &self.owner, .Xchg, platform.get_current_task(), .AcqRel) == null;
+  }
 
-//   }
-// };
+  pub fn lock(self: *Mutex) void {
+    while(!self.try_lock()) yield();
+  }
+
+  pub fn unlock(self: *Mutex) void {
+    if(self.owner != platform.get_current_task())
+      @panic("Unlock in different task!");
+    @atomicStore(?*Task, &self.owner, null, .Release);
+  }
+};
 
 // Just a simple round robin implementation
 const TaskQueue = struct {
