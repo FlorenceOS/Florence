@@ -123,7 +123,6 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
 
   var tag = info_in.tags;
   while(tag != null): (tag = tag.?.next) {
-    log("Stivale2 tag: {}\n", .{tag.?.identifier});
     switch(tag.?.identifier) {
       0x2187f79e8612de07 => info.memmap      = @ptrCast(*stivale2_memmap, tag),
       0xe5e76a1b4597a781 => info.commandline = @ptrCast(*stivale2_commandline, tag),
