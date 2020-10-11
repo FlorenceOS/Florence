@@ -49,7 +49,7 @@ fn build_kernel(b: *Builder, arch: builtin.Arch, main: []const u8, name: []const
   const kernel = b.addExecutable(kernel_filename, main);
   kernel.setTarget(target(arch, .kernel));
   kernel.setLinkerScriptPath("src/linker.ld");
-  kernel.setBuildMode(.ReleaseSafe);
+  kernel.setBuildMode(.ReleaseSmall);
 
   for(asmfiles) |f| {
     kernel.addAssemblyFile(f);

@@ -299,8 +299,8 @@ pub fn new_task_call(new_task: *scheduler.Task, func: anytype, args: anytype) !v
   var had_error: u64 = undefined;
   var result: u64 = undefined;
 
-  new_task.platform_data.stack = try vmm.alloc_single([task_stack_size]u8);
-  errdefer vmm.free_single(new_task.platform_data.stack.?) catch unreachable;
+  new_task.platform_data.stack = try vmm.ephemeral.create([task_stack_size]u8);
+  errdefer vmm.ephemeral.destroy(new_task.platform_data.stack.?);
 
   // task_fork()
   asm volatile(

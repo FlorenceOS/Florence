@@ -17,7 +17,7 @@ pub fn setup_idt() !*[num_handlers]idt_entry {
   log("IDT: Setting up IDT...\n", .{});
 
   // Allocate IDT
-  const idt = (try vmm.alloc_eternal(idt_entry, num_handlers))[0..num_handlers];
+  const idt = try vmm.eternal.create([num_handlers]idt_entry);
 
   const idtr = Idtr {
     .addr = @ptrToInt(&idt[0]),

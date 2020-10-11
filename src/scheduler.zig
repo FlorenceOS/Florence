@@ -121,7 +121,7 @@ pub fn yield_handler(frame: *platform.InterruptFrame) void {
 
 fn exit_impl() !void {
   const current_task = try platform.self_exited();
-  try vmm.free_single(current_task);
+  vmm.ephemeral.destroy(current_task);
 }
 
 // Exiting a task
@@ -135,7 +135,7 @@ pub fn exit_handler(frame: *platform.InterruptFrame) void {
 
 // Starting up a new processor
 pub fn startup_handler(frame: *platform.InterruptFrame) void {
-  const task = vmm.alloc_single(Task) catch |err| {
+  const task = vmm.ephemeral.create(Task) catch |err| {
     log("Error while allocating task: {}\n", .{@errorName(err)});
     while(true) { }
   };
@@ -147,8 +147,8 @@ pub fn startup_handler(frame: *platform.InterruptFrame) void {
 
 // Creating a new task from an existing one
 pub fn make_task(func: anytype, args: anytype) !void {
-  const task = try vmm.alloc_single(Task);
-  errdefer vmm.free_single(task) catch unreachable;
+  const task = try vmm.ephemeral.create(Task);
+  errdefer vmm.ephemeral.destroy(task);
   try platform.new_task_call(task, func, args);
 }
 
