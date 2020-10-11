@@ -1,6 +1,6 @@
 const libalign = @import("align.zig");
 
-pub fn bitset(num_bits: usize) type {
+pub fn Bitset(num_bits: usize) type {
   const num_bytes = libalign.align_up(usize, 8, num_bits)/8;
 
   return struct {
@@ -24,10 +24,10 @@ pub fn bitset(num_bits: usize) type {
   };
 }
 
-test "bitset" {
+test "Bitset" {
   const expect = @import("std").testing.expect;
 
-  var bs: bitset(8) = .{};
+  var bs: Bitset(8) = .{};
   expect(!bs.is_set(0));
   bs.set(0);
   expect(bs.is_set(0));
