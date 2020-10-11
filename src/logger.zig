@@ -6,7 +6,7 @@ const arch = @import("builtin").arch;
 
 const Printer = struct {
   pub fn writeAll(self: *const Printer, str: []const u8) !void {
-    try print_str(str);
+    try @call(.{.modifier = .never_inline}, print_str, .{str});
   }
 
   pub fn print(self: *const Printer, comptime format: []const u8, args: anytype) !void {
