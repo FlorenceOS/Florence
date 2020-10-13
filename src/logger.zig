@@ -43,7 +43,7 @@ fn putch(ch: u8) void {
   }
 }
 
-pub fn hexdump(in_bytes: []u8) void {
+pub fn hexdump(in_bytes: []const u8) void {
   var bytes = in_bytes;
   while(bytes.len != 0) {
     log("{x:0^16}: ", .{@ptrToInt(&bytes[0])});
