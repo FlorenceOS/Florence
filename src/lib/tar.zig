@@ -23,7 +23,7 @@ fn file_name(blob: []const u8) []const u8 {
 }
 
 fn file_size(blob: []const u8) usize {
-  // Filename is at [124..135], octal encoded
+  // File size is at [124..135], octal encoded
   return std.fmt.parseUnsigned(usize, blob[124..135], 8) catch unreachable;
 }
 
