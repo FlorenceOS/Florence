@@ -8,6 +8,22 @@ const Context = enum {
   userspace,
 };
 
+var source_blob: *std.build.RunStep = undefined;
+var source_blob_path: []u8 = undefined;
+
+fn make_source_blob(b: *Builder) void {
+  source_blob_path =
+    std.mem.concat(b.allocator, u8,
+      &[_][]const u8{ b.cache_root, "/sources.tar" }
+    ) catch unreachable;
+
+  source_blob = b.addSystemCommand(
+    &[_][]const u8 {
+      "tar", "--no-xattrs", "-cf", source_blob_path, "src", "build.zig",
+    },
+  );
+}
+
 fn target(arch: builtin.Arch, context: Context) std.zig.CrossTarget {
   var disabled_features = std.Target.Cpu.Feature.Set.empty;
   var enabled_feautres  = std.Target.Cpu.Feature.Set.empty;
@@ -47,6 +63,7 @@ fn build_kernel(b: *Builder, arch: builtin.Arch, main: []const u8, name: []const
     ) catch unreachable;
 
   const kernel = b.addExecutable(kernel_filename, main);
+  kernel.addBuildOption([] const u8, "source_blob_path", std.mem.concat(b.allocator, u8, &[_][]const u8{ "../", source_blob_path } ) catch unreachable);
   kernel.setTarget(target(arch, .kernel));
   kernel.setLinkerScriptPath("src/linker.ld");
   kernel.setBuildMode(.ReleaseSmall);
@@ -72,6 +89,8 @@ fn build_kernel(b: *Builder, arch: builtin.Arch, main: []const u8, name: []const
   kernel.disable_stack_probing = true;
 
   kernel.install();
+
+  kernel.step.dependOn(&source_blob.step);
 
   return kernel;
 }
@@ -198,6 +217,8 @@ fn limine_target(b: *Builder, command: []const u8, desc: []const u8, image_path:
 }
 
 pub fn build(b: *Builder) void {
+  const sources = make_source_blob(b);
+
   qemu_run_aarch64_sabaton(b,
     "virt",
     "Run aarch64 kernel with Sabaton stivale2 on the virt board",
