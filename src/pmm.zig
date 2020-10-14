@@ -4,8 +4,11 @@ const assert = std.debug.assert;
 const lalign = @import("lib/align.zig");
 const log = @import("logger.zig").log;
 
+const Mutex = @import("scheduler.zig").Mutex;
+
 const page_sizes = platform.page_sizes;
 var free_roots = [_]u64{0} ** page_sizes.len;
+var pmm_mutex = Mutex{};
 
 const reverse_sizes = init: {
   var result: [page_sizes.len]u64 = undefined;
@@ -15,6 +18,9 @@ const reverse_sizes = init: {
 };
 
 pub fn consume(phys: u64, size: u64) void {
+  pmm_mutex.lock();
+  defer pmm_mutex.unlock();
+
   var sz = size;
   var pp = phys;
 
@@ -64,8 +70,11 @@ fn alloc_impl(comptime ind: u64) !u64 {
 
 pub fn alloc_phys(size: u64) !u64 {
   inline for(page_sizes) |psz, i| {
-    if(size <= psz)
+    if(size <= psz) {
+      pmm_mutex.lock();
+      defer pmm_mutex.unlock();
       return alloc_impl(i);
+    }
   }
   return error.PhysAllocTooSmall;
 }
@@ -77,6 +86,9 @@ fn free_impl(phys: u64, comptime ind: u64) void {
 }
 
 pub fn free_phys(phys: u64, size: u64) void {
+  pmm_mutex.lock();
+  defer pmm_mutex.unlock();
+
   inline for(reverse_sizes) |psz, ri| {
     const i = page_sizes.len - ri - 1;
 
