@@ -80,17 +80,6 @@ pub fn register_fb(fb_phys: usize, fb_pitch: u16, fb_width: u16, fb_height: u16,
   log("VESAlog:  BPP:    {}\n", .{fb_bpp});
 }
 
-pub fn map_fb(paging_root: u64) void {
-  const fb_size = @as(u64, framebuffer.?.pitch) * @as(u64, framebuffer.?.height);
-  const fb_page_low = libalign.align_down(usize, page_size, @ptrToInt(&framebuffer.?.addr[0]));
-  const fb_page_high = libalign.align_up(usize, page_size, @ptrToInt(&framebuffer.?.addr[0]) + fb_size);
-
-  paging.map_phys_range(fb_page_low, fb_page_high, paging.wc(paging.data()), paging_root) catch |err| {
-    log("VESAlog: Couldn't map fb: {}\n", .{@errorName(err)});
-    return;
-  };
-}
-
 fn px(comptime bpp: u64, x: u64, y: u64) *[3]u8 {
   const offset = framebuffer.?.pitch * y + x * bpp;
   return framebuffer.?.addr[offset .. offset + 3][0..3];

@@ -16,22 +16,16 @@ var framebuffer: ?Framebuffer = null;
 
 pub fn register() void {
   if(arch == .x86_64) {
-    map_fb(null);
-    framebuffer = Framebuffer{};
-    log("vga_log ready!\n", .{});
-  }
-}
-
-pub fn map_fb(paging_root: ?u64) void {
-  if(arch == .x86_64) {
     const vga_size = 80 * 25 * 2;
     const vga_page_low = libalign.align_down(usize, page_size, 0xB8000);
     const vga_page_high = libalign.align_up(usize, page_size, 0xB8000 + vga_size);
 
-    paging.map_phys_range(vga_page_low, vga_page_high, paging.wc(paging.data()), paging_root) catch |err| {
+    paging.map_phys_range(vga_page_low, vga_page_high, paging.wc(paging.data()), null) catch |err| {
       log(":/ rip couldn't map vga: {}\n", .{@errorName(err)});
       return;
     };
+
+    framebuffer = Framebuffer{};
   }
 }
 

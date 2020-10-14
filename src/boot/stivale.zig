@@ -50,26 +50,10 @@ export fn stivale_main(input_info: *StivaleInfo) void {
     stivale.add_memmap_low(ent);
   }
 
-  if((stivale_flags & 1) == 1) {
-    vesa_log.register_fb(info.framebuffer_addr, info.framebuffer_pitch, info.framebuffer_width, info.framebuffer_height, info.framebuffer_bpp);
-  }
-  else {
-    vga_log.register();
-  }
-
   const paging_root = paging.bootstrap_kernel_paging() catch |err| {
     log("Stivale: Unable to bootstrap kernel paging: {}\n", .{@errorName(err)});
     panic(null, null);
   };
-
-  if((stivale_flags & 1) == 1) {
-    vesa_log.map_fb(paging_root);
-  }
-  else {
-    vga_log.map_fb(paging_root);
-  }
-
-  log("Stivale: Identity mapping bootloader data\n", .{});
 
   stivale.map_bootloader_data(paging_root);
 
@@ -78,6 +62,13 @@ export fn stivale_main(input_info: *StivaleInfo) void {
   }
 
   paging.finalize_kernel_paging(paging_root) catch unreachable;
+
+  if((stivale_flags & 1) == 1) {
+    vesa_log.register_fb(info.framebuffer_addr, info.framebuffer_pitch, info.framebuffer_width, info.framebuffer_height, info.framebuffer_bpp);
+  }
+  else {
+    vga_log.register();
+  }
 
   log("Stivale: Initializing vmm\n", .{});
   vmm.init(stivale.phys_high(info.memmap())) catch |err| {
