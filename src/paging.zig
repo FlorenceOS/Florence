@@ -349,6 +349,11 @@ fn unmap_at_level(virt: *usize, size: *usize, reclaim_pages: bool, table: *page_
       }
     }
   } else {
+    if(size.* <= page_sizes[level]) {
+      virt.* += size.*;
+      size.* = 0;
+      return;
+    }
     size.* -= page_sizes[level];
     virt.* += page_sizes[level];
   }
