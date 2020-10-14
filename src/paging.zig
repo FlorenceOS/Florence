@@ -171,6 +171,13 @@ pub fn add_physical_mapping(new_root: usize, phys: usize, size: usize) !void {
 pub fn map_phys_range(phys: usize, phys_end: usize, perm: perms, paging_root: ?u64) !void {
   var beg = phys;
   while(beg != phys_end): (beg += page_sizes[0]) {
+    try unmap(.{
+      .virt = @ptrToInt(&__physical_base) + beg,
+      .size = page_sizes[0],
+      .reclaim_pages = false,
+      .root = paging_root,
+    });
+
     try map_phys(.{
       .virt = @ptrToInt(&__physical_base) + beg,
       .phys = beg,
