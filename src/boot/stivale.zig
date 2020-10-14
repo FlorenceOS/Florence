@@ -6,6 +6,7 @@ const paging = @import("../paging.zig");
 const acpi = @import("../platform/acpi.zig");
 const platform = @import("../platform.zig");
 const panic = @import("../panic.zig").panic;
+const vital = @import("../vital.zig").vital;
 
 const vesa_log = @import("../drivers/vesa_log.zig");
 const vga_log = @import("../drivers/vga_log.zig");
@@ -41,19 +42,16 @@ const StivaleInfo = packed struct {
 var info: StivaleInfo = undefined;
 
 export fn stivale_main(input_info: *StivaleInfo) void {
-  info = input_info.*;
+  log("Stivale: Boot!\n", .{});
 
-  log("Stivale: Loading info...\n", .{});
+  info = input_info.*;
   log("Stivale: Boot arguments: {s}\n", .{info.cmdline});
 
   for(info.memmap()) |*ent| {
     stivale.add_memmap_low(ent);
   }
 
-  const paging_root = paging.bootstrap_kernel_paging() catch |err| {
-    log("Stivale: Unable to bootstrap kernel paging: {}\n", .{@errorName(err)});
-    panic(null, null);
-  };
+  const paging_root = vital(paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
 
   stivale.map_bootloader_data(paging_root);
 
@@ -61,7 +59,11 @@ export fn stivale_main(input_info: *StivaleInfo) void {
     stivale.map_phys(ent, paging_root);
   }
 
-  paging.finalize_kernel_paging(paging_root) catch unreachable;
+  vital(paging.finalize_kernel_paging(paging_root), "finalizing kernel paging");
+
+  for(info.memmap()) |*ent| {
+    stivale.add_memmap_high(ent);
+  }
 
   if((stivale_flags & 1) == 1) {
     vesa_log.register_fb(info.framebuffer_addr, info.framebuffer_pitch, info.framebuffer_width, info.framebuffer_height, info.framebuffer_bpp);
@@ -70,26 +72,9 @@ export fn stivale_main(input_info: *StivaleInfo) void {
     vga_log.register();
   }
 
-  log("Stivale: Initializing vmm\n", .{});
-  vmm.init(stivale.phys_high(info.memmap())) catch |err| {
-    log("Stivale: Failed to initialize vmm: {}\n", .{@errorName(err)});
-    panic(null, null);
-  };
-
-  log("Stivale: Registering stivale rsdp: 0x{X}\n", .{info.rsdp});
   acpi.register_rsdp(info.rsdp);
 
-  log("Stivale: Starting platform_init\n", .{});
-  platform.platform_init() catch |err| {
-    log("Stivale: platform_init failed: {}\n", .{@errorName(err)});
-    panic(null, null);
-  };
-
-  for(info.memmap()) |*ent| {
-    stivale.add_memmap_high(ent);
-  }
-
-  log("Stivale: Unmapped bootloader data\n", .{});
+  vital(vmm.init(stivale.phys_high(info.memmap())), "initializing vmm");
 
   kmain();
 }

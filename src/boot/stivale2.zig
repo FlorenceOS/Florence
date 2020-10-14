@@ -7,6 +7,7 @@ const platform = @import("../platform.zig");
 const kmain = @import("../kmain.zig").kmain;
 const acpi = @import("../platform/acpi.zig");
 const serial = @import("../serial.zig");
+const vital = @import("../vital.zig").vital;
 
 const vesa_log = @import("../drivers/vesa_log.zig");
 const vga_log = @import("../drivers/vga_log.zig");
@@ -148,10 +149,7 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     stivale.add_memmap_low(ent);
   }
 
-  const paging_root = paging.bootstrap_kernel_paging() catch |err| {
-    log("Stivale2: Error: {}\n", .{@errorName(err)});
-    @panic("Stivale2: Unable to bootstrap kernel paging");
-  };
+  const paging_root = vital(paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
 
   stivale.map_bootloader_data(paging_root);
 
@@ -159,7 +157,7 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     stivale.map_phys(ent, paging_root);
   }
 
-  paging.finalize_kernel_paging(paging_root) catch unreachable;
+  vital(paging.finalize_kernel_paging(paging_root), "finalizing kernel paging");
 
   if(info.framebuffer != null) {
     vesa_log.register_fb(info.framebuffer.?.addr, info.framebuffer.?.pitch, info.framebuffer.?.width, info.framebuffer.?.height, info.framebuffer.?.bpp);
@@ -172,21 +170,11 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     stivale.add_memmap_high(ent);
   }
 
-  log("Stivale2: Initializing vmm\n", .{});
-  vmm.init(stivale.phys_high(info.memmap.?.get())) catch |err| {
-    log("Stivale2: Error: {}\n", .{@errorName(err)});
-    @panic("Stivale2: Failed to initialize vmm");
-  };
-
   if(info.rsdp != null) {
     acpi.register_rsdp(info.rsdp.?.rsdp);
   }
 
-  log("Stivale2: Starting platform_init\n", .{});
-  platform.platform_init() catch |err| {
-    log("Stivale2: Error: {}\n", .{@errorName(err)});
-    @panic("Stivale2: platform_init failed");
-  };
+  vital(vmm.init(stivale.phys_high(info.memmap.?.get())), "initializing vmm");
 
   kmain();
 }

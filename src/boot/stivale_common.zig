@@ -6,6 +6,8 @@ const platform = @import("../platform.zig");
 
 const libalign = @import("../lib/align.zig");
 
+const vital = @import("../vital.zig").vital;
+
 const std = @import("std");
 
 pub const MemmapEntry = packed struct {
@@ -85,10 +87,7 @@ pub fn map_phys(ent: *const MemmapEntry, paging_root: u64) void {
 
   log("Stivale: Mapping phys mem 0x{X} to 0x{X}\n", .{new_ent.base, new_ent.base + new_ent.length});
 
-  paging.add_physical_mapping(paging_root, new_ent.base, new_ent.length) catch |err| {
-    log("Stivale: Error: {}\n", .{@errorName(err)});
-    @panic("Stivale: Unable to map physical memory");
-  };
+  vital(paging.add_physical_mapping(paging_root, new_ent.base, new_ent.length), "mapping physical stivale mem");
 }
 
 pub fn phys_high(map: []const MemmapEntry) usize {
@@ -99,8 +98,5 @@ pub fn phys_high(map: []const MemmapEntry) usize {
 }
 
 pub fn map_bootloader_data(paging_root: u64) void {
-  paging.map_phys_range(0, 0x100000, paging.data(), paging_root) catch |err| {
-    log("Stivale: Error: {}\n", .{@errorName(err)});
-    @panic("Stivale: Unable to map bootloader data");
-  };
+  vital(paging.map_phys_range(0, 0x100000, paging.data(), paging_root), "mapping stivale bootloader data");
 }
