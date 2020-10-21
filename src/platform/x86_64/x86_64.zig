@@ -311,7 +311,7 @@ pub fn new_task_call(new_task: *scheduler.Task, func: anytype, args: anytype) !v
   );
 
   if(had_error == 1)
-    return @intToError(@intCast(std.meta.IntType(false, @sizeOf(anyerror) * 8), result));
+    return @intToError(@intCast(std.meta.IntType(.unsigned, @sizeOf(anyerror) * 8), result));
 
   if(result == 1) {
     // Switch stack
