@@ -171,7 +171,7 @@ fn echfs_image(b: *Builder, image_path: []const u8, kernel_path: []const u8, ins
       "/bin/sh", "-c",
       std.mem.concat(b.allocator, u8, &[_][]const u8{
         "rm ", image_path, " || true && ",
-        "dd if=/dev/zero bs=1m count=0 seek=4 of=", image_path, " && ",
+        "dd if=/dev/zero bs=1048576 count=0 seek=4 of=", image_path, " && ",
         "parted -s ", image_path, " mklabel msdos && ",
         "parted -s ", image_path, " mkpart primary 1 100% && ",
         "parted -s ", image_path, " set 1 boot on && ",
