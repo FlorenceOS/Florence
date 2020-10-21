@@ -374,7 +374,7 @@ fn print_impl(root: *page_table, comptime level: usize) void {
         log(" ", .{});
         cnt -= 1;
       }
-      log("Index {x:0^3}: {}\n", .{offset/8, ent});
+      log("Index {x:0>3}: {}\n", .{offset/8, ent});
       if(level != 0)
         if(ent.is_table(level))
           print_impl(ent.get_table(level) catch unreachable, level - 1);

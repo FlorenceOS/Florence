@@ -149,7 +149,7 @@ pub const page_table_entry = packed struct {
     }
 
     if(self.is_mapping(0)) {
-      try writer.print("Mapping{{.phys = 0x{x:0^16}, .writable={}, .execute={}, .cacheable={}", .{self.physaddr(0), @boolToInt(self.raw & writable_bit != 0), @boolToInt(self.raw & execute_disable_bit == 0), @boolToInt(self.raw & cache_disable_bit == 0)});
+      try writer.print("Mapping{{.phys = 0x{x:0>16}, .writable={}, .execute={}, .cacheable={}", .{self.physaddr(0), @boolToInt(self.raw & writable_bit != 0), @boolToInt(self.raw & execute_disable_bit == 0), @boolToInt(self.raw & cache_disable_bit == 0)});
 
       if((self.raw & writable_bit) != 0) {
         try writer.print(", .writethrough={}", .{@boolToInt(self.raw & writethrough_bit != 0)});
@@ -159,7 +159,7 @@ pub const page_table_entry = packed struct {
       return;
     }
     if(self.is_table(0)) {
-      try writer.print("Table{{.phys = 0x{x:0^16}, .writable={}, .execute={}}}", .{self.physaddr(0), @boolToInt(self.raw & writable_bit != 0), @boolToInt(self.raw & execute_disable_bit == 0)});
+      try writer.print("Table{{.phys = 0x{x:0>16}, .writable={}, .execute={}}}", .{self.physaddr(0), @boolToInt(self.raw & writable_bit != 0), @boolToInt(self.raw & execute_disable_bit == 0)});
       return;
     }
     unreachable;

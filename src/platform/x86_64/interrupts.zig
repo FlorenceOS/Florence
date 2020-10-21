@@ -246,11 +246,11 @@ export fn interrupt_common() callconv(.Naked) void {
 
 fn dump_frame(frame: *InterruptFrame) void {
   log("FRAME DUMP:\n", .{});
-  log("RAX={x:0^16} RBX={x:0^16} RCX={x:0^16} RDX={x:0^16}\n", .{frame.rax, frame.rbx, frame.rcx, frame.rdx});
-  log("RSI={x:0^16} RDI={x:0^16} RBP={x:0^16} RSP={x:0^16}\n", .{frame.rsi, frame.rdi, frame.rbp, frame.rsp});
-  log("R8 ={x:0^16} R9 ={x:0^16} R10={x:0^16} R11={x:0^16}\n", .{frame.r8,  frame.r9,  frame.r10, frame.r11});
-  log("R12={x:0^16} R13={x:0^16} R14={x:0^16} R15={x:0^16}\n", .{frame.r12, frame.r13, frame.r14, frame.r15});
-  log("RIP={x:0^16} int={x:0^16} ec ={x:0^16}\n",              .{frame.rip, frame.intnum, frame.ec});
+  log("RAX={x:0>16} RBX={x:0>16} RCX={x:0>16} RDX={x:0>16}\n", .{frame.rax, frame.rbx, frame.rcx, frame.rdx});
+  log("RSI={x:0>16} RDI={x:0>16} RBP={x:0>16} RSP={x:0>16}\n", .{frame.rsi, frame.rdi, frame.rbp, frame.rsp});
+  log("R8 ={x:0>16} R9 ={x:0>16} R10={x:0>16} R11={x:0>16}\n", .{frame.r8,  frame.r9,  frame.r10, frame.r11});
+  log("R12={x:0>16} R13={x:0>16} R14={x:0>16} R15={x:0>16}\n", .{frame.r12, frame.r13, frame.r14, frame.r15});
+  log("RIP={x:0>16} int={x:0>16} ec ={x:0>16}\n",              .{frame.rip, frame.intnum, frame.ec});
 }
 
 export fn interrupt_handler(frame: u64) void {

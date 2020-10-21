@@ -14,7 +14,7 @@ pub const Addr = struct {
   function: u3,
 
   pub fn format(self: *const Addr, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
-    try writer.print("[{x:0^2}:{x:0^2}:{x:0^1}]", .{self.bus, self.device, self.function});
+    try writer.print("[{x:0>2}:{x:0>2}:{x:0>1}]", .{self.bus, self.device, self.function});
   }
 };
 
@@ -28,8 +28,8 @@ pub const Device = struct {
 
   pub fn format(self: *const Device, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
     try writer.print("{} ", .{self.addr});
-    try writer.print("{{{x:0^4}:{x:0^4}}} ", .{self.vendor_id, self.device_id});
-    try writer.print("({x:0^2}:{x:0^2}:{x:0^2})", .{self.class, self.subclass, self.prog_if});
+    try writer.print("{{{x:0>4}:{x:0>4}}} ", .{self.vendor_id, self.device_id});
+    try writer.print("({x:0>2}:{x:0>2}:{x:0>2})", .{self.class, self.subclass, self.prog_if});
   }
 };
 
@@ -126,7 +126,7 @@ fn function_scan(addr: Addr) void {
           }
           else {
             const secondary_bus = pci_read(u8, addr, 0x19);
-            log(", recursively scanning bus {x:0^2}\n", .{secondary_bus});
+            log(", recursively scanning bus {x:0>2}\n", .{secondary_bus});
             bus_scan(secondary_bus);
           }
         },

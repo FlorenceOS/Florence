@@ -46,12 +46,12 @@ fn putch(ch: u8) void {
 pub fn hexdump(in_bytes: []const u8) void {
   var bytes = in_bytes;
   while(bytes.len != 0) {
-    log("{x:0^16}: ", .{@ptrToInt(&bytes[0])});
+    log("{x:0>16}: ", .{@ptrToInt(bytes.ptr)});
 
     inline for(range.range(0x10)) |offset| {
       if(offset < bytes.len) {
         const value = bytes[offset];
-        log("{x:0^2} ", .{value});
+        log("{x:0>2} ", .{value});
       } else {
         log("   ", .{});
       }

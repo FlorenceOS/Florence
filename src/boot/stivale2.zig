@@ -21,7 +21,7 @@ const stivale2_tag = packed struct {
   next: ?*stivale2_tag,
 
   pub fn format(self: *const stivale2_tag, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
-    try writer.print("Identifier: 0x{X:0^16}", .{self.identifier});
+    try writer.print("Identifier: 0x{X:0>16}", .{self.identifier});
   }
 };
 
@@ -135,7 +135,7 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
         serial.register_mmio32_serial(ptr.uart_addr);
         log("Registered UART", .{});
       },
-      else => { log("Unknown stivale2 tag identifier: 0x{X:0^16}\n", .{tag.?.identifier}); }
+      else => { log("Unknown stivale2 tag identifier: 0x{X:0>16}\n", .{tag.?.identifier}); }
     }
   }
 
