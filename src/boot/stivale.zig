@@ -65,6 +65,8 @@ export fn stivale_main(input_info: *StivaleInfo) void {
     stivale.add_memmap_high(ent);
   }
 
+  vital(vmm.init(stivale.phys_high(info.memmap())), "initializing vmm");
+
   if((stivale_flags & 1) == 1) {
     vesa_log.register_fb(info.framebuffer_addr, info.framebuffer_pitch, info.framebuffer_width, info.framebuffer_height, info.framebuffer_bpp);
   }
@@ -73,8 +75,6 @@ export fn stivale_main(input_info: *StivaleInfo) void {
   }
 
   acpi.register_rsdp(info.rsdp);
-
-  vital(vmm.init(stivale.phys_high(info.memmap())), "initializing vmm");
 
   kmain();
 }

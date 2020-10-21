@@ -159,6 +159,8 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
 
   vital(paging.finalize_kernel_paging(paging_root), "finalizing kernel paging");
 
+  vital(vmm.init(stivale.phys_high(info.memmap.?.get())), "initializing vmm");
+
   if(info.framebuffer != null) {
     vesa_log.register_fb(info.framebuffer.?.addr, info.framebuffer.?.pitch, info.framebuffer.?.width, info.framebuffer.?.height, info.framebuffer.?.bpp);
   }
@@ -173,8 +175,6 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
   if(info.rsdp != null) {
     acpi.register_rsdp(info.rsdp.?.rsdp);
   }
-
-  vital(vmm.init(stivale.phys_high(info.memmap.?.get())), "initializing vmm");
 
   kmain();
 }
