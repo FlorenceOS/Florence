@@ -103,6 +103,11 @@ pub fn access_phys(comptime t: type, phys: u64) [*]t {
   return @intToPtr([*]t, phys);
 }
 
+pub fn set_phys_base(phys_base: usize) void {
+  if(phys_base != 0)
+    @panic("set_phys_base");
+}
+
 pub fn access_phys_volatile(comptime t: type, phys: u64) [*]volatile t {
   return @ptrCast([*]volatile t, access_phys(t, phys));
 }

@@ -136,7 +136,7 @@ pub fn get_current_paging_root() u64 {
 
 pub fn set_paging_root(pt_phys: u64, phys_base: u64) !void {
   platform.set_paging_root(pt_phys);
-  //pmm.set_phys_base(phys_base);
+  pmm.set_phys_base(phys_base);
 }
 
 extern var __kernel_text_begin: u8;
