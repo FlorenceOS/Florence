@@ -1,6 +1,6 @@
 .set stivale_flags_value, 1 // we disable kaslr for now as the linker is not emitting relocations.
 
-.section .stivale2hdr
+.section .stivale2hdr, "a"
 .8byte _start
 .8byte stack_top
 .8byte 0
@@ -25,7 +25,7 @@ _start:
 .extern stivale2_main
   B     stivale2_main
 
-.section .bss
+.section .bss.stack, "a"
 stack_bottom:
 .zero 4096 - 16
 stack_top:
