@@ -10,11 +10,11 @@ const page_sizes = platform.page_sizes;
 var free_roots = [_]u64{0} ** page_sizes.len;
 var pmm_mutex = Mutex{};
 
-const reverse_sizes = init: {
+const reverse_sizes = {
   var result: [page_sizes.len]u64 = undefined;
   for(page_sizes) |psz, i|
     result[page_sizes.len - i - 1] = psz;
-  break :init result;
+  return result;
 };
 
 pub fn consume(phys: u64, size: u64) void {
