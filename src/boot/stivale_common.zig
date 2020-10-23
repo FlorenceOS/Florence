@@ -70,7 +70,7 @@ pub fn add_memmap_high(ent: *const MemmapEntry) void {
 }
 
 pub fn map_phys(ent: *const MemmapEntry, paging_root: u64) void {
-  if(ent.type != 1)
+  if(ent.type != 1 and ent.type != 0x1000)
     return;
 
   var new_ent = ent.*;
