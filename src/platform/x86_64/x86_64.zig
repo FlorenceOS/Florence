@@ -189,6 +189,15 @@ pub fn make_page_table() !u64 {
 }
 
 pub fn set_paging_root(phys_paging_root: u64) void {
+pub fn invalidate_mapping(virt: usize) void {
+  asm volatile(
+    \\invlpg (%[virt])
+    :
+    : [virt] "r" (virt)
+    : "memory"
+  );
+}
+
   asm volatile (
     "mov %[paging_root], %%cr3\n\t"
     :

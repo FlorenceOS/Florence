@@ -47,17 +47,6 @@ pub const unmap_args = struct {
 pub fn unmap(args: unmap_args) !void {
   var argc = args;
   try unmap_impl(&argc.virt, &argc.size, argc.reclaim_pages, argc.root);
-
-  if(argc.root != null)
-    return;
-
-  const current_root = get_current_paging_root();
-
-  if(argc.root != current_root)
-    return;
-
-  // Flush page tables
-  platform.set_paging_root(current_root);
 }
 
 pub const perms = struct {
@@ -334,6 +323,8 @@ fn unmap_at_level(virt: *usize, size: *usize, reclaim_pages: bool, table: *page_
           pmm.free_phys(pte.physaddr(level), page_sizes[level]);
 
         pte.clear(level);
+        
+        platform.invalidate_mapping(virt.*);
         return;
       }
       else {
