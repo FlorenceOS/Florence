@@ -395,7 +395,7 @@ pub fn out(comptime T: type, port: u16, value: T) void {
   switch(T) {
     u8  => outb(port, value),
     u16 => outw(port, value),
-    u32 => outw(port, value),
+    u32 => outl(port, value),
     else => @compileError("No out instruction for this type"),
   }
 }
@@ -404,7 +404,7 @@ pub fn in(comptime T: type, port: u16) T {
   return switch(T) {
     u8  => inb(port),
     u16 => inw(port),
-    u32 => inw(port),
+    u32 => inl(port),
     else => @compileError("No in instruction for this type"),
   };
 }
