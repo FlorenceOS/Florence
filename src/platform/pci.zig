@@ -41,7 +41,7 @@ fn mmio(addr: Addr, offset: regoff) [*]u8 {
 
 pub fn pci_read(comptime T: type, addr: Addr, offset: regoff) T {
   if(pci_mmio[addr.bus] != null)
-    return std.mem.readInt(T, mmio(addr, offset)[0..@sizeOf(T)], builtin.endian);
+    return std.mem.readIntNative(T, mmio(addr, offset)[0..@sizeOf(T)]);
 
   if(@hasDecl(platform, "pci_read"))
     return platform.pci_read(T, addr, offset);
@@ -51,12 +51,12 @@ pub fn pci_read(comptime T: type, addr: Addr, offset: regoff) T {
 
 pub fn pci_write(comptime T: type, addr: Addr, offset: regoff, value: T) void {
   if(pci_mmio[addr.bus] != null) {
-    std.mem.writeInt(T, mmio(addr, offset)[0..@sizeOf(T)], value);
+    std.mem.writeIntNative(T, mmio(addr, offset)[0..@sizeOf(T)], value);
     return;
   }
 
   if(@hasDecl(platform, "pci_write"))
-    return platform.write(T, addr, offset, value);
+    return platform.pci_write(T, addr, offset, value);
 
   @panic("No pci_write method!");
 }
