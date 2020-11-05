@@ -16,6 +16,10 @@ const MemmapEntry = stivale.MemmapEntry;
 
 const std = @import("std");
 
+const arch = @import("builtin").arch;
+
+pub const os = @import("../os/kernel.zig");
+
 const stivale2_tag = packed struct {
   identifier: u64,
   next: ?*stivale2_tag,
@@ -181,15 +185,16 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     stivale.add_memmap_low(ent);
   }
 
-  const paging_root = vital(paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
+  var paging_root = vital(paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
 
-  stivale.map_bootloader_data(paging_root);
+  if(arch == .x86_64)
+    stivale.map_bootloader_data(&paging_root);
 
   for(info.memmap.?.get()) |*ent| {
-    stivale.map_phys(ent, paging_root);
+    stivale.map_phys(ent, &paging_root);
   }
 
-  vital(paging.finalize_kernel_paging(paging_root), "finalizing kernel paging");
+  vital(paging.finalize_kernel_paging(&paging_root), "finalizing kernel paging");
 
   vital(vmm.init(stivale.phys_high(info.memmap.?.get())), "initializing vmm");
 

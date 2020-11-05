@@ -16,6 +16,8 @@ const log = @import("../../logger.zig").log;
 
 pub const InterruptFrame = interrupts.InterruptFrame;
 
+pub const paging_root = u64;
+
 pub const page_sizes =
   [_]u64 {
     0x1000,
@@ -188,7 +190,10 @@ pub fn make_page_table() !u64 {
   return pt;
 }
 
-pub fn set_paging_root(phys_paging_root: u64) void {
+pub fn make_paging_root() !paging_root {
+  return make_page_table();
+}
+
 pub fn invalidate_mapping(virt: usize) void {
   asm volatile(
     \\invlpg (%[virt])
@@ -198,18 +203,29 @@ pub fn invalidate_mapping(virt: usize) void {
   );
 }
 
+pub fn set_paging_root(root: *paging_root) void {
   asm volatile (
     "mov %[paging_root], %%cr3\n\t"
     :
-    : [paging_root] "X" (phys_paging_root)
+    : [paging_root] "X" (root.*)
   );
 }
 
-pub fn current_paging_root() u64 {
+pub fn current_paging_root() paging_root {
   return asm volatile (
     "mov %%cr3, %[paging_root]\n\t"
     : [paging_root] "={rax}" (-> u64)
-  ); 
+  );
+}
+
+pub fn root_table(_: usize, root: paging_root) *page_table {
+  return pmm.access_phys_single(page_table, root);
+}
+
+pub fn root_tables(root: *paging_root) [1]*page_table {
+  return [_]*page_table {
+    pmm.access_phys_single(page_table, root.*),
+  };
 }
 
 pub fn prepare_paging() !void {

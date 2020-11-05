@@ -16,7 +16,7 @@ pub const map_args = struct {
   virt: usize,
   size: usize,
   perm: perms,
-  root: ?u64 = null,
+  root: ?*platform.paging_root = null,
 };
 
 pub fn map(args: map_args) !void {
@@ -29,7 +29,7 @@ pub const map_phys_args = struct {
   phys: usize,
   size: usize,
   perm: perms,
-  root: ?u64 = null,
+  root: ?*platform.paging_root = null,
 };
 
 pub fn map_phys(args: map_phys_args) !void {
@@ -41,7 +41,7 @@ pub const unmap_args = struct {
   virt: usize,
   size: usize,
   reclaim_pages: bool,
-  root: ?u64 = null,
+  root: ?*platform.paging_root = null,
 };
 
 pub fn unmap(args: unmap_args) !void {
@@ -119,12 +119,12 @@ pub fn user(p: perms) perms {
   return ret;
 }
 
-pub fn get_current_paging_root() u64 {
+pub fn get_current_paging_root() platform.paging_root {
   return platform.current_paging_root();
 }
 
-pub fn set_paging_root(pt_phys: u64, phys_base: u64) !void {
-  platform.set_paging_root(pt_phys);
+pub fn set_paging_root(new_root: *platform.paging_root, phys_base: u64) !void {
+  platform.set_paging_root(new_root);
   pmm.set_phys_base(phys_base);
 }
 
@@ -136,18 +136,18 @@ extern var __kernel_rodata_begin: u8;
 extern var __kernel_rodata_end: u8;
 extern var __physical_base: u8;
 
-pub fn bootstrap_kernel_paging() !usize {
+pub fn bootstrap_kernel_paging() !platform.paging_root {
   // Setup some paging
-  const new_root = try make_page_table();
+  var new_root = try platform.make_paging_root();
 
-  try map_kernel_section(new_root, &__kernel_text_begin, &__kernel_text_end, code());
-  try map_kernel_section(new_root, &__kernel_data_begin, &__kernel_data_end, data());
-  try map_kernel_section(new_root, &__kernel_rodata_begin, &__kernel_rodata_end, rodata());
+  try map_kernel_section(&new_root, &__kernel_text_begin, &__kernel_text_end, code());
+  try map_kernel_section(&new_root, &__kernel_data_begin, &__kernel_data_end, data());
+  try map_kernel_section(&new_root, &__kernel_rodata_begin, &__kernel_rodata_end, rodata());
 
   return new_root;
 }
 
-pub fn add_physical_mapping(new_root: usize, phys: usize, size: usize) !void {
+pub fn add_physical_mapping(new_root: *platform.paging_root, phys: usize, size: usize) !void {
   try map_phys(.{
     .virt = @ptrToInt(&__physical_base) + phys,
     .phys = phys,
@@ -157,7 +157,7 @@ pub fn add_physical_mapping(new_root: usize, phys: usize, size: usize) !void {
   });
 }
 
-pub fn map_phys_range(phys: usize, phys_end: usize, perm: perms, paging_root: ?u64) !void {
+pub fn map_phys_range(phys: usize, phys_end: usize, perm: perms, paging_root: ?*platform.paging_root) !void {
   var beg = phys;
   while(beg < phys_end): (beg += page_sizes[0]) {
     try unmap(.{
@@ -190,12 +190,12 @@ pub fn map_phys_size(phys: usize, size: usize, perm: perms) !void {
   try map_phys_range(page_addr_low, page_addr_high, perm, null);
 }
 
-pub fn finalize_kernel_paging(new_root: u64) !void {
+pub fn finalize_kernel_paging(new_root: *platform.paging_root) !void {
   try platform.prepare_paging();
-  try set_paging_root(new_root, @ptrToInt(&__physical_base));
+  try set_paging_root(new_root, 0);
 }
 
-fn map_kernel_section(new_paging_root: u64, start: *u8, end: *u8, perm: perms) !void {
+fn map_kernel_section(new_paging_root: *platform.paging_root, start: *u8, end: *u8, perm: perms) !void {
   const section_size = libalign.align_up(usize, platform.page_sizes[0], @ptrToInt(end) - @ptrToInt(start));
   try map_phys(.{
     .virt = @ptrToInt(start),
@@ -206,7 +206,7 @@ fn map_kernel_section(new_paging_root: u64, start: *u8, end: *u8, perm: perms) !
   });
 }
 
-fn map_loop(virt: *usize, phys: ?*usize, size: *usize, root: ?u64, perm: perms) !void {
+fn map_loop(virt: *usize, phys: ?*usize, size: *usize, root: ?*platform.paging_root, perm: perms) !void {
   const start_virt = virt.*;
 
   if(!is_aligned(virt, phys, 0) or !libalign.is_aligned(usize, page_sizes[0], size.*)) {
@@ -214,7 +214,7 @@ fn map_loop(virt: *usize, phys: ?*usize, size: *usize, root: ?u64, perm: perms) 
     return error.BadAlignment;
   }
 
-  const root_ptr = &pmm.access_phys(page_table, root orelse get_current_paging_root())[0];
+  const root_ptr = platform.root_table(virt.*, if(root) |r| r.* else get_current_paging_root());
 
   errdefer {
     // Unwind loop
@@ -303,8 +303,8 @@ fn make_pte(virt: usize, level: usize, perm: perms, root: *page_table) !*page_ta
   return error.make_pte;
 }
 
-fn unmap_impl(virt: *usize, size: *usize, reclaim_pages: bool, root_in: ?u64) !void {
-  const root: *page_table = &pmm.access_phys(page_table, root_in orelse get_current_paging_root())[0];
+fn unmap_impl(virt: *usize, size: *usize, reclaim_pages: bool, root_in: ?*platform.paging_root) !void {
+  const root = platform.root_table(virt.*, if(root_in) |root| root.* else get_current_paging_root());
 
   while(size.* != 0)
     try unmap_at_level(virt, size, reclaim_pages, root, paging_levels - 1);
@@ -350,25 +350,39 @@ fn unmap_at_level(virt: *usize, size: *usize, reclaim_pages: bool, table: *page_
   }
 }
 
-pub fn print_paging(root: u64) void {
-  log("Dumping page tables from root 0x{x}\n", .{root});
-  print_impl(&pmm.access_phys(page_table, root)[0], paging_levels - 1);
+pub fn print_paging(root: *platform.paging_root) void {
+  log("Paging: {x}\n", .{root});
+  for(platform.root_tables(root)) |table| {
+    log("Dumping page tables from root {x}\n", .{table});
+    print_impl(table, paging_levels - 1);
+  }
 }
 
 fn print_impl(root: *page_table, comptime level: usize) void {
   var offset: u32 = 0;
-  while(offset<0x1000): (offset += 8) {
+  var had_any: bool = false;
+  while(offset < platform.page_sizes[0]): (offset += 8) {
     const ent = @intToPtr(*page_table_entry, @ptrToInt(root) + offset);
     if(ent.is_present(level)) {
+      had_any = true;
       var cnt = paging_levels - level - 1;
       while(cnt != 0) {
         log(" ", .{});
         cnt -= 1;
       }
       log("Index {x:0>3}: {}\n", .{offset/8, ent});
-      if(level != 0)
+      if(level != 0) {
         if(ent.is_table(level))
           print_impl(ent.get_table(level) catch unreachable, level - 1);
+      }
     }
+  }
+  if(!had_any) {
+    var cnt = paging_levels - level - 1;
+    while(cnt != 0) {
+      log(" ", .{});
+      cnt -= 1;
+    }
+    log("Empty table\n", .{});
   }
 }

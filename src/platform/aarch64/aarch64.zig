@@ -141,19 +141,22 @@ pub fn index_into_table(table: *page_table, vaddr: usize, comptime level: usize)
   return table_index(table, index);
 }
 
-pub fn current_paging_root() u64 {
-  return asm (
-    \\mrs %[result], TTBR0_EL1
-    : [result] "=r" (-> u64)
-  );
+pub fn current_paging_root() paging_root {
+  return .{
+    .br0 = asm("mrs %[result], TTBR0_EL1": [result] "=r" (-> u64)),
+    .br1 = asm("mrs %[result], TTBR1_EL1": [result] "=r" (-> u64)),
+  };
 }
 
-pub fn set_paging_root(val: u64) void {
+pub fn set_paging_root(val: *paging_root) void {
   asm volatile(
-    \\msr TTBR0_EL1, %[value]
+    \\msr TTBR0_EL1, %[br0]
+    \\msr TTBR1_EL1, %[br1]
     \\isb sy
     :
-    : [value] "r" (val)
+    : [br0] "r" (val.br0)
+    , [br1] "r" (val.br1)
+    : "memory"
   );
 }
 
@@ -166,6 +169,34 @@ pub fn make_page_table() !u64 {
   const pt_ptr = &pmm.access_phys(page_table, pt)[0];
   @memset(@ptrCast([*]u8, pt_ptr), 0x00, 0x1000);
   return pt;
+}
+
+pub fn make_paging_root() !paging_root {
+  const br0 = try make_page_table();
+  errdefer pmm.free_phys(br0, 0x1000);
+
+  const br1 = try make_page_table();
+  errdefer pmm.free_phys(br1, 0x1000);
+
+  return paging_root{
+    .br0 = br0,
+    .br1 = br1,
+  };
+}
+
+pub fn root_table(virt: u64, root: paging_root) *page_table {
+  return pmm.access_phys_single(page_table, switch(virt >> 63) {
+    0 => root.br0,
+    1 => root.br1,
+    else => unreachable,
+  });
+}
+
+pub fn root_tables(root: *paging_root) [2]*page_table {
+  return [_]*page_table {
+    pmm.access_phys_single(page_table, root.br0),
+    pmm.access_phys_single(page_table, root.br1),
+  };
 }
 
 pub fn allowed_mapping_levels() usize {

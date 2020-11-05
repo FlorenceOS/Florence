@@ -69,7 +69,7 @@ pub fn add_memmap_high(ent: *const MemmapEntry) void {
   }
 }
 
-pub fn map_phys(ent: *const MemmapEntry, paging_root: u64) void {
+pub fn map_phys(ent: *const MemmapEntry, paging_root: *platform.paging_root) void {
   if(ent.type != 1 and ent.type != 0x1000)
     return;
 
@@ -97,6 +97,6 @@ pub fn phys_high(map: []const MemmapEntry) usize {
   return ent.base + ent.length;
 }
 
-pub fn map_bootloader_data(paging_root: u64) void {
+pub fn map_bootloader_data(paging_root: *platform.paging_root) void {
   vital(paging.map_phys_range(0, 0x100000, paging.data(), paging_root), "mapping stivale bootloader data");
 }
