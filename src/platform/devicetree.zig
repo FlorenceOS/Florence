@@ -4,7 +4,7 @@ const assert = std.debug.assert;
 
 var parsed_dt: bool = false;
 
-pub fn parse_dt(dt_data: [*]u8) !void {
+pub fn parse_dt(dt_data: []u8) !void {
   if(parsed_dt)
     return;
 
@@ -26,7 +26,7 @@ const token = .{
 };
 
 const Parser = struct {
-  data: [*]const u8,
+  data: []const u8,
   curr_offset: u32 = 0,
   limit: u32 = undefined,
 
@@ -34,7 +34,7 @@ const Parser = struct {
     const old_offset = self.curr_offset;
     self.curr_offset += num_bytes;
     assert(self.curr_offset <= self.limit);
-    return (self.data + old_offset)[0 .. num_bytes];
+    return self.data[old_offset..][0..num_bytes];
   }
 
   fn read(self: *Parser, comptime t: type) t {
@@ -54,11 +54,11 @@ const Parser = struct {
     const off_dt_struct  = readBig(u32, self.data[0x08 .. 0x0C]);
     const off_mem_rsvmap = readBig(u32, self.data[0x10 .. 0x14]);
 
-    self.curr_offset = off_mem_rsvmap;
-    self.parse_resrved_regions();
+    //self.curr_offset = off_mem_rsvmap;
+    //self.parse_resrved_regions();
 
     self.curr_offset = off_dt_struct;
-    self.parse_structures();
+    self.node(0);
 
     //log("DT has size {}\n", .{self.limit});
 
@@ -77,28 +77,18 @@ const Parser = struct {
       const addr = self.read(u64);
       const size = self.read(u64);
       if(addr == 0 and size == 0)
-        return;
-      log("ddddddd\n", .{});
+        continue;
 
       log("TODO: Reserved: {x} with size {x}", .{addr, size});
     }
   }
 
-  fn parse_structures(self: *Parser) void {
-    log("Parsing structure block\n", .{});
-    while(true) {
-      const current_token = self.read(u32);
-      switch(current_token) {
-        token.begin_node => self.parse_node(),
-        token.end => return,
-        token.nop => continue,
-        else => unreachable,
-      }
-    }
+  fn node(self: *Parser, depth: usize) void {
+    return; // We really don't care for now
   }
 
   pub fn format(self: *const Parser, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
-    try writer.print("Parser{{.data={X}, .offset={X}, limit={X}}}", .{@ptrToInt(self.data), self.curr_offset, self.limit});
+    try writer.print("Parser{{.data={X}, .offset={X}, limit={X}}}", .{@ptrToInt(self.data.ptr), self.curr_offset, self.limit});
   }
 
   fn parse_node(self: *Parser) void {
