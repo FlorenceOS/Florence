@@ -201,6 +201,10 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     stivale.map_phys(ent, &paging_root);
   }
 
+  if(info.uart) |uart| {
+    vital(paging.map_phys_size(uart.uart_addr, platform.page_sizes[0], paging.mmio()), "mapping UART");
+  }
+
   vital(paging.finalize_kernel_paging(&paging_root), "finalizing kernel paging");
 
   vital(vmm.init(stivale.phys_high(info.memmap.?.get())), "initializing vmm");
