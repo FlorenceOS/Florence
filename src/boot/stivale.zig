@@ -53,7 +53,7 @@ export fn stivale_main(input_info: *StivaleInfo) void {
     stivale.add_memmap_low(ent);
   }
 
-  const paging_root = vital(paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
+  var paging_root = vital(paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
 
   stivale.map_bootloader_data(&paging_root);
 
