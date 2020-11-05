@@ -200,8 +200,8 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
 
   vital(vmm.init(stivale.phys_high(info.memmap.?.get())), "initializing vmm");
 
-  if(info.framebuffer != null) {
-    vesa_log.register_fb(info.framebuffer.?.addr, info.framebuffer.?.pitch, info.framebuffer.?.width, info.framebuffer.?.height, info.framebuffer.?.bpp);
+  if(info.framebuffer) |fb| {
+    vesa_log.register_fb(fb.addr, fb.pitch, fb.width, fb.height, fb.bpp);
   }
   else {
     vga_log.register();
