@@ -183,6 +183,11 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     @panic("Stivale2: Info not valid!");
   }
 
+  if(info.dtb) |dtb| {
+    vital(@import("../platform/devicetree.zig").parse_dt(dtb.slice()), "parsing devicetree blob");
+    log("Stivale2: Parsed devicetree blob!\n", .{});
+  }
+
   for(info.memmap.?.get()) |*ent| {
     stivale.add_memmap_low(ent);
   }
