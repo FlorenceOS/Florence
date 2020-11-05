@@ -47,6 +47,8 @@ export fn stivale_main(input_info: *StivaleInfo) void {
   info = input_info.*;
   log("Stivale: Boot arguments: {s}\n", .{info.cmdline});
 
+  platform.platform_early_init();
+
   for(info.memmap()) |*ent| {
     stivale.add_memmap_low(ent);
   }

@@ -237,6 +237,10 @@ pub fn platform_init() !void {
   setup_gdt();
 }
 
+pub fn platform_early_init() void {
+
+}
+
 pub fn read_msr(comptime T: type, msr_num: u32) T {
   assert(T == u64);
 

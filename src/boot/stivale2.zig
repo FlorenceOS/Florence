@@ -177,6 +177,8 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
 
   log("{}\n", .{info});
 
+  platform.platform_early_init();
+
   if(!info.valid()) {
     @panic("Stivale2: Info not valid!");
   }
