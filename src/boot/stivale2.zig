@@ -20,7 +20,7 @@ const stivale2_tag = packed struct {
   identifier: u64,
   next: ?*stivale2_tag,
 
-  pub fn format(self: *const stivale2_tag, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+  pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
     try writer.print("Identifier: 0x{X:0>16}", .{self.identifier});
   }
 };
@@ -35,11 +35,11 @@ const stivale2_memmap = packed struct {
   tag: stivale2_tag,
   entries: u64,
 
-  pub fn get(self: *const stivale2_memmap) []MemmapEntry {
+  pub fn get(self: *const @This()) []MemmapEntry {
     return @intToPtr([*]MemmapEntry, @ptrToInt(&self.entries) + 8)[0..self.entries];
   }
 
-  pub fn format(self: *const stivale2_memmap, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+  pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
     try writer.print("{} entries:\n", .{self.entries});
     for(self.get()) |ent| {
       try writer.print("\t\t{}\n", .{ent});
@@ -51,7 +51,7 @@ const stivale2_commandline = packed struct {
   tag: stivale2_tag,
   commandline: [*:0]u8,
 
-  pub fn format(self: *const stivale2_commandline, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+  pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
     try writer.print("{}", .{self.commandline});
   }
 };
@@ -64,7 +64,7 @@ const stivale2_framebuffer = packed struct {
   pitch: u16,
   bpp: u16,
 
-  pub fn format(self: *const stivale2_framebuffer, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+  pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
     try writer.print("0x{X}, {}x{}, bpp={}, pitch={}", .{self.addr, self.width, self.height, self.bpp, self.pitch});
   }
 };
@@ -73,7 +73,7 @@ const stivale2_rsdp = packed struct {
   tag: stivale2_tag,
   rsdp: u64,
 
-  pub fn format(self: *const stivale2_rsdp, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+  pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
     try writer.print("0x{X}", .{self.rsdp});
   }
 };
@@ -83,7 +83,7 @@ const stivale2_smp = packed struct {
   entries: u64,
   cpus: [*]stivale2_smp_info,
 
-  pub fn format(self: *const stivale2_smp, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+  pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
     try writer.print("{} CPU(s)", .{self.entries});
   }
 };
