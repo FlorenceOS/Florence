@@ -2,6 +2,8 @@ const std = @import("std");
 const pmm = @import("../../pmm.zig");
 const scheduler = @import("../../scheduler.zig");
 const paging = @import("../../paging.zig");
+const log = @import("../../logger.zig").log;
+const bf = @import("../../lib/bitfields.zig");
 
 const assert = std.debug.assert;
 
@@ -17,32 +19,43 @@ pub const page_sizes =
 // All mapping_ bits are ignored when it is a table,
 // all table_   bits are ignored when it is a mapping.
 // PXN is XN for EL3
-pub const page_table_entry = packed struct {
-  valid: u1,
-  walk: u1,
-  mapping_memory_attribute_index: u3, // 0 for device, 1 for normal
-  mapping_nonsecure: u1,
-  mapping_access: u2, // [2:1]=0 for RW, 2 for RO
-  mapping_shareability: u2,
-  mapping_accessed: u1,
-  mapping_nonGlobal: u1,
-  physaddr_bits: u36,
-  zeroes: u4,
-  mapping_hint: u1,
-  mapping_pxn: u1,
-  mapping_xn: u1,
-  ignored: u4,
-  table_pxn: u1,
-  table_xn: u1,
-  table_access: u2,
-  table_nonsecure: u1,
+
+pub const paging_root = struct {
+  br0: u64,
+  br1: u64,
+};
+
+const phys_bitmask: u64 = ((@as(u64, 1) << 36) - 1) << 12;
+
+pub const page_table_entry = extern union {
+  raw: u64,
+
+  present_bit: bf.boolean(u64, 0),
+  walk_bit: bf.boolean(u64, 1),
+
+  // For mappings
+  mapping_xn:  bf.boolean(u64, 54), // eXecute Never
+  mapping_wn:  bf.boolean(u64, 7),  // Write Never
+  mapping_ns:  bf.boolean(u64, 5),  // NonSecure, outside EL3
+  mapping_pxn: bf.boolean(u64, 53), // Privileged eXecute Never, XN in EL3
+  mapping_ng:  bf.boolean(u64, 11), // NonGlobal, has to match asid
+  mapping_af:  bf.boolean(u64, 10), // Just set it
+
+  mapping_sh: bf.bitfield(u64, 8, 2), // SHareability, 2 for normal memory
+  mapping_ai: bf.bitfield(u64, 2, 3), // Memory attribute index into MAIR
+
+  // For tables
+  table_xn: bf.boolean(u64, 60),
+  table_wn: bf.boolean(u64, 62),
+  table_ns: bf.boolean(u64, 63),
+  table_pxn: bf.boolean(u64, 59),
 
   pub fn is_present(self: *const @This(), comptime level: usize) bool {
-    return self.valid != 0;
+    return self.present_bit.read();
   }
 
   pub fn clear(self: *@This(), comptime level: usize) void {
-    self.valid = 0;
+    self.present_bit.write(false);
   }
 
   pub fn set_table(self: *@This(), comptime level: usize, table: u64, perm: paging.perms) !void {
@@ -51,11 +64,16 @@ pub const page_table_entry = packed struct {
     if(self.is_present(level))
       return error.AlreadyPresent;
 
-    self.walk = 1;
-    self.set_physaddr(level, table);
+    self.raw = 0;
 
-    self.table_access = 3;
-    self.table_xn = 1;
+    self.walk_bit.write(true);
+    self.present_bit.write(true);
+    self.table_xn.write(true);
+    self.table_wn.write(true);
+    self.table_ns.write(true);
+    self.table_pxn.write(true);
+
+    self.set_physaddr(level, table);
 
     self.add_table_perms(level, perm) catch unreachable;
   }
@@ -64,28 +82,34 @@ pub const page_table_entry = packed struct {
     if(!self.is_table(level))
       return error.IsNotTable;
 
-    if(perm.writable)
-      self.table_access = 1;
-    if(perm.executable)
-      self.table_xn = 0;
+    if(perm.writable)   self.table_wn.write(false);
+    if(perm.executable) self.table_xn.write(false);
   }
 
   pub fn set_mapping(self: *@This(), comptime level: usize, addr: u64, perm: paging.perms) !void {
     if(self.is_present(level))
       return error.AlreadyPresent;
 
-    if(level == 0) {
-      self.walk = 1;
-    }
-    else {
-      self.walk = 0;
-    }
+    self.raw = 0;
+
+    self.walk_bit.write(level == 0);
+    self.present_bit.write(true);
+    self.mapping_xn.write(!perm.executable);
+    self.mapping_wn.write(!perm.writable);
+
+    self.mapping_ns.write(true);
+    self.mapping_pxn.write(true);
+    self.mapping_ng.write(false);
+    self.mapping_af.write(true);
+    self.mapping_sh.write(2);
+    self.mapping_ai.write(1);
 
     self.set_physaddr(level, addr);
   }
 
   pub fn set_physaddr(self: *@This(), comptime level: usize, addr: u64) void {
-    self.physaddr_bits = @intCast(u36, addr >> 12);
+    self.raw &= ~phys_bitmask;
+    self.raw |= addr & phys_bitmask;
   }
 
   pub fn is_mapping(self: *const @This(), comptime level: usize) bool {
@@ -93,11 +117,11 @@ pub const page_table_entry = packed struct {
       return false;
 
     if(level == 0) {
-      std.debug.assert(self.walk == 1);
+      std.debug.assert(self.walk_bit.read());
       return true;
     }
     else {
-      return self.walk == 0;
+      return !self.walk_bit.read();
     }
   }
 
@@ -106,11 +130,11 @@ pub const page_table_entry = packed struct {
       return false;
 
     if(level == 0) {
-      std.debug.assert(self.walk == 1);
+      std.debug.assert(self.walk_bit.read());
       return false;
     }
     else {
-      return self.walk == 1;
+      return self.walk_bit.read();
     }
   }
 
@@ -122,11 +146,21 @@ pub const page_table_entry = packed struct {
   }
 
   pub fn physaddr(self: *const @This(), comptime level: usize) u64 {
-    return @as(u64, self.physaddr_bits) << 12;
+    return @as(u64, self.raw & phys_bitmask);
+  }
+
+  pub fn format(self: *const page_table_entry, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+    if(!self.is_present(0)) {
+      try writer.writeAll("Empty");
+      return;
+    }
+
+    try writer.print("PTE{{.phys = 0x{x:0>16}, .raw=0x{x:0>16}}}", .{self.physaddr(0), self.raw});
   }
 };
 
 comptime {
+  assert(@sizeOf(page_table_entry) == 8);
   assert(@bitSizeOf(page_table_entry) == 64);
 }
 
@@ -197,6 +231,15 @@ pub fn root_tables(root: *paging_root) [2]*page_table {
     pmm.access_phys_single(page_table, root.br0),
     pmm.access_phys_single(page_table, root.br1),
   };
+}
+
+pub fn invalidate_mapping(virt: usize) void {
+  asm volatile(
+    \\TLBI VAE1, %[virt]
+    :
+    : [virt] "r" (virt >> 12)
+    : "memory"
+  );
 }
 
 pub fn allowed_mapping_levels() usize {
