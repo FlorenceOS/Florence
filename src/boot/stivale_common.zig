@@ -80,7 +80,6 @@ pub fn map_phys(ent: *const MemmapEntry, paging_root: *platform.paging_root) voi
   if(new_ent.base >= ent.base + ent.length)
     return;
 
-  // Align entry length down
   new_ent.length = libalign.align_up(u64, platform.page_sizes[0], new_ent.length);
   if(new_ent.length == 0)
     return;
