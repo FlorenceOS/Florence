@@ -194,6 +194,20 @@ pub fn set_paging_root(val: *paging_root) void {
   );
 }
 
+pub fn get_current_task() *scheduler.Task {
+  return asm(
+    \\mrs %[result], CONTEXTIDR_EL1
+    : [result] "=r" (-> *scheduler.Task)
+  );
+}
+
+pub fn set_current_task(ptr: *scheduler.Task) void {
+  return asm(
+    \\msr CONTEXTIDR_EL1, %[result]
+    : [result] "=r" (ptr)
+  );
+}
+
 pub fn spin_hint() void {
   asm volatile("YIELD");
 }
