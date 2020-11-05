@@ -43,6 +43,10 @@ fn putch(ch: u8) void {
   }
 }
 
+pub fn hexdump_obj(val: anytype) void {
+  hexdump(@ptrCast([*]u8, val)[0..@sizeOf(@TypeOf(val.*))]);
+}
+
 pub fn hexdump(in_bytes: []const u8) void {
   var bytes = in_bytes;
   while(bytes.len != 0) {
