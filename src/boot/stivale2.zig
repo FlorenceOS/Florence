@@ -97,7 +97,25 @@ const stivale2_smp_info = packed struct {
 
 const stivale2_mmio32_uart = packed struct {
   tag: stivale2_tag,
-  uart_addr: u64
+  uart_addr: u64,
+
+  pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+    try writer.print("0x{X}", .{self.uart_addr});
+  }
+};
+
+const stivale2_dtb = packed struct {
+  tag: stivale2_tag,
+  addr: [*]u8,
+  size: u64,
+
+  pub fn slice(self: *const @This()) []u8 {
+    return self.addr[0..self.size];
+  }
+
+  pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+    try writer.print("0x{X} bytes at 0x{X}", .{self.size, @ptrToInt(self.addr)});
+  }
 };
 
 const parsed_info = struct {
@@ -106,6 +124,8 @@ const parsed_info = struct {
   framebuffer: ?*stivale2_framebuffer = null,
   rsdp:        ?*stivale2_rsdp = null,
   smp:         ?*stivale2_smp = null,
+  dtb:         ?*stivale2_dtb = null,
+  uart:        ?*stivale2_mmio32_uart = null,
 
   pub fn valid(self: *const parsed_info) bool {
     if(self.memmap == null) return false;
@@ -113,7 +133,17 @@ const parsed_info = struct {
   }
 
   pub fn format(self: *const parsed_info, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
-    try writer.print("Parsed stivale2 tags:\n\tMemmap: {}\n\tCommandline: {}\n\tFramebuffer: {}\n\tRSDP: {}\n\tSMP: {}\n", .{self.memmap, self.commandline, self.framebuffer, self.rsdp, self.smp});
+    try writer.print(
+      \\Parsed stivale2 tags:
+      \\  Memmap: {}
+      \\  Commandline: {}
+      \\  Framebuffer: {}
+      \\  RSDP: {}
+      \\  SMP: {}
+      \\  DTB: {}
+      \\  UART: {}
+      \\
+      , .{self.memmap, self.commandline, self.framebuffer, self.rsdp, self.smp, self.dtb, self.uart});
   }
 };
 
@@ -130,13 +160,15 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
       0x506461d2950408fa => info.framebuffer = @ptrCast(*stivale2_framebuffer, tag),
       0x9e1786930a375e78 => info.rsdp        = @ptrCast(*stivale2_rsdp, tag),
       0x34d1d96339647025 => info.smp         = @ptrCast(*stivale2_smp, tag),
-      0xb813f9b8dbc78797 => {
-        const ptr = @ptrCast(*stivale2_mmio32_uart, tag);
-        serial.register_mmio32_serial(ptr.uart_addr);
-        log("Registered UART", .{});
-      },
+      0xabb29bd49a2833fa => info.dtb         = @ptrCast(*stivale2_dtb, tag),
+      0xb813f9b8dbc78797 => info.uart        = @ptrCast(*stivale2_mmio32_uart, tag),
       else => { log("Unknown stivale2 tag identifier: 0x{X:0>16}\n", .{tag.?.identifier}); }
     }
+  }
+
+  if(info.uart) |uart| {
+    serial.register_mmio32_serial(uart.uart_addr);
+    log("Stivale2: Registered UART\n", .{});
   }
 
   log("{}\n", .{info});
