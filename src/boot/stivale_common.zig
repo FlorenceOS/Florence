@@ -75,7 +75,7 @@ pub fn map_phys(ent: *const MemmapEntry, paging_root: *platform.paging_root) voi
 
   var new_ent = ent.*;
 
-  new_ent.base = libalign.align_up(u64, platform.page_sizes[0], new_ent.base);
+  new_ent.base = libalign.align_down(u64, platform.page_sizes[0], new_ent.base);
   // If there is nothing left of the entry
   if(new_ent.base >= ent.base + ent.length)
     return;
