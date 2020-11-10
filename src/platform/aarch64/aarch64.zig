@@ -27,6 +27,14 @@ pub const paging_root = struct {
 
 const phys_bitmask: u64 = ((@as(u64, 1) << 36) - 1) << 12;
 
+// D5.5.1
+const shareability = .{
+  .nonshareable = 0,
+  // 1 reserved
+  .outer = 2,
+  .inner = 3,
+};
+
 pub const page_table_entry = extern union {
   raw: u64,
 
@@ -37,7 +45,7 @@ pub const page_table_entry = extern union {
   mapping_xn:  bf.boolean(u64, 54), // eXecute Never
   mapping_wn:  bf.boolean(u64, 7),  // Write Never
   mapping_ns:  bf.boolean(u64, 5),  // NonSecure, outside EL3
-  mapping_pxn: bf.boolean(u64, 53), // Privileged eXecute Never, XN in EL3
+  mapping_pxn: bf.boolean(u64, 53), // Privileged eXecute Never
   mapping_ng:  bf.boolean(u64, 11), // NonGlobal, has to match asid
   mapping_af:  bf.boolean(u64, 10), // Just set it
 
@@ -71,7 +79,7 @@ pub const page_table_entry = extern union {
     self.table_xn.write(true);
     self.table_wn.write(true);
     self.table_ns.write(true);
-    self.table_pxn.write(true);
+    self.table_pxn.write(false);
 
     self.set_physaddr(level, table);
 
@@ -95,14 +103,29 @@ pub const page_table_entry = extern union {
     self.walk_bit.write(level == 0);
     self.present_bit.write(true);
     self.mapping_xn.write(!perm.executable);
+    self.mapping_pxn.write(!perm.executable);
     self.mapping_wn.write(!perm.writable);
 
     self.mapping_ns.write(true);
-    self.mapping_pxn.write(true);
-    self.mapping_ng.write(false);
+    self.mapping_ng.write(true);
     self.mapping_af.write(true);
-    self.mapping_sh.write(2);
-    self.mapping_ai.write(1);
+    self.mapping_sh.write(shareability.outer);
+
+    var ai_value: u3 = undefined;
+
+    if(perm.cacheable and perm.writethrough) {
+      // Normal memory
+      ai_value = 0;
+    } else {
+      if(!perm.cacheable and perm.writethrough) {
+        // Device memory
+        ai_value = 2;
+      } else {
+        return error.UnknownMappingPerms;
+      }
+    }
+
+    self.mapping_ai.write(ai_value);
 
     self.set_physaddr(level, addr);
   }
@@ -182,14 +205,24 @@ pub fn current_paging_root() paging_root {
   };
 }
 
+fn mair_value() u64 {
+  return 0
+    | (0b11111111 << 0) // Normal, Write-back RW-Allocate non-transient
+    | (0b00001100 << 8) // Device, GRE
+    | (0b00000000 << 16) // Device, nGnRnE
+  ;
+}
+
 pub fn set_paging_root(val: *paging_root) void {
   asm volatile(
     \\msr TTBR0_EL1, %[br0]
     \\msr TTBR1_EL1, %[br1]
+    \\msr MAIR_EL1,  %[mair]
     \\isb sy
     :
     : [br0] "r" (val.br0)
     , [br1] "r" (val.br1)
+    , [mair] "r" (mair_value())
     : "memory"
   );
 }
