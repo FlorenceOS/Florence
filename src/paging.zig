@@ -177,17 +177,17 @@ pub fn map_phys_range(phys: usize, phys_end: usize, perm: perms, paging_root: ?*
   }
 }
 
-pub fn map_phys_struct(comptime T: type, phys: usize, perm: perms) !*T {
+pub fn map_phys_struct(comptime T: type, phys: usize, perm: perms, paging_root: ?*platform.paging_root) !*T {
   const struct_size = @sizeOf(T);
-  try map_phys_size(phys, struct_size, perm);
+  try map_phys_size(phys, struct_size, perm, paging_root);
   return &pmm.access_phys(T, phys)[0];
 }
 
-pub fn map_phys_size(phys: usize, size: usize, perm: perms) !void {
+pub fn map_phys_size(phys: usize, size: usize, perm: perms, paging_root: ?*platform.paging_root) !void {
   const page_addr_low = libalign.align_down(usize, page_sizes[0], phys);
   const page_addr_high = libalign.align_up(usize, page_sizes[0], phys + size);
 
-  try map_phys_range(page_addr_low, page_addr_high, perm, null);
+  try map_phys_range(page_addr_low, page_addr_high, perm, paging_root);
 }
 
 pub fn finalize_kernel_paging(new_root: *platform.paging_root) !void {

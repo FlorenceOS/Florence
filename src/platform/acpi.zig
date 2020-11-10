@@ -66,9 +66,9 @@ fn signature_value(sdt: anytype) u32 {
 }
 
 fn map_sdt(addr: u64) ![]u8 {
-  const sdt = @ptrCast([*]u8, try paging.map_phys_struct([8]u8, addr, paging.data()));
+  const sdt = @ptrCast([*]u8, try paging.map_phys_struct([8]u8, addr, paging.data(), null));
   const sz = sdt_size(sdt);
-  try paging.map_phys_size(addr, sz, paging.data());
+  try paging.map_phys_size(addr, sz, paging.data(), null);
   return sdt[0..sz];
 }
 
@@ -118,7 +118,7 @@ pub fn init_acpi() !void {
   if(rsdp_phys == 0)
     return error.NoRSDP;
 
-  rsdp = try paging.map_phys_struct(RSDP, rsdp_phys, paging.data());
+  rsdp = try paging.map_phys_struct(RSDP, rsdp_phys, paging.data(), null);
 
   log("ACPI: Revision: {}\n", .{rsdp.revision});
 
