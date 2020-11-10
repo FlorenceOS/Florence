@@ -202,7 +202,7 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
   }
 
   if(info.uart) |uart| {
-    vital(paging.map_phys_size(uart.uart_addr, platform.page_sizes[0], paging.mmio()), "mapping UART");
+    vital(paging.map_phys_size(uart.uart_addr, platform.page_sizes[0], paging.mmio(), &paging_root), "mapping UART");
   }
 
   vital(paging.finalize_kernel_paging(&paging_root), "finalizing kernel paging");
