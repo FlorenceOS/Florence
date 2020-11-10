@@ -69,6 +69,14 @@ pub fn add_memmap_high(ent: *const MemmapEntry) void {
   }
 }
 
+pub fn add_memmap(ent: *const MemmapEntry) void {
+  if(ent.type != 1)
+    return;
+
+  log("Stivale: Consuming 0x{X} to 0x{X}\n", .{ent.base, ent.base + ent.length});
+  pmm.consume(ent.base, ent.length);
+}
+
 pub fn map_phys(ent: *const MemmapEntry, paging_root: *platform.paging_root) void {
   if(ent.type != 1 and ent.type != 0x1000)
     return;

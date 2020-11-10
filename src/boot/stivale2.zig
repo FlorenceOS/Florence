@@ -189,7 +189,7 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
   }
 
   for(info.memmap.?.get()) |*ent| {
-    stivale.add_memmap_low(ent);
+    stivale.add_memmap(ent);
   }
 
   var paging_root = vital(paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
@@ -214,10 +214,6 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
   }
   else {
     vga_log.register();
-  }
-
-  for(info.memmap.?.get()) |*ent| {
-    stivale.add_memmap_high(ent);
   }
 
   if(info.rsdp != null) {
