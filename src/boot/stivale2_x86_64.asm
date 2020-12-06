@@ -22,7 +22,8 @@ smp:
 .section .text
 .global _start
 _start:
-  xor rbp, rbp
+  lea rsp, stack_top
+  mov rbp, rsp
   
 .extern stivale2_main
   jmp   stivale2_main
