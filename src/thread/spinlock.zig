@@ -9,9 +9,8 @@ pub const Spinlock = struct {
   pub fn try_lock(self: *@This()) ?os.platform.InterruptState {
     const state = os.platform.get_and_disable_interrupts();
     if(self.try_grab()) return state;
-    @panic("wtf lock grabbed");
-    //os.platform.set_interrupts(state);
-    //return null;
+    os.platform.set_interrupts(state);
+    return null;
   }
 
   // Grabs lock and disables interrupts atomically.
