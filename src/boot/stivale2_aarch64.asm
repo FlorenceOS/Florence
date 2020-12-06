@@ -16,8 +16,12 @@ framebuffer:
 
 smp:
 .8byte 0x1ab015085f3273df
-.8byte 0
+.8byte sabaton_compatible
 .8byte 1
+
+sabaton_compatible:
+.8byte 0x160d4d6c2fc2db30
+.8byte 0
 
 .section .text
 .global _start
