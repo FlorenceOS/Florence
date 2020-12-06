@@ -328,7 +328,7 @@ pub const TaskData = struct {
   stack: ?*[task_stack_size]u8 = null,
 };
 
-const task_stack_size = 0x1000;
+const task_stack_size = 1024 * 16;
 
 // https://github.com/ziglang/zig/issues/3857
 
