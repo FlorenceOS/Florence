@@ -63,7 +63,7 @@ fn build_kernel(b: *Builder, arch: builtin.Arch, main: []const u8, name: []const
     ) catch unreachable;
 
   const kernel = b.addExecutable(kernel_filename, main);
-  kernel.addBuildOption([] const u8, "source_blob_path", std.mem.concat(b.allocator, u8, &[_][]const u8{ "../", source_blob_path } ) catch unreachable);
+  kernel.addBuildOption([] const u8, "source_blob_path", std.mem.concat(b.allocator, u8, &[_][]const u8{ "../../", source_blob_path } ) catch unreachable);
   kernel.setTarget(target(arch, .kernel));
   kernel.setLinkerScriptPath("src/linker.ld");
   kernel.setBuildMode(.ReleaseSmall);
