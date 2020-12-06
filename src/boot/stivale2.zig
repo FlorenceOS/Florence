@@ -193,7 +193,7 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
   }
 
   // If we didn't get a compatible pagetable from the bootloader, make our own
-  if(info.compatible_pt) {
+  if(!info.compatible_pt) {
     os.log("Page tables NOT compatible, making our own\n", .{});
     var paging_root = os.vital(paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
 
