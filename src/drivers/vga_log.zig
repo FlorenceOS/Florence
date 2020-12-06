@@ -1,11 +1,12 @@
-const libalign = @import("../lib/align.zig");
-
-const paging = @import("../paging.zig");
-const pmm = @import("../pmm.zig");
-const log = @import("../logger.zig").log;
-
-const page_size = @import("../platform.zig").page_sizes[0];
+const os = @import("root").os;
 const arch = @import("builtin").arch;
+
+const libalign = os.lib.libalign;
+
+const paging = os.memory.paging;
+const pmm    = os.memory.pmm;
+
+const page_size = os.platform.page_sizes[0];
 
 const Framebuffer = struct {
   x_pos: u64 = 0,
@@ -21,7 +22,7 @@ pub fn register() void {
     const vga_page_high = libalign.align_up(usize, page_size, 0xB8000 + vga_size);
 
     paging.map_phys_range(vga_page_low, vga_page_high, paging.wc(paging.data()), null) catch |err| {
-      log(":/ rip couldn't map vga: {}\n", .{@errorName(err)});
+      os.log(":/ rip couldn't map vga: {}\n", .{@errorName(err)});
       return;
     };
 

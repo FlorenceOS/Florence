@@ -1,17 +1,16 @@
 const std = @import("std");
-
-const paging = @import("paging.zig");
-
-const log = @import("logger.zig").log;
+const os = @import("root").os;
 
 const GPAlloc = std.heap.GeneralPurposeAllocator;
-const RangeAlloc = @import("lib/range_alloc.zig").RangeAlloc;
-const Mutex = @import("scheduler.zig").Mutex;
+
+const paging     = os.memory.paging;
+const RangeAlloc = os.lib.range_alloc.RangeAlloc;
+const Mutex      = os.thread.Mutex;
 
 var sbrk_head: u64 = undefined;
 
 pub fn init(phys_high: u64) !void {
-  log("Initializing vmm with base 0x{X}\n", .{phys_high});
+  os.log("Initializing vmm with base 0x{X}\n", .{phys_high});
   sbrk_head = phys_high;
 }
 
@@ -22,7 +21,7 @@ pub fn sbrk(num_bytes: u64) ![]u8 {
   defer sbrk_mutex.unlock();
 
   const ret = sbrk_head;
-  log("VMM: sbrk(0x{X}) = 0x{X}\n", .{num_bytes, ret});
+  os.log("VMM: sbrk(0x{X}) = 0x{X}\n", .{num_bytes, ret});
 
   try paging.map(.{
     .virt = ret,

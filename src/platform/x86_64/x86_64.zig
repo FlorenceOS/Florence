@@ -1,18 +1,22 @@
 const interrupts = @import("interrupts.zig");
 const setup_gdt = @import("gdt.zig").setup_gdt;
+const serial = @import("serial.zig");
 
-const pmm = @import("../../pmm.zig");
-const paging = @import("../../paging.zig");
-const scheduler = @import("../../scheduler.zig");
-const vmm = @import("../../vmm.zig");
-const pci = @import("../pci.zig");
+const os = @import("root").os;
 
-const range = @import("../../lib/range.zig");
+const pmm    = os.memory.pmm;
+const vmm    = os.memory.vmm;
+const paging = os.memory.paging;
+
+const scheduler = os.thread.scheduler;
+const Task      = os.thread.Task;
+
+const pci   = os.platform.pci;
+
+const range = os.lib.range;
 
 const std = @import("std");
 const assert = std.debug.assert;
-
-const log = @import("../../logger.zig").log;
 
 pub const InterruptFrame = interrupts.InterruptFrame;
 
@@ -30,7 +34,7 @@ pub fn allowed_mapping_levels() u8 {
   return 2;
 }
 
-const paging_perms = @import("../../paging.zig").perms;
+const paging_perms = os.memory.paging.perms;
 
 // https://github.com/ziglang/zig/issues/2627
 // Just straight up doesn't work, everything breaks as page table entries has size 9
@@ -233,12 +237,14 @@ pub fn prepare_paging() !void {
 }
 
 pub fn platform_init() !void {
-  try interrupts.init_interrupts();
-  setup_gdt();
+  try os.platform.acpi.init_acpi();
+  try os.platform.pci.init_pci();
 }
 
 pub fn platform_early_init() void {
-
+  serial.init();
+  try interrupts.init_interrupts();
+  setup_gdt();
 }
 
 pub fn read_msr(comptime T: type, msr_num: u32) T {
@@ -291,6 +297,33 @@ pub fn pci_write(comptime T: type, addr: pci.Addr, offset: pci.regoff, value: T)
   out(T, 0xCFC + @as(u16, offset % 4), value);
 }
 
+pub const InterruptState = bool;
+
+pub fn eflags() u64 {
+  return asm volatile(
+    \\pushfq
+    \\cli
+    \\pop %[flags]
+    : [flags] "=r" (-> u64)
+  );
+}
+
+pub fn get_and_disable_interrupts() InterruptState {
+  return eflags() & 0x200 == 0x200;
+}
+
+pub fn set_interrupts(s: InterruptState) void {
+  if(s) {
+    asm volatile(
+      \\sti
+    );
+  } else {
+    asm volatile(
+      \\cli
+    );
+  }
+}
+
 pub const TaskData = struct {
   stack: ?*[task_stack_size]u8 = null,
 };
@@ -301,10 +334,10 @@ const task_stack_size = 0x1000;
 
 // Sets 
 fn task_fork_impl(frame: *InterruptFrame) !void {
-  const new_task = @intToPtr(*scheduler.Task, frame.rax);
+  const new_task = @intToPtr(*Task, frame.rax);
   const current_task = get_current_task();
 
-  scheduler.queue.enqueue_task_front(current_task);
+  scheduler.ready.enqueue(current_task);
 
   frame.rax = 0;
 
@@ -324,7 +357,7 @@ pub fn task_fork_handler(frame: *InterruptFrame) void {
   };
 }
 
-pub fn new_task_call(new_task: *scheduler.Task, func: anytype, args: anytype) !void {
+pub fn new_task_call(new_task: *Task, func: anytype, args: anytype) !void {
   var had_error: u64 = undefined;
   var result: u64 = undefined;
 
@@ -343,6 +376,12 @@ pub fn new_task_call(new_task: *scheduler.Task, func: anytype, args: anytype) !v
     return @intToError(@intCast(std.meta.IntType(.unsigned, @sizeOf(anyerror) * 8), result));
 
   if(result == 1) {
+    // Enqueue the current task
+    scheduler.ready.enqueue(get_current_task());
+
+    // Switch to the new task
+    set_current_task(new_task);
+
     // Switch stack
     // https://github.com/ziglang/zig/issues/3857
     // @call(.{
@@ -366,15 +405,18 @@ fn new_task_call_part_2(func: anytype, args_ptr: anytype) noreturn {
   // the function arguments onto our stack
   scheduler.yield();
   @call(.{}, func, new_args) catch |err| {
-    log("Task exited with error: {}\n", .{@errorName(err)});
+    os.log("Task exited with error: {}\n", .{@errorName(err)});
     while(true) { }
   };
   scheduler.exit_task();
 }
 
-pub fn yield() void {
+pub fn yield_to_task(t: *Task) void {
   asm volatile(
     \\int $0x6B
+    :
+    : [_] "{rax}" (t)
+    : "memory"
   );
 }
 
@@ -385,30 +427,33 @@ pub fn exit_task() noreturn {
   unreachable;
 }
 
-pub fn self_exited() !*scheduler.Task {
-  const curr = get_current_task();
-  if(curr.platform_data.stack != null) {
-    // TODO: Figure out how to free the stack while returning using it??
-    // We can just leak it for now
-    //try vmm.free_single(curr.platform_data.stack.?);
-  }
-  return curr;
-}
+pub const self_exited = interrupts.self_exited;
 
 pub const IA32_APIC_BASE = msr(u64, 0x0000001B);
 pub const IA32_EFER      = msr(u64, 0xC0000080);
 pub const KernelGSBase   = msr(u64, 0xC0000102);
 
-pub fn set_current_task(task_ptr: *scheduler.Task) void {
+pub fn set_current_task(task_ptr: *Task) void {
   KernelGSBase.write(@ptrToInt(task_ptr));
 }
 
-pub fn get_current_task() *scheduler.Task {
-  return @intToPtr(*scheduler.Task, KernelGSBase.read());
+pub fn get_current_task() *Task {
+  return @intToPtr(*Task, KernelGSBase.read());
 }
 
 pub fn spin_hint() void {
   asm volatile("pause");
+}
+
+pub fn await_interrupt() void {
+  asm volatile(
+    \\sti
+    \\hlt
+    \\cli
+    :
+    :
+    : "memory"
+  );
 }
 
 pub fn out(comptime T: type, port: u16, value: T) void {
@@ -479,4 +524,8 @@ pub fn inl(port: u16) u32 {
 
 pub fn debugputch(ch: u8) void {
   outb(0xe9, ch);
+  serial.port(1).write(ch);
+  serial.port(2).write(ch);
+  serial.port(3).write(ch);
+  serial.port(4).write(ch);
 }

@@ -1,24 +1,24 @@
-const libalign = @import("../lib/align.zig");
-const range = @import("../lib/range.zig");
-
-const page_size = @import("../platform.zig").page_sizes[0];
-
-const log = @import("../logger.zig").log;
-const paging = @import("../paging.zig");
-const pmm = @import("../pmm.zig");
-
+const os = @import("root").os;
 const std = @import("std");
 
+const range = os.lib.range.range;
+
+const page_size = os.platform.page_sizes[0];
+
+const paging = os.memory.paging;
+const pmm    = os.memory.pmm;
+
 // 8x8 bits per char
-const font = @embedFile("vesa_font.bin");
+const char_width = 8;
+const char_height = 8;
+
+// '\x20' / ' ' (whitespace) is the first character in the font
 const font_base = 0x20;
+const font = @embedFile("vesa_font.bin");
 const font_max_char: u8 = font_base + font.len/8;
 
 const bgcol = 0x00;
 const fgcol = 0xaa;
-
-const char_width = 8;
-const char_height = 8;
 
 const clear_screen = false;
 
@@ -52,11 +52,11 @@ pub fn register_fb(fb_phys: usize, fb_pitch: u16, fb_width: u16, fb_height: u16,
   // Bits are lies, I do bytes.
   const fb_bpp = fb_bpp_in / 8;
   const fb_size = @as(u64, fb_pitch) * @as(u64, fb_height);
-  const fb_page_low = libalign.align_down(usize, page_size, fb_phys);
-  const fb_page_high = libalign.align_up(usize, page_size, fb_phys + fb_size);
+  const fb_page_low = os.lib.libalign.align_down(usize, page_size, fb_phys);
+  const fb_page_high = os.lib.libalign.align_up(usize, page_size, fb_phys + fb_size);
 
   paging.map_phys_range(fb_page_low, fb_page_high, paging.wc(paging.data()), null) catch |err| {
-    log("VESAlog: Couldn't map fb: {}\n", .{@errorName(err)});
+    os.log("VESAlog: Couldn't map fb: {}\n", .{@errorName(err)});
     return;
   };
 
@@ -70,14 +70,14 @@ pub fn register_fb(fb_phys: usize, fb_pitch: u16, fb_width: u16, fb_height: u16,
 
   if(clear_screen) {
     @memset(@ptrCast([*]u8, framebuffer.?.addr), bgcol, fb_size);
-    log("VESAlog: Screen cleared.\n", .{});
+    os.log("VESAlog: Screen cleared.\n", .{});
   }
 
-  log("VESAlog: Registered fb @0x{X} with size 0x{X}\n", .{fb_phys, fb_size});
-  log("VESAlog:  Width:  {}\n", .{fb_width});
-  log("VESAlog:  Height: {}\n", .{fb_height});
-  log("VESAlog:  Pitch:  {}\n", .{fb_pitch});
-  log("VESAlog:  BPP:    {}\n", .{fb_bpp});
+  os.log("VESAlog: Registered fb @0x{X} with size 0x{X}\n", .{fb_phys, fb_size});
+  os.log("VESAlog:  Width:  {}\n", .{fb_width});
+  os.log("VESAlog:  Height: {}\n", .{fb_height});
+  os.log("VESAlog:  Pitch:  {}\n", .{fb_pitch});
+  os.log("VESAlog:  BPP:    {}\n", .{fb_bpp});
 }
 
 fn px(comptime bpp: u64, x: u64, y: u64) *[3]u8 {
@@ -86,12 +86,12 @@ fn px(comptime bpp: u64, x: u64, y: u64) *[3]u8 {
 }
 
 fn blit_impl(comptime bpp: u64, ch: u8) void {
-  inline for(range.range(char_height)) |y| {
+  inline for(range(char_height)) |y| {
     const chr_line = font[y + (@as(u64, ch) - font_base) * char_height * ((char_width + 7)/8)];
 
     const ypx = framebuffer.?.pos_y * char_height + y;
 
-    inline for(range.range(char_width)) |x| {
+    inline for(range(char_width)) |x| {
       const xpx = framebuffer.?.pos_x * char_width + x;
 
       const pixel = px(bpp, xpx, ypx);

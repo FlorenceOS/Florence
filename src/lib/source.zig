@@ -1,12 +1,10 @@
-const source_blob = @embedFile(@import("build_options").source_blob_path);
-const iterate_files = @import("lib/tar.zig").iterate_files;
-
+const os = @import("root").os;
 const std = @import("std");
 
-const log = @import("logger.zig").log;
+const source_blob = @embedFile(@import("build_options").source_blob_path);
 
 pub fn file_line(filename: []const u8, line: usize) ![]const u8 {
-  var iterator = iterate_files(source_blob) catch unreachable;
+  var iterator = os.lib.tar.iterate_files(source_blob) catch unreachable;
   while(iterator.has_file): (iterator.next()) {
     if(!std.mem.endsWith(u8, filename, iterator.file_name)) {
       continue;

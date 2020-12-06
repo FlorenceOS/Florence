@@ -1,4 +1,4 @@
-const log = @import("../logger.zig").log;
+const os = @import("root").os;
 const std = @import("std");
 const assert = std.debug.assert;
 
@@ -60,7 +60,7 @@ const Parser = struct {
     self.curr_offset = off_dt_struct;
     self.node(0);
 
-    //log("DT has size {}\n", .{self.limit});
+    //os.log("DT has size {}\n", .{self.limit});
 
     // const off_dt_strings    = read(u32, dt_data[0x0C .. 0x10]);
     // const version           = read(u32, dt_data[0x14 .. 0x18]);
@@ -71,15 +71,15 @@ const Parser = struct {
   }
 
   fn parse_resrved_regions(self: *Parser) void {
-    log("Parsing reserved regions\n", .{});
+    os.log("Parsing reserved regions\n", .{});
     while(true) {
-      log("{}\n", .{self});
+      os.log("{}\n", .{self});
       const addr = self.read(u64);
       const size = self.read(u64);
       if(addr == 0 and size == 0)
         continue;
 
-      log("TODO: Reserved: {x} with size {x}", .{addr, size});
+      os.log("TODO: Reserved: {x} with size {x}", .{addr, size});
     }
   }
 

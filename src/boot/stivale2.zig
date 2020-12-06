@@ -1,24 +1,21 @@
-const log = @import("../logger.zig").log;
+const std = @import("std");
+pub const os = @import("../os.zig");
+
 const stivale = @import("stivale_common.zig");
 
-const paging = @import("../paging.zig");
-const vmm = @import("../vmm.zig");
-const platform = @import("../platform.zig");
-const kmain = @import("../kmain.zig").kmain;
-const acpi = @import("../platform/acpi.zig");
-const serial = @import("../serial.zig");
-const vital = @import("../vital.zig").vital;
+const paging = os.memory.paging;
+const vmm    = os.memory.vmm;
 
-const vesa_log = @import("../drivers/vesa_log.zig");
-const vga_log = @import("../drivers/vga_log.zig");
+const platform = os.platform;
+const kmain    = os.kernel.kmain;
+
+const mmio_serial = os.drivers.mmio_serial;
+const vesa_log    = os.drivers.vesa_log;
+const vga_log     = os.drivers.vga_log;
 
 const MemmapEntry = stivale.MemmapEntry;
 
-const std = @import("std");
-
 const arch = @import("builtin").arch;
-
-pub const os = @import("../os/kernel.zig");
 
 const stivale2_tag = packed struct {
   identifier: u64,
@@ -152,7 +149,7 @@ const parsed_info = struct {
 };
 
 export fn stivale2_main(info_in: *stivale2_info) noreturn {
-  log("Stivale2: Boot!\n", .{});
+  os.log("Stivale2: Boot!\n", .{});
 
   var info = parsed_info{};
 
@@ -166,33 +163,33 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
       0x34d1d96339647025 => info.smp         = @ptrCast(*stivale2_smp, tag),
       0xabb29bd49a2833fa => info.dtb         = @ptrCast(*stivale2_dtb, tag),
       0xb813f9b8dbc78797 => info.uart        = @ptrCast(*stivale2_mmio32_uart, tag),
-      else => { log("Unknown stivale2 tag identifier: 0x{X:0>16}\n", .{tag.?.identifier}); }
+      else => { os.log("Unknown stivale2 tag identifier: 0x{X:0>16}\n", .{tag.?.identifier}); }
     }
   }
 
   if(info.uart) |uart| {
-    serial.register_mmio32_serial(uart.uart_addr);
-    log("Stivale2: Registered UART\n", .{});
+    mmio_serial.register_mmio32_serial(uart.uart_addr);
+    os.log("Stivale2: Registered UART\n", .{});
   }
 
-  log("{}\n", .{info});
-
   platform.platform_early_init();
+
+  os.log("{}\n", .{info});
 
   if(!info.valid()) {
     @panic("Stivale2: Info not valid!");
   }
 
   if(info.dtb) |dtb| {
-    vital(@import("../platform/devicetree.zig").parse_dt(dtb.slice()), "parsing devicetree blob");
-    log("Stivale2: Parsed devicetree blob!\n", .{});
+    os.vital(platform.devicetree.parse_dt(dtb.slice()), "parsing devicetree blob");
+    os.log("Stivale2: Parsed devicetree blob!\n", .{});
   }
 
   for(info.memmap.?.get()) |*ent| {
     stivale.add_memmap(ent);
   }
 
-  var paging_root = vital(paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
+  var paging_root = os.vital(paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
 
   if(arch == .x86_64)
     stivale.map_bootloader_data(&paging_root);
@@ -202,12 +199,19 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
   }
 
   if(info.uart) |uart| {
-    vital(paging.map_phys_size(uart.uart_addr, platform.page_sizes[0], paging.mmio(), &paging_root), "mapping UART");
+    os.log("Mapping UART\n", .{});
+    os.vital(paging.map_phys_size(uart.uart_addr, platform.page_sizes[0], paging.mmio(), &paging_root), "mapping UART");
   }
 
-  vital(paging.finalize_kernel_paging(&paging_root), "finalizing kernel paging");
+  //paging.print_paging(&paging_root);
 
-  vital(vmm.init(stivale.phys_high(info.memmap.?.get())), "initializing vmm");
+  os.vital(paging.finalize_kernel_paging(&paging_root), "finalizing kernel paging");
+
+  os.log("Doing vmm\n", .{});
+
+  os.vital(vmm.init(stivale.phys_high(info.memmap.?.get())), "initializing vmm");
+
+  os.log("Doing framebuffer\n", .{});
 
   if(info.framebuffer) |fb| {
     vesa_log.register_fb(fb.addr, fb.pitch, fb.width, fb.height, fb.bpp);
@@ -217,8 +221,11 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
   }
 
   if(info.rsdp != null) {
-    acpi.register_rsdp(info.rsdp.?.rsdp);
+    os.log("Registering rsdp!\n", .{});
+    platform.acpi.register_rsdp(info.rsdp.?.rsdp);
   }
+
+  os.log("Calling kmain: 0x{X}\n", .{@intToPtr(*u32, @ptrToInt(kmain)).*});
 
   kmain();
 }

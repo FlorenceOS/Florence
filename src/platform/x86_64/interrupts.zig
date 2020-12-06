@@ -1,11 +1,9 @@
 const std = @import("std");
+const os = @import("root").os;
 
-const log = @import("../../logger.zig").log;
-const panic = @import("../../panic.zig").panic;
-const debug = @import("../../debug.zig");
-const platform = @import("../../platform.zig");
-const range = @import("../../lib/range.zig").range;
-const scheduler = @import("../../scheduler.zig");
+const platform  = os.platform;
+const range     = os.lib.range.range;
+const scheduler = os.thread.scheduler;
 
 const idt = @import("idt.zig");
 const gdt = @import("gdt.zig");
@@ -17,19 +15,19 @@ var handlers = [_]handler_func {unhandled_interrupt} ** num_handlers;
 
 pub fn init_interrupts() !void {
   disable_pic();
-  var itable = try idt.setup_idt();
+  var itable = idt.setup_idt();
 
   inline for(range(num_handlers)) |intnum| {
     itable[intnum] = idt.entry(make_handler(intnum), true, 0);
   }
 
   handlers[0x0E] = page_fault_handler;
-  handlers[0x69] = startup_handler;
+  handlers[0x69] = bsp_handler;
   handlers[0x6A] = platform.task_fork_handler;
-  handlers[0x6B] = scheduler.yield_handler;
+  handlers[0x6B] = yield_to_handler;
   handlers[0x6C] = scheduler.exit_handler;
 
-  log("Interrupts: Enabling interrupts...\n", .{});
+  os.log("Interrupts: Enabling interrupts...\n", .{});
 
   asm volatile("sti");
 }
@@ -44,11 +42,37 @@ fn type_page_fault(error_code: usize) !platform.PageFaultAccess {
   return .Read;
 }
 
-fn startup_handler(frame: *InterruptFrame) void {
+var bsp_task: os.thread.Task = .{};
+
+fn bsp_handler(frame: *InterruptFrame) void {
   frame.cs = gdt.selector.code64;
   frame.ss = gdt.selector.data64;
 
-  scheduler.startup_handler(frame);
+  platform.set_current_task(&bsp_task);
+}
+
+pub fn self_exited() !?*os.thread.Task {
+  const curr = platform.get_current_task();
+  
+  if(curr == &bsp_task)
+    return null;
+
+  if(curr.platform_data.stack != null) {
+    // TODO: Figure out how to free the stack while returning using it??
+    // We can just leak it for now
+    //try vmm.free_single(curr.platform_data.stack.?);
+  }
+  return curr;
+}
+
+fn yield_to_handler(frame: *InterruptFrame) void {
+  const current_task = platform.get_current_task();
+  const next_task = @intToPtr(*os.thread.Task, frame.rax);
+
+  platform.set_current_task(next_task);
+
+  current_task.registers = frame.*;
+  frame.* = next_task.registers;
 }
 
 fn page_fault_handler(frame: *InterruptFrame) void {
@@ -57,12 +81,12 @@ fn page_fault_handler(frame: *InterruptFrame) void {
     :[addr] "=r" (-> usize)
   );
   const page_fault_type = type_page_fault(frame.ec) catch |err| {
-    log("Interrupts: Page fault at addr 0x{x}, but we couldn't determine what type. (error code was 0x{x}).\nCaught error {}.\n", .{page_fault_addr, frame.ec, @errorName(err)});
+    os.log("Interrupts: Page fault at addr 0x{x}, but we couldn't determine what type. (error code was 0x{x}).\nCaught error {}.\n", .{page_fault_addr, frame.ec, @errorName(err)});
     dump_frame(frame);
     while(true) { }
   };
 
-  log("Interrupts: Page fault while {} at 0x{x}\n",
+  os.log("Interrupts: Page fault while {} at 0x{x}\n",
     .{
       switch(page_fault_type) {
         .Read => @as([]const u8, "reading"),
@@ -79,13 +103,13 @@ fn page_fault_handler(frame: *InterruptFrame) void {
 }
 
 fn unhandled_interrupt(frame: *InterruptFrame) void {
-  log("Interrupts: Unhandled interrupt: {}!\n", .{frame.intnum});
+  os.log("Interrupts: Unhandled interrupt: {}!\n", .{frame.intnum});
   dump_frame(frame);
   while(true) { }
 }
 
 fn disable_pic() void {
-  log("Interrupts: Disabling PIC...\n", .{});
+  os.log("Interrupts: Disabling PIC...\n", .{});
   {
     const outb = @import("x86_64.zig").outb;
     outb(0x20, 0x11);
@@ -245,12 +269,12 @@ export fn interrupt_common() callconv(.Naked) void {
 }
 
 fn dump_frame(frame: *InterruptFrame) void {
-  log("FRAME DUMP:\n", .{});
-  log("RAX={x:0>16} RBX={x:0>16} RCX={x:0>16} RDX={x:0>16}\n", .{frame.rax, frame.rbx, frame.rcx, frame.rdx});
-  log("RSI={x:0>16} RDI={x:0>16} RBP={x:0>16} RSP={x:0>16}\n", .{frame.rsi, frame.rdi, frame.rbp, frame.rsp});
-  log("R8 ={x:0>16} R9 ={x:0>16} R10={x:0>16} R11={x:0>16}\n", .{frame.r8,  frame.r9,  frame.r10, frame.r11});
-  log("R12={x:0>16} R13={x:0>16} R14={x:0>16} R15={x:0>16}\n", .{frame.r12, frame.r13, frame.r14, frame.r15});
-  log("RIP={x:0>16} int={x:0>16} ec ={x:0>16}\n",              .{frame.rip, frame.intnum, frame.ec});
+  os.log("FRAME DUMP:\n", .{});
+  os.log("RAX={x:0>16} RBX={x:0>16} RCX={x:0>16} RDX={x:0>16}\n", .{frame.rax, frame.rbx, frame.rcx, frame.rdx});
+  os.log("RSI={x:0>16} RDI={x:0>16} RBP={x:0>16} RSP={x:0>16}\n", .{frame.rsi, frame.rdi, frame.rbp, frame.rsp});
+  os.log("R8 ={x:0>16} R9 ={x:0>16} R10={x:0>16} R11={x:0>16}\n", .{frame.r8,  frame.r9,  frame.r10, frame.r11});
+  os.log("R12={x:0>16} R13={x:0>16} R14={x:0>16} R15={x:0>16}\n", .{frame.r12, frame.r13, frame.r14, frame.r15});
+  os.log("RIP={x:0>16} int={x:0>16} ec ={x:0>16}\n",              .{frame.rip, frame.intnum, frame.ec});
 }
 
 export fn interrupt_handler(frame: u64) void {

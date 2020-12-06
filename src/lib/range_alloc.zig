@@ -1,12 +1,11 @@
 const std = @import("std");
+const os = @import("root").os;
 
-const rb = @import("../extern/std-lib-orphanage/std/rb.zig");
 const Order = std.math.Order;
 
-const sbrk = @import("../vmm.zig").sbrk;
-const Mutex = @import("../scheduler.zig").Mutex;
-
-const log = @import("../logger.zig").log;
+const rb    = os.external.rb;
+const sbrk  = os.memory.vmm.sbrk;
+const Mutex = os.thread.Mutex;
 
 const max_alloc_size = 0x1000 << 10;
 const node_block_size = 0x1000;
@@ -108,8 +107,8 @@ pub const RangeAlloc = struct {
 
   fn alloc_impl(self: *@This(), len: usize, ptr_align: u29, len_align: u29, ret_addr: usize) ![]u8 {
     const placement = try self.find_placement(len, ptr_align, len_align);
-    //log("Calling alloc(sz=0x{X}, align=0x{X}, len_align=0x{X})\n", .{len, ptr_align, len_align});
-    //log("Got placement: {}\n", .{placement});
+    //os.log("Calling alloc(sz=0x{X}, align=0x{X}, len_align=0x{X})\n", .{len, ptr_align, len_align});
+    //os.log("Got placement: {}\n", .{placement});
 
     const nodes = placement.nodes;
     const pmt = placement.placement;
@@ -137,7 +136,7 @@ pub const RangeAlloc = struct {
       self.by_size.remove(&nodes.size.node);
       nodes.size.size = pmt.offset;
       if(self.by_size.insert(&nodes.size.node) != null) {
-        log("Could not reinsert node after size update after split\n", .{});
+        os.log("Could not reinsert node after size update after split\n", .{});
         @panic("");
       }
 
@@ -156,7 +155,7 @@ pub const RangeAlloc = struct {
         nodes.addr.size -= pmt.effective_size;
         nodes.addr.base += pmt.effective_size;
         if(self.by_addr.insert(&nodes.addr.node) != null) {
-          log("Could not reinsert node after addr update after reuse\n", .{});
+          os.log("Could not reinsert node after addr update after reuse\n", .{});
           @panic("");
         }
       }
@@ -166,7 +165,7 @@ pub const RangeAlloc = struct {
       nodes.size.base = nodes.addr.base;
       nodes.size.size = nodes.addr.size;
       if(self.by_size.insert(&nodes.size.node) != null) {
-        log("Could not reinsert node after size update after reuse\n", .{});
+        os.log("Could not reinsert node after size update after reuse\n", .{});
         @panic("");
       }
     }
@@ -195,7 +194,7 @@ pub const RangeAlloc = struct {
       switch(err) {
         error.OutOfMemory => return error.OutOfMemory,
         else => {
-          log("Alloc returned error: {}", .{err});
+          os.log("Alloc returned error: {}", .{err});
           @panic("Alloc error");
         }
       }
@@ -208,7 +207,7 @@ pub const RangeAlloc = struct {
     defer self.mutex.unlock();
 
     if(new_size != 0) {
-      log("Todo: RangeAlloc.resize(): actually resize\n", .{});
+      os.log("Todo: RangeAlloc.resize(): actually resize\n", .{});
       @panic("");
     }
 
@@ -220,7 +219,7 @@ pub const RangeAlloc = struct {
       switch(err) {
         error.OutOfMemory => return error.OutOfMemory,
         else => {
-          log("Error while making new nodes for free(): {}\n", .{err});
+          os.log("Error while making new nodes for free(): {}\n", .{err});
           @panic("");
         }
       }
@@ -237,7 +236,7 @@ pub const RangeAlloc = struct {
     if(node) |n| {
       return @fieldParentPtr(Range, "node", n);
     }
-    log("Could not locate addr node for {}\n", .{size_node});
+    os.log("Could not locate addr node for {}\n", .{size_node});
     @panic("");
   }
 
@@ -271,7 +270,7 @@ pub const RangeAlloc = struct {
       }
     }
 
-    log("Unable to find a size placement\n", .{});
+    os.log("Unable to find a size placement\n", .{});
     @panic("");
   }
 

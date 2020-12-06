@@ -1,11 +1,12 @@
-const bitset = @import("bitset.zig").bitset;
-const range = @import("range.zig");
+const os = @import("root").os;
+
+const Bitset = os.lib.bitset.Bitset;
+const range = os.lib.range.range;
 
 const assert = @import("std").debug.assert;
 
-const paging = @import("../paging.zig");
-
-const page_size = @import("../platform.zig").page_sizes[0];
+const paging = os.memory.paging;
+const page_size = os.platform.page_sizes[0];
 
 // O(1) worst case alloc() and free() buddy allocator I came up with (idk if anyone has done this before)
 const free_node = struct {
@@ -37,7 +38,7 @@ pub fn buddy_alloc(comptime allocator_size: usize, comptime minsize: usize) type
   assert(@sizeOf(free_node) <= minsize);
 
   return struct {
-    bs: bitset(bitset_sz) = .{},
+    bs: Bitset(bitset_sz) = .{},
     freelists: [allocator_levels]free_node = [_]free_node{free_node{}} ** allocator_levels,
     inited: bool = false,
     base: usize,
@@ -75,7 +76,7 @@ pub fn buddy_alloc(comptime allocator_size: usize, comptime minsize: usize) type
     }
 
     pub fn alloc_size(self: *@This(), size: usize) !usize {
-      inline for(range.range(allocator_levels)) |lvl| {
+      inline for(range(allocator_levels)) |lvl| {
         if(size <= level_size(lvl))
           return self.alloc(lvl);
       }
@@ -83,7 +84,7 @@ pub fn buddy_alloc(comptime allocator_size: usize, comptime minsize: usize) type
     }
 
     pub fn free_size(self: *@This(), size: usize, addr: usize) !void {
-      inline for(range.range(allocator_levels)) |lvl| {
+      inline for(range(allocator_levels)) |lvl| {
         if(size <= level_size(lvl))
           return self.free(lvl, addr);
       }
@@ -103,7 +104,7 @@ pub fn buddy_alloc(comptime allocator_size: usize, comptime minsize: usize) type
       var idx: usize = 0;
       var block_size = minsize;
 
-      inline for(range.range(level)) |lvl| {
+      inline for(range(level)) |lvl| {
         idx += curr_step;
         curr_step /= 2;
         block_size *= 2;

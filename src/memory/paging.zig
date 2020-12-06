@@ -1,9 +1,14 @@
-const platform = @import("platform.zig");
-const log = @import("logger.zig").log;
-const libalign = @import("lib/align.zig");
-const range = @import("lib/range.zig").range;
-const range_reverse = @import("lib/range.zig").range_reverse;
-const pmm = @import("pmm.zig");
+const os = @import("root").os;
+
+const platform = os.platform;
+
+const log = os.log;
+
+const libalign      = os.lib.libalign;
+const range         = os.lib.range.range;
+const range_reverse = os.lib.range.range_reverse;
+
+const pmm = os.memory.pmm;
 
 pub const make_page_table = platform.make_page_table;
 const page_table_entry = platform.page_table_entry;
@@ -226,7 +231,7 @@ fn map_loop(virt: *usize, phys: ?*usize, size: *usize, root: ?*platform.paging_r
         .root = root,
       }) catch |err| {
         log("Unable to unmap partially failed mapping: {}\n", .{@errorName(err)});
-        unreachable;
+        @panic("");
       };
     }
   }

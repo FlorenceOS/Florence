@@ -1,5 +1,6 @@
 const std = @import("std");
-const log = @import("logger.zig").log;
+
+const os = @import("root").os;
 
 var debug_allocator_bytes: [1024 * 1024]u8 = undefined;
 var debug_allocator_state = std.heap.FixedBufferAllocator.init(debug_allocator_bytes[0..]);
@@ -28,7 +29,7 @@ var debug_info = std.dwarf.DwarfInfo {
 var inited_debug_info = false;
 
 pub fn dump_stack_trace(bp: usize, ip: usize) void {
-  log("Dumping ip={x}, bp={x}\n", .{ip, bp});
+  os.log("Dumping ip={x}, bp={x}\n", .{ip, bp});
   if(!inited_debug_info) {
     debug_info.debug_info   = slice_section(&__debug_info_start, &__debug_info_end);
     debug_info.debug_abbrev = slice_section(&__debug_abbrev_start, &__debug_abbrev_end);
@@ -36,12 +37,12 @@ pub fn dump_stack_trace(bp: usize, ip: usize) void {
     debug_info.debug_line   = slice_section(&__debug_line_start, &__debug_line_end);
     debug_info.debug_ranges = slice_section(&__debug_ranges_start, &__debug_ranges_end);
 
-    log("Doing the thiiiiing 1\n", .{});
+    os.log("Doing the thiiiiing 1\n", .{});
     std.dwarf.openDwarfDebugInfo(&debug_info, debug_allocator) catch |err| {
-      log("Unable to open debug info: {}\n", .{@errorName(err)});
+      os.log("Unable to open debug info: {}\n", .{@errorName(err)});
       return;
     };
-    log("Doing the thiiiiing 2\n", .{});
+    os.log("Doing the thiiiiing 2\n", .{});
     inited_debug_info = true;
   }
 
@@ -61,12 +62,12 @@ fn slice_section(start: *u8, end: *u8) []const u8 {
 
 fn print_addr(ip: usize) void {
   var compile_unit = debug_info.findCompileUnit(ip) catch |err| {
-    log("Couldn't find the compile unit at {x}: {}\n", .{ip, @errorName(err)});
+    os.log("Couldn't find the compile unit at {x}: {}\n", .{ip, @errorName(err)});
     return;
   };
 
   var line_info = debug_info.getLineNumberInfo(compile_unit.*, ip) catch |err| {
-    log("Couldn't find the line info at {x}: {}\n", .{ip, @errorName(err)});
+    os.log("Couldn't find the line info at {x}: {}\n", .{ip, @errorName(err)});
     return;
   };
 

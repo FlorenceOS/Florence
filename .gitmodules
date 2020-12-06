@@ -7,6 +7,6 @@
 [submodule "Sabaton"]
 	path = Sabaton
 	url = git@github.com:N00byEdge/Sabaton.git
-[submodule "src/extern/std-lib-orphanage"]
-	path = src/extern/std-lib-orphanage
+[submodule "src/external/std-lib-orphanage"]
+	path = src/external/std-lib-orphanage
 	url = https://github.com/ziglang/std-lib-orphanage.git

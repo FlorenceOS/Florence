@@ -1,17 +1,12 @@
-const log = @import("../logger.zig").log;
-const hexdump = @import("../logger.zig").hexdump;
-
-const pmm = @import("../pmm.zig");
-const vmm = @import("../vmm.zig");
-const paging = @import("../paging.zig");
-
-const pci = @import("pci.zig");
-
-const libalign = @import("../lib/align.zig");
-const range = @import("../lib/range.zig");
-
+const os = @import("root").os;
 const builtin = @import("builtin");
 const std = @import("std");
+
+const paging = os.memory.paging;
+const pci    = os.platform.pci;
+
+const libalign = os.lib.libalign;
+const range    = os.lib.range;
 
 const RSDP = packed struct {
   signature: [8]u8,
@@ -45,7 +40,7 @@ fn parse_MCFG(sdt: []u8) void {
 
     while(true) {
       pci.register_mmio(lo_bus, addr) catch |err| {
-        log("ACPI: Unable to register PCI mmio: {}\n", .{@errorName(err)});
+        os.log("ACPI: Unable to register PCI mmio: {}\n", .{@errorName(err)});
       };
 
       if(lo_bus == hi_bus)
@@ -88,15 +83,15 @@ fn parse_sdt(addr: usize) !void {
         @import("x86_64/apic.zig").handle_madt(sdt);
       }
       else {
-        log("ACPI: MADT found on non-x86 architecture!\n", .{});
+        os.log("ACPI: MADT found on non-x86 architecture!\n", .{});
       }
     },
     signature_value("MCFG") => {
       parse_MCFG(sdt);
     },
     else => {
-      log("ACPI: Unknown SDT: '{s}' with size {} bytes\n", .{sdt[0..4], sdt.len});
-      hexdump(sdt);
+      os.log("ACPI: Unknown SDT: '{s}' with size {} bytes\n", .{sdt[0..4], sdt.len});
+      //hexdump(sdt);
     },
   }
 }
@@ -120,7 +115,7 @@ pub fn init_acpi() !void {
 
   rsdp = try paging.map_phys_struct(RSDP, rsdp_phys, paging.data(), null);
 
-  log("ACPI: Revision: {}\n", .{rsdp.revision});
+  os.log("ACPI: Revision: {}\n", .{rsdp.revision});
 
   switch(rsdp.revision) {
     0 => try parse_root_sdt(u32, rsdp.rsdt_addr),

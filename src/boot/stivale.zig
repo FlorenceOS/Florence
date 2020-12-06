@@ -1,17 +1,7 @@
-const kmain = @import("../kmain.zig").kmain;
-const log = @import("../logger.zig").log;
-const pmm = @import("../pmm.zig");
-const vmm = @import("../vmm.zig");
-const paging = @import("../paging.zig");
-const acpi = @import("../platform/acpi.zig");
-const platform = @import("../platform.zig");
-const panic = @import("../panic.zig").panic;
-const vital = @import("../vital.zig").vital;
+pub const os = @import("../os.zig");
 
-const vesa_log = @import("../drivers/vesa_log.zig");
-const vga_log = @import("../drivers/vga_log.zig");
-
-pub const os = @import("../os/kernel.zig");
+const paging = os.memory.paging;
+const vmm    = os.memory.vmm;
 
 const stivale = @import("stivale_common.zig");
 
@@ -42,18 +32,18 @@ const StivaleInfo = packed struct {
 var info: StivaleInfo = undefined;
 
 export fn stivale_main(input_info: *StivaleInfo) void {
-  log("Stivale: Boot!\n", .{});
+  os.log("Stivale: Boot!\n", .{});
 
   info = input_info.*;
-  log("Stivale: Boot arguments: {s}\n", .{info.cmdline});
+  os.log("Stivale: Boot arguments: {s}\n", .{info.cmdline});
 
-  platform.platform_early_init();
+  os.platform.platform_early_init();
 
   for(info.memmap()) |*ent| {
     stivale.add_memmap_low(ent);
   }
 
-  var paging_root = vital(paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
+  var paging_root = os.vital(paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
 
   stivale.map_bootloader_data(&paging_root);
 
@@ -61,22 +51,22 @@ export fn stivale_main(input_info: *StivaleInfo) void {
     stivale.map_phys(ent, &paging_root);
   }
 
-  vital(paging.finalize_kernel_paging(&paging_root), "finalizing kernel paging");
+  os.vital(paging.finalize_kernel_paging(&paging_root), "finalizing kernel paging");
 
   for(info.memmap()) |*ent| {
     stivale.add_memmap_high(ent);
   }
 
-  vital(vmm.init(stivale.phys_high(info.memmap())), "initializing vmm");
+  os.vital(vmm.init(stivale.phys_high(info.memmap())), "initializing vmm");
 
   if((stivale_flags & 1) == 1) {
-    vesa_log.register_fb(info.framebuffer_addr, info.framebuffer_pitch, info.framebuffer_width, info.framebuffer_height, info.framebuffer_bpp);
+    os.drivers.vesa_log.register_fb(info.framebuffer_addr, info.framebuffer_pitch, info.framebuffer_width, info.framebuffer_height, info.framebuffer_bpp);
   }
   else {
-    vga_log.register();
+    os.drivers.vga_log.register();
   }
 
-  acpi.register_rsdp(info.rsdp);
+  os.platform.acpi.register_rsdp(info.rsdp);
 
-  kmain();
+  os.kernel.kmain();
 }

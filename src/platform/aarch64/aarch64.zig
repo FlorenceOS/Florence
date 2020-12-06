@@ -1,9 +1,9 @@
+const os = @import("root").os;
 const std = @import("std");
-const pmm = @import("../../pmm.zig");
-const scheduler = @import("../../scheduler.zig");
-const paging = @import("../../paging.zig");
-const log = @import("../../logger.zig").log;
-const bf = @import("../../lib/bitfields.zig");
+
+const pmm       = os.memory.pmm;
+const paging    = os.memory.paging;
+const bf        = os.lib.bitfields;
 
 const assert = std.debug.assert;
 
@@ -74,16 +74,20 @@ pub const page_table_entry = extern union {
 
     self.raw = 0;
 
-    self.walk_bit.write(true);
-    self.present_bit.write(true);
-    self.table_xn.write(true);
-    self.table_wn.write(true);
-    self.table_ns.write(true);
-    self.table_pxn.write(false);
+    self.raw = table;
+    self.raw |= (1 << 63) | 0x3;
+    return;
 
-    self.set_physaddr(level, table);
+    // self.walk_bit.write(true);
+    // self.present_bit.write(true);
+    // self.table_xn.write(true);
+    // self.table_wn.write(true);
+    // self.table_ns.write(true);
+    // self.table_pxn.write(false);
 
-    self.add_table_perms(level, perm) catch unreachable;
+    // self.set_physaddr(level, table);
+
+    // self.add_table_perms(level, perm) catch unreachable;
   }
 
   pub fn add_table_perms(self: *@This(), comptime level: usize, perm: paging.perms) !void {
@@ -100,16 +104,8 @@ pub const page_table_entry = extern union {
 
     self.raw = 0;
 
-    self.walk_bit.write(level == 0);
-    self.present_bit.write(true);
-    self.mapping_xn.write(!perm.executable);
-    self.mapping_pxn.write(!perm.executable);
-    self.mapping_wn.write(!perm.writable);
-
-    self.mapping_ns.write(true);
-    self.mapping_ng.write(true);
-    self.mapping_af.write(true);
-    self.mapping_sh.write(shareability.outer);
+    self.raw = addr;
+    self.raw |= 0x623;
 
     var ai_value: u3 = undefined;
 
@@ -127,7 +123,20 @@ pub const page_table_entry = extern union {
 
     self.mapping_ai.write(ai_value);
 
-    self.set_physaddr(level, addr);
+    return;
+
+    // self.walk_bit.write(level == 0);
+    // self.present_bit.write(true);
+    // self.mapping_xn.write(!perm.executable);
+    // self.mapping_pxn.write(!perm.executable);
+    // self.mapping_wn.write(!perm.writable);
+
+    // self.mapping_ns.write(true);
+    // self.mapping_ng.write(true);
+    // self.mapping_af.write(true);
+    // self.mapping_sh.write(shareability.outer);
+
+    // self.set_physaddr(level, addr);
   }
 
   pub fn set_physaddr(self: *@This(), comptime level: usize, addr: u64) void {
@@ -218,6 +227,7 @@ pub fn set_paging_root(val: *paging_root) void {
     \\msr TTBR0_EL1, %[br0]
     \\msr TTBR1_EL1, %[br1]
     \\msr MAIR_EL1,  %[mair]
+    \\dsb sy
     \\isb sy
     :
     : [br0] "r" (val.br0)
@@ -227,14 +237,14 @@ pub fn set_paging_root(val: *paging_root) void {
   );
 }
 
-pub fn get_current_task() *scheduler.Task {
+pub fn get_current_task() *os.thread.Task {
   return asm(
     \\mrs %[result], CONTEXTIDR_EL1
-    : [result] "=r" (-> *scheduler.Task)
+    : [result] "=r" (-> *os.thread.Task)
   );
 }
 
-pub fn set_current_task(ptr: *scheduler.Task) void {
+pub fn set_current_task(ptr: *os.thread.Task) void {
   return asm(
     \\msr CONTEXTIDR_EL1, %[result]
     : [result] "=r" (ptr)
@@ -294,7 +304,7 @@ pub fn allowed_mapping_levels() usize {
 }
 
 pub fn platform_init() !void {
-  log("The platform is alive!\n", .{});
+  os.log("The platform is alive!\n", .{});
 }
 
 pub fn debugputch(val: u8) void {
@@ -462,7 +472,7 @@ pub fn platform_early_init() void {
 }
 
 pub fn install_vector_table() void {
-  log("Installing exception vector table at 0x{X}\n", .{@ptrToInt(&exception_vector_table[0])});
+  os.log("Installing exception vector table at 0x{X}\n", .{@ptrToInt(&exception_vector_table[0])});
   asm volatile(
     \\MSR VBAR_EL1, %[evt]
     :
@@ -471,12 +481,12 @@ pub fn install_vector_table() void {
 }
 
 export fn interrupt64_handler(frame: *InterruptFrame) void {
-  log("Got a 64 bit interrupt or something idk\n", .{});
+  os.log("Got a 64 bit interrupt or something idk\n", .{});
   while(true) { }
 }
 
 export fn interrupt32_handler(frame: *InterruptFrame) void {
-  log("Got a 32 bit interrupt or something idk\n", .{});
+  os.log("Got a 32 bit interrupt or something idk\n", .{});
   while(true) { }
 }
 
@@ -492,7 +502,7 @@ pub fn yield() void {
   @panic("yield");
 }
 
-pub fn new_task_call(new_task: *scheduler.Task, func: anytype, args: anytype) !void {
+pub fn new_task_call(new_task: *os.thread.Task, func: anytype, args: anytype) !void {
   @panic("yield");
 }
 

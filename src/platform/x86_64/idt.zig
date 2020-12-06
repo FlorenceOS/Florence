@@ -1,6 +1,6 @@
-const log = @import("../../logger.zig").log;
-const vmm = @import("../../vmm.zig");
+const os = @import("root").os;
 const assert = @import("std").debug.assert;
+
 const interrupts = @import("interrupts.zig");
 const gdt = @import("gdt.zig");
 
@@ -11,26 +11,25 @@ const Idtr = packed struct {
   addr: u64,
 };
 
+var idt = [1]idt_entry{undefined} ** num_handlers;
+
 pub const InterruptHandler = fn func() callconv(.Naked) void;
 
-pub fn setup_idt() !*[num_handlers]idt_entry {
-  log("IDT: Setting up IDT...\n", .{});
-
-  // Allocate IDT
-  const idt = try vmm.eternal.create([num_handlers]idt_entry);
+pub fn setup_idt() *[num_handlers]idt_entry {
+  os.log("IDT: Setting up IDT...\n", .{});
 
   const idtr = Idtr {
     .addr = @ptrToInt(&idt[0]),
-    .limit = @sizeOf(idt_entry) * num_handlers - 1,
+    .limit = @sizeOf(@TypeOf(idt)) - 1,
   };
 
   asm volatile(
-    \\  lidt (%[idt])
+    \\  lidt (%[idtr_addr])
     :
-    : [idt] "r" (&idtr)
+    : [idtr_addr] "r" (&idtr)
   );
 
-  return idt;
+  return idt[0..];
 }
 
 pub fn entry(handler: InterruptHandler, interrupt: bool, priv_level: u2) idt_entry {

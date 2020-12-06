@@ -1,12 +1,10 @@
-const platform = @import("../platform.zig");
-const pmm = @import("../pmm.zig");
-const paging = @import("../paging.zig");
-
-const range = @import("../lib/range.zig");
-const log = @import("../logger.zig").log;
-
+const os = @import("root").os;
 const std = @import("std");
 const builtin = @import("builtin");
+
+const paging = os.memory.paging;
+
+const range = os.lib.range.range;
 
 pub const Addr = struct {
   bus: u8,
@@ -43,8 +41,8 @@ pub fn pci_read(comptime T: type, addr: Addr, offset: regoff) T {
   if(pci_mmio[addr.bus] != null)
     return std.mem.readIntNative(T, mmio(addr, offset)[0..@sizeOf(T)]);
 
-  if(@hasDecl(platform, "pci_read"))
-    return platform.pci_read(T, addr, offset);
+  if(@hasDecl(os.platform, "pci_read"))
+    return os.platform.pci_read(T, addr, offset);
 
   @panic("No pci_read method!");
 }
@@ -55,8 +53,8 @@ pub fn pci_write(comptime T: type, addr: Addr, offset: regoff, value: T) void {
     return;
   }
 
-  if(@hasDecl(platform, "pci_write"))
-    return platform.pci_write(T, addr, offset, value);
+  if(@hasDecl(os.platform, "pci_write"))
+    return os.platform.pci_write(T, addr, offset, value);
 
   @panic("No pci_write method!");
 }
@@ -81,52 +79,54 @@ fn function_scan(addr: Addr) void {
     .prog_if = prog_if,
   };
 
-  log("PCI: {} ", .{dev});
+  os.log("PCI: {} ", .{dev});
 
   switch(class) {
-    else => { log("Unknown class!\n", .{}); },
+    else => { os.log("Unknown class!\n", .{}); },
     0x00 => {
       switch(subclass) {
-        else => { log("Unknown unclassified device!\n", .{}); },
+        else => { os.log("Unknown unclassified device!\n", .{}); },
       }
     },
     0x01 => {
       switch(subclass) {
-        else => { log("Unknown storage controller!\n", .{}); },
-        0x06 => { log("SATA controller\n", .{}); },
+        else => { os.log("Unknown storage controller!\n", .{}); },
+        0x06 => {
+          os.log("SATA controller\n", .{});
+        },
       }
     },
     0x02 => {
       switch(subclass) {
-        else => { log("Unknown network controller!\n", .{}); },
-        0x00 => { log("Ethernet controller\n", .{}); },
-        0x80 => { log("Other network controller\n", .{}); },
+        else => { os.log("Unknown network controller!\n", .{}); },
+        0x00 => { os.log("Ethernet controller\n", .{}); },
+        0x80 => { os.log("Other network controller\n", .{}); },
       }
     },
     0x03 => {
       switch(subclass) {
-        else => { log("Unknown display controller!\n", .{}); },
-        0x00 => { log("VGA compatible controller\n", .{}); },
+        else => { os.log("Unknown display controller!\n", .{}); },
+        0x00 => { os.log("VGA compatible controller\n", .{}); },
       }
     },
     0x04 => {
       switch(subclass) {
-        else => { log("Unknown multimedia controller!\n", .{}); },
-        0x03 => { log("Audio device\n", .{}); },
+        else => { os.log("Unknown multimedia controller!\n", .{}); },
+        0x03 => { os.log("Audio device\n", .{}); },
       }
     },
     0x06 => {
       switch(subclass) {
-        else => { log("Unknown bridge device!\n", .{}); },
-        0x00 => { log("Host bridge\n", .{}); },
-        0x01 => { log("ISA bridge\n", .{}); },
-        0x04 => { log("PCI-to-PCI bridge", .{});
+        else => { os.log("Unknown bridge device!\n", .{}); },
+        0x00 => { os.log("Host bridge\n", .{}); },
+        0x01 => { os.log("ISA bridge\n", .{}); },
+        0x04 => { os.log("PCI-to-PCI bridge", .{});
           if((get_header_type(addr) & 0x7F) != 0x01) {
-            log(": Not PCI-to-PCI bridge header type!\n", .{});
+            os.log(": Not PCI-to-PCI bridge header type!\n", .{});
           }
           else {
             const secondary_bus = pci_read(u8, addr, 0x19);
-            log(", recursively scanning bus {x:0>2}\n", .{secondary_bus});
+            os.log(", recursively scanning bus {x:0>2}\n", .{secondary_bus});
             bus_scan(secondary_bus);
           }
         },
@@ -134,12 +134,14 @@ fn function_scan(addr: Addr) void {
     },
     0x0c => {
       switch(subclass) {
-        else => { log("Unknown serial bus controller!\n", .{}); },
+        else => { os.log("Unknown serial bus controller!\n", .{}); },
         0x03 => {
           switch(prog_if) {
-            else => { log("Unknown USB controller!\n", .{}); },
-            0x20 => { log("USB2 EHCI controller\n", .{}); },
-            0x30 => { log("USB3 XHCI controller\n", .{}); },
+            else => { os.log("Unknown USB controller!\n", .{}); },
+            0x20 => { os.log("USB2 EHCI controller\n", .{}); },
+            0x30 => {
+              os.log("USB3 XHCI controller\n", .{});
+            },
           }
         },
       }
@@ -183,13 +185,13 @@ fn device_scan(bus: u8, device: u5) void {
   if(get_header_type(nullfunc) & 0x80 == 0)
     return;
 
-  inline for(range.range((1 << 3) - 1)) |function| {
+  inline for(range((1 << 3) - 1)) |function| {
     function_scan(.{ .bus = bus, .device = device, .function = function + 1 });
   }
 }
 
 fn bus_scan(bus: u8) void {
-  inline for(range.range(1 << 5)) |device| {
+  inline for(range(1 << 5)) |device| {
     device_scan(bus, device);
   }
 }
@@ -200,7 +202,7 @@ pub fn init_pci() !void {
 
 pub fn register_mmio(bus: u8, physaddr: u64) !void {
   try paging.map_phys_size(physaddr, 1 << 20, paging.mmio(), null);
-  pci_mmio[bus] = &pmm.access_phys([1 << 20]u8, physaddr)[0];
+  pci_mmio[bus] = &os.memory.pmm.access_phys([1 << 20]u8, physaddr)[0];
 }
 
 var pci_mmio: [0x100]?*[1 << 20]u8 linksection(".bss") = undefined;

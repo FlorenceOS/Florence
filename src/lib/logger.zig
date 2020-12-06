@@ -1,8 +1,8 @@
+const os = @import("root").os;
 const fmt = @import("std").fmt;
-const platform = @import("platform.zig");
-const serial = @import("serial.zig");
-const range = @import("lib/range.zig");
 const arch = @import("builtin").arch;
+
+const range = os.lib.range.range;
 
 const Printer = struct {
   pub fn writeAll(self: *const Printer, str: []const u8) !void {
@@ -35,11 +35,11 @@ fn print_str(str: []const u8) !void {
 }
 
 fn putch(ch: u8) void {
-  platform.debugputch(ch);
-  serial.putch(ch);
-  @import("drivers/vesa_log.zig").putch(ch);
+  os.platform.debugputch(ch);
+  os.drivers.mmio_serial.putch(ch);
+  os.drivers.vesa_log.putch(ch);
   if(arch == .x86_64) {
-    @import("drivers/vga_log.zig").putch(ch);
+    os.drivers.vga_log.putch(ch);
   }
 }
 
@@ -52,7 +52,7 @@ pub fn hexdump(in_bytes: []const u8) void {
   while(bytes.len != 0) {
     log("{x:0>16}: ", .{@ptrToInt(bytes.ptr)});
 
-    inline for(range.range(0x10)) |offset| {
+    inline for(range(0x10)) |offset| {
       if(offset < bytes.len) {
         const value = bytes[offset];
         log("{x:0>2} ", .{value});
@@ -61,7 +61,7 @@ pub fn hexdump(in_bytes: []const u8) void {
       }
     }
 
-    inline for(range.range(0x10)) |offset| {
+    inline for(range(0x10)) |offset| {
       if(offset < bytes.len) {
         const value = bytes[offset];
         if(0x20 <= value and value < 0x7F) {

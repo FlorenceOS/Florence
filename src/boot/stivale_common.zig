@@ -1,12 +1,8 @@
-const log = @import("../logger.zig").log;
-const pmm = @import("../pmm.zig");
-const paging = @import("../paging.zig");
+const os = @import("root").os;
 
-const platform = @import("../platform.zig");
-
-const libalign = @import("../lib/align.zig");
-
-const vital = @import("../vital.zig").vital;
+const paging   = os.memory.paging;
+const platform = os.platform;
+const libalign = os.lib.libalign;
 
 const std = @import("std");
 
@@ -42,13 +38,13 @@ pub fn add_memmap_low(ent_in: *const MemmapEntry) void {
     ent.base = 0x200000;
   }
 
-  log("Stivale: Consuming low: 0x{X} to 0x{X}\n", .{ent.base, ent.base + ent.length});
+  os.log("Stivale: Consuming low: 0x{X} to 0x{X}\n", .{ent.base, ent.base + ent.length});
 
   if(ent.base + ent.length > high_mem_limit) {
-    pmm.consume(ent.base, high_mem_limit - ent.base);
+    os.memory.pmm.consume(ent.base, high_mem_limit - ent.base);
   }
   else {
-    pmm.consume(ent.base, ent.length);
+    os.memory.pmm.consume(ent.base, ent.length);
   }
 }
 
@@ -59,13 +55,13 @@ pub fn add_memmap_high(ent: *const MemmapEntry) void {
   if(ent.base + ent.length < high_mem_limit)
     return;
 
-  log("Stivale: Consuming high: 0x{X} to 0x{X}\n", .{ent.base, ent.base + ent.length});
+  os.log("Stivale: Consuming high: 0x{X} to 0x{X}\n", .{ent.base, ent.base + ent.length});
 
   if(ent.base < high_mem_limit){
-    pmm.consume(high_mem_limit, ent.base + ent.length - high_mem_limit);
+    os.memory.pmm.consume(high_mem_limit, ent.base + ent.length - high_mem_limit);
   }
   else {
-    pmm.consume(ent.base, ent.length);
+    os.memory.pmm.consume(ent.base, ent.length);
   }
 }
 
@@ -73,8 +69,8 @@ pub fn add_memmap(ent: *const MemmapEntry) void {
   if(ent.type != 1)
     return;
 
-  log("Stivale: Consuming 0x{X} to 0x{X}\n", .{ent.base, ent.base + ent.length});
-  pmm.consume(ent.base, ent.length);
+  os.log("Stivale: Consuming 0x{X} to 0x{X}\n", .{ent.base, ent.base + ent.length});
+  os.memory.pmm.consume(ent.base, ent.length);
 }
 
 pub fn map_phys(ent: *const MemmapEntry, paging_root: *platform.paging_root) void {
@@ -92,9 +88,9 @@ pub fn map_phys(ent: *const MemmapEntry, paging_root: *platform.paging_root) voi
   if(new_ent.length == 0)
     return;
 
-  log("Stivale: Mapping phys mem 0x{X} to 0x{X}\n", .{new_ent.base, new_ent.base + new_ent.length});
+  os.log("Stivale: Mapping phys mem 0x{X} to 0x{X}\n", .{new_ent.base, new_ent.base + new_ent.length});
 
-  vital(paging.add_physical_mapping(paging_root, new_ent.base, new_ent.length), "mapping physical stivale mem");
+  os.vital(paging.add_physical_mapping(paging_root, new_ent.base, new_ent.length), "mapping physical stivale mem");
 }
 
 pub fn phys_high(map: []const MemmapEntry) usize {
@@ -105,5 +101,5 @@ pub fn phys_high(map: []const MemmapEntry) usize {
 }
 
 pub fn map_bootloader_data(paging_root: *platform.paging_root) void {
-  vital(paging.map_phys_range(0, 0x100000, paging.data(), paging_root), "mapping stivale bootloader data");
+  os.vital(paging.map_phys_range(0, 0x100000, paging.data(), paging_root), "mapping stivale bootloader data");
 }

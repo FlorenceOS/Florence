@@ -1,14 +1,14 @@
-const platform = @import("platform.zig");
+const os = @import("root").os;
 const std = @import("std");
-const assert = std.debug.assert;
-const lalign = @import("lib/align.zig");
-const log = @import("logger.zig").log;
 
-const Mutex = @import("scheduler.zig").Mutex;
+const assert   = std.debug.assert;
+const platform = os.platform;
+const lalign   = os.lib.libalign;
 
 const page_sizes = platform.page_sizes;
-var free_roots = [_]u64{0} ** page_sizes.len;
-var pmm_mutex = Mutex{};
+var free_roots   = [_]u64{0} ** page_sizes.len;
+
+var pmm_mutex    = os.thread.Mutex{};
 
 const reverse_sizes = {
   var result: [page_sizes.len]u64 = undefined;
