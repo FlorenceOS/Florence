@@ -176,9 +176,9 @@ fn has_error_code(intnum: u64) bool {
     0x0F ... 0x10 => false,
     0x11          => true,
     0x12 ... 0x14 => false,
-    0x15 ... 0x1D => unreachable,
+    //0x15 ... 0x1D => unreachable,
     0x1E          => true,
-    0x1F          => unreachable,
+    //0x1F          => unreachable,
 
     // Other interrupts
     else => false,
@@ -188,7 +188,7 @@ fn has_error_code(intnum: u64) bool {
 pub fn make_handler(comptime intnum: u64) idt.InterruptHandler {
   return struct {
     fn func() callconv(.Naked) void {
-      if(!has_error_code(intnum)) {
+      if(comptime !has_error_code(intnum)) {
         asm volatile(
           \\push $0
         );
