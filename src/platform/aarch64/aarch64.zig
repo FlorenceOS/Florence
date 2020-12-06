@@ -492,6 +492,23 @@ extern const exception_vector_table: [0x800]u8;
 
 pub fn platform_early_init() void {
   install_vector_table();
+  set_current_task(&bsp_task);
+}
+
+var bsp_task: os.thread.Task = .{};
+
+pub fn self_exited() !?*os.thread.Task {
+  const curr = get_current_task();
+  
+  if(curr == &bsp_task)
+    return null;
+
+  if(curr.platform_data.stack != null) {
+    // TODO: Figure out how to free the stack while returning using it??
+    // We can just leak it for now
+    //try vmm.free_single(curr.platform_data.stack.?);
+  }
+  return curr;
 }
 
 pub fn install_vector_table() void {
@@ -503,9 +520,45 @@ pub fn install_vector_table() void {
   );
 }
 
+pub fn await_interrupt() void {
+  asm volatile(
+    \\ MSR DAIFCLR, 0xF
+    \\ WFI
+    \\ MSR DAIFSET, 0xF
+    :
+    :
+    : "memory"
+  );
+}
+
 export fn interrupt64_handler(frame: *InterruptFrame) void {
-  os.log("Got a 64 bit interrupt or something idk\n", .{});
-  while(true) { }
+  const esr = asm volatile("MRS %[esr], ESR_EL1" : [esr] "=r" (-> u64));
+
+  const ec = (esr >> 26) & 0x3f;
+  const iss = esr & 0x1ffffff;
+
+  if(ec == 0b111100) {
+    os.log("BRK instruction execution in AArch64 state\n", .{});
+    while(true) { }
+  }
+
+  switch(ec) {
+    else => @panic("Unknown EC!"),
+    0b00000000 => @panic("Unknown reason in EC!"),
+    0b00100101 => @panic("Data abort without change in exception level"),
+    0b00100001 => @panic("Instruction fault without change in exception level"),
+    0b00010101 => {
+      // SVC instruction execution in AArch64 state
+      // Figure out which call this is
+
+      switch(@intCast(u16, iss & 0xFFFF)) {
+        else => @panic("Unknown SVC"),
+
+        'X' => os.thread.scheduler.exit_handler(frame),
+        'Y' => @panic("yield_to_task"),
+      }
+    },
+  }
 }
 
 export fn interrupt32_handler(frame: *InterruptFrame) void {
@@ -514,15 +567,18 @@ export fn interrupt32_handler(frame: *InterruptFrame) void {
 }
 
 pub const TaskData = struct {
-  stack: []u8,
+  stack: ?*[task_stack_size]u8 = null,
 };
 
+const task_stack_size = 1024 * 16;
+
 pub fn exit_task() noreturn {
-  @panic("exit_task");
+  asm volatile("SVC #'X'");
+  unreachable;
 }
 
 pub fn yield_to_task(new_task: *os.thread.Task) void {
-  @panic("yield");
+  asm volatile("SVC #'Y'" :: [_] "{x0}" (new_task));
 }
 
 pub fn new_task_call(new_task: *os.thread.Task, func: anytype, args: anytype) !void {

@@ -31,7 +31,7 @@ _start:
 
 .section .bss.stack, "a"
 stack_bottom:
-.zero 4096 - 16
+.zero 1024 * 16 - 16
 stack_top:
 .zero 16
 
