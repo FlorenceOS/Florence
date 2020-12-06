@@ -311,6 +311,29 @@ pub fn debugputch(val: u8) void {
 
 }
 
+pub const InterruptState = bool;
+
+pub fn get_and_disable_interrupts() InterruptState {
+  // Get interrupt mask flag
+  var daif = asm volatile("MRS %[daif_val], DAIF" : [daif_val] "=r" (-> u64));
+
+  // Set the flag
+  asm volatile("MSR DAIFSET, 2" ::: "memory");
+  
+  // Check if it was set
+  return (daif >> 7) & 1 == 0;
+}
+
+pub fn set_interrupts(s: InterruptState) void {
+  if(s) {
+    // Enable interrupts
+    asm volatile("MSR DAIFCLR, 2" ::: "memory");
+  } else {
+    // Disable interrupts
+    asm volatile("MSR DAIFSET, 2" ::: "memory");
+  }
+}
+
 pub const InterruptFrame = struct {
   mode: u64,
   _: u64,
@@ -498,7 +521,7 @@ pub fn exit_task() noreturn {
   @panic("exit_task");
 }
 
-pub fn yield() void {
+pub fn yield_to_task(new_task: *os.thread.Task) void {
   @panic("yield");
 }
 
