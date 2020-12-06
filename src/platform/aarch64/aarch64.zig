@@ -239,14 +239,14 @@ pub fn set_paging_root(val: *paging_root) void {
 
 pub fn get_current_task() *os.thread.Task {
   return asm(
-    \\mrs %[result], CONTEXTIDR_EL1
+    \\mrs %[result], TPIDR_EL1
     : [result] "=r" (-> *os.thread.Task)
   );
 }
 
 pub fn set_current_task(ptr: *os.thread.Task) void {
   return asm(
-    \\msr CONTEXTIDR_EL1, %[result]
+    \\msr TPIDR_EL1, %[result]
     : [result] "=r" (ptr)
   );
 }
