@@ -266,6 +266,7 @@ export fn interrupt_common() callconv(.Naked) void {
     \\add  rsp, 16 // Pop error code and interrupt number
     \\iretq
   );
+  unreachable;
 }
 
 fn dump_frame(frame: *InterruptFrame) void {
