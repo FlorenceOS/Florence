@@ -225,7 +225,7 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     platform.acpi.register_rsdp(info.rsdp.?.rsdp);
   }
 
-  os.log("Calling kmain: 0x{X}\n", .{@intToPtr(*u32, @ptrToInt(kmain)).*});
+  os.vital(os.platform.platform_init(), "calling platform_init");
 
   kmain();
 }

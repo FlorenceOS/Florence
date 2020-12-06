@@ -68,5 +68,7 @@ export fn stivale_main(input_info: *StivaleInfo) void {
 
   os.platform.acpi.register_rsdp(info.rsdp);
 
+  os.vital(os.platform.platform_init(), "calling platform_init");
+
   os.kernel.kmain();
 }
