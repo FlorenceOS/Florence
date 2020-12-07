@@ -25,7 +25,6 @@ pub fn init_interrupts() !void {
   handlers[0x69] = bsp_handler;
   handlers[0x6A] = platform.task_fork_handler;
   handlers[0x6B] = yield_to_handler;
-  handlers[0x6C] = scheduler.exit_handler;
 
   os.log("Interrupts: Enabling interrupts...\n", .{});
 

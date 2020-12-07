@@ -555,7 +555,6 @@ export fn interrupt64_handler(frame: *InterruptFrame) void {
       switch(@intCast(u16, iss & 0xFFFF)) {
         else => @panic("Unknown SVC"),
 
-        'X' => os.thread.scheduler.exit_handler(frame),
         'Y' => @panic("yield_to_task"),
       }
     },
@@ -572,11 +571,6 @@ pub const TaskData = struct {
 };
 
 const task_stack_size = 1024 * 16;
-
-pub fn exit_task() noreturn {
-  asm volatile("SVC #'X'");
-  unreachable;
-}
 
 pub fn yield_to_task(new_task: *os.thread.Task) void {
   asm volatile("SVC #'Y'" :: [_] "{x0}" (new_task));

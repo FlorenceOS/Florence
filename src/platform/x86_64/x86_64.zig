@@ -420,13 +420,6 @@ pub fn yield_to_task(t: *Task) void {
   );
 }
 
-pub fn exit_task() noreturn {
-  asm volatile(
-    \\int $0x6C
-  );
-  unreachable;
-}
-
 pub const self_exited = interrupts.self_exited;
 
 pub const IA32_APIC_BASE = msr(u64, 0x0000001B);
