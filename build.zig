@@ -28,23 +28,28 @@ fn target(arch: builtin.Arch, context: Context) std.zig.CrossTarget {
   var disabled_features = std.Target.Cpu.Feature.Set.empty;
   var enabled_feautres  = std.Target.Cpu.Feature.Set.empty;
 
-  if(arch == .aarch64) { // This is equal to -mgeneral-regs-only
+  if(arch == .aarch64) {
     const features = std.Target.aarch64.Feature;
-    disabled_features.addFeature(@enumToInt(features.fp_armv8));
-    disabled_features.addFeature(@enumToInt(features.crypto));
-    disabled_features.addFeature(@enumToInt(features.neon));
+    if(context == .kernel) {
+      // This is equal to -mgeneral-regs-only
+      disabled_features.addFeature(@enumToInt(features.fp_armv8));
+      disabled_features.addFeature(@enumToInt(features.crypto));
+      disabled_features.addFeature(@enumToInt(features.neon));
+    }
   }
 
   if(arch == .x86_64) {
     const features = std.Target.x86.Feature;
-    // Disable SIMD registers
-    disabled_features.addFeature(@enumToInt(features.mmx));
-    disabled_features.addFeature(@enumToInt(features.sse));
-    disabled_features.addFeature(@enumToInt(features.sse2));
-    disabled_features.addFeature(@enumToInt(features.avx));
-    disabled_features.addFeature(@enumToInt(features.avx2));
+    if(context == .kernel) {
+      // Disable SIMD registers
+      disabled_features.addFeature(@enumToInt(features.mmx));
+      disabled_features.addFeature(@enumToInt(features.sse));
+      disabled_features.addFeature(@enumToInt(features.sse2));
+      disabled_features.addFeature(@enumToInt(features.avx));
+      disabled_features.addFeature(@enumToInt(features.avx2));
 
-    enabled_feautres.addFeature(@enumToInt(features.soft_float));
+      enabled_feautres.addFeature(@enumToInt(features.soft_float));
+    }
   }
 
   return std.zig.CrossTarget {
