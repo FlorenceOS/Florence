@@ -201,14 +201,22 @@ pub fn finalize_kernel_paging(new_root: *platform.paging_root) !void {
 }
 
 fn map_kernel_section(new_paging_root: *platform.paging_root, start: *u8, end: *u8, perm: perms) !void {
-  const section_size = libalign.align_up(usize, platform.page_sizes[0], @ptrToInt(end) - @ptrToInt(start));
-  try map_phys(.{
-    .virt = @ptrToInt(start),
-    .phys = @ptrToInt(start) - 0xffffffff80000000,
-    .size = section_size,
-    .perm = perm,
-    .root = new_paging_root,
-  });
+  const step_size = platform.page_sizes[0];
+
+  var remaining_bytes = libalign.align_up(usize, step_size, @ptrToInt(end) - @ptrToInt(start));
+  var virt = @ptrToInt(start);
+
+  while(remaining_bytes >= step_size) {
+    os.vital(map_phys(.{
+      .virt = virt,
+      .phys = os.vital(translate_virt(virt, null), "Translating kaddr"),
+      .size = step_size,
+      .perm = perm,
+      .root = new_paging_root,
+    }), "Mapping kernel section");
+    remaining_bytes -= step_size;
+    virt += step_size;
+  }
 }
 
 fn map_loop(virt: *usize, phys: ?*usize, size: *usize, root: ?*platform.paging_root, perm: perms) !void {
