@@ -247,7 +247,8 @@ pub fn get_current_task() *os.thread.Task {
 pub fn set_current_task(ptr: *os.thread.Task) void {
   return asm(
     \\msr TPIDR_EL1, %[result]
-    : [result] "=r" (ptr)
+    :
+    : [result] "r" (ptr)
   );
 }
 
