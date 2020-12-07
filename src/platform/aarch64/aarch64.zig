@@ -238,14 +238,14 @@ pub fn set_paging_root(val: *paging_root) void {
 }
 
 pub fn get_current_task() *os.thread.Task {
-  return asm(
+  return asm volatile(
     \\mrs %[result], TPIDR_EL1
     : [result] "=r" (-> *os.thread.Task)
   );
 }
 
 pub fn set_current_task(ptr: *os.thread.Task) void {
-  return asm(
+  asm volatile(
     \\msr TPIDR_EL1, %[result]
     :
     : [result] "r" (ptr)
