@@ -308,6 +308,28 @@ fn make_pte(virt: usize, level: usize, perm: perms, root: *page_table) !*page_ta
   return error.make_pte;
 }
 
+fn translate_virt_impl(virt: usize, table: *page_table, comptime level: usize) !usize {
+  const pte = index_into_table(table, virt, level);
+
+  if(!pte.is_present(level))
+    return error.NotPresent;
+
+  if(pte.is_mapping(level)) {
+    const virt_base = libalign.align_down(usize, page_sizes[level], virt);
+    return pte.physaddr(level) + (virt - virt_base);
+  }
+
+  if(level > 0 and pte.is_table(level))
+    return translate_virt_impl(virt, pte.get_table(level) catch unreachable, level - 1);
+
+  unreachable;
+}
+
+fn translate_virt(virt: usize, root: ?*platform.paging_root) !usize {
+  const root_ptr = platform.root_table(virt, if(root) |r| r.* else get_current_paging_root());
+  return translate_virt_impl(virt, root_ptr, paging_levels - 1);
+}
+
 fn unmap_impl(virt: *usize, size: *usize, reclaim_pages: bool, root_in: ?*platform.paging_root) !void {
   const root = platform.root_table(virt.*, if(root_in) |root| root.* else get_current_paging_root());
 
