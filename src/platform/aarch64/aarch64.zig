@@ -301,7 +301,7 @@ pub fn invalidate_mapping(virt: usize) void {
 }
 
 pub fn allowed_mapping_levels() usize {
-  return 1;
+  return 2;
 }
 
 pub fn platform_init() !void {
