@@ -361,34 +361,30 @@ pub const RangeAlloc = struct {
     var node = node_in;
     {
       // Try to merge to the left
-      while(true) {
-        if(node.addr_node.prev()) |prev_in| {
-          const prev = @fieldParentPtr(Range, "addr_node", prev_in);
-          if(self.try_merge(prev, node)) {
-            self.by_addr.remove(&node.addr_node);
-            self.by_size.remove(&node.size_node);
-            self.free_node(node);
-            node = prev;
-            continue;
-          }
+      while(node.addr_node.prev()) |prev_in| {
+        const prev = @fieldParentPtr(Range, "addr_node", prev_in);
+        if(self.try_merge(prev, node)) {
+          self.by_addr.remove(&node.addr_node);
+          self.by_size.remove(&node.size_node);
+          self.free_node(node);
+          node = prev;
+        } else {
+          break;
         }
-        break;
       }
     }
 
     {
       // Try to merge to the right
-      while(true) {
-        if(node.addr_node.next()) |next_in| {
-          const next = @fieldParentPtr(Range, "addr_node", next_in);
-          if(self.try_merge(node, next)) {
-            self.by_addr.remove(&next.addr_node);
-            self.by_size.remove(&next.size_node);
-            self.free_node(next);
-            continue;
-          }
+      while(node.addr_node.next()) |next_in| {
+        const next = @fieldParentPtr(Range, "addr_node", next_in);
+        if(self.try_merge(node, next)) {
+          self.by_addr.remove(&next.addr_node);
+          self.by_size.remove(&next.size_node);
+          self.free_node(next);
+        } else {
+          break;
         }
-        break;
       }
     }
   }
