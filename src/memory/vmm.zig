@@ -1,8 +1,6 @@
 const std = @import("std");
 const os = @import("root").os;
 
-const GPAlloc = std.heap.GeneralPurposeAllocator;
-
 const paging     = os.memory.paging;
 const RangeAlloc = os.lib.range_alloc.RangeAlloc;
 const Mutex      = os.thread.Mutex;
@@ -34,7 +32,7 @@ pub fn sbrk(num_bytes: u64) ![]u8 {
   return @intToPtr([*]u8, ret)[0..num_bytes];
 }
 
-fn threadsafe_gpalloc(comptime is_eternal: bool) type {
+fn threadsafe_alloc(comptime is_eternal: bool, comptime backing: anytype) type {
   return struct {
     allocator: std.mem.Allocator = .{
       .allocFn = alloc,
@@ -43,7 +41,7 @@ fn threadsafe_gpalloc(comptime is_eternal: bool) type {
 
     // We use our own mutex since we don't spinlock, we do other useful work
     mutex: Mutex = .{},
-    gpalloc: GPAlloc(.{.thread_safe = false}) = .{
+    gpalloc: backing(.{.thread_safe = false}) = .{
       .backing_allocator = range,
     },
 
@@ -73,8 +71,8 @@ fn threadsafe_gpalloc(comptime is_eternal: bool) type {
 var range_allocator = RangeAlloc{};
 pub const range = &range_allocator.allocator;
 
-var ephemeral_alloc = threadsafe_gpalloc(false){};
+var ephemeral_alloc = threadsafe_alloc(false, std.heap.GeneralPurposeAllocator){};
 pub const ephemeral = &ephemeral_alloc.allocator;
 
-var eternal_alloc = threadsafe_gpalloc(true){};
+var eternal_alloc = threadsafe_alloc(true, std.heap.ArenaAllocator){};
 pub const eternal = &eternal_alloc.allocator;
