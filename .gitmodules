@@ -6,7 +6,7 @@
 	url = https://github.com/limine-bootloader/limine.git
 [submodule "Sabaton"]
 	path = Sabaton
-	url = git@github.com:N00byEdge/Sabaton.git
+	url = https://github.com/N00byEdge/Sabaton.git
 [submodule "src/external/std-lib-orphanage"]
 	path = src/external/std-lib-orphanage
 	url = https://github.com/ziglang/std-lib-orphanage.git
