@@ -1,0 +1,1 @@
+-std=c++2a -Wno-sign-compare
