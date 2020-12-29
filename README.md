@@ -12,19 +12,43 @@ Its goals include but is not limited to:
 * Software should be able to pass on its permissions to other software it is allowed to call
 * Remove string semantics where possible. Strings are almost always handled or parsed incorrectly.
 * Build your application for running in userspace. Isolate your browser from your network stack in separate processes. Or don't. Build and statically link everything to the kernel if you like.
-  * The implementer should be able to write their own effective replacement of `/sbin/init` (with libraries for writing very consise code) something like this (pseudocode with ziglike syntax)
-     ```
-     import kernel, ahci, echfs, smb;
-     kernel.addService(ahci);
-     const storage_drive = kernel.disk_by_uuid("abcdef-ghij");
-     const my_fs = echfs(.Kernel).from_partition(storage_drive.partitions[0]);
-     
-     const managment_process = kernel.addProcess(
-        .services = .{
-            // smb library can know at compile time it's building for userspace with an fs in
-            // kernel, which makes it do syscalls to access the filesystem.
-            .smb = smb(my_fs);
-        },
-     );
-     ```
+  * The implementer should be able to write their own effective replacement of `/sbin/init` and `kconfig` (with libraries for writing very consise code) something like this (pseudocode with ziglike syntax). This is somewhat inspired by the design philosophy of NixOS.
+    ```
+    import kernel, ahci, xhci, ide, disk_multiplexer;
+
+    const storage_services = kernel.services(
+      .disks = disk_multiplexer(.{
+        .ide  = ide(.AllDrives),
+        .ahci = ahci(.AllDrives),
+        .xhci = xhci(.StorageDevices),
+      }),
+    });
+
+    import userspace, disk_identifier, echfs;
+
+    // Some storage provider `storage_services` providing
+    // disks objects are now known to exist in the kernel
+
+    const fs_service = userspace.services(.{
+      .fs = echfs.use_partition(
+        disk_identifier(storage_services.disks)
+          .find_by_uuid("abcdef-ghij").partitions[0],
+      ),
+    });
+
+    import tcp;
+
+    const network_services = kernel.services(
+      // Theoretically some set of drivers here too (or
+      // a provided default one) but this is just an example
+      .tcp = tcp;
+    });
+
+    // This server can see that it will communicate with another
+    // process over IPC at compile time to access the filesystem,
+    // and that the network is in the kernel through syscalls
+    const share_server = userspace.services(.{
+      .smb_server = smb(.{.fs = fs_service.fs, .tcp = network_services.tcp }),
+    });
+    ```
   * These kind of files of course should be composable in some way. If someone writes a more complicated combined service which takes a couple of inputs, you should be able to use it in your config here, just like calling any function in any programming language.
