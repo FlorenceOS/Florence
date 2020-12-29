@@ -1,5 +1,7 @@
 # Florence OS
 
+[Discord server](https://discord.gg/6mq8h3tmuD)
+
 Florence OS is aimed at developers and service providers more than your average user. This isn't for your new facebook machine, but it should be configurable to be just that.
 It's just a runtime for your applications can have access to only the things you provide them, providing true separation where needed.
 
