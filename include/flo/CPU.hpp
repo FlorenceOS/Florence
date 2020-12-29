@@ -5,7 +5,9 @@
 #include "flo/Containers/Array.hpp"
 
 #include "flo/Bitfields.hpp"
+#include "flo/Florence.hpp"
 
+#ifdef FLO_ARCH_X86_64
 #define SYSREG(reg, type) \
 struct reg##_S { \
   operator type() { type out; asm volatile("mov %%"#reg ", %0":"=r"(out)); return out; }\
@@ -13,9 +15,11 @@ struct reg##_S { \
   reg##_S &operator|=(type value) { return *this = static_cast<type>(*this) | value; }\
   reg##_S &operator&=(type value) { return *this = static_cast<type>(*this) & value; }\
 }; inline reg##_S reg;
+#endif
 
 namespace flo {
   namespace CPU {
+#ifdef FLO_ARCH_X86_64
     template<typename T>
     inline T read_msr(u32 msr) {
       if constexpr(sizeof(T) == 4) {
@@ -58,7 +62,7 @@ namespace flo {
 
     SYSREG(cr0, uptr);
     SYSREG(cr2, uptr);
-    SYSREG(cr3, uptr);
+    SYSREG(cr3, flo::PhysicalAddress);
     SYSREG(cr4, uptr);
 
     namespace Impl {
@@ -72,7 +76,9 @@ namespace flo {
     }
 
     inline Impl::MSR<0xC0000080, u32> IA32_EFER;
+    inline Impl::MSR<0x0000001B, uptr> IA32_APIC_BASE;
     inline Impl::MSR<0xC0000102, uptr> KernelGSBase;
+#endif
   }
 
   namespace Impl {

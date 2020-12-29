@@ -1,20 +1,20 @@
-#include "flo/PCI.hpp"
+#include "Kernel/PCI.hpp"
 
-#include "flo/Drivers/Disk/IDE.hpp"
-#include "flo/Drivers/Disk/AHCI.hpp"
-#include "flo/Drivers/Gfx/IntelGraphics.hpp"
-#include "flo/Drivers/Gfx/GenericVGA.hpp"
+#include "Kernel/Drivers/Disk/IDE.hpp"
+#include "Kernel/Drivers/Disk/AHCI.hpp"
+#include "Kernel/Drivers/Gfx/IntelGraphics.hpp"
+#include "Kernel/Drivers/Gfx/GenericVGA.hpp"
 
 #include "flo/Assert.hpp"
 #include "flo/Bitfields.hpp"
 #include "flo/IO.hpp"
 
-namespace flo::PCI {
+namespace Kernel::PCI {
   namespace {
-    constexpr bool quiet = true;
+    constexpr bool quiet = false;
     auto pline = flo::makePline<quiet>("[PCI]");
 
-    auto noVid = flo::PCI::Vid{0xFFFF};
+    auto noVid = Kernel::PCI::Vid{0xFFFF};
 
     void *mmioBase[0x100]{};
 
@@ -79,12 +79,12 @@ namespace flo::PCI {
     }
 
     void deviceHandler(Reference const &ref, DeviceConfig *device) {
-      auto trace = [&](auto &&...vals) {
+      auto trace = [&](char const *message) {
         pline(
           ref.bus(), ":", ref.slot(), ".", ref.function(), " (",
           device->vid(), ":", device->pid(), ", ",
           device->deviceClass(), ":", device->deviceSubclass(), ".", device->progIf(), ") ",
-          flo::forward<decltype(vals)>(vals)...
+          message
         );
       };
 
@@ -94,25 +94,30 @@ namespace flo::PCI {
         switch(device->deviceSubclass()) {
 
         case 0x01: // IDE controller
-          flo::IDE::initialize(ref, *device);
+          Kernel::IDE::initialize(ref, *device);
+          break;
+
+        case 0x04: // RAID
+          // IDK maybe we shouldn't do this but it works on my PC so w/e
+          Kernel::AHCI::initialize(ref, *device);
           break;
 
         case 0x06: // SATA controller
           switch(device->progIf()) {
 
           case 0x01: // AHCI
-            flo::AHCI::initialize(ref, *device);
+            Kernel::AHCI::initialize(ref, *device);
             break;
 
           default:
-            trace("Unhandled SATA controller: ", device->progIf());
+            trace("Unhandled SATA controller");
             break;
 
           }
           break;
 
         default:
-          trace("Unhandled mass storage controller: ", device->deviceSubclass());
+          trace("Unhandled mass storage controller");
           break;
 
         }
@@ -126,7 +131,7 @@ namespace flo::PCI {
           break;
 
         default:
-          trace("Unhandled network controller: ", device->deviceSubclass());
+          trace("Unhandled network controller");
 
         }
         break;
@@ -137,12 +142,12 @@ namespace flo::PCI {
         case 0x00: // VGA controller
           switch(device->vid()) {
 
-          case 0x8086:
-            flo::IntelGraphics::initialize(ref, *device);
-            break;
+          /*case 0x8086:
+            Kernel::IntelGraphics::initialize(ref, *device);
+            break;*/
             
           default:
-            flo::GenericVGA::initialize(ref, *device);
+            Kernel::GenericVGA::initialize(ref, *device);
             break;
 
           }
@@ -153,7 +158,7 @@ namespace flo::PCI {
           break;
 
         default:
-          trace("Unhandled display controller subclass: ", device->deviceSubclass());
+          trace("Unhandled display controller subclass");
           break;
 
         }
@@ -171,7 +176,7 @@ namespace flo::PCI {
           break;
 
         default:
-          trace("Unhandled bridge: ", device->deviceSubclass());
+          trace("Unhandled bridge");
           break;
 
         }
@@ -192,20 +197,20 @@ namespace flo::PCI {
               break;
 
             default:
-              trace("Unhandled USB controller: ", device->progIf());
+              trace("Unhandled USB controller");
 
           }
           break;
 
         default:
-          trace("Unhandled serial bus controller: ", device->deviceSubclass());
+          trace("Unhandled serial bus controller");
           break;
 
         }
         break;
 
       default:
-        trace("Unhandled device class ", device->deviceClass());
+        trace("Unhandled device class");
         break;
 
       }
@@ -213,11 +218,11 @@ namespace flo::PCI {
   }
 }
 
-void flo::PCI::initialize() {
-  flo::PCI::busScan(flo::PCI::Bus{0});
+void Kernel::PCI::initialize() {
+  Kernel::PCI::busScan(Kernel::PCI::Bus{0});
 }
 
-flo::PCI::DeviceConfig *flo::PCI::getDevice(Reference const &ref) {
+Kernel::PCI::DeviceConfig *Kernel::PCI::getDevice(Reference const &ref) {
   if(auto base = (u8 *)mmioBase[ref.bus()]; base) {
     base += ref.slot() << 15;
     base += ref.function() << 12;
@@ -228,7 +233,7 @@ flo::PCI::DeviceConfig *flo::PCI::getDevice(Reference const &ref) {
   return nullptr;
 }
 
-void flo::PCI::registerMMIO(void *base, u8 first, u8 last) {
+void Kernel::PCI::registerMMIO(void *base, u8 first, u8 last) {
   auto num = last - first + 1;
   for(int i = 0; i < num; ++i)
     mmioBase[first + i] = (u8 *)base + (i << 20);

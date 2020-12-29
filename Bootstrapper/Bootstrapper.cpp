@@ -5,18 +5,19 @@
 #include "flo/Bitfields.hpp"
 #include "flo/CPU.hpp"
 #include "flo/Florence.hpp"
-#include "flo/IO.hpp"
+#include "flo/Kernel.hpp"
+#include "flo/Memory.hpp"
 #include "flo/Paging.hpp"
 #include "flo/Random.hpp"
 
-using flo::Decimal;
-using flo::spaces;
+#include "flo/Containers/Optional.hpp"
+
+#include "Kernel/IO.hpp"
 
 // This data needs to be accessible from asm
 extern "C" {
-  flo::VirtualAddress kernelLoaderEntry;
+  flo::VirtualAddress kernelLoaderEntry = flo::VirtualAddress{0};
   flo::VirtualAddress loaderStack;
-
   u8 diskdata[512];
   flo::BIOS::MemmapEntry mem;
   flo::BIOS::DAP dap;
@@ -35,12 +36,6 @@ auto const minMemory = flo::PhysicalAddress{(u64)&BootstrapEnd};
 namespace {
   constexpr bool quiet = false;
   auto pline = flo::makePline<quiet>("[FBTS]");
-
-  // 3 -> aligned to 1GB, 2 -> aligned to 2MB, 1 -> aligned to 4KB etc
-  // Every level higher alignment means one factor of 512 less memory overhead
-  // but also 9 less bits of entropy.
-  // That means lower numbers are more secure but also take more memory.
-  constexpr auto kaslrAlignmentLevel = 2;
 
   // Memory ranges above the 4GB memory limit, we have to wait to
   // consume these to after we've enabled paging.
@@ -62,8 +57,8 @@ void flo::feedLine() {
   if constexpr(quiet)
     return;
 
-  flo::IO::VGA::feedLine();
-  flo::IO::Debugout::feedLine();
+  Kernel::IO::VGA::feedLine();
+  Kernel::IO::Debugout::feedLine();
 }
 
 void flo::putchar(char c) {
@@ -73,44 +68,19 @@ void flo::putchar(char c) {
   if(c == '\n')
     return feedLine();
 
-  flo::IO::VGA::putchar(c);
-  flo::IO::Debugout::write(c);
+  Kernel::IO::VGA::putchar(c);
+  Kernel::IO::Debugout::write(c);
 }
 
-void flo::setColor(flo::IO::Color col) {
+void flo::setColor(flo::TextColor col) {
   if constexpr(quiet)
     return;
 
-  flo::IO::VGA::setColor(col);
-  flo::IO::Debugout::setColor(col);
+  Kernel::IO::VGA::setColor(col);
+  Kernel::IO::Debugout::setColor(col);
 }
 
 namespace {
-  flo::VirtualAddress randomizeKASLRBase() {
-  redo:
-    // We're currently running in 32 bit so we have to generate 32 bits at a time
-    auto base = flo::VirtualAddress{flo::getRand()};
-
-    // Align the base
-    base = flo::Paging::alignPageDown<kaslrAlignmentLevel>(base);
-
-    // Mask away bits we can't use
-    base %= flo::Paging::maxUaddr;
-
-    // Start at possible addresses at 8 GB, we don't wan't to map the lower 4 GB
-    if(base < flo::VirtualAddress{flo::Util::giga(8ull)})
-      goto redo;
-
-    // End the possible addresses in such a way that we can fit all of our physical memory
-    if(base > flo::Paging::maxUaddr + flo::VirtualAddress{physHigh()})
-      goto redo;
-
-    // Make the pointer canonical
-    base = flo::Paging::makeCanonical(base);
-
-    return base;
-  }
-
   bool shouldUse(flo::BIOS::MemmapEntry const &ent) {
     if(ent.type != flo::BIOS::MemmapEntry::RegionType::Usable)
       return false;
@@ -124,6 +94,17 @@ namespace {
     }
 
     return true;
+  }
+
+  bool shouldMap(flo::BIOS::MemmapEntry const &ent) {
+    switch(ent.type) {
+    case flo::BIOS::MemmapEntry::RegionType::Usable: return true;
+    case flo::BIOS::MemmapEntry::RegionType::Reserved: return true;
+    case flo::BIOS::MemmapEntry::RegionType::ACPIReclaimable: return true;
+    case flo::BIOS::MemmapEntry::RegionType::ACPINonReclaimable: return true;
+    case flo::BIOS::MemmapEntry::RegionType::Bad: return false;
+    default: assert_not_reached();
+    }
   }
 
   [[noreturn]]
@@ -156,10 +137,10 @@ namespace {
 
   void checkRDRAND() {
     if(!flo::cpuid.rdrand) {
-      pline(flo::IO::Color::red, "Your CPU is missing RDRAND support.");
-      pline(flo::IO::Color::red, "Please run Florence with a more modern CPU.");
-      pline(flo::IO::Color::red, "If using KVM, use flag \"-cpu host\".");
-      pline(flo::IO::Color::red, "We are not able to provide good randomness.");
+      pline(flo::TextColor::red, "Your CPU is missing RDRAND support.");
+      pline(flo::TextColor::red, "Please run Florence with a more modern CPU.");
+      pline(flo::TextColor::red, "If using KVM, use flag \"-cpu host\".");
+      pline(flo::TextColor::red, "We are not able to provide good randomness.");
     }
   }
 
@@ -188,12 +169,12 @@ namespace {
 
   auto initializeDebug = []() {
     // We always initialize as other bootloader stages could be non-quiet
-    flo::IO::serial1.initialize();
-    flo::IO::serial2.initialize();
-    flo::IO::serial3.initialize();
-    flo::IO::serial4.initialize();
+    Kernel::IO::serial1.initialize();
+    Kernel::IO::serial2.initialize();
+    Kernel::IO::serial3.initialize();
+    Kernel::IO::serial4.initialize();
 
-    flo::IO::VGA::clear();
+    Kernel::IO::VGA::clear();
 
     assertAssumptions();
     return flo::nullopt;
@@ -209,8 +190,8 @@ void consumeMemory(flo::PhysicalMemoryRange &range) {
     physHigh = range.end;
 
   // First align the memory to whole pages
-  range.begin = flo::Paging::alignPageUp(range.begin);
-  range.end   = flo::Paging::alignPageDown(range.end);
+  range.begin = flo::Paging::align_page_up(range.begin);
+  range.end   = flo::Paging::align_page_down(range.end);
 
   // We'll consume the low memory (below 4 GB) before going to 64 bit.
   auto constexpr maxMemory = flo::PhysicalAddress{1} << 32ull;
@@ -248,6 +229,8 @@ extern "C" void setupMemory() {
     if(!mem.bytesFetched)
       break;
 
+    //pline("Base: ", mem.base, " size: ", mem.size, " type: ", (u32)mem.type);
+
     bool use = shouldUse(mem);
     if(use) {
       flo::PhysicalMemoryRange mr;
@@ -259,38 +242,70 @@ extern "C" void setupMemory() {
 }
 
 extern "C" void doEarlyPaging() {
+  // Align the physical memory size
+  physHigh = flo::Paging::align_page_up<flo::kaslr_alignment_level>(physHigh);
+
   // We will locate the physical memory at this point
-  kaslrBase = randomizeKASLRBase();
+  kaslrBase = flo::bootstrap_aslr_base(physHigh);
   physicalVirtBase = kaslrBase;
 
-  using PageRoot = flo::Paging::PageTable<flo::Paging::PageTableLevels>;
-
   // Prepare the paging root
-  auto &pageRootPhys = *new((PageRoot *)flo::physFree.getPhysicalPage(1)()) PageRoot();
+  //auto pageRoot = flo::physFree.getPhysicalPage(1);
+
+  auto pageRoot = flo::Paging::make_paging_root();
 
   // Set the paging root
-  flo::CPU::cr3 = (uptr)&pageRootPhys;
+  flo::Paging::set_root(pageRoot);
 
-  // Align the physical memory size
-  physHigh = flo::Paging::alignPageUp<kaslrAlignmentLevel>(physHigh);
-
+  // Identity map ourselves
   flo::Paging::Permissions permissions;
-  permissions.writeEnable = 1;
-  permissions.allowUserAccess = 0;
-  permissions.writethrough = 0;
-  permissions.disableCache = 0;
-  permissions.mapping.global = 0;
-  permissions.mapping.executeDisable = 1;
+  permissions.readable = 1;
+  permissions.writeable = 1;
+  permissions.userspace = 0;
+  permissions.writethrough = 1;
+  permissions.cacheable = 1;
+  permissions.global = 0;
+  permissions.executable = 1;
 
-  auto err = flo::Paging::map(flo::PhysicalAddress{0}, kaslrBase, physHigh, permissions, pline);
+  flo::Paging::map_phys({
+    .phys = flo::PhysicalAddress{0},
+    .virt = flo::VirtualAddress{0},
+    .size = flo::Util::mega(2),
+    .perm = permissions,
+  });
 
-  flo::checkMappingError(err, pline, flo::CPU::hang);
+  // Map physical memory
+  permissions.executable = 0;
 
-  permissions.mapping.executeDisable = 0;
+  mem.savedEbx = 0;
+  do {
+    fetchMemoryRegion();
 
-  // Identity map ourselves to be able to turn on paging
-  err = flo::Paging::map(flo::PhysicalAddress{0}, flo::VirtualAddress{0}, flo::Util::mega(2), permissions, pline);
-  flo::checkMappingError(err, pline, flo::CPU::hang);
+    if(!mem.bytesFetched)
+      break;
+    
+    mem.base = [&]() {
+      auto base = flo::Paging::align_page_up(mem.base);
+      mem.size = flo::Paging::align_page_down(mem.size - (base - mem.base));
+      return base;
+    }();
+
+    if(mem.base() >= 0x100000 && shouldMap(mem))
+      flo::Paging::map_phys({
+        .phys = mem.base,
+        .virt = kaslrBase + flo::VirtualAddress{mem.base()},
+        .size = mem.size,
+        .perm = permissions,
+      });
+  } while(mem.savedEbx);
+
+  // Map low memory
+  flo::Paging::map_phys({
+    .phys = flo::PhysicalAddress{0},
+    .virt = kaslrBase,
+    .size = 0x100000,
+    .perm = permissions,
+  });
 }
 
 namespace {
@@ -315,25 +330,25 @@ namespace {
 
     // RWX, supervisor only
     flo::Paging::Permissions perms;
-    perms.writeEnable = 1;
-    perms.allowUserAccess = 0;
+    perms.readable = 1;
+    perms.writeable = 1;
+    perms.userspace = 0;
     perms.writethrough = 0;
-    perms.disableCache = 0;
-    perms.mapping.executeDisable = 0;
+    perms.cacheable = 1;
+    perms.executable = 1;
 
     auto rewriteLoaderHeader =
-      [&, passedMagic = false, entryFound = false](u64 *mem) mutable {
+      [&, passedMagic = false](u64 *mem) mutable {
         u64 ind = 0;
 
         if(flo::exchange(passedMagic, true))
           ind += 2;
 
-        while(ind < flo::Paging::PageSize<1>/sizeof(*mem) && !entryFound) {
+        while(ind < flo::Paging::PageSize<1>/sizeof(*mem) && !kernelLoaderEntry) {
           switch(mem[ind]) {
           case flo::Util::genMagic("FLORKLOD"):
             // Calculate the virtual address this is loaded at
             kernelLoaderEntry = outAddr + flo::VirtualAddress{(ind + 1) * 8};
-            entryFound = true;
             break;
 
           case flo::Util::genMagic("PhysFree"):
@@ -353,11 +368,11 @@ namespace {
             break;
 
           case flo::Util::genMagic("DispVGAX"):
-            mem[ind] = (u64)&flo::IO::VGA::currX;
+            mem[ind] = (u64)&Kernel::IO::VGA::currX;
             break;
 
           case flo::Util::genMagic("DispVGAY"):
-            mem[ind] = (u64)&flo::IO::VGA::currY;
+            mem[ind] = (u64)&Kernel::IO::VGA::currY;
             break;
 
           default: // Unknown magic
@@ -378,8 +393,12 @@ namespace {
         flo::Util::copymem(flo::getPhys<u8>(ppage) + offs, diskdata, flo::IO::Disk::SectorSize);
       }
 
-      auto err = flo::Paging::map(ppage, outAddr, flo::Paging::PageSize<1>, perms, pline);
-      flo::checkMappingError(err, pline, flo::CPU::hang);
+      flo::Paging::map_phys({
+        .phys = ppage,
+        .virt = outAddr,
+        .size = flo::Paging::PageSize<1>,
+        .perm = perms,
+      });
 
       rewriteLoaderHeader(flo::getPhys<u64>(ppage));
 
@@ -391,16 +410,20 @@ namespace {
       flo::CPU::hang();
     }
 
-    perms.writeEnable = 1;
-    perms.allowUserAccess = 0;
+    perms.readable = 1;
+    perms.writeable = 1;
+    perms.userspace = 0;
     perms.writethrough = 0;
-    perms.disableCache = 0;
-    perms.mapping.executeDisable = 1;
+    perms.cacheable = 1;
+    perms.executable = 0;
 
     // Make a stack for the loader
-    auto constexpr loaderStackSize = flo::Util::kilo(4);
-    auto err = flo::Paging::map(loaderStack - flo::VirtualAddress{loaderStackSize}, loaderStackSize, perms);
-    flo::checkMappingError(err, pline, flo::CPU::hang);
+    auto constexpr loaderStackSize = flo::Util::kilo(32);
+    flo::Paging::map({
+      .virt = loaderStack - flo::VirtualAddress{loaderStackSize},
+      .size = loaderStackSize,
+      .perm = perms,
+    });
   }
 }
 

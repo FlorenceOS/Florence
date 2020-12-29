@@ -21,17 +21,17 @@ namespace flo {
   };
 
   template<typename T>
-  constexpr T &&move(T &value) noexcept {
+  constexpr __attribute__((always_inline)) T &&move(T &value) noexcept {
     return static_cast<T &&>(value);
   }
 
   template<typename T>
-  constexpr T &&forward(removeRef<T> &t) noexcept {
+  constexpr __attribute__((always_inline)) T &&forward(removeRef<T> &t) noexcept {
     return static_cast<T &&>(t);
   }
 
   template<typename T>
-  constexpr T &&forward(removeRef<T> &&t) noexcept {
+  constexpr __attribute__((always_inline)) T &&forward(removeRef<T> &&t) noexcept {
     static_assert(!isLValueReference<T>, "Can not forward an rvalue as an lvalue.");
     return static_cast<T &&>(t);
   }
@@ -40,7 +40,7 @@ namespace flo {
   struct alignedStorage { alignas(align) u8 data[length]; };
 
   template<typename T, typename Ty>
-  constexpr T exchange(T &val, Ty &&newVal) noexcept {
+  constexpr __attribute__((always_inline)) T exchange(T &val, Ty &&newVal) noexcept {
     T copy = val;
     val = forward<Ty>(newVal);
     return copy;
@@ -353,6 +353,18 @@ namespace flo {
         f(p, ": ", p[0], " ", p[1], " ", p[2], " ", p[3], " ", p[4], " ", p[5], " ", p[6], " ", p[7]);
         p += 8;
         size -= 8;
+      }
+
+      switch(size) {
+      case 7: f(p, ": ", p[0], " ", p[1], " ", p[2], " ", p[3], " ", p[4], " ", p[5], " ", p[6]); break;
+      case 6: f(p, ": ", p[0], " ", p[1], " ", p[2], " ", p[3], " ", p[4], " ", p[5]); break;
+      case 5: f(p, ": ", p[0], " ", p[1], " ", p[2], " ", p[3], " ", p[4]); break;
+      case 4: f(p, ": ", p[0], " ", p[1], " ", p[2], " ", p[3]); break;
+      case 3: f(p, ": ", p[0], " ", p[1], " ", p[2]); break;
+      case 2: f(p, ": ", p[0], " ", p[1]); break;
+      case 1: f(p, ": ", p[0]); break;
+      case 0: f(p, ": "); break;
+      default: __builtin_unreachable();
       }
     }
   }

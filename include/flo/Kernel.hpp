@@ -1,6 +1,5 @@
 #pragma once
 
-#include "flo/Containers/Function.hpp"
 #include "flo/ELF.hpp"
 #include "flo/Florence.hpp"
 
@@ -10,23 +9,44 @@ namespace flo {
     flo::PhysicalFreeList const *physFree;
     flo::VirtualAddress physBase;
     flo::VirtualAddress physEnd;
-    u32 const *vgaX;
-    u32 const *vgaY;
+
+    enum struct BootType {
+      Florence,
+      Stivale,
+      Multiboot,
+    };
+
+    BootType type;
+
+    union {
+      struct {
+        flo::PhysicalAddress rsdp;
+        flo::PhysicalAddress fb;
+        u16 pitch;
+        u16 width;
+        u16 height;
+        u16 bpp;
+      } stivale_boot;
+
+      struct {
+        u32 const *vgaX;
+        u32 const *vgaY;
+      } flo_boot;
+    };
   };
 
   void printBacktrace();
+  void printBacktrace(uptr basePointer);
   uptr deslide(uptr addr);
   char const *symbolName(uptr addr);
-  void yield();
-  void exit();
 
-  struct TaskControlBlock {
-    bool isRunnable = true; // If false, this task will never be run
-    char const *name;
-  };
+  // 3 -> aligned to 1GB, 2 -> aligned to 2MB, 1 -> aligned to 4KB etc
+  // Every level higher alignment means one factor of 512 less memory overhead
+  // but also 9 less bits of entropy.
+  // That means lower numbers are more secure but also take more memory.
+  constexpr auto kaslr_alignment_level = 3;
 
-  using TaskFunc = flo::Function<void(TaskControlBlock &)>;
-  TaskControlBlock &makeTask(char const *taskName, TaskFunc &&);
+  flo::VirtualAddress bootstrap_aslr_base(u64 highest_phys_addr);
 }
 
 extern "C" void *makeStack();

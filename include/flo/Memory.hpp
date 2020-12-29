@@ -159,6 +159,8 @@ namespace flo {
 
   void *getVirtualPages(uSz numPages);
   void returnVirtualPages(void *at, uSz numPages);
+  
+  void consumePhysicalMemory(PhysicalAddress addr, u64 size);
 
   struct WriteBack {};
   struct WriteCombining {};

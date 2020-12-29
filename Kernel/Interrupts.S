@@ -9,7 +9,7 @@
 dq handler%1
 %endmacro
 
-section .rodata
+section .data
 global exceptionHandlers
 exceptionHandlers: ; Interrupt 
 %assign i 0

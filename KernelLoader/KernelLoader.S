@@ -44,6 +44,9 @@ global _start
 extern callGlobalConstructors
   call callGlobalConstructors
 
+  mov byte [0xB8000], '?'
+  hlt
+
 extern kernelArguments
   lea rax, [kernelArguments]
 
@@ -51,12 +54,9 @@ extern kernelEntry
   mov rbx, [kernelEntry]
   jmp rbx
 
-l:hlt
-  jmp l
-
 section .kernel
 global bundledKernel
        bundledKernel:
-  incbin "build/Kernel/Kernel.elf"
+  incbin "./build/Kernel/Kernel.elf"
 global bundledKernelEnd
        bundledKernelEnd:

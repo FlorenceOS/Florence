@@ -28,10 +28,12 @@ endif()
 
 include_directories("${gmock_SOURCE_DIR}/include")
 
-set(CMAKE_CXX_FLAGS "-g -Werror -fsanitize=address,undefined -Wall -Wno-sign-compare")
+set(CMAKE_CXX_FLAGS "-g -Werror -fsanitize=address,undefined -Wall -Wno-sign-compare -ffunction-sections -fdata-sections -DFLO_ARCH_X86_64")
+SET(GCC_COVERAGE_LINK_FLAGS "--gc-sections")
 
 file(GLOB TestSources "*.cpp")
-add_executable(tests ${TestSources})
+file(GLOB LibFloSources "../LibFlo/*.cpp")
+add_executable(tests ${TestSources} ${LibFloSources})
 target_include_directories(tests PRIVATE ".")
 target_include_directories(tests PRIVATE "../include")
 set_property(TARGET tests PROPERTY CXX_STANDARD 17)

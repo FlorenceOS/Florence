@@ -3,6 +3,7 @@
 #include "Ints.hpp"
 
 #include "flo/StrongTypedef.hpp"
+#include "flo/Util.hpp"
 
 namespace flo {
   struct VirtualAddress: flo::StrongTypedef<VirtualAddress, u64> {
@@ -70,9 +71,13 @@ namespace flo {
 
   template<typename Output>
   inline void getStackTrace(Impl::StackFrame const *frame, Output &&out) {
-    for(int i = 0; i < 10 && (frame->retaddr || frame->prev); ++i) {
+    for(int i = 0; i < 4 && frame->retaddr && frame->prev; ++i, frame = frame->prev) {
       out(*frame);
-      frame = frame->prev;
     };
+  }
+
+  template<typename Output>
+  inline void getStackTrace(uptr frame, Output &&out) {
+    getStackTrace((Impl::StackFrame const *)frame, flo::forward<Output>(out));
   }
 }

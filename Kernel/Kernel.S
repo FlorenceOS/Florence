@@ -14,6 +14,7 @@ extern kernelArgumentPtr
   lea rax, [rel jmpdest]
   jmp far [rax]
 
+
 f:
   ; Set data segments
   mov ax, GDT64Data - GDT
@@ -24,8 +25,7 @@ f:
   mov gs, ax
 
   ; Set up a stack
-  lea rax, [rel stack]
-  mov rsp, rax
+  lea rsp, [rel stack]
   mov rbp, rsp
 
 extern callGlobalConstructors
@@ -40,7 +40,7 @@ extern kernelMain
   ; Exit task
   int $31 ; This is hex but there is no way to make that clear :(
 
-section .rodata
+section .data
 jmpdest:
 dq f
 dw GDT64Code - GDT

@@ -1,11 +1,12 @@
-#include "flo/ACPI.hpp"
+#include "Kernel/ACPI.hpp"
+#include "Kernel/APIC.hpp"
+#include "Kernel/PCI.hpp"
 
 #include "flo/Assert.hpp"
 #include "flo/IO.hpp"
 #include "flo/Memory.hpp"
-#include "flo/PCI.hpp"
 
-namespace flo::ACPI {
+namespace Kernel::ACPI {
   namespace {
     constexpr bool quiet = true;
     auto pline = flo::makePline<quiet>("[ACPI]");
@@ -40,7 +41,7 @@ namespace flo::ACPI {
 
       // If revision > 0:
       u32 length;
-      PhysicalAddress xsdtAddr;
+      u64 xsdtAddr;
       u8 extendedChecksum;
       u8 reserved[3];
 
@@ -59,7 +60,7 @@ namespace flo::ACPI {
           return false;
 
         // Calculate checksum
-        flo::ACPI::pline("Possible ACPI with revision ", revision);
+        Kernel::ACPI::pline("Possible ACPI with revision ", revision);
         auto numBytes = revision > 0 ? length : 20u;
         if(!byteZeroChecksum(this, numBytes))
             return false;
@@ -72,7 +73,7 @@ namespace flo::ACPI {
         if(*ptr % 16 == 0) {
           auto rsdpdesc = flo::getPhys<RSDPDesc>(flo::PhysicalAddress{*ptr});
           if(rsdpdesc->validate()) {
-            flo::ACPI::pline("Found valid RSD PTR from EBDA");
+            Kernel::ACPI::pline("Found valid RSD PTR from EBDA");
             return rsdpdesc;
           }
         }
@@ -80,7 +81,7 @@ namespace flo::ACPI {
         for(uSz mempos = 0x000E0000; mempos <= 0x00100000; mempos += 16) {
           auto rsdpdesc = flo::getPhys<RSDPDesc>(flo::PhysicalAddress{mempos});
           if(rsdpdesc->validate()) {
-            flo::ACPI::pline("Found valid RSD PTR from MBDA");
+            Kernel::ACPI::pline("Found valid RSD PTR from MBDA");
             return rsdpdesc;
           }
         }
@@ -142,9 +143,9 @@ namespace flo::ACPI {
     inline SDTArray *sdtarr = nullptr;
 
     void prepareSDTs(RSDPDesc const *ptr) {
-      flo::ACPI::pline("Preparing ACPI with RSDP at ", ptr);
+      Kernel::ACPI::pline("Preparing ACPI with RSDP at ", ptr);
 
-      u8 const *byteArray = flo::getPhys<u8>(ptr->revision ? ptr->xsdtAddr : flo::PhysicalAddress{ptr->rdstAddr});
+      u8 const *byteArray = flo::getPhys<u8>(ptr->revision ? flo::PhysicalAddress{ptr->xsdtAddr} : flo::PhysicalAddress{ptr->rdstAddr});
       auto table_bytes = flo::Util::get<u32>(byteArray, 4);
 
       SDT = flo::malloc_eternal(table_bytes);
@@ -178,46 +179,52 @@ namespace flo::ACPI {
   }
 }
 
-void flo::ACPI::initialize() {
-  auto rsdptr = RSDPDesc::aquire();
-  if(!rsdptr)
-    return;
+void Kernel::ACPI::initialize(u64 rsdpptr) {
+  auto ptr = (RSDPDesc *)rsdpptr;
+  prepareSDTs(ptr);
 
-  prepareSDTs(rsdptr);
-
-  flo::ACPI::pline("Got RSD PTR: ", rsdptr);
+  Kernel::ACPI::pline("Got RSD PTR: ", ptr);
 
   forEachSDT([&](SDTHeader const &sdt) {
     switch(*(u32 const *)sdt.signature) {
     case signature("FACP"):
-      flo::ACPI::pline("FADT at ", &sdt);
+      Kernel::ACPI::pline("FADT at ", &sdt);
       break;
 
     case signature("APIC"):
-      flo::ACPI::pline("APIC at ", &sdt);
+      Kernel::ACPI::pline("MADT at ", &sdt);
+      Kernel::APIC::initialize(&sdt);
       break;
 
     case signature("HPET"):
-      flo::ACPI::pline("HPET at ", &sdt);
+      Kernel::ACPI::pline("HPET at ", &sdt);
       break;
 
     case signature("MSDM"):
-      flo::ACPI::pline("Got your windows key! :^)");
-      flo::Util::hexdump(&sdt, sdt.length, flo::ACPI::pline);
+      Kernel::ACPI::pline("Got your windows key! :^)");
+      flo::Util::hexdump(&sdt, sdt.length, Kernel::ACPI::pline);
       break;
 
     case signature("MCFG"):
       for(uSz bt = 44; bt + 16 <= sdt.length; bt += 16) {
-        auto ptr = flo::getPhys<void>(flo::Util::get<PhysicalAddress>((u8 const *)&sdt, bt));
+        auto ptr = flo::getPhys<void>(flo::PhysicalAddress{flo::Util::get<u64>((u8 const *)&sdt, bt)});
         auto first = flo::Util::get<u8>((u8 const *)&sdt, bt + 10);
         auto last = flo::Util::get<u8>((u8 const *)&sdt, bt + 11);
-        flo::PCI::registerMMIO(ptr, first, last);
+        Kernel::PCI::registerMMIO(ptr, first, last);
       }
       break;
 
     default:
-      flo::ACPI::pline("Unknown SDT at ", &sdt, " with signature ", sdt.signature);
+      Kernel::ACPI::pline("Unknown SDT at ", &sdt, " with signature ", sdt.signature);
       break;
     }
   });
+}
+
+void Kernel::ACPI::initialize() {
+  auto rsdptr = RSDPDesc::aquire();
+  if(!rsdptr)
+    return;
+
+  Kernel::ACPI::initialize((u64)rsdptr);
 }

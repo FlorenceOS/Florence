@@ -39,6 +39,10 @@ struct type_mismatch_info_v1 {
   u8 type_check_kind;
 };
 
+struct unreachable_info {
+  source_location location;
+};
+
 const char *type_check_kinds[] = {
   "Load of",
   "Store to",
@@ -105,8 +109,9 @@ void __ubsan_handle_pointer_overflow() {
 }
 
 extern "C"
-void __ubsan_handle_builtin_unreachable() {
+void __ubsan_handle_builtin_unreachable(unreachable_info const *info) {
   flo::ubsan::pline("__builtin_unreachable() hit!");
+  flo::ubsan::log_location(info->location);
   assert_not_reached();
 }
 

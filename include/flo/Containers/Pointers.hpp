@@ -17,14 +17,17 @@ namespace flo {
 
       OwnPtrBase(OwnPtrBase &&other)
         : Allocator{flo::move(other.alloc())}
-        {
-        ptr = flo::exchange(other.ptr, nullptr);
+        , ptr{flo::exchange(other.ptr, nullptr)}
+      {
+
       }
 
       OwnPtrBase(T *ptr, Allocator allocator = Allocator{})
         : Allocator{flo::move(allocator)}
         , ptr{ptr}
-        { }
+      {
+
+      }
 
       OwnPtrBase &operator=(OwnPtrBase &&other) {
         cleanup();
@@ -35,8 +38,10 @@ namespace flo {
 
       template<typename OtherPtr>
       OwnPtrBase(OtherPtr &&derived_ptr)
-        : OwnPtrBase{(T*)derived_ptr.get(), flo::move(derived_ptr.alloc())}
-        { }
+        : OwnPtrBase{(T*)derived_ptr.release(), flo::move(derived_ptr.alloc())}
+      {
+
+      }
 
       OwnPtrBase           (OwnPtrBase const &) = delete;
       OwnPtrBase &operator=(OwnPtrBase const &) = delete;

@@ -1,14 +1,14 @@
-#include "flo/Drivers/Gfx/IntelGraphics.hpp"
+#include "Kernel/Drivers/Gfx/IntelGraphics.hpp"
 
 #include "flo/IO.hpp"
 
-namespace flo::IntelGraphics {
+namespace Kernel::IntelGraphics {
   namespace {
     constexpr bool quiet = false;
     auto pline = flo::makePline<quiet>("[IntelGFX]");
   }
 }
 
-void flo::IntelGraphics::initialize(PCI::Reference const &ref, PCI::DeviceConfig const &device) {
-  flo::IntelGraphics::pline("Got Intel VGA!");
+void Kernel::IntelGraphics::initialize(PCI::Reference const &ref, PCI::DeviceConfig const &device) {
+  Kernel::IntelGraphics::pline("Got Intel VGA!");
 }

@@ -1,5 +1,6 @@
 OUTPUT_FORMAT(elf64-x86-64)
 OUTPUT_ARCH(i386:x86-64)
+ENTRY(_start)
 
 SectorBytes = 0x200;
 
@@ -24,6 +25,10 @@ SECTIONS {
     . = ALIGN(4K);
     KernelLoaderEnd = .;
   } = 0x00
+
+  .stivalehdr :{
+    KEEP(*(.stivalehdr));
+  }
 }
 
 KernelLoaderSize = KernelLoaderEnd - KernelLoaderBegin;

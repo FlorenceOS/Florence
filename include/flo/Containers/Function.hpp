@@ -1,6 +1,9 @@
 #pragma once
 
+#include "flo/Assert.hpp"
+#include "flo/Bitfields.hpp"
 #include "flo/TypeTraits.hpp"
+#include "flo/IO.hpp"
 
 #include "flo/Containers/Pointers.hpp"
 
@@ -56,7 +59,7 @@ namespace flo {
       __attribute__((no_sanitize("function")))
       void deallocate(void *ptr) {
         if(ptr) {
-          auto cf = flo::Paging::makeCanonical(func);
+          auto cf = flo::Paging::make_canonical(func);
           if(cf)
             cf(ptr);
         }
@@ -71,7 +74,7 @@ namespace flo {
       explicit CallableImpl(Functor &&callable)
         : callable{flo::forward<Functor>(callable)}
         { }
-      virtual ~CallableImpl() override final = default;
+      virtual ~CallableImpl() = default;
       virtual RetType invoke(Args... args) override final { return callable(flo::forward<Args>(args)...); }
     private:
       Functor callable;
@@ -79,7 +82,7 @@ namespace flo {
 
     Function(OwnPtr<Callable, CustomFreeAlloc> &&ptr)
         :callable{flo::move(ptr)}
-      {
+    {
       isFuncPtr = false;
     }
   public:
@@ -95,7 +98,10 @@ namespace flo {
     ~Function() {
       // Do some cleanup
       if(!isFuncPtr) {
-        callable.reset();
+        decltype(callable) cb {
+          callable.release(),
+          flo::move(*flo::Paging::make_canonical(&callable.alloc()))
+        };
       }
     }
 
@@ -113,14 +119,14 @@ namespace flo {
 
     RetType operator()(Args ...args) const {
       if(isFuncPtr)
-        return flo::Paging::makeCanonical(funcPtr)(flo::forward<Args>(args)...);
+        return flo::Paging::make_canonical(funcPtr)(flo::forward<Args>(args)...);
       else
         return callable->invoke(flo::forward<Args>(args)...);
     }
 
     operator bool() const {
       if(isFuncPtr)
-        return flo::Paging::makeCanonical(funcPtr);
+        return flo::Paging::make_canonical(funcPtr);
       else
         return callable;
     }

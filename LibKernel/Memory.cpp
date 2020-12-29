@@ -20,46 +20,54 @@ namespace flo::Memory {
       assert(pageBase);
 
       flo::Paging::Permissions kernelRW;
-      kernelRW.writeEnable = 1;
-      kernelRW.allowUserAccess = 0;
+      kernelRW.readable = 1;
+      kernelRW.writeable = 1;
+      kernelRW.executable = 1;
+      kernelRW.userspace = 0;
+      kernelRW.cacheable = 1;
       kernelRW.writethrough = 0;
-      kernelRW.disableCache = 0;
-      kernelRW.mapping.global = 0;
-      kernelRW.mapping.executeDisable = 1;
+      kernelRW.global = 0;
 
-      // @TODO: lock mapping
-      auto err = flo::Paging::map(pageBase, numPages * flo::Paging::PageSize<1>, kernelRW);
-      flo::checkMappingError(err, flo::Memory::pline, []() {
-        assert_not_reached();
+      flo::Paging::map({
+        .virt = pageBase,
+        .size = numPages * flo::Paging::PageSize<1>,
+        .perm = kernelRW,
       });
 
       return pageBase;
     }
 
-    struct Stack {
-      u8 data[4096 - 16];
-      u8 stackBase[16]{};
+    union Stack {
+      Stack *next;
+      struct {
+        u8 data[4096 - 16];
+        u8 stackBase[16]{};
+      };
     };
 
     auto mmioPerms() {
       flo::Paging::Permissions result;
-      result.writeEnable = 1;
-      result.allowUserAccess = 0;
-      result.disableCache = 1;
-      result.mapping.global = 0;
-      result.mapping.executeDisable = 1;
+
+      result.readable = 1;
+      result.writeable = 1;
+      result.executable = 0;
+      result.userspace = 0;
+      result.cacheable = 0;
+      result.global = 0;
+
       return result;
     }
 
 
     auto doMapMMIO(flo::PhysicalAddress phys, uSz size, flo::Paging::Permissions perms) {
-      size = flo::Paging::alignPageUp<1>(size);
+      size = flo::Paging::align_page_up<1>(size);
       auto virt = flo::VirtualAddress{(u64)getVirtualPages(size/flo::Paging::PageSize<1>)};
 
-      // @TODO: lock mapping
-      auto err = flo::Paging::map(phys, virt, size, perms);
-      flo::checkMappingError(err, flo::Memory::pline, []() {
-        assert_not_reached();
+      flo::Paging::map_phys({
+        .phys = phys,
+        .virt = virt,
+        .size = size,
+        .perm = perms
       });
 
       return virt;
@@ -76,14 +84,18 @@ void flo::returnVirtualPages(void *at, uSz numPages) {
 }
 
 void *flo::large_malloc_size(uSz size) {
-  auto numPages = flo::Paging::alignPageUp<1>(size);
+  auto numPages = flo::Paging::align_page_up<1>(size);
   auto base = flo::Memory::makePages(numPages);
   return flo::getVirt<void>(base);
 }
 
 void flo::large_free_size(void *ptr, uSz size) {
-  auto numPages = flo::Paging::alignPageUp<1>(size);
-  flo::Paging::unmap<true>(VirtualAddress{(u64)ptr}, numPages * flo::Paging::PageSize<1>);
+  auto numPages = flo::Paging::align_page_up<1>(size);
+  flo::Paging::unmap({
+    .virt = VirtualAddress{(u64)ptr},
+    .size = numPages * flo::Paging::PageSize<1>,
+    .recycle_pages = true,
+  });
   flo::returnVirtualPages(ptr, numPages);
 }
 
@@ -151,20 +163,60 @@ flo::VirtualAddress flo::mapMMIO(flo::PhysicalAddress addr, uSz size, WriteCombi
 }
 
 void flo::freeMapMMIO(flo::VirtualAddress virt, uSz size) {
-  flo::Paging::unmap<false>(virt, flo::Paging::alignPageUp<1>(size));
+  flo::Paging::unmap({
+    .virt = virt,
+    .size = flo::Paging::align_page_up<1>(size),
+    .recycle_pages = false,
+  });
+}
+
+flo::VirtPhysPair flo::allocMMIO(uSz size, WriteBack tag) {
+  assert(size <= flo::Paging::PageSize<1>);
+  flo::VirtPhysPair result{};
+  result.phys = flo::physFree.getPhysicalPage(1);
+  result.virt = flo::mapMMIO(result.phys, size, tag);
+  return result;
+}
+
+flo::VirtPhysPair flo::allocMMIO(uSz size, WriteCombining tag) {
+  assert(size <= flo::Paging::PageSize<1>);
+  flo::VirtPhysPair result{};
+  result.phys = flo::physFree.getPhysicalPage(1);
+  result.virt = flo::mapMMIO(result.phys, size, tag);
+  return result;
+}
+
+void flo::freeAllocMMIO(void *virt) {
+  flo::Paging::unmap({
+    .virt = VirtualAddress{(u64)virt},
+    .size = flo::Paging::PageSize<1>,
+    .recycle_pages = true,
+  });
+}
+
+namespace {
+  flo::Memory::Stack *stack_head = nullptr;
 }
 
 extern "C"
 void *makeStack() {
-  auto stack = flo::Allocator<flo::Memory::Stack>::allocate();
+  flo::Memory::Stack *stack;
+  if(stack_head) {
+    stack = flo::exchange(stack_head, stack_head->next);
+  }
+  else {
+    stack = flo::Allocator<flo::Memory::Stack>::allocate();
+  }
+
   flo::Util::setmem(stack->stackBase, 0, sizeof(stack->stackBase));
   return stack->stackBase;
 }
 
 extern "C"
 void freeStack(void *ptr) {
-  auto stack = (flo::Memory::Stack *)((uptr)ptr & ~0xFFFull);
-  flo::Allocator<flo::Memory::Stack>::deallocate(stack);
+  auto stack = (flo::Memory::Stack *)ptr;
+  stack->next = stack_head;
+  stack_head = stack;
 }
 
 // Instatiate all the malloc/free functions for the slab sizes
@@ -180,3 +232,34 @@ struct Dummy {
 };
 
 Dummy d;
+
+namespace flo::Memory {
+  namespace {
+    template<int level>
+    bool __attribute__((always_inline)) consume_page(flo::PhysicalAddress &addr, u64 &size) {
+      auto constexpr pageSz = flo::Paging::PageSize<level>;
+      if(size >= pageSz && addr() % pageSz == 0) {
+        //flo::Memory::pline("Consuming physical page ", addr(), " at level ", level);
+        flo::physFree.returnPhysicalPage(addr, level);
+        size -= pageSz;
+        addr += PhysicalAddress{pageSz};
+        return true;
+      }
+      return false;
+    }
+  }
+}
+
+void flo::consumePhysicalMemory(flo::PhysicalAddress addr, u64 size) {
+  using flo::Memory::consume_page;
+
+  flo::Memory::pline("Consuming physical memory ", addr(), " to ", addr() + size);
+
+  while(
+    consume_page<5>(addr, size) ||
+    consume_page<4>(addr, size) ||
+    consume_page<3>(addr, size) ||
+    consume_page<2>(addr, size) ||
+    consume_page<1>(addr, size)
+  );
+}

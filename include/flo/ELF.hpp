@@ -1,6 +1,7 @@
 #pragma once
 
 #include "flo/Algorithm.hpp"
+#include "flo/Assert.hpp"
 #include "flo/Bitfields.hpp"
 #include "flo/Florence.hpp"
 #include "flo/Paging.hpp"
@@ -189,14 +190,10 @@ namespace flo {
         case RelocType::X86_64_RELATIVE:
           *(at) = loadOffset + addend;
           break;
-        default: break;
-        }
-      }
 
-      bool valid() const {
-        switch(type) {
-        case RelocType::X86_64_RELATIVE: return true;
-        default: return false;
+        default:
+          assert_not_reached();
+          break;
         }
       }
     };
@@ -243,97 +240,72 @@ namespace flo {
 
     ELF64::SectionHeader const *symbolTable = nullptr;
 
-    bool initSymbols() {
+    void initSymbols() {
       symbolTable = nullptr;
-      bool failed = false;
 
       forEachSection([&](ELF64::SectionHeader const &section) {
         if(section.type == ELF64::SectionHeader::Type::strtab) {
           // If this is not the section name string table
           if(&section != &sectionHeader(header().sectionNameIndex))
-            if(flo::exchange(symbolTable, &section)) // Two possible symbol STRTABs
-              failed = true;
+            assert(!flo::exchange(symbolTable, &section)); // Two possible symbol STRTABs
         }
       });
-
-      return !failed;
     }
 
     // Also calls initSymbols
-    template<typename Fail>
-    void verify(Fail &&fail) {
-      verify_inside_file(ELF64::foff{0}, sizeof(ELF64::Header), move(fail));
+    void verify() {
+      verify_inside_file(ELF64::foff{0}, sizeof(ELF64::Header));
 
-      if(!equals(header().magic, "\x7F""ELF"))
-        return forward<Fail>(fail)("Invalid magic for ELF file: ",
-          (u8)header().magic[0], " ", (u8)header().magic[1], " ", (u8)header().magic[2], " ", (u8)header().magic[3]);
+      assert(equals(header().magic, "\x7F""ELF"));
 
-      if(header().fileclass != ELF::ObjectClass::ELF64)
-        return forward<Fail>(fail)("Unexpected class: ", flo::Decimal{static_cast<u8>(header().fileclass)});
+      assert(header().fileclass == ELF::ObjectClass::ELF64);
 
-      if(header().version != ELF::Version::Current)
-        return forward<Fail>(fail)("Unexpected version: ", flo::Decimal{static_cast<u8>(header().version)});
+      assert(header().version == ELF::Version::Current);
 
-      if(!entry())
-        return forward<Fail>(fail)("No entry point found: ", header().entry());
+      assert(entry());
+      
+      assert(header().phentsize >= sizeof(ELF64::ProgramHeader));
 
-      if(header().phentsize < sizeof(ELF64::ProgramHeader))
-        return forward<Fail>(fail)("Program header size (", header().shentsize, ") too low, expected at least ", sizeof(ELF64::ProgramHeader));
+      assert(header().phnum > 0);
 
-      if(header().phnum < 1)
-        return forward<Fail>(fail)("Expecting at least one program header!");
+      verify_inside_file(header().phoff, header().phentsize * header().phnum);
 
-      verify_inside_file(header().phoff, header().phentsize * header().phnum, move(fail));
+      assert(header().shentsize >= sizeof(ELF64::SectionHeader));
 
-      if(header().shentsize < sizeof(ELF64::SectionHeader))
-        return forward<Fail>(fail)("Section header size (", header().shentsize, ") too low, expected at least ", sizeof(ELF64::SectionHeader));
+      assert(header().shnum > 0);
 
-      if(header().shnum < 1)
-        return forward<Fail>(fail)("Expecting at least one section header!");
+      assert(header().sectionNameIndex < header().shnum);
 
-      if(header().shnum < header().sectionNameIndex)
-        return forward<Fail>(fail)("Invalid section name string table index");
+      assert(sectionHeader(header().sectionNameIndex).type == ELF64::SectionHeader::Type::strtab);
 
-      if(sectionHeader(header().sectionNameIndex).type != ELF64::SectionHeader::Type::strtab)
-        return forward<Fail>(fail)("Section name string table is not of type strtab");
-
-      verify_inside_file(header().shoff, header().shentsize * header().shnum, move(fail));
+      verify_inside_file(header().shoff, header().shentsize * header().shnum);
 
       forEachSection([&](ELF64::SectionHeader const &section) {
         // Nobits are zero initialized and don't have backing bytes in the image
         if(section.type != ELF64::SectionHeader::Type::nobits)
-          verify_inside_file(section.offset, section.size, move(fail));
+          verify_inside_file(section.offset, section.size);
 
         if(section.type == ELF64::SectionHeader::Type::rela)
           // There are relocations in this section, let's take a quick look at them.
           forEachRelocation(section, [&](ELF64::RelocationEntry const &relent) {
-            verify_inside_loaded(relent.address, relent.size(), move(fail));
-            if(!relent.valid())
-              return forward<Fail>(fail)("Invalid relocation type ", (u32)relent.type);
+            verify_inside_loaded(relent.address, relent.size());
           });
 
-        if(section.type == ELF64::SectionHeader::Type::rel)
-          return forward<Fail>(fail)("REL section handling not implemented yet.");
+        assert(section.type != ELF64::SectionHeader::Type::rel);
 
         if(section.type == ELF64::SectionHeader::Type::strtab) {
-          if(section.size < 1)
-            return forward<Fail>(fail)("strtab section is too small to contain its required null byte!");
-          if(data[section.offset() + section.size - 1] != '\0')
-            return forward<Fail>(fail)("strtab section not null terminated!");
-          if(data[section.offset()] != '\0')
-            return forward<Fail>(fail)("strtab section doesn't start with a null char");
+          assert(section.size >= 1);
+          assert(data[section.offset() + section.size - 1] == '\0');
+          assert(data[section.offset()] == '\0');
         }
       });
 
       forEachProgramHeader([&](ELF64::ProgramHeader const &phdr) {
-        verify_inside_file(phdr.offset, phdr.fileSz, move(fail));
-        if(phdr.memSz < phdr.fileSz)
-          forward<Fail>(fail)("memSz < fileSz!!");
+        assert(phdr.memSz >= phdr.fileSz);
       });
 
       // Required for symbolTable below
-      if(!initSymbols())
-        return forward<Fail>(fail)("Could not deduce symbol name string table");
+      initSymbols();
 
       forEachSymbol([&](auto &sym) {
         // Check symbol section
@@ -344,18 +316,14 @@ namespace flo {
           break;
         default:
           // Make sure this is a valid section number
-          if(sym.sectionNum >= header().shnum)
-            forward<Fail>(fail)("Symbol string table index is too large: ", sym.sectionNum);
+          assert(sym.sectionNum < header().shnum);
           break;
         }
 
         // Symbol has a name
         if(sym.stringTableOffset) {
-          if(!symbolTable)
-            forward<Fail>(fail)("Symbol has name but no symbol string table was found!");
-
-          if(symbolTable->size <= sym.stringTableOffset)
-            forward<Fail>(fail)("String offset ", sym.stringTableOffset, " is too large for string table size ", symbolTable->size);
+          assert(symbolTable);
+          assert(symbolTable->size > sym.stringTableOffset);
         }
       });
     }
@@ -461,7 +429,9 @@ namespace flo {
           break;
         case ELF64::SectionHeader::Type::rel:
           // Not implemented!
+          assert_not_reached();
           break;
+
         default:
           break;
         }
@@ -469,43 +439,74 @@ namespace flo {
     }
 
     void loadAll() const {
+      // Map everything RW- temporarily...
       forEachProgramHeader([&](flo::ELF64::ProgramHeader const &header) {
         if(header.type != flo::ELF64::ProgramHeader::Type::Load)
           return;
 
         auto sectionBase = flo::VirtualAddress{loadOffset + header.vaddr()};
-        auto sectionMemSize = flo::Paging::alignPageUp(header.memSz);
-        flo::Paging::Permissions perms;
-        perms.writeEnable = static_cast<bool>(header.flags & header.Flags::Writeable);
-        perms.mapping.executeDisable = !static_cast<bool>(header.flags & header.Flags::Executable);
-        perms.mapping.global = 0;
-        perms.allowUserAccess = 0;
-        perms.writethrough = 0;
-        perms.disableCache = 0;
+        auto sectionMemSize = flo::Paging::align_page_up(header.memSz);
+        flo::Paging::Permissions perms{
+          .readable = 1,
+          .writeable = 1,
+          .executable = 0,
+          .userspace = 0,
+          .cacheable = 1,
+          .writethrough = 1,
+          .global = 0,
+        };
 
-        auto err = flo::Paging::map(sectionBase, sectionMemSize, perms);
-        flo::checkMappingError(err, [](auto &&...) {}, flo::CPU::halt);
+        flo::Paging::map({
+          .virt = sectionBase,
+          .size = sectionMemSize,
+          .perm = perms,
+        });
 
+        // Put the data in memory...
         if(header.fileSz)
           flo::Util::copymem((u8 *)sectionBase(), (u8 const *)fileData(header), header.fileSz);
         if(auto set = sectionMemSize - header.fileSz; set)
           flo::Util::setmem((u8 *)sectionBase() + header.fileSz, 0, set);
       });
 
+      // The relocations ofc also have to be done while things are RW-
       applyAllRelocations();
+
+      // Now we can set the access permissions properly.
+      forEachProgramHeader([&](flo::ELF64::ProgramHeader const &header) {
+        if(header.type != flo::ELF64::ProgramHeader::Type::Load)
+          return;
+
+        auto sectionBase = flo::VirtualAddress{loadOffset + header.vaddr()};
+        auto sectionMemSize = flo::Paging::align_page_up(header.memSz);
+
+        flo::Paging::Permissions perms;
+        perms.writeable = static_cast<bool>(header.flags & header.Flags::Writeable);
+        perms.executable = static_cast<bool>(header.flags & header.Flags::Executable);
+        perms.readable = 1;
+        perms.global = 0;
+        perms.userspace = 0;
+        perms.writethrough = 0;
+        perms.cacheable = 1;
+
+        flo::Paging::set_perms({
+          .virt = sectionBase,
+          .size = sectionMemSize,
+          .perm = perms,
+        });
+      });
+    }
+
+    ELF64::addr entry() {
+      return ELF64::addr{loadOffset + header().entry()};
     }
 
   private:
-    template<typename Fail>
-    void verify_inside_file(ELF64::foff off, uSz region_size, Fail &&fail) {
-      if(off() + region_size <= size)
-        return;
-
-      forward<Fail>(fail)("Offset ", off(), " + size ", region_size, " = ", off() + region_size, ", not <= file size (", size, ").");
+    void verify_inside_file(ELF64::foff off, uSz region_size) {
+      assert(off() + region_size <= size);
     }
 
-    template<typename Fail>
-    void verify_inside_loaded(ELF64::addr off, uSz region_size, Fail &&fail) {
+    void verify_inside_loaded(ELF64::addr off, uSz region_size) {
       bool valid = false;
       forEachProgramHeader([&](ELF64::ProgramHeader const &ph) {
         // Begins before
@@ -513,17 +514,12 @@ namespace flo {
           return;
 
         // Ends after
-        if(off() + region_size >= ph.vaddr() + ph.memSz)
+        if(off() + region_size > ph.vaddr() + ph.memSz)
           return;
 
         valid = true;
       });
-      if(!valid)
-        forward<Fail>(fail)("Addr ", off(), " with size ", region_size, " not inside any LOADs");
-    }
-
-    ELF64::addr entry() {
-      return ELF64::addr{loadOffset + header().entry()};
+      assert(valid);
     }
   };
 }

@@ -10,7 +10,7 @@
 
 namespace LibKernel {
   namespace {
-    constexpr bool quiet = false;
+    constexpr bool quiet = true;
     auto pline = flo::makePline<quiet>("[LibKernel]");
 
     struct {
@@ -75,8 +75,9 @@ flo::PhysicalAddress flo::PhysicalFreeList::getPhysicalPage(int pageLevel) {
   auto tryGet =
     [pageLevel](flo::PhysicalAddress &currHead) {
       // Fast path, try to get from current level
-      if(currHead())
+      if(currHead()) {
         return flo::exchange(currHead, *getPhys<PhysicalAddress>(currHead));
+      }
 
       if(pageLevel == 5)
         return PhysicalAddress{0};
@@ -119,6 +120,9 @@ flo::PhysicalAddress flo::PhysicalFreeList::getPhysicalPage(int pageLevel) {
 }
 
 void flo::PhysicalFreeList::returnPhysicalPage(flo::PhysicalAddress phys, int pageLevel) {
+  if(phys() <= flo::Util::mega(1)) {
+    return;
+  }
   switch(pageLevel) {
   case 1: *getPhys<PhysicalAddress>(phys) = exchange(physFree.lvl1, phys); return;
   case 2: *getPhys<PhysicalAddress>(phys) = exchange(physFree.lvl2, phys); return;
@@ -130,12 +134,39 @@ void flo::PhysicalFreeList::returnPhysicalPage(flo::PhysicalAddress phys, int pa
 }
 
 void flo::assertionFailure(char const *file, u64 line, char const *error) {
-  LibKernel::pline("Assertion failure at: ", file, ":", flo::Decimal{line}, ": ", error);
-
-  flo::printBacktrace();
+  if constexpr(sizeof(uptr) < 8) {
+    // Lazy me dun wanna implement flo::Decimal for 32 bit with 64 bit ints
+    LibKernel::pline("Assertion failure at: ", file, ":", line, ": ", error);
+  }
+  else {
+    LibKernel::pline("Assertion failure at: ", file, ":", flo::Decimal{line}, ": ", error);
+  }
 
   flo::CPU::halt();
   __builtin_unreachable();
 }
 
+flo::VirtualAddress flo::bootstrap_aslr_base(u64 highest_phys_addr) {
+redo:
+  // Generate a base
+  auto base = flo::VirtualAddress{flo::getRand()};
 
+  // Align the base
+  base = flo::Paging::align_page_down<kaslr_alignment_level>(base);
+
+  // Mask away bits we can't use since the address has to be canonical
+  base %= flo::Paging::virt_limit;
+
+  // Start at possible addresses at 8 GB, we don't wan't to map the lower 4 GB
+  if(base < flo::VirtualAddress{flo::Util::giga(8ull)})
+    goto redo;
+
+  // End the possible addresses in such a way that we can fit all of our physical memory
+  if(base > flo::Paging::virt_limit + flo::VirtualAddress{highest_phys_addr})
+    goto redo;
+
+  // Make the pointer canonical
+  base = flo::Paging::make_canonical(base);
+
+  return base;
+}

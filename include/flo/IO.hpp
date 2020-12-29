@@ -8,241 +8,46 @@
 #include "flo/Containers/Array.hpp"
 
 namespace flo {
-  template<typename T>
-  constexpr bool isDecimal = false;
-  template<typename T>
-  constexpr bool isDecimal<Decimal<T>> = true;
+  enum struct TextColor {
+    red,
+    cyan,
+    yellow,
+    white,
+    blue,
+    green,
+  };
 
-  namespace IO {
-    enum struct Color {
-      red,
-      cyan,
-      yellow,
-      white,
-      blue,
-    };
-  }
+  bool colorOverride = false;
 
   extern void putchar(char c);
-  extern void setColor(IO::Color col);
+  extern void setColor(TextColor col);
   extern void feedLine();
 
   namespace IO {
-    template<typename T>
-    T in(u16 port) {
-      T retval;
-      asm volatile("in %1, %0":"=a"(retval):"Nd"(port));
-      return retval;
-    }
-
-    template<typename T, u16 port>
-    T in() {
-      T retval;
-      asm volatile("in %1, %0":"=a"(retval):"Nd"(port));
-      return retval;
-    }
-
-    inline auto inb = [](auto port) { return in<u8> (port); };
-    inline auto inw = [](auto port) { return in<u16>(port); };
-    inline auto inl = [](auto port) { return in<u32>(port); };
-
-    template<typename T>
-    void out(u16 port, T value) {
-      asm volatile("out %0, %1"::"a"(value),"Nd"(port));
-    }
-
-    template<u16 port, typename T>
-    void out(T value) {
-      asm volatile("out %0, %1"::"a"(value),"Nd"(port));
-    }
-
-    inline auto outb = [](auto port, auto value) { out<u8> (port, value); };
-    inline auto outw = [](auto port, auto value) { out<u16>(port, value); };
-    inline auto outl = [](auto port, auto value) { out<u32>(port, value); };
-
-    inline void waitIO() {
-      out<0x80>(0);
-    }
-
     namespace Disk {
       auto constexpr SectorSize = 0x200;
     }
-
-    namespace Impl {
-      template<typename Putchar>
-      void puts(char const *str, Putchar &&pch) {
-        while(*str)
-          pch(*str++);
-      }
-
-      char const *colorString(Color c) {
-        switch(c) {
-        case Color::red:    return "31";
-        case Color::cyan:   return "36";
-        case Color::yellow: return "33";
-        case Color::white:  return "37";
-        case Color::blue:   return "34";
-        default:            return "0";
-        }
-      }
-    }
-
-    namespace Debugout {
-      inline void write(char c) {
-        IO::out<0xE9>(c);
-      }
-
-      inline void feedLine() {
-        write('\n');
-      }
-
-      static inline char const *lastCol = "0";
-      inline void setColor(Color c) {
-        auto str = Impl::colorString(c);
-
-        if(str != flo::exchange(lastCol, str)) {
-          write('\x1b');
-          write('[');
-          Impl::puts(str, &write);
-          write('m');
-        }
-      }
-    }
-
-    namespace VGA {
-      auto constexpr width = 80;
-      auto constexpr height = 25;
-
-      u32 inline currX = 0;
-      u32 inline currY = 0;
-
-      u8 inline currentColor = 0x7;
-
-      inline void setColor(Color c) {
-        switch(c) {
-        case Color::red:    currentColor = 0x4; break;
-        case Color::cyan:   currentColor = 0x3; break;
-        case Color::yellow: currentColor = 0xE; break;
-        case Color::white:  currentColor = 0x7; break;
-        case Color::blue:   currentColor = 0x1; break;
-        default:            currentColor = 0xF; break;
-        }
-      }
-
-      inline volatile u16 *charaddr(int x, int y) {
-        return (volatile u16 *)flo::getPhys<u16>(flo::PhysicalAddress{0xB8000}) + (y * width + x);
-      }
-
-      inline void setchar(int x, int y, char c) {
-        *charaddr(x, y) = (currentColor << 8) | c;
-      }
-
-      inline void setchar(int x, int y, u16 entireChar) {
-        *charaddr(x, y) = entireChar;
-      }
-
-      inline u16 getchar(int x, int y) {
-        return *charaddr(x, y);
-      }
-
-      inline void feedLine() {
-        currX = 0;
-        if(currY == height - 1) {
-          // Scroll
-          for(int i = 0; i < height - 1; ++ i) for(int x = 0; x < width; ++ x)
-              setchar(x, i, getchar(x, i + 1));
-
-          // Clear bottom line
-          for(int x = 0; x < width; ++ x)
-            setchar(x, height - 1, ' ');
-        }
-        else
-          ++currY;
-      }
-
-      inline void putchar(char c) {
-        if(currX == width) {
-          feedLine();
-        }
-        setchar(currX++, currY, c);
-      }
-
-      inline void clear() {
-        for(int x = 0; x < width;  ++ x)
-        for(int y = 0; y < height; ++ y)
-          setchar(x, y, ' ');
-      }
-    }
-
-    namespace Impl {
-      template<int port>
-      struct Serial {
-      private:
-        using T = char;
-        static constexpr int hwport() {
-          if constexpr(port == 1) {
-            return 0x3f8;
-          }
-          else if constexpr(port == 2) {
-            return 0x2f8;
-          }
-          else if constexpr(port == 3) {
-            return 0x3e8;
-          }
-          else if constexpr(port == 4) {
-            return 0x2e8;
-          }
-          else {
-            static_assert(port != port, "Invalid port number");
-          }
-        }
-      public:
-        static void initialize() {
-          IO::out<hwport() + 1>('\x00');
-          IO::out<hwport() + 3>('\x80');
-          IO::out<hwport() + 0>('\x01');
-          IO::out<hwport() + 1>('\x00');
-          IO::out<hwport() + 3>('\x03');
-          IO::out<hwport() + 2>('\xC7');
-        }
-
-        static bool canSend() { return IO::in<T, hwport() + 5>() & 0x20; }
-        static void write(char c) {
-          if(!c) return;
-          while(!canSend()) __asm__("pause");
-          IO::out<hwport()>(c);
-        }
-        static bool hasData() { return IO::in<T, hwport() + 5>() & 0x01; }
-        static char read() {
-          while(!hasData()) __asm__("pause");
-          return IO::in<T, hwport()>();
-        }
-
-        static inline char const *lastCol = "0";
-        static void setColor(Color c) {
-          auto str = Impl::colorString(c);
-
-          if(flo::exchange(lastCol, str) != str) { // New color
-            write('\x1b');
-            write('[');
-            Impl::puts(str, &write);
-            write('m');
-          }
-        }
-
-        static void feedLine() {
-          write('\n');
-        }
-      };
-    }
-
-    inline Impl::Serial<1> serial1;
-    inline Impl::Serial<2> serial2;
-    inline Impl::Serial<3> serial3;
-    inline Impl::Serial<4> serial4;
   }
 
-  void printChrArr(char const *arr, uSz size) {
+  template<typename Putchar>
+  void printString(char const *str, Putchar &&pch) {
+    while(*str)
+      pch(*str++);
+  }
+
+  char const *colorString(TextColor c) {
+    switch(c) {
+    case TextColor::red:    return "31";
+    case TextColor::cyan:   return "36";
+    case TextColor::yellow: return "33";
+    case TextColor::white:  return "37";
+    case TextColor::blue:   return "34";
+    case TextColor::green:  return "32";
+    default:                return "0";
+    }
+  }
+
+  void __attribute__((noinline)) printChrArr(char const *arr, uSz size) {
     if(!arr[size - 1])
       --size;
 
@@ -286,57 +91,108 @@ namespace flo {
     return print(&*it);
   }
 
+  void __attribute__((noinline)) doColor(TextColor color) {
+    if(!exchange(colorOverride, false))
+      flo::setColor(color);
+  }
+
+  template<typename T>
+  struct Printer {
+    static __attribute__((noinline)) void print(T const &value) {
+      doColor(TextColor::cyan);
+      return printNum(value);
+    }
+  };
+
+  template<>
+  struct Printer<char const *> {
+    static __attribute__((noinline)) void print(char const *str) {
+      doColor(TextColor::white);
+      flo::print(str);
+    }
+  };
+
+  template<typename T>
+  struct Printer<Decimal<T>> {
+    static __attribute__((noinline)) void print(Decimal<T> const &val) {
+      doColor(TextColor::yellow);
+      flo::printDec(val.val);
+    }
+  };
+
+  template<typename T>
+  struct Printer<T *> {
+    static __attribute__((noinline)) void print(T *val) {
+      doColor(TextColor::blue);
+      flo::printNum(reinterpret_cast<uptr>(val));
+    }
+  };
+
+  template<>
+  struct Printer<flo::PhysicalAddress> {
+    static __attribute__((noinline)) void print(flo::PhysicalAddress addr) {
+      doColor(TextColor::green);
+      flo::printNum(addr());
+    }
+  };
+
+  template<>
+  struct Printer<flo::VirtualAddress> {
+    static __attribute__((noinline)) void print(flo::VirtualAddress addr) {
+      doColor(TextColor::yellow);
+      flo::printNum(addr());
+    }
+  };
+
+  template<>
+  struct Printer<flo::Spaces> {
+    static __attribute__((noinline)) void print(flo::Spaces spaces) {
+      doColor(TextColor::white);
+      for(int i = 0; i < spaces.numSpaces; ++ i)
+        flo::putchar(' ');
+    }
+  };
+
+  namespace Impl {
+    template<typename T>
+    void __attribute__((always_inline)) printSingle(T &&val) {
+      if constexpr(isSame<decay<T>, TextColor>) {
+        setColor(val);
+        colorOverride = true;
+      }
+      else if constexpr(isArrayKnownBounds<removeRef<T>>) {
+        if constexpr(isSame<decay<decltype(*val)>, char>) {
+          doColor(TextColor::white);
+          return flo::printChrArr(val, Util::arrSz(val));
+        }
+        else
+          Printer<decay<T>>::print(val);
+      }
+      else if constexpr(isIntegral<decay<T>>) {
+        doColor(TextColor::cyan);
+        printNum(val);
+      }
+      else
+        Printer<decay<T>>::print(val);
+    }
+
+    void __attribute__((noinline)) printPrefix(char const *prefix) {
+      flo::setColor(TextColor::red);
+      flo::print(prefix);
+      flo::setColor(TextColor::white);
+      flo::print(" ");
+    }
+  }
+
   template<bool nopOut>
   constexpr auto makePline(char const *prefix) {
     if constexpr(nopOut)
-      return [](auto &&...vs) {};
+      return [](auto &&...vs) __attribute__((always_inline)) {};
 
     else return
-      [prefix, colorOverride = false](auto &&...vs) mutable {
-        auto p = [&colorOverride](auto &&val) {
-          auto doColor =
-            [&colorOverride](IO::Color col) {
-              if(!exchange(colorOverride, false))
-                flo::setColor(col);
-            };
-
-          if constexpr(isSame<decay<decltype(val)>, IO::Color>) {
-            setColor(val);
-            colorOverride = true;
-          }
-          else if constexpr(isDecimal<decay<decltype(val)>>) {
-            doColor(IO::Color::yellow);
-            return printDec(val.val);
-          }
-          else if constexpr(isArray<decay<decltype(val)>>) {
-            doColor(IO::Color::white);
-            return printChrArr(val, Util::arrSz(val));
-          }
-          else if constexpr(isSame<decay<decltype(val)>, char const *> ||
-                            isSame<decay<decltype(val)>, char *>) {
-            doColor(IO::Color::white);
-            return print(val);
-          }
-          else if constexpr(isSame<decay<decltype(val)>, Spaces>) {
-            doColor(IO::Color::white);
-            for(int i = 0; i < val.numSpaces; ++ i)
-              putchar(' ');
-          }
-          else if constexpr(isPointer<decay<decltype(val)>>) {
-            doColor(IO::Color::blue);
-            return printNum(reinterpret_cast<uptr>(val));
-          }
-          else {
-            doColor(IO::Color::cyan);
-            return printNum(val);
-          }
-        };
-
-        flo::setColor(IO::Color::red);
-        print(prefix);
-        flo::setColor(IO::Color::white);
-        print(" ");
-        (p(flo::forward<decltype(vs)>(vs)), ...);
+      [prefix](auto &&...vs) __attribute__((always_inline)) mutable {
+        Impl::printPrefix(prefix);
+        (Impl::printSingle(flo::forward<decltype(vs)>(vs)), ...);
         feedLine();
       };
   }

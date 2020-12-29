@@ -259,15 +259,15 @@ namespace flo {
       /*if constexpr(isTriviallyMoveAssignable<T>)
         itMoveBytes(dest, begin, end);
       else {*/
-        if constexpr(isSame<direction, Backwards>) {
-          dest += distance(begin, end);
-          while(begin != end)
-            *--dest = move(*--end);
-        }
-        else {
-          while(begin != end)
-            *dest++ = move(*begin++);
-        }
+      if constexpr(isSame<direction, Backwards>) {
+        dest += distance(begin, end);
+        while(begin != end)
+          *--dest = move(*--end);
+      }
+      else {
+        while(begin != end)
+          *dest++ = move(*begin++);
+      }
       //}
     }
   };

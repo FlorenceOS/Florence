@@ -44,6 +44,6 @@ namespace flo {
       return (uSz)-1;
     }
   private:
-    flo::Array<u8, flo::Util::roundUp<8>(size)> data{{}};
+    flo::Array<u8, flo::Util::roundUp<8>(size)/8> data{{}};
   };
 }
