@@ -563,8 +563,7 @@ export fn interrupt64_handler(frame: *InterruptFrame) void {
 }
 
 export fn interrupt32_handler(frame: *InterruptFrame) void {
-  os.log("Got a 32 bit interrupt or something idk\n", .{});
-  while(true) { }
+  @panic("Got a 32 bit interrupt or something idk");
 }
 
 pub const TaskData = struct {
