@@ -15,12 +15,12 @@ pub fn panic(message: ?[]const u8, stack_trace: ?*StackTrace) noreturn {
     os.log("PANIC!!\n", .{});
   }
 
-  if(stack_trace != null) {
+  if(stack_trace) |trace| {
     os.log("TODO: print stack trace.\nI bet this is very helpful. No problem.\n", .{});
+    os.lib.debug.dump_stack_trace(trace);
   } else {
     os.log("idfk I didn't get a stack trace.\n", .{});
   }
 
-  while(true) { @breakpoint(); }
-  unreachable;
+  os.platform.hang();
 }
