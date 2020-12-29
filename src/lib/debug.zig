@@ -18,7 +18,7 @@ extern var __debug_ranges_start: u8;
 extern var __debug_ranges_end: u8;
 
 var debug_info = std.dwarf.DwarfInfo {
-  .endian = std.builtin.endian,
+  .endian       = std.builtin.endian,
   .debug_info   = undefined,
   .debug_abbrev = undefined,
   .debug_str    = undefined,
@@ -28,29 +28,41 @@ var debug_info = std.dwarf.DwarfInfo {
 
 var inited_debug_info = false;
 
-pub fn dump_stack_trace(bp: usize, ip: usize) void {
-  os.log("Dumping ip={x}, bp={x}\n", .{ip, bp});
+fn init_debug_info() void {
   if(!inited_debug_info) {
-    debug_info.debug_info   = slice_section(&__debug_info_start, &__debug_info_end);
-    debug_info.debug_abbrev = slice_section(&__debug_abbrev_start, &__debug_abbrev_end);
-    debug_info.debug_str    = slice_section(&__debug_str_start, &__debug_str_end);
-    debug_info.debug_line   = slice_section(&__debug_line_start, &__debug_line_end);
-    debug_info.debug_ranges = slice_section(&__debug_ranges_start, &__debug_ranges_end);
+    //debug_info.debug_info   = slice_section(&__debug_info_start, &__debug_info_end);
+    //debug_info.debug_abbrev = slice_section(&__debug_abbrev_start, &__debug_abbrev_end);
+    //debug_info.debug_str    = slice_section(&__debug_str_start, &__debug_str_end);
+    //debug_info.debug_line   = slice_section(&__debug_line_start, &__debug_line_end);
+    //debug_info.debug_ranges = slice_section(&__debug_ranges_start, &__debug_ranges_end);
 
-    os.log("Doing the thiiiiing 1\n", .{});
+    os.log("Opening debug info\n", .{});
     std.dwarf.openDwarfDebugInfo(&debug_info, debug_allocator) catch |err| {
       os.log("Unable to open debug info: {}\n", .{@errorName(err)});
       return;
     };
-    os.log("Doing the thiiiiing 2\n", .{});
+    os.log("Opened debug info\n", .{});
     inited_debug_info = true;
   }
+}
+
+pub fn dump_frame(bp: usize, ip: usize) void {
+  os.log("Dumping ip=0x{x}, bp=0x{x}\n", .{ip, bp});
+  init_debug_info();
 
   print_addr(ip);
 
   var it = std.debug.StackIterator.init(null, bp);
   while(it.next()) |addr| {
     print_addr(ip);
+  }
+}
+
+pub fn dump_stack_trace(trace: *std.builtin.StackTrace) void {
+  init_debug_info();
+
+  for(trace.instruction_addresses[trace.index..]) |addr| {
+    print_addr(addr);
   }
 }
 
