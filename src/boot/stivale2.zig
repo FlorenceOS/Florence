@@ -43,7 +43,7 @@ const stivale2_memmap = packed struct {
   pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
     try writer.print("{} entries:\n", .{self.entries});
     for(self.get()) |ent| {
-      try writer.print("\t\t{}\n", .{ent});
+      try writer.print("    {}\n", .{ent});
     }
   }
 };
