@@ -177,7 +177,12 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
 
   platform.platform_early_init();
 
-  os.log("{}\n", .{info});
+  os.log(
+    \\Bootloader: {}
+    \\Bootloader version: {}
+    \\{}
+    , .{info_in.bootloader_brand, info_in.bootloader_version, info}
+  );
 
   if(!info.valid()) {
     @panic("Stivale2: Info not valid!");
