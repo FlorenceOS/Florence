@@ -192,27 +192,21 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     stivale.add_memmap(ent);
   }
 
-  // If we didn't get a compatible pagetable from the bootloader, make our own
-  if(!info.compatible_pt) {
-    os.log("Page tables NOT compatible, making our own\n", .{});
-    var paging_root = os.vital(paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
+  var paging_root = os.vital(paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
 
-    if(arch == .x86_64)
-      stivale.map_bootloader_data(&paging_root);
+  if(arch == .x86_64)
+    stivale.map_bootloader_data(&paging_root);
 
-    for(info.memmap.?.get()) |*ent| {
-      stivale.map_phys(ent, &paging_root);
-    }
-
-    if(info.uart) |uart| {
-      os.log("Mapping UART\n", .{});
-      os.vital(paging.map_phys_size(uart.uart_addr, platform.page_sizes[0], paging.mmio(), &paging_root), "mapping UART");
-    }
-
-    os.vital(paging.finalize_kernel_paging(&paging_root), "finalizing kernel paging");
-  } else {
-    os.log("Page tables compatible, skipping creation.\n", .{});
+  for(info.memmap.?.get()) |*ent| {
+    stivale.map_phys(ent, &paging_root);
   }
+
+  if(info.uart) |uart| {
+    os.log("Mapping UART\n", .{});
+    os.vital(paging.map_phys_size(uart.uart_addr, platform.page_sizes[0], paging.mmio(), &paging_root), "mapping UART");
+  }
+
+  os.vital(paging.finalize_kernel_paging(&paging_root), "finalizing kernel paging");
 
   os.log("Doing vmm\n", .{});
 
