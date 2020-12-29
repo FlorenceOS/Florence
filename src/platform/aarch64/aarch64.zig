@@ -540,7 +540,7 @@ export fn interrupt64_handler(frame: *InterruptFrame) void {
 
   if(ec == 0b111100) {
     os.log("BRK instruction execution in AArch64 state\n", .{});
-    while(true) { }
+    os.platform.hang();
   }
 
   switch(ec) {

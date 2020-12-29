@@ -81,8 +81,8 @@ fn page_fault_handler(frame: *InterruptFrame) void {
   );
   const page_fault_type = type_page_fault(frame.ec) catch |err| {
     os.log("Interrupts: Page fault at addr 0x{x}, but we couldn't determine what type. (error code was 0x{x}).\nCaught error {}.\n", .{page_fault_addr, frame.ec, @errorName(err)});
-    dump_frame(frame);
-    while(true) { }
+    frame.dump();
+    os.platform.hang();
   };
 
   os.log("Interrupts: Page fault while {} at 0x{x}\n",
@@ -96,15 +96,15 @@ fn page_fault_handler(frame: *InterruptFrame) void {
     }
   );
 
-  platform.page_fault(page_fault_addr, (frame.ec & 1) != 0, page_fault_type);
-  dump_frame(frame);
-  while(true) { }
+  platform.page_fault(page_fault_addr, (frame.ec & 1) != 0, page_fault_type, frame);
+  os.platform.hang();
 }
 
 fn unhandled_interrupt(frame: *InterruptFrame) void {
   os.log("Interrupts: Unhandled interrupt: {}!\n", .{frame.intnum});
-  dump_frame(frame);
-  while(true) { }
+  frame.dump();
+  frame.trace_stack();
+  os.platform.hang();
 }
 
 fn disable_pic() void {
@@ -225,6 +225,19 @@ pub const InterruptFrame = packed struct {
   eflags: u64,
   rsp: u64, 
   ss:  u64,
+
+  pub fn dump(self: *@This()) void {
+    os.log("FRAME DUMP:\n", .{});
+    os.log("RAX={x:0>16} RBX={x:0>16} RCX={x:0>16} RDX={x:0>16}\n", .{self.rax, self.rbx, self.rcx, self.rdx});
+    os.log("RSI={x:0>16} RDI={x:0>16} RBP={x:0>16} RSP={x:0>16}\n", .{self.rsi, self.rdi, self.rbp, self.rsp});
+    os.log("R8 ={x:0>16} R9 ={x:0>16} R10={x:0>16} R11={x:0>16}\n", .{self.r8,  self.r9,  self.r10, self.r11});
+    os.log("R12={x:0>16} R13={x:0>16} R14={x:0>16} R15={x:0>16}\n", .{self.r12, self.r13, self.r14, self.r15});
+    os.log("RIP={x:0>16} int={x:0>16} ec ={x:0>16}\n",              .{self.rip, self.intnum, self.ec});
+  }
+
+  pub fn trace_stack(self: *@This()) void {
+    os.lib.debug.dump_frame(self.rbp, self.rip);
+  }
 };
 
 export fn interrupt_common() callconv(.Naked) void {
@@ -266,15 +279,6 @@ export fn interrupt_common() callconv(.Naked) void {
     \\iretq
   );
   unreachable;
-}
-
-fn dump_frame(frame: *InterruptFrame) void {
-  os.log("FRAME DUMP:\n", .{});
-  os.log("RAX={x:0>16} RBX={x:0>16} RCX={x:0>16} RDX={x:0>16}\n", .{frame.rax, frame.rbx, frame.rcx, frame.rdx});
-  os.log("RSI={x:0>16} RDI={x:0>16} RBP={x:0>16} RSP={x:0>16}\n", .{frame.rsi, frame.rdi, frame.rbp, frame.rsp});
-  os.log("R8 ={x:0>16} R9 ={x:0>16} R10={x:0>16} R11={x:0>16}\n", .{frame.r8,  frame.r9,  frame.r10, frame.r11});
-  os.log("R12={x:0>16} R13={x:0>16} R14={x:0>16} R15={x:0>16}\n", .{frame.r12, frame.r13, frame.r14, frame.r15});
-  os.log("RIP={x:0>16} int={x:0>16} ec ={x:0>16}\n",              .{frame.rip, frame.intnum, frame.ec});
 }
 
 export fn interrupt_handler(frame: u64) void {

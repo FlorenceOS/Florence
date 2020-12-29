@@ -21,7 +21,18 @@ pub const PageFaultAccess = enum {
   InstructionFetch,
 };
 
-pub fn page_fault(addr: usize, present: bool, access: PageFaultAccess) void {
+pub fn page_fault(addr: usize, present: bool, access: PageFaultAccess, frame: anytype) void {
   if(present)
     assert(access != .Read);
+
+  frame.dump();
+  frame.trace_stack();
+}
+
+pub fn hang() noreturn {
+  _ = get_and_disable_interrupts();
+  while(true) {
+    await_interrupt();
+    unreachable;
+  }
 }
