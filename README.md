@@ -21,7 +21,8 @@ Its goals include but is not limited to:
      
      const managment_process = kernel.addProcess(
         .services = .{
-            // smb library can know at compile time it's building for userspace with an fs in kernel, which makes it do syscalls to access the filesystem.
+            // smb library can know at compile time it's building for userspace with an fs in
+            // kernel, which makes it do syscalls to access the filesystem.
             .smb = smb(my_fs);
         },
      );
