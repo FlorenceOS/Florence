@@ -468,6 +468,7 @@ export fn interrupt32_common() callconv(.Naked) void {
 
 comptime {
   asm(
+    \\.section .text.evt
     \\.balign 0x800
     \\.global exception_vector_table; exception_vector_table:
     \\.balign 0x80; B interrupt64_common // curr_el_sp0_sync
