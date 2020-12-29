@@ -375,13 +375,8 @@ pub fn new_task_call(new_task: *Task, func: anytype, args: anytype) !void {
   if(had_error == 1)
     return @intToError(@intCast(std.meta.IntType(.unsigned, @sizeOf(anyerror) * 8), result));
 
+  // Guaranteed to be run first
   if(result == 1) {
-    // Enqueue the current task
-    scheduler.ready.enqueue(get_current_task());
-
-    // Switch to the new task
-    set_current_task(new_task);
-
     // Switch stack
     // https://github.com/ziglang/zig/issues/3857
     // @call(.{
@@ -394,8 +389,9 @@ pub fn new_task_call(new_task: *Task, func: anytype, args: anytype) !void {
       : [_] "={rax}" (args_ptr)
       : [_] "{rsp}" (@ptrToInt(&new_task.platform_data.stack.?[task_stack_size - 16]))
       , [_] "{rax}" (args_ptr)
+      : "memory"
     );
-    @call(.{.modifier = .always_inline}, new_task_call_part_2, .{func, args_ptr});
+    new_task_call_part_2(func, args_ptr);
   }
 }
 
@@ -406,7 +402,7 @@ fn new_task_call_part_2(func: anytype, args_ptr: anytype) noreturn {
   scheduler.yield();
   @call(.{}, func, new_args) catch |err| {
     os.log("Task exited with error: {}\n", .{@errorName(err)});
-    while(true) { }
+    os.platform.hang();
   };
   scheduler.exit_task();
 }
