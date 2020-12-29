@@ -105,6 +105,18 @@ const stivale2_mmio32_uart = packed struct {
   }
 };
 
+const stivale2_mmio32_status_uart = packed struct {
+  tag: stivale2_tag,
+  uart_addr: u64,
+  uart_status: u64,
+  status_mask: u32,
+  status_value: u32,
+
+  pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+    try writer.print("0x{X}, 0x{X}, (val & 0x{X}) == 0x{X}", .{self.uart_addr, self.uart_status, self.status_mask, self.status_value});
+  }
+};
+
 const stivale2_dtb = packed struct {
   tag: stivale2_tag,
   addr: [*]u8,
@@ -127,7 +139,7 @@ const parsed_info = struct {
   smp:         ?*stivale2_smp = null,
   dtb:         ?*stivale2_dtb = null,
   uart:        ?*stivale2_mmio32_uart = null,
-  compatible_pt: bool = false,
+  uart_status: ?*stivale2_mmio32_status_uart = null,
 
   pub fn valid(self: *const parsed_info) bool {
     if(self.memmap == null) return false;
@@ -144,9 +156,10 @@ const parsed_info = struct {
       \\  SMP: {}
       \\  DTB: {}
       \\  UART: {}
-      \\  Page tables compatible: {}
+      \\  UART with status: {}
       \\
-      , .{self.memmap, self.commandline, self.framebuffer, self.rsdp, self.smp, self.dtb, self.uart, self.compatible_pt});
+      \\
+      , .{self.memmap, self.commandline, self.framebuffer, self.rsdp, self.smp, self.dtb, self.uart, self.uart_status});
   }
 };
 
@@ -165,7 +178,7 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
       0x34d1d96339647025 => info.smp         = @ptrCast(*stivale2_smp, tag),
       0xabb29bd49a2833fa => info.dtb         = @ptrCast(*stivale2_dtb, tag),
       0xb813f9b8dbc78797 => info.uart        = @ptrCast(*stivale2_mmio32_uart, tag),
-      0x8d05fea98a9aae95 => info.compatible_pt = true,
+      0xf77485dbfeb260f9 => info.uart_status = @ptrCast(*stivale2_mmio32_status_uart, tag),
       else => { os.log("Unknown stivale2 tag identifier: 0x{X:0>16}\n", .{tag.?.identifier}); }
     }
   }
@@ -173,6 +186,11 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
   if(info.uart) |uart| {
     mmio_serial.register_mmio32_serial(uart.uart_addr);
     os.log("Stivale2: Registered UART\n", .{});
+  }
+
+  if(info.uart_status) |u| {
+    mmio_serial.register_mmio32_status_serial(u.uart_addr, u.uart_status, u.status_mask, u.status_value);
+    os.log("Stivale2: Registered status UART\n", .{});
   }
 
   platform.platform_early_init();
