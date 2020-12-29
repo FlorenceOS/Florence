@@ -1,7 +1,7 @@
 const std = @import("std");
 const os = @import("root").os;
 
-pub var ready = os.thread.TaskQueue{};
+pub var ready = os.thread.ReadyQueue{};
 
 // Creating a new task from an existing one
 pub fn make_task(func: anytype, args: anytype) !void {

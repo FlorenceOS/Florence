@@ -2,7 +2,7 @@ const os = @import("root").os;
 
 pub const Semaphore = struct {
   counter: usize,
-  queue: os.thread.TaskQueue = .{},
+  queue: os.thread.WaitQueue = .{},
 
   fn P_impl(self: *@This(), bp: *bool) bool {
     const b = self.counter == 0;

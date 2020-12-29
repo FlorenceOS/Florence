@@ -1,7 +1,7 @@
-const TaskQueue = @import("task_queue.zig").TaskQueue;
+const os = @import("root").os;
 
 pub const ConditionVariable = struct {
-  queue: TaskQueue = .{},
+  queue: os.thread.WaitQueue = .{},
 
   fn wait_impl(mtx: anytype) bool {
     mtx.unlock();

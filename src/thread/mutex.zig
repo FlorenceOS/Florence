@@ -2,7 +2,7 @@ const os = @import("root").os;
 
 pub const Mutex = struct {
   held_by: ?*os.thread.Task = null,
-  queue: os.thread.TaskQueue = .{},
+  queue: os.thread.WaitQueue = .{},
 
   fn lock_impl(self: *@This()) bool {
     if(self.held_by) |h|
