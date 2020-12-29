@@ -100,7 +100,7 @@ fn make_exec(b: *Builder, arch: builtin.Arch, ctx: Context, filename: []const u8
 }
 
 fn build_kernel(b: *Builder, arch: builtin.Arch, name: []const u8) *std.build.LibExeObjStep {
-  const kernel_filename = b.fmt("Zigger_{}_{}", .{name, @tagName(arch)});
+  const kernel_filename = b.fmt("Flork_{}_{}", .{name, @tagName(arch)});
   const main_file       = b.fmt("src/boot/{}.zig", .{name});
 
   const kernel = make_exec(b, arch, .kernel, kernel_filename, main_file);
@@ -213,7 +213,7 @@ fn echfs_image(b: *Builder, image_path: []const u8, kernel_path: []const u8, ins
         "parted -s ", image_path, " mkpart primary 1 100% && ",
         "parted -s ", image_path, " set 1 boot on && ",
         "echfs-utils -m -p0 ", image_path, " quick-format 32768 && ",
-        "echfs-utils -m -p0 ", image_path, " import '", kernel_path, "' Zigger.elf && ",
+        "echfs-utils -m -p0 ", image_path, " import '", kernel_path, "' flork.elf && ",
         install_command,
       }) catch unreachable,
     };
