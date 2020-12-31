@@ -5,21 +5,27 @@ fn RingBuffer(comptime T: type) type {
         buffer: []T,
         head: usize,
         tail: usize,
+        last_remove: bool,
 
         pub fn init(buffer: []T) @This() {
             return .{
                 .buffer = buffer,
                 .head = 0,
                 .tail = 0,
+                .last_remove = true,
             };
         }
 
         pub fn next(self: *@This()) void {
             self.tail = (self.tail + 1) % self.buffer.len;
+            self.last_remove = true;
         }
 
         pub fn skip(self: *@This(), count: usize) void {
             self.tail = (self.tail + count) % self.buffer.len;
+            if (count != 0) {
+                self.last_remove = true;
+            }
         }
 
         pub fn read_ahead(self: *const @This()) T {
@@ -39,6 +45,7 @@ fn RingBuffer(comptime T: type) type {
         pub fn push(self: *@This(), elem: T) void {
             self.buffer[self.head] = elem;
             self.head = (self.head + 1) % self.buffer.len;
+            self.last_remove = false;
         }
 
         pub fn pop(self: *@This()) T {
@@ -59,15 +66,19 @@ fn RingBuffer(comptime T: type) type {
         }
 
         pub fn used_size(self: *const @This()) usize {
-            if (self.head >= self.tail) {
+            if (self.head > self.tail) {
                 return self.head - self.tail;
-            } else {
+            } else if (self.head < self.tail) {
                 return (self.head + self.buffer.len) - self.tail;
+            } else if (self.last_remove) {
+                return 0;
+            } else {
+                return self.buffer.len;
             }
         }
 
         pub fn free_size(self: *const @This()) usize {
-            return (self.buffer.len - 1) - self.used_size();
+            return self.buffer.len - self.used_size();
         }
 
         pub fn is_empty(self: *const @This()) bool {
@@ -86,11 +97,13 @@ test "push pop sequence" {
     buffer.push(1);
     buffer.push(2);
     buffer.push(3);
-    expect(buffer.pop() == 1);
-    expect(buffer.pop() == 2);
     buffer.push(4);
+    expect(buffer.pop() == 1);
+    buffer.push(5);
+    expect(buffer.pop() == 2);
     expect(buffer.pop() == 3);
     expect(buffer.pop() == 4);
+    expect(buffer.pop() == 5);
 }
 
 test "push pop slices sequence" {
@@ -106,7 +119,7 @@ test "push pop slices sequence" {
 }
 
 test "read ahead" {
-    var buffer_space: [4]u64 = undefined;
+    var buffer_space: [3]u64 = undefined;
     var buffer: RingBuffer(u64) = RingBuffer(u64).init(&buffer_space);
     buffer.push(1);
     buffer.push(2);
@@ -126,24 +139,25 @@ test "read ahead" {
 test "sizes" {
     var buffer_space: [4]u64 = undefined;
     var buffer: RingBuffer(u64) = RingBuffer(u64).init(&buffer_space);
-    expect(buffer.free_size() == 3);
+    expect(buffer.free_size() == 4);
     expect(buffer.used_size() == 0);
     expect(buffer.is_empty());
     expect(!buffer.is_full());
-    buffer.push(2);
-    expect(buffer.free_size() == 2);
+    buffer.push(0);
+    expect(buffer.free_size() == 3);
     expect(buffer.used_size() == 1);
     expect(!buffer.is_empty());
     expect(!buffer.is_full());
     buffer.push(1);
-    buffer.push(0);
+    buffer.push(2);
+    buffer.push(3);
     expect(buffer.free_size() == 0);
-    expect(buffer.used_size() == 3);
+    expect(buffer.used_size() == 4);
     expect(buffer.is_full());
     expect(!buffer.is_empty());
     buffer.next();
     expect(buffer.free_size() == 1);
-    expect(buffer.used_size() == 2);
+    expect(buffer.used_size() == 3);
     expect(!buffer.is_empty());
     expect(!buffer.is_full());
 }
