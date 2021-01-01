@@ -5,26 +5,26 @@ fn RingBuffer(comptime T: type) type {
         buffer: []T,
         head: usize,
         tail: usize,
-        last_remove: bool,
+        last_action: enum { Add, Remove },
 
         pub fn init(buffer: []T) @This() {
             return .{
                 .buffer = buffer,
                 .head = 0,
                 .tail = 0,
-                .last_remove = true,
+                .last_action = .Remove,
             };
         }
 
         pub fn next(self: *@This()) void {
             self.tail = (self.tail + 1) % self.buffer.len;
-            self.last_remove = true;
+            self.last_action = .Remove;
         }
 
         pub fn skip(self: *@This(), count: usize) void {
             self.tail = (self.tail + count) % self.buffer.len;
             if (count != 0) {
-                self.last_remove = true;
+                self.last_action = .Remove;
             }
         }
 
@@ -45,7 +45,7 @@ fn RingBuffer(comptime T: type) type {
         pub fn push(self: *@This(), elem: T) void {
             self.buffer[self.head] = elem;
             self.head = (self.head + 1) % self.buffer.len;
-            self.last_remove = false;
+            self.last_action = .Add;
         }
 
         pub fn pop(self: *@This()) T {
@@ -70,7 +70,7 @@ fn RingBuffer(comptime T: type) type {
                 return self.head - self.tail;
             } else if (self.head < self.tail) {
                 return (self.head + self.buffer.len) - self.tail;
-            } else if (self.last_remove) {
+            } else if (self.last_action == .Remove) {
                 return 0;
             } else {
                 return self.buffer.len;

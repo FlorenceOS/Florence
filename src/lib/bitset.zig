@@ -25,19 +25,24 @@ pub fn Bitset(num_bits: usize) type {
     };
 }
 
+const DynamicBitsetInitError = error{NotEnoughMemory};
+
 const DynamicBitset = struct {
     len: usize,
-    data: []u8,
+    data: [*]u8,
 
     pub fn size_needed(len: usize) usize {
-        return @divCeil(len, 8);
+        return libalign.align_up(usize, 8, len) / 8;
     }
 
-    pub fn init(len: usize, data: []u8) DynamicBitset {
+    pub fn init(len: usize, data: []u8) DynamicBitsetInitError!DynamicBitset {
+        if (data.len < DynamicBitset.size_needed(len)) {
+            return error.NotEnoughMemory;
+        }
         for (data) |*cell| {
             cell.* = 0;
         }
-        return .{ .len = len, .data = data };
+        return DynamicBitset{ .len = len, .data = data.ptr };
     }
 
     pub fn set(self: *@This(), idx: usize) void {
@@ -62,9 +67,15 @@ test "bitset" {
     expect(!bs.is_set(0));
 }
 
+test "dynamic bitset init error" {
+    var mem: [2]u8 = undefined;
+    var bs: DynamicBitsetInitError!DynamicBitset = DynamicBitset.init(36, &mem) catch |_| return;
+    unreachable;
+}
+
 test "dynamic bitset" {
     var mem: [2]u8 = undefined;
-    var bs: DynamicBitset = DynamicBitset.init(4, &mem);
+    var bs: DynamicBitset = try DynamicBitset.init(4, &mem);
     expect(!bs.is_set(0));
     bs.set(0);
     expect(bs.is_set(0));
