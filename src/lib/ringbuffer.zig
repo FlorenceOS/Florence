@@ -1,4 +1,6 @@
-const expect = @import("std").testing.expect;
+const std = @import("std");
+const expect = std.testing.expect;
+const assert = std.debug.assert;
 
 fn RingBuffer(comptime T: type) type {
     return struct {
@@ -17,11 +19,13 @@ fn RingBuffer(comptime T: type) type {
         }
 
         pub fn next(self: *@This()) void {
+            std.debug.assert(!self.is_empty());
             self.tail = (self.tail + 1) % self.buffer.len;
             self.last_action = .Remove;
         }
 
         pub fn skip(self: *@This(), count: usize) void {
+            std.debug.assert(count <= self.used_size());
             self.tail = (self.tail + count) % self.buffer.len;
             if (count != 0) {
                 self.last_action = .Remove;
@@ -29,38 +33,45 @@ fn RingBuffer(comptime T: type) type {
         }
 
         pub fn read_ahead(self: *const @This()) T {
+            std.debug.assert(!self.is_empty());
             return self.buffer[self.tail];
         }
 
         pub fn read_ahead_at(self: *const @This(), index: usize) T {
+            std.debug.assert(index < self.used_size());
             return self.buffer[(self.tail + index) % self.buffer.len];
         }
 
         pub fn read_ahead_slice(self: *const @This(), slice: []T) void {
+            std.debug.assert(slice.len <= self.used_size());
             for (slice) |*ref, i| {
                 ref.* = self.read_ahead_at(i);
             }
         }
 
         pub fn push(self: *@This(), elem: T) void {
+            std.debug.assert(!self.is_full());
             self.buffer[self.head] = elem;
             self.head = (self.head + 1) % self.buffer.len;
             self.last_action = .Add;
         }
 
         pub fn pop(self: *@This()) T {
+            std.debug.assert(!self.is_empty());
             var result: T = self.buffer[self.tail];
             self.next();
             return result;
         }
 
         pub fn push_slice(self: *@This(), slice: []const T) void {
+            std.debug.assert(slice.len <= self.free_size());
             for (slice) |value| {
                 self.push(value);
             }
         }
 
         pub fn pop_slice(self: *@This(), slice: []T) void {
+            std.debug.assert(slice.len <= self.used_size());
             self.read_ahead_slice(slice);
             self.skip(slice.len);
         }
@@ -93,7 +104,7 @@ fn RingBuffer(comptime T: type) type {
 
 test "push pop sequence" {
     var buffer_space: [4]u64 = undefined;
-    var buffer: RingBuffer(u64) = RingBuffer(u64).init(&buffer_space);
+    var buffer = RingBuffer(u64).init(&buffer_space);
     buffer.push(1);
     buffer.push(2);
     buffer.push(3);
@@ -108,7 +119,7 @@ test "push pop sequence" {
 
 test "push pop slices sequence" {
     var buffer_space: [5]u64 = undefined;
-    var buffer: RingBuffer(u64) = RingBuffer(u64).init(&buffer_space);
+    var buffer = RingBuffer(u64).init(&buffer_space);
     buffer.push_slice(&[_]u64{ 0, 1, 2, 3 });
     buffer.next();
     var return_buffer: [3]u64 = undefined;
@@ -120,7 +131,7 @@ test "push pop slices sequence" {
 
 test "read ahead" {
     var buffer_space: [3]u64 = undefined;
-    var buffer: RingBuffer(u64) = RingBuffer(u64).init(&buffer_space);
+    var buffer = RingBuffer(u64).init(&buffer_space);
     buffer.push(1);
     buffer.push(2);
     buffer.push(3);
@@ -138,7 +149,7 @@ test "read ahead" {
 
 test "sizes" {
     var buffer_space: [4]u64 = undefined;
-    var buffer: RingBuffer(u64) = RingBuffer(u64).init(&buffer_space);
+    var buffer = RingBuffer(u64).init(&buffer_space);
     expect(buffer.free_size() == 4);
     expect(buffer.used_size() == 0);
     expect(buffer.is_empty());
@@ -164,7 +175,7 @@ test "sizes" {
 
 test "skip and next" {
     var buffer_space: [4]u64 = undefined;
-    var buffer: RingBuffer(u64) = RingBuffer(u64).init(&buffer_space);
+    var buffer = RingBuffer(u64).init(&buffer_space);
     buffer.push(0);
     buffer.push(1);
     buffer.push(2);
