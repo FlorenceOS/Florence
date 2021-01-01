@@ -70,7 +70,7 @@ test "bitset" {
 
 test "dynamic bitset" {
     var mem: [2]u8 = undefined;
-    var bs: DynamicBitset = DynamicBitset.init(16, &mem);
+    var bs = DynamicBitset.init(16, &mem);
     expect(!bs.is_set(0));
     bs.set(0);
     expect(bs.is_set(0));
