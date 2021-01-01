@@ -56,7 +56,7 @@ pub fn bitfield(comptime field_type: type, comptime shamt: usize, comptime num_b
 
   const self_mask: field_type = ((1 << num_bits) - 1) << shamt;
 
-  const val_t = std.meta.IntType(.unsigned, num_bits);
+  const val_t = std.meta.Int(.unsigned, num_bits);
 
   return struct {
     dummy: field_type,

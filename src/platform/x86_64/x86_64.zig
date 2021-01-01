@@ -373,7 +373,7 @@ pub fn new_task_call(new_task: *Task, func: anytype, args: anytype) !void {
   );
 
   if(had_error == 1)
-    return @intToError(@intCast(std.meta.IntType(.unsigned, @sizeOf(anyerror) * 8), result));
+    return @intToError(@intCast(std.meta.Int(.unsigned, @sizeOf(anyerror) * 8), result));
 
   // Guaranteed to be run first
   if(result == 1) {
