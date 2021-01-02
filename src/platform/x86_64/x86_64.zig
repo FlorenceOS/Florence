@@ -1,3 +1,5 @@
+pub const memory = @import("memory.zig");
+
 const interrupts = @import("interrupts.zig");
 const setup_gdt = @import("gdt.zig").setup_gdt;
 const serial = @import("serial.zig");
