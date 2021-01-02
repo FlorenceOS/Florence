@@ -99,8 +99,12 @@ pub fn free_phys(phys: u64, size: u64) void {
   unreachable;
 }
 
+pub fn phys_to_virt(phys: u64) u64 {
+  return phys;
+}
+
 pub fn access_phys(comptime t: type, phys: u64) [*]t {
-  return @intToPtr([*]t, phys);
+  return @intToPtr([*]t, phys_to_virt(phys));
 }
 
 pub fn set_phys_base(phys_base: usize) void {
