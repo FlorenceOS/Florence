@@ -5,7 +5,7 @@ pub fn packed_int(comptime num_bits: usize, comptime result_type: type, comptime
   return packed struct {
     raw: storage_type,
 
-    pub fn get(self: *@This()) result_type {
+    pub fn get(self: *const @This()) result_type {
       return @as(result_type, self.raw) << shamt;
     }
 
@@ -32,4 +32,7 @@ test "packed_int" {
 
   a.write(4096);
   std.testing.expect(a.get() == 4096);
+
+  const b = thing.init(2048);
+  std.testing.expect(b.get() == 2048);
 }
