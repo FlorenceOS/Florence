@@ -4,6 +4,7 @@ pub const buddy       = @import("buddy.zig");
 pub const debug       = @import("debug.zig");
 pub const libalign    = @import("libalign.zig");
 pub const logger      = @import("logger.zig");
+pub const packed_int  = @import("packed_int.zig");
 pub const panic       = @import("panic.zig");
 pub const range       = @import("range.zig");
 pub const range_alloc = @import("range_alloc.zig");
