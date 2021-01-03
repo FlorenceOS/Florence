@@ -8,14 +8,21 @@ const page_size = os.platform.page_sizes[0];
 const paging = os.memory.paging;
 const pmm    = os.memory.pmm;
 
-// 8x8 bits per char
-const char_width = 8;
-const char_height = 8;
+const font_fixed_8x13 = .{
+  .width = 8,
+  .height = 13,
+  .base = 0x20,
+  .data = @embedFile("fixed8x13.bin"),
+};
 
-// '\x20' / ' ' (whitespace) is the first character in the font
-const font_base = 0x20;
-const font = @embedFile("vesa_font.bin");
-const font_max_char: u8 = font_base + font.len/8;
+const vesa_font = .{
+  .width = 8,
+  .height = 8,
+  .base = 0x20,
+  .data = @embedFile("vesa_font.bin"),
+};
+
+const font = font_fixed_8x13;
 
 const bgcol = 0x00;
 const fgcol = 0xaa;
@@ -33,18 +40,18 @@ const Framebuffer = struct {
   pos_y: u64 = 0,
 
   pub fn width_in_chars(self: *@This()) u64 {
-    return self.width / char_width;
+    return self.width / font.width;
   }
 
   pub fn height_in_chars(self: *@This()) u64 {
-    return self.height / char_height;
+    return self.height / font.height;
   }
 };
 
 var framebuffer: ?Framebuffer = null;
 
 fn is_printable(c: u8) bool {
-  return font_base <= c and c < font_max_char;
+  return font.base <= c and c < font.base + font.data.len/8;
 }
 
 pub fn register_fb(fb_phys: usize, fb_pitch: u16, fb_width: u16, fb_height: u16, fb_bpp_in: u16) void {
@@ -86,17 +93,17 @@ fn px(comptime bpp: u64, x: u64, y: u64) *[3]u8 {
 }
 
 fn blit_impl(comptime bpp: u64, ch: u8) void {
-  inline for(range(char_height)) |y| {
-    const chr_line = font[y + (@as(u64, ch) - font_base) * char_height * ((char_width + 7)/8)];
+  inline for(range(font.height)) |y| {
+    const chr_line = font.data[y + (@as(u64, ch) - font.base) * font.height * ((font.width + 7)/8)];
 
-    const ypx = framebuffer.?.pos_y * char_height + y;
+    const ypx = framebuffer.?.pos_y * font.height + y;
 
-    inline for(range(char_width)) |x| {
-      const xpx = framebuffer.?.pos_x * char_width + x;
+    inline for(range(font.width)) |x| {
+      const xpx = framebuffer.?.pos_x * font.width + x;
 
       const pixel = px(bpp, xpx, ypx);
 
-      const shift: u3 = char_width - 1 - x;
+      const shift: u3 = font.width - 1 - x;
       const has_pixel_set = ((chr_line >> shift) & 1) == 1;
 
       if(has_pixel_set) {
@@ -131,13 +138,13 @@ fn scroll_fb() void {
   @setRuntimeSafety(false);
 
   // Yes this is slow but I don't care, I love it.
-  var y: u64 = char_height;
-  while(y < (framebuffer.?.height/char_height) * char_height): (y += 1) {
-    const dst = @ptrCast([*]u8, framebuffer.?.addr) + framebuffer.?.pitch * (y - char_height);
+  var y: u64 = font.height;
+  while(y < (framebuffer.?.height/font.height) * font.height): (y += 1) {
+    const dst = @ptrCast([*]u8, framebuffer.?.addr) + framebuffer.?.pitch * (y - font.height);
     const src = @ptrCast([*]u8, framebuffer.?.addr) + framebuffer.?.pitch * y;
     @memcpy(dst, src, framebuffer.?.pitch);
   }
-  @memset(@ptrCast([*]u8, framebuffer.?.addr) + framebuffer.?.pitch * (y - char_height), 0x00, framebuffer.?.pitch * char_height);
+  @memset(@ptrCast([*]u8, framebuffer.?.addr) + framebuffer.?.pitch * (y - font.height), 0x00, framebuffer.?.pitch * font.height);
 }
 
 fn feed_line() void {
