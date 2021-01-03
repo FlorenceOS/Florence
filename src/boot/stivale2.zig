@@ -53,7 +53,7 @@ const stivale2_commandline = packed struct {
   commandline: [*:0]u8,
 
   pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
-    try writer.print("{}", .{self.commandline});
+    try writer.print("Commandline: {}", .{self.commandline});
   }
 };
 
@@ -133,13 +133,12 @@ const stivale2_dtb = packed struct {
 
 const parsed_info = struct {
   memmap:      ?*stivale2_memmap = null,
-  commandline: ?*stivale2_commandline = null,
-  framebuffer: ?*stivale2_framebuffer = null,
-  rsdp:        ?*stivale2_rsdp = null,
+  framebuffer: ?stivale2_framebuffer = null,
+  rsdp:        ?u64 = null,
   smp:         ?*stivale2_smp = null,
-  dtb:         ?*stivale2_dtb = null,
-  uart:        ?*stivale2_mmio32_uart = null,
-  uart_status: ?*stivale2_mmio32_status_uart = null,
+  dtb:         ?stivale2_dtb = null,
+  uart:        ?stivale2_mmio32_uart = null,
+  uart_status: ?stivale2_mmio32_status_uart = null,
 
   pub fn valid(self: *const parsed_info) bool {
     if(self.memmap == null) return false;
@@ -150,7 +149,6 @@ const parsed_info = struct {
     try writer.print(
       \\Parsed stivale2 tags:
       \\  Memmap: {}
-      \\  Commandline: {}
       \\  Framebuffer: {}
       \\  RSDP: {}
       \\  SMP: {}
@@ -159,7 +157,7 @@ const parsed_info = struct {
       \\  UART with status: {}
       \\
       \\
-      , .{self.memmap, self.commandline, self.framebuffer, self.rsdp, self.smp, self.dtb, self.uart, self.uart_status});
+      , .{self.memmap, self.framebuffer, self.rsdp, self.smp, self.dtb, self.uart, self.uart_status});
   }
 };
 
@@ -172,13 +170,13 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
   while(tag != null): (tag = tag.?.next) {
     switch(tag.?.identifier) {
       0x2187f79e8612de07 => info.memmap      = @ptrCast(*stivale2_memmap, tag),
-      0xe5e76a1b4597a781 => info.commandline = @ptrCast(*stivale2_commandline, tag),
-      0x506461d2950408fa => info.framebuffer = @ptrCast(*stivale2_framebuffer, tag),
-      0x9e1786930a375e78 => info.rsdp        = @ptrCast(*stivale2_rsdp, tag),
+      0xe5e76a1b4597a781 => os.log("{}\n", .{@ptrCast(*stivale2_commandline, tag)}),
+      0x506461d2950408fa => info.framebuffer = @ptrCast(*stivale2_framebuffer, tag).*,
+      0x9e1786930a375e78 => info.rsdp        = @ptrCast(*stivale2_rsdp, tag).rsdp,
       0x34d1d96339647025 => info.smp         = @ptrCast(*stivale2_smp, tag),
-      0xabb29bd49a2833fa => info.dtb         = @ptrCast(*stivale2_dtb, tag),
-      0xb813f9b8dbc78797 => info.uart        = @ptrCast(*stivale2_mmio32_uart, tag),
-      0xf77485dbfeb260f9 => info.uart_status = @ptrCast(*stivale2_mmio32_status_uart, tag),
+      0xabb29bd49a2833fa => info.dtb         = @ptrCast(*stivale2_dtb, tag).*,
+      0xb813f9b8dbc78797 => info.uart        = @ptrCast(*stivale2_mmio32_uart, tag).*,
+      0xf77485dbfeb260f9 => info.uart_status = @ptrCast(*stivale2_mmio32_status_uart, tag).*,
       else => { os.log("Unknown stivale2 tag identifier: 0x{X:0>16}\n", .{tag.?.identifier}); }
     }
   }
@@ -244,9 +242,9 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     vga_log.register();
   }
 
-  if(info.rsdp != null) {
-    os.log("Registering rsdp!\n", .{});
-    platform.acpi.register_rsdp(info.rsdp.?.rsdp);
+  if(info.rsdp) |rsdp| {
+    os.log("Registering rsdp: 0x{X}!\n", .{rsdp});
+    platform.acpi.register_rsdp(rsdp);
   }
 
   os.vital(os.platform.platform_init(), "calling platform_init");
