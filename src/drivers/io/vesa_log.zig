@@ -8,6 +8,13 @@ const page_size = os.platform.page_sizes[0];
 const paging = os.memory.paging;
 const pmm    = os.memory.pmm;
 
+const font_fixed_6x13 = .{
+  .width = 6,
+  .height = 13,
+  .base = 0x20,
+  .data = @embedFile("fixed6x13.bin"),
+};
+
 const font_fixed_8x13 = .{
   .width = 8,
   .height = 13,
@@ -22,7 +29,7 @@ const vesa_font = .{
   .data = @embedFile("vesa_font.bin"),
 };
 
-const font = font_fixed_8x13;
+const font = font_fixed_6x13;
 
 const bgcol = 0x00;
 const fgcol = 0xaa;
