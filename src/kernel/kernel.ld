@@ -9,7 +9,6 @@ PHDRS {
 
 SECTIONS {
   . = 0;
-  __physical_base = .;
 
   .stivalehdr : {
     KEEP(*(.stivalehdr))

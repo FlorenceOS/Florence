@@ -139,7 +139,8 @@ extern var __kernel_data_begin: u8;
 extern var __kernel_data_end: u8;
 extern var __kernel_rodata_begin: u8;
 extern var __kernel_rodata_end: u8;
-extern var __physical_base: u8;
+
+const physical_base: usize = 0;
 
 pub fn bootstrap_kernel_paging() !platform.paging_root {
   // Setup some paging
@@ -154,7 +155,7 @@ pub fn bootstrap_kernel_paging() !platform.paging_root {
 
 pub fn add_physical_mapping(new_root: *platform.paging_root, phys: usize, size: usize) !void {
   try map_phys(.{
-    .virt = @ptrToInt(&__physical_base) + phys,
+    .virt = physical_base + phys,
     .phys = phys,
     .size = size,
     .perm = data(),
@@ -166,14 +167,14 @@ pub fn map_phys_range(phys: usize, phys_end: usize, perm: perms, paging_root: ?*
   var beg = phys;
   while(beg < phys_end): (beg += page_sizes[0]) {
     try unmap(.{
-      .virt = @ptrToInt(&__physical_base) + beg,
+      .virt = physical_base + beg,
       .size = page_sizes[0],
       .reclaim_pages = false,
       .root = paging_root,
     });
 
     try map_phys(.{
-      .virt = @ptrToInt(&__physical_base) + beg,
+      .virt = physical_base + beg,
       .phys = beg,
       .size = page_sizes[0],
       .perm = perm,
