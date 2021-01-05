@@ -91,6 +91,10 @@ fn function_scan(addr: Addr) void {
     0x01 => {
       switch(subclass) {
         else => { os.log("Unknown storage controller!\n", .{}); },
+        0x01 => {
+          os.log("IDE controller\n", .{});
+          os.drivers.ide.register_controller(dev);
+        },
         0x06 => {
           os.log("SATA controller\n", .{});
         },

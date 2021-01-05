@@ -239,6 +239,7 @@ pub fn prepare_paging() !void {
 pub fn platform_init() !void {
   try os.platform.acpi.init_acpi();
   try os.platform.pci.init_pci();
+  os.drivers.ide.discover_controllers();
 }
 
 pub fn platform_early_init() void {
