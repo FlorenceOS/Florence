@@ -276,6 +276,25 @@ pub fn msr(comptime T: type, comptime msr_num: u32) type {
   };
 }
 
+pub fn reg(comptime T: type, comptime name: []const u8) type {
+  return struct {
+    pub fn read() T {
+      return asm volatile(
+        "mov %%" ++ name ++ " %[out]"
+        : [out]"=r"(-> T)
+      );
+    }
+
+    pub fn write(val: T) void {
+      asm volatile(
+        "mov %[in] %%" ++ name
+        :
+        : [in]"r"(val)
+      );
+    }
+  };
+}
+
 fn request(addr: pci.Addr, offset: pci.regoff) void {
   const val = 1 << 31
     | @as(u32, offset)
