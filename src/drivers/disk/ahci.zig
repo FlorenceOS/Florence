@@ -23,7 +23,14 @@ const Port = packed struct {
   fis_base: u64,
   interrupt_status: u32,
   interrupt_enable: u32,
-  command_status: u32,
+  command_status: extern union {
+    raw: u32,
+
+    start: bf.boolean(u32, 0),
+    recv_enable: bf.boolean(u32, 4),
+    fis_recv_running: bf.boolean(u32, 14),
+    command_list_running: bf.boolean(u32, 15),
+  },
   reserved_0x1C: u32,
   task_file_data: u32,
   signature: u32,
@@ -41,7 +48,35 @@ const Port = packed struct {
   pub fn command_headers(self: *const volatile @This()) *volatile [32]CommandTableHeader {
     return &pmm.access_phys_single_volatile(CommandList, self.command_list_base).command_headers;
   }
+
+  pub fn start_command_engine(self: *volatile @This()) void {
+    while((self.task_file_data & (0x88)) != 0) // Transfer busy or data transfer requested
+      scheduler.yield();
+
+    self.command_status.start.write(false);
+    self.command_status.recv_enable.write(false);
+
+    while(self.command_status.command_list_running.read()
+       or self.command_status.fis_recv_running.read())
+      scheduler.yield();
+
+    self.command_status.recv_enable.write(true);
+    self.command_status.start.write(true);
+  }
+
+  pub fn stop_command_engine(self: *volatile @This()) void {
+    self.command_status.start.write(false);
+
+    while(self.command_status.command_list_running.read() != 0)
+      scheduler.yield();
+
+    self.command_status.recv_enable.write(false);
+  }
 };
+
+const status_start: u32 = 0x00000001;
+const fis_recv_running: u32 = 0x00004000;
+const status_receive_enable: u32 = 0x00000010;
 
 comptime {
   std.debug.assert(@sizeOf(Port) == 0x80);
@@ -155,23 +190,8 @@ const sata_port_type = enum {
   pm,
 };
 
-const status_start: u32 = 0x00000001;
-const status_command_list_running: u32 = 0x00008000;
-const status_receive_enable: u32 = 0x00000010;
-
 fn send_command(port: *volatile Port, slot: u5) void {
   log("AHCI: Sending command in slot {} to port 0x{X}\n", .{slot, @ptrToInt(port)});
-
-  while((port.task_file_data & (0x88)) != 0) // Transfer busy or data transfer requested
-    scheduler.yield();
-
-  port.command_status &= ~status_start;
-
-  while(port.command_status & status_command_list_running != 0)
-    scheduler.yield();
-
-  port.command_status |= status_receive_enable;
-  port.command_status |= status_start;
 
   const slot_bit = @as(u32, 1) << slot;
 
@@ -179,13 +199,6 @@ fn send_command(port: *volatile Port, slot: u5) void {
 
   while(port.command_issue & slot_bit != 0)
     scheduler.yield();
-
-  port.command_status &= ~status_start;
-
-  while(port.command_status & status_command_list_running != 0)
-    scheduler.yield();
-
-  port.command_status &= ~status_receive_enable;
 
   log("AHCI: Port 0x{X}: Command sent!\n", .{@ptrToInt(port)});
 }
@@ -364,6 +377,8 @@ fn sata_port_task(comptime port_type: sata_port_type, port: *volatile Port) !voi
       header.table().command_fis.cmd.fis_type = 0x27;
     }
   }
+
+  port.start_command_engine();
 
   // Port is now ready to be used on all command slots
   {
