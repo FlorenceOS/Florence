@@ -136,7 +136,7 @@ fn claim_controller(abar: *volatile ABAR) void {
     }
   }
 
-  if(abar.hba_capabilities & 1 == 0) {
+  if(abar.hba_capabilities_extended & 1 == 0) {
     log("AHCI: Handoff not supported (capabilities)\n", .{});
     return;
   }
