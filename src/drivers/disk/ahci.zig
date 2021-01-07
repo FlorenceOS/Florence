@@ -258,7 +258,7 @@ comptime {
 }
 
 const FisH2D = packed struct {
-  fis_type: u8 = 0x27,
+  fis_type: u8,
   pmport: u4,
   _res1_4: u3,
   c: u1,
@@ -361,6 +361,7 @@ fn sata_port_task(comptime port_type: sata_port_type, port: *volatile Port) !voi
       @memset(pmm.access_phys_volatile(u8, buf), 0, page_size);
       header.table().prds[0].data_base_addr = buf;
       header.table().prds[0].sizem1 = page_size - 1;
+      header.table().command_fis.cmd.fis_type = 0x27;
     }
   }
 
