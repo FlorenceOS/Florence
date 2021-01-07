@@ -457,7 +457,7 @@ fn controller_task(abar: *volatile ABAR) !void {
 
 pub fn register_controller(dev: pci.Device) void {
   // Busty master bit
-  pci.pci_write(u32, dev.addr, 0x4, pci.pci_read(u32, dev.addr, 0x4) | (0x6 << 1));
+  pci.pci_write(u32, dev.addr, 0x4, pci.pci_read(u32, dev.addr, 0x4) | 0x6);
 
   const abar_phys = pci.pci_read(u32, dev.addr, 0x24) & 0xFFFFF000;
 
