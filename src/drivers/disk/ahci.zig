@@ -103,7 +103,6 @@ const ahci_version = extern union {
 const abar_handoff = extern union {
   value: u32,
   bios_owned: bf.boolean(u32, 4),
-  ownership:  bf.boolean(u32, 3),
   os_owned:   bf.boolean(u32, 1),
   bios_busy:  bf.boolean(u32, 0),
 
@@ -126,10 +125,7 @@ const abar_handoff = extern union {
 
   fn try_claim(self: *volatile @This()) bool {
     self.set_handoff();
-    const success = self.check_handoff();
-    if(success)
-      self.ownership.write(true);
-    return success;
+    return self.check_handoff();
   }
 };
 
