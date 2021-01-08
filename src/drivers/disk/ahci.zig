@@ -32,7 +32,12 @@ const Port = packed struct {
     command_list_running: bf.boolean(u32, 15),
   },
   reserved_0x1C: u32,
-  task_file_data: u32,
+  task_file_data: extern union {
+    raw: u32,
+
+    transfer_requested: bf.boolean(u32, 3),
+    interface_busy: bf.boolean(u32, 7),
+  },
   signature: u32,
   sata_status: u32,
   sata_control: u32,
@@ -51,8 +56,9 @@ const Port = packed struct {
   }
 
   pub fn start_command_engine(self: *volatile @This()) void {
-    while((self.task_file_data & (0x88)) != 0) // Transfer busy or data transfer requested
-      scheduler.yield();
+    os.log("AHCI: Starting command engine for port at 0x{X}\n", .{@ptrToInt(self)});
+
+    self.wait_ready();
 
     self.command_status.start.write(false);
     self.command_status.recv_enable.write(false);
@@ -66,12 +72,22 @@ const Port = packed struct {
   }
 
   pub fn stop_command_engine(self: *volatile @This()) void {
+    os.log("AHCI: Stopping command engine for port at 0x{X}\n", .{@ptrToInt(self)});
     self.command_status.start.write(false);
 
-    while(self.command_status.command_list_running.read() != 0)
+    while(self.command_status.command_list_running.read())
       scheduler.yield();
 
     self.command_status.recv_enable.write(false);
+
+    while(self.command_status.fis_recv_running.read())
+      scheduler.yield();
+  }
+
+  pub fn wait_ready(self: *volatile @This()) void {
+    while(self.task_file_data.transfer_requested.read()
+       or self.task_file_data.interface_busy.read())
+      scheduler.yield();
   }
 };
 
@@ -331,10 +347,14 @@ fn command_with_buffer(port: *volatile Port, slot: u5, buf: usize, bufsize: usiz
 }
 
 fn sata_port_task(comptime port_type: sata_port_type, port: *volatile Port) !void {
-  if(port_type != .ata)
-    return;
+  switch(port_type) {
+    .ata, .atapi => { },
+    else => return,
+  }
 
   log("AHCI: {} task started for port at 0x{X}\n", .{@tagName(port_type), @ptrToInt(port)});
+
+  port.stop_command_engine();
 
   // Set up command buffers
   {
@@ -357,7 +377,6 @@ fn sata_port_task(comptime port_type: sata_port_type, port: *volatile Port) !voi
   {
     var current_table_addr: usize = undefined;
     var reamining_table_size: usize = 0;
-
     for(port.command_headers()) |*header| {
       if(reamining_table_size < @sizeOf(CommandTable)) {
         reamining_table_size = page_size;
@@ -385,6 +404,9 @@ fn sata_port_task(comptime port_type: sata_port_type, port: *volatile Port) !voi
 
   port.start_command_engine();
 
+  var num_disk_sectors: usize = undefined;
+  var disk_sector_size: usize = undefined;
+
   // Port is now ready to be used on all command slots
   {
     log("AHCI: Identifying drive...\n", .{});
@@ -403,22 +425,31 @@ fn sata_port_task(comptime port_type: sata_port_type, port: *volatile Port) !voi
     identify_fis.c = 1;
     identify_fis.device = 0;
 
-    os.hexdump_obj(header);
-    log("\n", .{});
-    os.hexdump_obj(table);
-
-    asm volatile("":::"memory");
-
     send_command(port, 0);
 
-    asm volatile("":::"memory");
+    const addr = read_u64(&table.prds[0].data_base_addr);
+    const buf = pmm.access_phys(u8, addr)[0..page_size];
 
-    var i: usize = 0;
-    while(i < 1000000): (i += 1) {
-      scheduler.yield();
-    }
+    os.hexdump(buf[0..256]);
 
-    os.hexdump(pmm.access_phys(u8, table.prds[0].data_base_addr)[0..512]);
+    num_disk_sectors = std.mem.readIntLittle(u64, buf[200..][0..8]);
+  }
+
+  log("AHCI: Disk has 0x{X} sectors of 0x{X} bytes each.\n", .{num_disk_sectors, disk_sector_size});
+
+  {
+    log("AHCI: Attempting read...\n", .{});
+
+    const header = &port.command_headers()[0];
+    const table = header.table();
+    const read_fis = &table.command_fis.cmd;
+
+    read_fis.command = 
+      switch(port_type) {
+        .ata   => 0x00,
+        .atapi => 0x00,
+        else => unreachable,
+      };
   }
 }
 
@@ -460,15 +491,15 @@ fn controller_task(abar: *volatile ABAR) !void {
 
     switch(port.signature) {
       0x00000101 => try scheduler.make_task(sata_port_task, .{.ata,   port}),
-      0xEB140101 => try scheduler.make_task(sata_port_task, .{.atapi, port}),
+      //0xEB140101 => try scheduler.make_task(sata_port_task, .{.atapi, port}),
       0xC33C0101,
       0x96690101 => {
-        log("Known TODO port signature: 0x{X}\n", .{port.signature});
+        log("AHCI: Known TODO port signature: 0x{X}\n", .{port.signature});
         //scheduler.make_task(sata_port_task, .{.semb,   port})
         //scheduler.make_task(sata_port_task, .{.pm,     port})
       },
       else => {
-        log("Unknown port signature: 0x{X}\n", .{port.signature});
+        log("AHCI: Unknown port signature: 0x{X}\n", .{port.signature});
         return;
       },
     }
