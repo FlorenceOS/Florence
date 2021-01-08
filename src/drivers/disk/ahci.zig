@@ -19,8 +19,8 @@ const port_control_registers_size = 0x80;
 const bf = os.lib.bitfields;
 
 const Port = packed struct {
-  command_list_base: u64,
-  fis_base: u64,
+  command_list_base: [2]u32,
+  fis_base: [2]u32,
   interrupt_status: u32,
   interrupt_enable: u32,
   command_status: extern union {
@@ -46,7 +46,8 @@ const Port = packed struct {
   vendor_0x70: [0x80-0x70]u8,
 
   pub fn command_headers(self: *const volatile @This()) *volatile [32]CommandTableHeader {
-    return &pmm.access_phys_single_volatile(CommandList, self.command_list_base).command_headers;
+    const addr = read_u64(&self.command_list_base);
+    return &pmm.access_phys_single_volatile(CommandList, addr).command_headers;
   }
 
   pub fn start_command_engine(self: *volatile @This()) void {
@@ -73,6 +74,15 @@ const Port = packed struct {
     self.command_status.recv_enable.write(false);
   }
 };
+
+fn write_u64(mmio: anytype, value: u64) void {
+  mmio[0] = @intCast(u32, value & 0xFFFFFFFF);
+  mmio[1] = @intCast(u32, (value >> 32) & 0xFFFFFFFF);
+}
+
+fn read_u64(mmio: anytype) u64 {
+  return @as(u64, mmio[0]) | (@as(u64, mmio[1]) << 32);
+}
 
 const status_start: u32 = 0x00000001;
 const fis_recv_running: u32 = 0x00004000;
@@ -213,11 +223,12 @@ const CommandTableHeader = packed struct {
 
   pdrt_count: u16,
   command_table_byte_size: u32,
-  command_table_addr: u64,
+  command_table_addr: [2]u32,
   reserved: [4]u32,
 
   pub fn table(self: *volatile @This()) *volatile CommandTable {
-    return pmm.access_phys_single_volatile(CommandTable, self.command_table_addr);
+    const addr = read_u64(&self.command_table_addr);
+    return pmm.access_phys_single_volatile(CommandTable, addr);
   }
 };
 
@@ -255,7 +266,7 @@ comptime {
 }
 
 const PRD = packed struct {
-  data_base_addr: u64,
+  data_base_addr: [2]u32,
   _res08: u32,
   sizem1: u22,
   _res10_22: u9,
@@ -327,21 +338,19 @@ fn sata_port_task(comptime port_type: sata_port_type, port: *volatile Port) !voi
 
   // Set up command buffers
   {
-    if(port.command_list_base == 0 or port.fis_base == 0) {
-      const port_io_size = @sizeOf(CommandList) + @sizeOf(RecvFis);
+    const port_io_size = @sizeOf(CommandList) + @sizeOf(RecvFis);
 
-      const commands_phys = try pmm.alloc_phys(port_io_size);
-      const fis_phys = commands_phys + @sizeOf(CommandList);
+    const commands_phys = try pmm.alloc_phys(port_io_size);
+    const fis_phys = commands_phys + @sizeOf(CommandList);
+    try paging.map_phys_size(commands_phys, port_io_size, paging.mmio(), null);
+    @memset(pmm.access_phys_volatile(u8, commands_phys), 0, port_io_size);
+    write_u64(&port.command_list_base, commands_phys);
+    write_u64(&port.fis_base, fis_phys);
 
-      try paging.map_phys_size(commands_phys, port_io_size, paging.mmio(), null);
-      @memset(pmm.access_phys_volatile(u8, commands_phys), 0, port_io_size);
-
-      port.command_list_base = commands_phys;
-      port.fis_base = fis_phys;
-    } else {
-      try paging.map_phys_size(port.command_list_base, @sizeOf(CommandList), paging.mmio(), null);
-      try paging.map_phys_size(port.fis_base, @sizeOf(RecvFis), paging.mmio(), null);
-    }
+    if(read_u64(&port.command_list_base) != commands_phys)
+      // Indicating that the controller isn't letting us do this yet,
+      // something else has gone wrong with the init earlier
+      return error.BailingOnController;
   }
 
   // Preallocate and set up command tables
@@ -357,7 +366,7 @@ fn sata_port_task(comptime port_type: sata_port_type, port: *volatile Port) !voi
         @memset(pmm.access_phys_volatile(u8, current_table_addr), 0, page_size);
       }
 
-      header.command_table_addr = current_table_addr;
+      write_u64(&header.command_table_addr, current_table_addr);
       header.pdrt_count = 1;
       header.command_fis_length = @sizeOf(FisH2D) / @sizeOf(u32);
       header.atapi = if(port_type == .atapi) 1 else 0;
@@ -368,7 +377,7 @@ fn sata_port_task(comptime port_type: sata_port_type, port: *volatile Port) !voi
       const buf = try pmm.alloc_phys(page_size);
       try paging.map_phys_size(buf, page_size, paging.mmio(), null);
       @memset(pmm.access_phys_volatile(u8, buf), 0, page_size);
-      header.table().prds[0].data_base_addr = buf;
+      write_u64(&header.table().prds[0].data_base_addr, buf);
       header.table().prds[0].sizem1 = page_size - 1;
       header.table().command_fis.cmd.fis_type = 0x27;
     }
