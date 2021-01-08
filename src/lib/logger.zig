@@ -55,7 +55,7 @@ pub fn hexdump(in_bytes: []const u8) void {
     inline for(range(0x10)) |offset| {
       if(offset < bytes.len) {
         const value = bytes[offset];
-        log("{x:0>2} ", .{value});
+        log("{x:0>2}{c}", .{value, if(offset == 7) '-' else ' '});
       } else {
         log("   ", .{});
       }
