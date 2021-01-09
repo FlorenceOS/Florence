@@ -39,7 +39,7 @@ pub fn Node(comptime features: Features) type {
                 .iterators = if (features.enable_iterators_cache) .{ null, null } else {},
                 .par = null,
                 .subtree_size = if (features.enable_kth_queries) 1 else {},
-                .color = Color.Red,
+                .color = .Red,
             };
         }
         /// Query direction from parent
@@ -54,7 +54,7 @@ pub fn Node(comptime features: Features) type {
 
         // If `self` if null, return black color, otherwise return color of `self`
         pub fn color_or_black(self: ?*const @This()) Color {
-            return if (self) |self_nonnull| self_nonnull.color else Color.Black;
+            return if (self) |self_nonnull| self_nonnull.color else .Black;
         }
 
         // Get node's sibling, or return null if there is none
@@ -120,7 +120,7 @@ pub fn Tree(comptime T: type, comptime member_name: []const u8, comptime cfg: Co
             struct {
                 /// Fix zero sized pointer issue in zig compiler
                 /// Citation: "the issue is: kth is a zero-size type, so the pointer to kth is itself zero-sized, and therefore has no data"
-                /// We need to make it not zero-sized XD
+                /// Issue in zig lang repository: "https://github.com/ziglang/zig/issues/1530"
                 temp_fix: u8,
                 /// Get subtree size
                 pub fn subtree_size(node: ?*const NodeType) usize {
@@ -267,7 +267,7 @@ pub fn Tree(comptime T: type, comptime member_name: []const u8, comptime cfg: Co
             } else {
                 self.root = new_top;
                 new_top.par = null;
-                new_top.color = Color.Black;
+                new_top.color = .Black;
             }
             _ = update_parent_subtree_size(node);
             _ = update_parent_augment(node);
@@ -299,15 +299,14 @@ pub fn Tree(comptime T: type, comptime member_name: []const u8, comptime cfg: Co
             var current: *NodeType = node;
             while (current.par) |parent| {
                 // if parent is black, there is no double red. See diagram above.
-                if (parent.color == Color.Black) {
+                if (parent.color == .Black) {
                     break;
                 }
                 const uncle = parent.sibling();
                 // Root has to be black, and as parent is red, grandparent should exist
-                std.debug.assert(parent.par != null);
                 const grandparent = parent.par.?;
                 const dir = current.direction();
-                if (NodeType.color_or_black(uncle) == Color.Black) {
+                if (NodeType.color_or_black(uncle) == .Black) {
                     const parent_dir = parent.direction();
                     if (parent_dir == dir) {
                         //           G(B)                   P(B)
@@ -319,10 +318,10 @@ pub fn Tree(comptime T: type, comptime member_name: []const u8, comptime cfg: Co
                         // If uncle is black, grandparent has to be black, as parent is red.
                         // If grandparent was red, both of its children would have to be black,
                         // but parent is red.
-                        // Grandparent color is updated on line 313. Black height on path to B has not changed
+                        // Grandparent color is updated on line 339. Black height on path to B has not changed
                         // (before: grandparent black and uncle black, now P black and U black)
                         self.rotate(grandparent, 1 - dir);
-                        parent.color = Color.Black;
+                        parent.color = .Black;
                     } else {
                         //          G(B)                  G(B)               C(B)
                         //        /     \                /   \              /   \
@@ -330,14 +329,14 @@ pub fn Tree(comptime T: type, comptime member_name: []const u8, comptime cfg: Co
                         //        \                   /                          \
                         //         C(R)             P(R)                         U(B)
                         //
-                        // Final recoloring of grandparent is done on line 313 as well.
+                        // Final recoloring of grandparent is done on line 339 as well.
                         // Black height on path to U has not changed (before: G and U black, after: C and U black)
                         // On the old track in P direction, nothing has changed as well
                         self.rotate(parent, 1 - dir);
                         self.rotate(grandparent, dir);
-                        current.color = Color.Black;
+                        current.color = .Black;
                     }
-                    grandparent.color = Color.Red;
+                    grandparent.color = .Red;
                     break;
                 } else {
                     //           G(B)                  G(R) <- potential double red fix needed
@@ -354,16 +353,15 @@ pub fn Tree(comptime T: type, comptime member_name: []const u8, comptime cfg: Co
                     // fixing by setting `current` to grandparent
 
                     // If uncle is red, it is not null
-                    std.debug.assert(uncle != null);
                     const uncle_nonnull = uncle.?;
-                    parent.color = Color.Black;
-                    uncle_nonnull.color = Color.Black;
-                    grandparent.color = Color.Red;
+                    parent.color = .Black;
+                    uncle_nonnull.color = .Black;
+                    grandparent.color = .Red;
                     current = grandparent;
                 }
             }
             // We were inserting node, so root is not null
-            self.root.?.color = Color.Black;
+            self.root.?.color = .Black;
         }
 
         /// Attaches node that is not yet in tree to the node in tree
@@ -417,7 +415,7 @@ pub fn Tree(comptime T: type, comptime member_name: []const u8, comptime cfg: Co
                 update_path_augment(prev);
             } else {
                 // If node is root, our job is easy
-                node.color = Color.Black;
+                node.color = .Black;
                 if (enable_iterators_cache) {
                     self.iterators.ends[0] = node;
                     self.iterators.ends[1] = node;
@@ -539,7 +537,7 @@ pub fn Tree(comptime T: type, comptime member_name: []const u8, comptime cfg: Co
                 // Node was root. Set tree root to replacement
                 self.root = replacement;
                 replacement.par = null;
-                replacement.color = Color.Black;
+                replacement.color = .Black;
             }
             // Swap iterators if needed
             if (enable_iterators_cache) {
@@ -622,10 +620,10 @@ pub fn Tree(comptime T: type, comptime member_name: []const u8, comptime cfg: Co
                 // W and Z should be black, as S is red (check rbtree invariants)
                 // This transformation leaves us with black sibling
                 if (current_node_sibling) |sibling| {
-                    if (sibling.color == Color.Red) {
+                    if (sibling.color == .Red) {
                         self.rotate(current_node_par, current_node_dir);
-                        sibling.color = Color.Black;
-                        current_node_par.color = Color.Red;
+                        sibling.color = .Black;
+                        current_node_par.color = .Red;
                         current_node_sibling = current_node.sibling();
                     }
                 }
@@ -639,15 +637,15 @@ pub fn Tree(comptime T: type, comptime member_name: []const u8, comptime cfg: Co
                 // from parent with different black heights
                 var sibling = current_node_sibling.?;
                 // if both children of sibling are black, and parent is black too, there is easy fix
-                if (NodeType.color_or_black(sibling.desc[0]) == Color.Black and NodeType.color_or_black(sibling.desc[1]) == Color.Black) {
-                    if (current_node_par.color == Color.Black) {
+                if (NodeType.color_or_black(sibling.desc[0]) == .Black and NodeType.color_or_black(sibling.desc[1]) == .Black) {
+                    if (current_node_par.color == .Black) {
                         //       P(B)                            P(B)
                         //      /   \                           /    \
                         //    C(B)  S(B)       -------->      C(B)  S(R)
                         //
                         // if parent is already black, we can't compensate changing S color to red (which changes black height)
                         // locally. Instead we jump to a new iteration of the loop, requesting to recolor P to red
-                        sibling.color = Color.Red;
+                        sibling.color = .Red;
                         current_node = current_node_par;
                         continue;
                     } else {
@@ -657,14 +655,14 @@ pub fn Tree(comptime T: type, comptime member_name: []const u8, comptime cfg: Co
                         //
                         // in this case there is no need to fix anything else, as we compensated for changing S color to R with
                         // changing N's color to black. This means that black height on this path won't change at all.
-                        current_node_par.color = Color.Black;
-                        sibling.color = Color.Red;
+                        current_node_par.color = .Black;
+                        sibling.color = .Red;
                         return;
                     }
                 }
                 const parent_color = current_node_par.color;
                 // check if red nephew has the same direction from parent
-                if (NodeType.color_or_black(sibling.desc[current_node_dir]) == Color.Red) {
+                if (NodeType.color_or_black(sibling.desc[current_node_dir]) == .Red) {
                     //        P(X)                      P(X)
                     //       /   \                     /   \
                     //     C(B)  S(B)                C(B)  N(B)
@@ -678,10 +676,10 @@ pub fn Tree(comptime T: type, comptime member_name: []const u8, comptime cfg: Co
                     // the purpose is to make this case right newphew case
                     // (in which direction of red nephew is opposite to direction of node)
                     self.rotate(sibling, 1 - current_node_dir);
-                    sibling.color = Color.Red;
+                    sibling.color = .Red;
                     // nephew exists and it will be a new subling
                     sibling = current_node.sibling().?;
-                    sibling.color = Color.Black;
+                    sibling.color = .Black;
                 }
                 //     P(X)                 S(P's old color)
                 //    /   \                     /     \
@@ -694,10 +692,10 @@ pub fn Tree(comptime T: type, comptime member_name: []const u8, comptime cfg: Co
                 // We only increased black height on path from P/S to C. But that is okey, cause
                 // recoloring C to red or deleting it is our final goal
                 self.rotate(current_node_par, current_node_dir);
-                current_node_par.color = Color.Black;
+                current_node_par.color = .Black;
                 sibling.color = parent_color;
                 if (sibling.desc[1 - current_node_dir]) |nephew| {
-                    nephew.color = Color.Black;
+                    nephew.color = .Black;
                 }
                 return;
             }
@@ -724,7 +722,7 @@ pub fn Tree(comptime T: type, comptime member_name: []const u8, comptime cfg: Co
                     self.root = child;
                     child.par = null;
                 }
-                child.color = Color.Black;
+                child.color = .Black;
                 self.cut_from_iter_list(node);
                 // calling augment callback only after all updates
                 if (node_parent_nullable) |parent| {
@@ -734,7 +732,7 @@ pub fn Tree(comptime T: type, comptime member_name: []const u8, comptime cfg: Co
                 self.size -= 1;
                 return;
             }
-            if (node.color == Color.Red) {
+            if (node.color == .Red) {
                 // if color is red, node is not root, and parent should exist
                 const parent = node_parent_nullable.?;
                 parent.desc[node.direction()] = null;
