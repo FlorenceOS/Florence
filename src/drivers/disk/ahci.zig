@@ -63,10 +63,7 @@ const Port = packed struct {
         self.command_status.start.write(false);
         self.command_status.recv_enable.write(false);
 
-        while (self.command_status.command_list_running.read())
-            scheduler.yield();
-
-        while (self.command_status.fis_recv_running.read())
+        while (self.command_status.command_list_running.read() or self.command_status.fis_recv_running.read())
             scheduler.yield();
 
         self.command_status.recv_enable.write(true);
@@ -87,17 +84,8 @@ const Port = packed struct {
     }
 
     pub fn wait_ready(self: *volatile @This()) void {
-        while (true) {
-            if (self.task_file_data.transfer_requested.read()) {
-                scheduler.yield();
-                continue;
-            }
-
-            if (self.task_file_data.interface_busy.read()) {
-                scheduler.yield();
-                continue;
-            }
-        }
+        while (self.task_file_data.transfer_requested.read() or self.task_file_data.interface_busy.read())
+            scheduler.yield();
     }
 };
 
