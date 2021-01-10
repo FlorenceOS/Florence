@@ -17,6 +17,7 @@ const abar_size = 0x1100;
 const port_control_registers_size = 0x80;
 
 const bf = os.lib.bitfields;
+const libalign = os.lib.libalign;
 
 const Port = packed struct {
     command_list_base: [2]u32,
@@ -87,6 +88,50 @@ const Port = packed struct {
         while (self.task_file_data.transfer_requested.read() or self.task_file_data.interface_busy.read())
             scheduler.yield();
     }
+
+    pub fn issue_commands(self: *volatile @This(), slot_bits: u32) void {
+        log("AHCI: Sending {} command(s) to port 0x{X}\n", .{ @popCount(u32, slot_bits), @ptrToInt(self) });
+
+        self.wait_ready();
+
+        self.command_issue |= slot_bits;
+
+        while ((self.command_issue & slot_bits) != 0)
+            scheduler.yield();
+    }
+
+    pub fn command_header(self: *const volatile @This(), slot: u5) *volatile CommandTableHeader {
+        return &self.command_headers()[slot];
+    }
+
+    pub fn command_table(self: *const volatile @This(), slot: u5) *volatile CommandTable {
+        return self.command_header(slot).table();
+    }
+
+    pub fn get_fis(self: *volatile @This(), slot: u5) *volatile CommandFis {
+        return &self.command_table(slot).command_fis;
+    }
+
+    pub fn make_h2d(self: *volatile @This(), slot: u5) *volatile FisH2D {
+        const fis = &self.get_fis(slot).h2d;
+        fis.fis_type = 0x27;
+        return fis;
+    }
+
+    pub fn prd(self: *volatile @This(), slot: u5, prd_idx: usize) *volatile PRD {
+        return &self.command_table(slot).prds[prd_idx];
+    }
+
+    pub fn buffer(self: *volatile @This(), slot: u5, prd_idx: usize) []u8 {
+        const prd_ptr = self.prd(slot, 0);
+        const buf_addr = read_u64(&prd_ptr.data_base_addr);
+        const buf_size = @as(usize, prd_ptr.sizem1) + 1;
+        return pmm.access_phys(u8, buf_addr)[0..buf_size];
+    }
+
+    pub fn read_single_sector(self: *volatile @This(), slot: u5) void {
+        self.issue_commands(1 << slot);
+    }
 };
 
 fn write_u64(mmio: anytype, value: u64) void {
@@ -98,64 +143,8 @@ fn read_u64(mmio: anytype) u64 {
     return @as(u64, mmio[0]) | (@as(u64, mmio[1]) << 32);
 }
 
-const status_start: u32 = 0x00000001;
-const fis_recv_running: u32 = 0x00004000;
-const status_receive_enable: u32 = 0x00000010;
-
 comptime {
     std.debug.assert(@sizeOf(Port) == 0x80);
-}
-
-const handoff_bios_busy = 1 << 4;
-const handoff_os_owned = 1 << 1;
-const handoff_bios_owned = 1 << 0;
-
-const ahci_version = extern union {
-    value: u32,
-
-    major: bf.bitfield(u32, 16, 16),
-    minor_high: bf.bitfield(u32, 8, 8),
-    minor_low: bf.bitfield(u32, 0, 8),
-
-    pub fn format(self: *const ahci_version, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
-        try writer.print("{}.{}", .{ self.major.read(), self.minor_high.read() });
-        if (self.minor_low.read() != 0)
-            try writer.print(".{}", .{self.minor_low.read()});
-    }
-};
-
-const abar_handoff = extern union {
-    value: u32,
-    bios_owned: bf.boolean(u32, 4),
-    os_owned: bf.boolean(u32, 1),
-    bios_busy: bf.boolean(u32, 0),
-
-    fn set_handoff(self: *volatile @This()) void {
-        self.os_owned.write(true);
-    }
-
-    fn check_handoff(self: *volatile @This()) bool {
-        if (self.bios_owned.read())
-            return false;
-
-        if (self.bios_busy.read())
-            return false;
-
-        if (self.os_owned.read())
-            return true;
-
-        return false;
-    }
-
-    fn try_claim(self: *volatile @This()) bool {
-        self.set_handoff();
-        return self.check_handoff();
-    }
-};
-
-comptime {
-    std.debug.assert(@sizeOf(abar_handoff) == 4);
-    std.debug.assert(@bitSizeOf(abar_handoff) == 32);
 }
 
 const ABAR = struct {
@@ -163,13 +152,62 @@ const ABAR = struct {
     global_hba_control: u32,
     interrupt_status: u32,
     ports_implemented: u32,
-    version: ahci_version,
+    version: extern union {
+        value: u32,
+
+        major: bf.bitfield(u32, 16, 16),
+        minor_high: bf.bitfield(u32, 8, 8),
+        minor_low: bf.bitfield(u32, 0, 8),
+
+        pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+            try writer.print("{}.{}", .{ self.major.read(), self.minor_high.read() });
+            if (self.minor_low.read() != 0)
+                try writer.print(".{}", .{self.minor_low.read()});
+        }
+
+        comptime {
+            std.debug.assert(@sizeOf(@This()) == 4);
+            std.debug.assert(@bitSizeOf(@This()) == 32);
+        }
+    },
     command_completion_coalescing_control: u32,
     command_completion_coalescing_port: u32,
     enclosure_managment_location: u32,
     enclosure_managment_control: u32,
     hba_capabilities_extended: u32,
-    bios_handoff: abar_handoff,
+    bios_handoff: extern union {
+        value: u32,
+        bios_owned: bf.boolean(u32, 4),
+        os_owned: bf.boolean(u32, 1),
+        bios_busy: bf.boolean(u32, 0),
+
+        fn set_handoff(self: *volatile @This()) void {
+            self.os_owned.write(true);
+        }
+
+        fn check_handoff(self: *volatile @This()) bool {
+            if (self.bios_owned.read())
+                return false;
+
+            if (self.bios_busy.read())
+                return false;
+
+            if (self.os_owned.read())
+                return true;
+
+            return false;
+        }
+
+        fn try_claim(self: *volatile @This()) bool {
+            self.set_handoff();
+            return self.check_handoff();
+        }
+
+        comptime {
+            std.debug.assert(@sizeOf(@This()) == 4);
+            std.debug.assert(@bitSizeOf(@This()) == 32);
+        }
+    },
     reserved_0x2C: u32,
     reserved_0x30: [0xA0 - 0x30]u8,
     vendor_0xA0: [0x100 - 0xA0]u8,
@@ -209,19 +247,6 @@ const sata_port_type = enum {
     semb,
     pm,
 };
-
-fn send_command(port: *volatile Port, slot: u5) void {
-    log("AHCI: Sending command in slot {} to port 0x{X}\n", .{ slot, @ptrToInt(port) });
-
-    const slot_bit = @as(u32, 1) << slot;
-
-    port.command_issue |= slot_bit;
-
-    while (port.command_issue & slot_bit != 0)
-        scheduler.yield();
-
-    log("AHCI: Port 0x{X}: Command sent!\n", .{@ptrToInt(port)});
-}
 
 const CommandTableHeader = packed struct {
     command_fis_length: u5,
@@ -317,7 +342,8 @@ comptime {
 
 const CommandFis = extern union {
     bytes: [0x40]u8,
-    cmd: FisH2D,
+    h2d: FisH2D,
+    //d2h: FisD2H,
 };
 
 const CommandTable = struct {
@@ -328,6 +354,251 @@ const CommandTable = struct {
     // First buffer should always be pointing to a single preallocated page
     // when this command table is unused. Make sure to restore it if you overwrite it
     prds: [8]PRD,
+};
+
+const ReadOrWrite = enum {
+    Read,
+    Write,
+};
+
+// Our own structure for keeping track of everything we need for a port
+const PortState = struct {
+    mmio: *volatile Port = undefined,
+    num_sectors: usize = undefined,
+    sector_size: usize = 512,
+    port_type: sata_port_type = undefined,
+
+    pub fn init(port: *volatile Port) !PortState {
+        var result: PortState = .{};
+        result.mmio = port;
+        result.port_type =
+            switch(result.mmio.signature) {
+                0x00000101 => .ata,
+                //0xEB140101 => .atapi, // Drop atapi for now
+                else => return error.UnknownSignature,
+            };
+
+        result.mmio.stop_command_engine();
+
+        try result.setup_command_headers();
+
+        try result.setup_prdts();
+
+        result.mmio.start_command_engine();
+
+        try result.identify();
+
+        return result;
+    }
+
+    fn setup_command_headers(self: *@This()) !void {
+        const port_io_size = @sizeOf(CommandList) + @sizeOf(RecvFis);
+
+        const commands_phys = try pmm.alloc_phys(port_io_size);
+        const fis_phys = commands_phys + @sizeOf(CommandList);
+        try paging.map_phys_size(commands_phys, port_io_size, paging.mmio(), null);
+        @memset(pmm.access_phys_volatile(u8, commands_phys), 0, port_io_size);
+        write_u64(&self.mmio.command_list_base, commands_phys);
+        write_u64(&self.mmio.fis_base, fis_phys);
+    }
+
+    fn setup_prdts(self: *@This()) !void {
+        var current_table_addr: usize = undefined;
+        var reamining_table_size: usize = 0;
+        for (self.mmio.command_headers()) |*header| {
+            if (reamining_table_size < @sizeOf(CommandTable)) {
+                reamining_table_size = page_size;
+                current_table_addr = try pmm.alloc_phys(page_size);
+                try paging.map_phys_size(current_table_addr, page_size, paging.mmio(), null);
+                @memset(pmm.access_phys_volatile(u8, current_table_addr), 0, page_size);
+            }
+
+            write_u64(&header.command_table_addr, current_table_addr);
+            header.pdrt_count = 1;
+            header.command_fis_length = @sizeOf(FisH2D) / @sizeOf(u32);
+            header.atapi = if (self.port_type == .atapi) 1 else 0;
+            current_table_addr += @sizeOf(CommandTable);
+            reamining_table_size -= @sizeOf(CommandTable);
+
+            // First PRD is just a small preallocated single page buffer
+            const buf = try pmm.alloc_phys(page_size);
+            try paging.map_phys_size(buf, page_size, paging.mmio(), null);
+            @memset(pmm.access_phys_volatile(u8, buf), 0, page_size);
+            write_u64(&header.table().prds[0].data_base_addr, buf);
+            header.table().prds[0].sizem1 = page_size - 1;
+        }
+    }
+
+    fn identify_command(self: *@This()) u8 {
+        return switch (self.port_type) {
+            .ata => 0xEC,
+            .atapi => 0xA1,
+            else => unreachable,
+        };
+    }
+
+    fn identify(self: *@This()) !void {
+        //log("AHCI: Identifying drive...\n", .{});
+
+        const identify_fis = self.mmio.make_h2d(0);
+
+        identify_fis.command = self.identify_command();
+
+        identify_fis.c = 1;
+        identify_fis.device = 0;
+
+        self.mmio.issue_commands(1);
+
+        const buf = self.mmio.buffer(0, 0);
+
+        //os.hexdump(buf[0..256]);
+
+        const data_valid = std.mem.readIntLittle(u16, buf[212..][0..2]);
+
+        if(data_valid & (1 << 15) == 0 and data_valid & (1 << 14) != 0 and data_valid & (1 << 12) != 0)
+            self.sector_size = std.mem.readIntLittle(u32, buf[234..][0..4]);
+
+        self.num_sectors = std.mem.readIntLittle(u64, buf[200..][0..8]);
+        if(self.num_sectors == 0)
+            self.num_sectors = std.mem.readIntLittle(u32, buf[120..][0..4]);
+
+        if(self.num_sectors == 0)
+            return error.NoSectors;
+
+        log("AHCI: Disk has 0x{X} sectors of size {}\n", .{self.num_sectors, self.sector_size});
+    }
+
+    fn issue_command_on_port(self: *@This(), command_slot: u5) void {
+        // TODO: Call this from command slot task and
+        // make this dispatch work to the port task
+        self.mmio.issue_commands(@as(u32, 1) << command_slot);
+    }
+
+    fn finalize_io(self: *@This(), command_slot: u5, lba: u48, sector_count: u16, mode: ReadOrWrite) void {
+        const fis = self.mmio.make_h2d(0);
+
+        fis.command =
+            switch (self.port_type) {
+            .ata => switch(mode) {
+                .Read => @as(u8, 0x25),
+                .Write => 0x35,
+            },
+            else => unreachable,
+        };
+
+        fis.device = 0xA0 | (1 << 6);
+        fis.control = 0x08;
+
+        fis.lba_low = @intCast(u24, lba & 0xFFFFFF);
+        fis.lba_high = @intCast(u24, (lba >> 24) & 0xFFFFFF);
+
+        fis.count = sector_count;
+
+        self.issue_command_on_port(command_slot);
+    }
+
+    // All the following functions will sooner or later be moved out into a general
+    // block dev interface, and this will just have a simple dma interface instead.
+    pub fn offset_to_sector(self: *@This(), offset: usize) u48 {
+        return @intCast(u48, offset / self.sector_size);
+    }
+
+    fn do_small_write(self: *@This(), command_slot: u5, buffer: []const u8, lba: u48, offset: usize) void {
+        self.mmio.command_header(command_slot).pdrt_count = 1;
+
+        // Read the shit we're not going to overwite
+        self.finalize_io(command_slot, lba, 1, .Read);
+
+        // Overwrite what we want to buffer
+        for(buffer) |b, i| {
+            self.mmio.buffer(command_slot, 0)[offset + i] = b;
+        }
+
+        // Write buffer to disk
+        self.finalize_io(command_slot, lba, 1, .Write);
+    }
+
+    fn do_small_read(self: *@This(), command_slot: u5, buffer: []u8, lba: u48, offset: usize) void {
+        self.finalize_io(command_slot, lba, 1, .Read);
+        for(buffer) |*b, i|
+            b.* = self.mmio.buffer(command_slot, 0)[offset + i];
+    }
+
+    fn do_large_write(self: *@This(), command_slot: u5, buffer: []const u8, lba: u48) void {
+        for(buffer[0..self.sector_size]) |b, i|
+            self.mmio.buffer(command_slot, 0)[i] = b;
+        self.finalize_io(command_slot, lba, 1, .Write);
+    }
+
+    fn do_large_read(self: *@This(), command_slot: u5, buffer: []u8, lba: u48) void {
+        self.finalize_io(command_slot, lba, 1, .Read);
+        for(buffer[0..self.sector_size]) |*b, i|
+            b.* = self.mmio.buffer(command_slot, 0)[i];
+    }
+
+    fn iterate_byte_sectors(
+        self: *@This(),
+        command_slot: u5,
+        buffer_in: anytype,
+        disk_offset_in: usize,
+        small_callback: anytype,
+        large_callback: anytype,
+    ) void {
+        if(buffer_in.len == 0)
+            return;
+
+        self.mmio.command_header(command_slot).pdrt_count = 1;
+
+        var first_sector = self.offset_to_sector(disk_offset_in);
+        const last_sector = self.offset_to_sector(disk_offset_in + buffer_in.len - 1);
+
+        if(first_sector == last_sector) {
+            small_callback(self, command_slot, buffer_in, first_sector, disk_offset_in % self.sector_size);
+            return;
+        }
+
+        var disk_offset = disk_offset_in;
+        var buffer = buffer_in;
+
+        // We need to preserve data on the first sector
+        if(!libalign.is_aligned(usize, self.sector_size, disk_offset)) {
+            const step = libalign.align_up(usize, self.sector_size, disk_offset) - disk_offset;
+
+            small_callback(self, command_slot, buffer[0..step], first_sector, self.sector_size - step);
+
+            buffer.ptr += step;
+            buffer.len -= step;
+            disk_offset += step;
+            first_sector += 1;
+        }
+
+        // Now we're sector aligned, we can do the transfer sector by sector
+        // TODO: make this faster, doing multiple sectors at a time
+        while(buffer.len > self.sector_size) {
+            os.log("Doing entire sector {}\n", .{first_sector});
+
+            large_callback(self, command_slot, buffer, first_sector);
+
+            buffer.ptr += self.sector_size;
+            buffer.len -= self.sector_size;
+            first_sector += 1;
+        }
+
+        if(buffer.len == 0)
+            return;
+
+        os.log("Doing last partial sector {}\n", .{first_sector});
+        // Last sector, partial
+        small_callback(self, command_slot, buffer, first_sector, 0);
+    }
+
+    pub fn do_io_bytes_write(self: *@This(), command_slot: u5, buffer: []const u8, disk_offset: usize) void {
+        self.iterate_byte_sectors(command_slot, buffer, disk_offset, do_small_write, do_large_write);
+    }
+
+    pub fn do_io_bytes_read(self: *@This(), command_slot: u5, buffer: []u8, disk_offset: usize) void {
+        self.iterate_byte_sectors(command_slot, buffer, disk_offset, do_small_read, do_large_read);
+    }
 };
 
 comptime {
@@ -342,6 +613,8 @@ fn command_with_buffer(port: *volatile Port, slot: u5, buf: usize, bufsize: usiz
     //const oldsize = ;
 }
 
+var test_buf: [4096]u8 = undefined;
+
 fn sata_port_task(comptime port_type: sata_port_type, port: *volatile Port) !void {
     switch (port_type) {
         .ata, .atapi => {},
@@ -350,103 +623,20 @@ fn sata_port_task(comptime port_type: sata_port_type, port: *volatile Port) !voi
 
     log("AHCI: {} task started for port at 0x{X}\n", .{ @tagName(port_type), @ptrToInt(port) });
 
-    port.stop_command_engine();
+    var port_state = try PortState.init(port);
 
-    // Set up command buffers
-    {
-        const port_io_size = @sizeOf(CommandList) + @sizeOf(RecvFis);
+    // Put 0x204 'x's across 3 sectors if sector size is 0x200
+    //port_state.do_io_bytes_write(0, "x" ** 0x204, port_state.sector_size - 2);
+    //port_state.finalize_io(0, 0, 3, .Read);
+    //os.hexdump(port_state.mmio.buffer(0, 0)[port_state.sector_size - 0x10..port_state.sector_size * 2 + 0x10]);
 
-        const commands_phys = try pmm.alloc_phys(port_io_size);
-        const fis_phys = commands_phys + @sizeOf(CommandList);
-        try paging.map_phys_size(commands_phys, port_io_size, paging.mmio(), null);
-        @memset(pmm.access_phys_volatile(u8, commands_phys), 0, port_io_size);
-        write_u64(&port.command_list_base, commands_phys);
-        write_u64(&port.fis_base, fis_phys);
+    // Read first disk sector
+    port_state.finalize_io(0, 0, 1, .Read);
+    os.hexdump(port_state.mmio.buffer(0, 0)[0..port_state.sector_size]);
 
-        if (read_u64(&port.command_list_base) != commands_phys)
-            // Indicating that the controller isn't letting us do this yet,
-            // something else has gone wrong with the init earlier
-            return error.BailingOnController;
-    }
-
-    // Preallocate and set up command tables
-    {
-        var current_table_addr: usize = undefined;
-        var reamining_table_size: usize = 0;
-        for (port.command_headers()) |*header| {
-            if (reamining_table_size < @sizeOf(CommandTable)) {
-                reamining_table_size = page_size;
-                current_table_addr = try pmm.alloc_phys(page_size);
-                try paging.map_phys_size(current_table_addr, page_size, paging.mmio(), null);
-                @memset(pmm.access_phys_volatile(u8, current_table_addr), 0, page_size);
-            }
-
-            write_u64(&header.command_table_addr, current_table_addr);
-            header.pdrt_count = 1;
-            header.command_fis_length = @sizeOf(FisH2D) / @sizeOf(u32);
-            header.atapi = if (port_type == .atapi) 1 else 0;
-            current_table_addr += @sizeOf(CommandTable);
-            reamining_table_size -= @sizeOf(CommandTable);
-
-            // First PRD is just a small preallocated single page buffer
-            const buf = try pmm.alloc_phys(page_size);
-            try paging.map_phys_size(buf, page_size, paging.mmio(), null);
-            @memset(pmm.access_phys_volatile(u8, buf), 0, page_size);
-            write_u64(&header.table().prds[0].data_base_addr, buf);
-            header.table().prds[0].sizem1 = page_size - 1;
-            header.table().command_fis.cmd.fis_type = 0x27;
-        }
-    }
-
-    port.start_command_engine();
-
-    var num_disk_sectors: usize = undefined;
-    var disk_sector_size: usize = undefined;
-
-    // Port is now ready to be used on all command slots
-    {
-        log("AHCI: Identifying drive...\n", .{});
-
-        const header = &port.command_headers()[0];
-        const table = header.table();
-        const identify_fis = &table.command_fis.cmd;
-
-        identify_fis.command =
-            switch (port_type) {
-            .ata => 0xEC,
-            .atapi => 0xA1,
-            else => unreachable,
-        };
-
-        identify_fis.c = 1;
-        identify_fis.device = 0;
-
-        send_command(port, 0);
-
-        const addr = read_u64(&table.prds[0].data_base_addr);
-        const buf = pmm.access_phys(u8, addr)[0..page_size];
-
-        os.hexdump(buf[0..256]);
-
-        num_disk_sectors = std.mem.readIntLittle(u64, buf[200..][0..8]);
-    }
-
-    log("AHCI: Disk has 0x{X} sectors of 0x{X} bytes each.\n", .{ num_disk_sectors, disk_sector_size });
-
-    {
-        log("AHCI: Attempting read...\n", .{});
-
-        const header = &port.command_headers()[0];
-        const table = header.table();
-        const read_fis = &table.command_fis.cmd;
-
-        read_fis.command =
-            switch (port_type) {
-            .ata => 0x00,
-            .atapi => 0x00,
-            else => unreachable,
-        };
-    }
+    // Read first sector into buffer
+    //port_state.do_io_bytes_read(0, test_buf[0..512], 0);
+    //os.hexdump(test_buf[0..512]);
 }
 
 fn controller_task(abar: *volatile ABAR) !void {
