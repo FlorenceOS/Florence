@@ -66,6 +66,7 @@ pub fn pci_write(comptime T: type, addr: Addr, offset: regoff, value: T) void {
 
   @panic("No pci_write method!");
 }
+
 const virtio_gpu = os.drivers.virtio_gpu;
 
 fn function_scan(addr: Addr) void {

@@ -1,17 +1,18 @@
-// Descriptor iterator helper.
+/// Descriptor iterator helper.
 pub const DescIter = struct {
   drv: *Driver,
   i: u8,
   curr: Descriptor,
   next: Descriptor,
-  // Put the head of a descriptor chain on the available ring
+
+  /// Put the head of a descriptor chain on the available ring
   pub fn begin(iter: *DescIter) void {
     var i = &iter.drv.queues[iter.i];
     iter.next = iter.drv.descr(iter.i);
     i.avail.rings((i.avail.idx + i.pending) % i.size).* = iter.next;
     i.pending += 1;
   }
-  // Put a descriptor to be part of the descriptor chain
+  /// Put a descriptor to be part of the descriptor chain
   pub fn put(iter: *DescIter, a: anytype, len: u32, flags: u16) void {
     iter.curr = iter.next;
     iter.next = if ((flags & VRING_DESC_F_NEXT) != 0) iter.drv.descr(iter.i) else 0xFFFF;
@@ -23,10 +24,10 @@ pub const DescIter = struct {
   }
 };
 
-// The actual driver structure for the modern virtio-pci transport. It expects already-initialized BARs.
-// There is no support for the legacy PIO-only interface.
+/// The actual driver structure for the modern virtio-pci transport.
+/// It expects already-initialized BARs. There is no support for the legacy PIO-only interface.
 pub const Driver = struct {
-  // Find PCI BARs and initialize device
+  /// Find PCI BARs and initialize device
   pub fn init(a: pci.Addr, reqFeatures: u64, optFeatures: u64) !Driver {
     var drv: Driver = detectbars(a);
     drv.cfg.device_status = 0; // reset
@@ -48,12 +49,12 @@ pub const Driver = struct {
     return drv;
   }
 
-  // Create descriptor iterator
+  /// Create descriptor iterator
   pub fn iter(drv: *Driver, i: u8) DescIter {
     return .{ .drv = drv, .i = i, .curr = 0xFFFF, .next = 0xFFFF };
   }
 
-  // Free the chain which starts at `head`
+  /// Free the chain which starts at `head`
   pub fn freechain(drv: *Driver, i: u8, head: Descriptor) void {
     var q: *VirtQueue = &drv.queues[i];
     var last = &q.desc[head];
@@ -67,7 +68,7 @@ pub const Driver = struct {
     q.first_unused = head;
   }
 
-  // Process incoming events. NOTE: this does not acknowledge the interrupt, to do that, use acknowledge()
+  /// Process incoming events. NOTE: this does not acknowledge the interrupt, to do that, use acknowledge()
   pub fn process(drv: *Driver, i: u8, cb: anytype, ctx: anytype) void {
     var q = &drv.queues[i];
     while (q.last_in_used != q.used.idx) {
@@ -77,18 +78,19 @@ pub const Driver = struct {
     }
   }
 
-  // Make the descriptors available to the device and notify it.
+  /// Make the descriptors available to the device and notify it.
   pub fn start(drv: *Driver, i: u8) void {
     drv.queues[i].avail.idx += drv.queues[i].pending;
     drv.queues[i].pending = 0;
     drv.notify[i * drv.notify_mul] = drv.queues[i].avail.idx;
   }
 
+  /// Acknowledge virtio interrupt
   pub fn acknowledge(drv: *Driver) void {
     var result = drv.isr.*; // Doesn't look very robust, but it works. Definitively look here if something breaks.
   }
 
-  // Allocate a descriptor
+  /// Allocate a descriptor
   pub fn descr(drv: *Driver, i: u8) Descriptor {
     var q = &drv.queues[i];
     var first_un = q.first_unused;
@@ -98,7 +100,7 @@ pub const Driver = struct {
     return first_un;
   }
 
-  // Negotiate feature bitmask with device
+  /// Negotiate feature bitmask with device
   fn feature(drv: *Driver, i: u32, req: u32, opt: u32) !void {
     drv.cfg.device_feature_select = i;
     const f = drv.cfg.device_feature & (req | opt);
@@ -107,7 +109,7 @@ pub const Driver = struct {
     drv.cfg.guest_feature = f;
   }
 
-  // Detect BARs and capabilities and set up the cfg/notify/isr/dev structures
+  /// Detect BARs and capabilities and set up the cfg/notify/isr/dev structures
   fn detectbars(a: pci.Addr) Driver {
     var drv: Driver = undefined;
     var cap_ptr = pci.pci_read(u8, a, pci.PCI_OFFSET_CAP_PTR) & 0xFC;
@@ -149,7 +151,7 @@ pub const Driver = struct {
     return drv;
   }
 
-  // Set up a specific queue
+  /// Set up a specific queue
   fn setupqueue(drv: *Driver, i: u16) void {
     drv.cfg.queue_select = i;
     const size = drv.cfg.queue_size;
@@ -205,7 +207,7 @@ const paging = os.memory.paging;
 const pci = os.platform.pci;
 const assert = @import("std").debug.assert;
 
-// ring descriptor, actual structure (`Descriptor` is only its id)
+/// Ring descriptor, actual structure (`Descriptor` is only its id)
 const VirtqDesc = packed struct {
   addr: u64, // guest phyaddr
   len: u32,
