@@ -4,5 +4,4 @@ pub const vga_log     = @import("io/vga_log.zig");
 
 pub const ahci        = @import("disk/ahci.zig");
 
-
 pub const virtio_gpu  = @import("virtio/virtio-gpu.zig");
