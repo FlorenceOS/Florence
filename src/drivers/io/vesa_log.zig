@@ -36,15 +36,21 @@ const fgcol = 0xaa;
 
 const clear_screen = false;
 
+
 const Framebuffer = struct {
   addr: []u8,
   pitch: u64,
-  width: u64,
-  height: u64,
+  width: u32,
+  height: u32,
   bpp: u64,
 
   pos_x: u64 = 0,
   pos_y: u64 = 0,
+
+  phys: u64,
+
+  updater: Updater,
+  updater_ctx: u64,
 
   pub fn width_in_chars(self: *@This()) u64 {
     return self.width / font.width;
@@ -55,7 +61,26 @@ const Framebuffer = struct {
   }
 };
 
+fn default_updater(x: u32, y: u32, w: u32, h: u32, ctx: u64) void {} // Do nothing
+
 var framebuffer: ?Framebuffer = null;
+
+pub const Updater = fn(x: u32, y: u32, width: u32, height: u32, ctx: u64)void;
+pub const FBInfo = struct { phys: u64, width: u32, height: u32 }; 
+
+pub fn get_info() ?FBInfo {
+  if (framebuffer) |fb| {
+    var i = .{ .phys = fb.phys, .width = @truncate(u32, fb.width), .height = @truncate(u32, fb.height) };
+    return i;
+  } else return null;
+}
+
+pub fn set_updater(u: Updater, ctx: u64) void {
+  if (framebuffer) |*fb| {
+    fb.updater = u;
+    fb.updater_ctx = ctx;
+  }
+}
 
 fn is_printable(c: u8) bool {
   return font.base <= c and c < font.base + font.data.len/8;
@@ -80,6 +105,9 @@ pub fn register_fb(fb_phys: usize, fb_pitch: u16, fb_width: u16, fb_height: u16,
     .width = fb_width,
     .height = fb_height,
     .bpp = fb_bpp,
+    .phys = fb_phys,
+    .updater = default_updater,
+    .updater_ctx = 0,
   };
 
   if(clear_screen) {
@@ -125,6 +153,7 @@ fn blit_impl(comptime bpp: u64, ch: u8) void {
       }
     }
   }
+
   framebuffer.?.pos_x += 1;
 }
 
@@ -152,6 +181,7 @@ fn scroll_fb() void {
     @memcpy(dst, src, framebuffer.?.pitch);
   }
   @memset(@ptrCast([*]u8, framebuffer.?.addr) + framebuffer.?.pitch * (y - font.height), 0x00, framebuffer.?.pitch * font.height);
+  framebuffer.?.updater(0, 0, framebuffer.?.width, framebuffer.?.height, framebuffer.?.updater_ctx);
 }
 
 fn feed_line() void {
@@ -164,9 +194,15 @@ fn feed_line() void {
   }
 }
 
+pub fn update() void {
+  var y = @truncate(u32, framebuffer.?.pos_y * font.height);
+  framebuffer.?.updater(0, y, framebuffer.?.width, @truncate(u32, font.height), framebuffer.?.updater_ctx);
+}
+
 pub fn putch(ch: u8) void {
   if(framebuffer != null) {
     if(ch == '\n') {
+      update();
       feed_line();
       return;
     }

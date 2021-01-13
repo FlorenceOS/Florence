@@ -6,6 +6,14 @@ const paging = os.memory.paging;
 
 const range = os.lib.range.range;
 
+pub const Handler = struct {
+  function: fn(*os.platform.InterruptFrame, u64)void,
+  context: u64
+};
+
+var handlers: [0x100]Handler = undefined;
+
+
 pub const Addr = struct {
   bus: u8,
   device: u5,
@@ -58,6 +66,7 @@ pub fn pci_write(comptime T: type, addr: Addr, offset: regoff, value: T) void {
 
   @panic("No pci_write method!");
 }
+const virtio_gpu = os.drivers.virtio_gpu;
 
 fn function_scan(addr: Addr) void {
   const class = get_class(addr);
@@ -105,7 +114,15 @@ fn function_scan(addr: Addr) void {
       }
     },
     0x03 => {
-      switch(subclass) {
+      if (vendor_id == 0x1AF4 or device_id == 0x1050) {
+        os.log("Virtio display controller\n", .{});
+        if (os.drivers.vesa_log.get_info()) |vesa| {
+          var drv = virtio_gpu.Driver.init(addr) catch unreachable;
+          drv.modeset(vesa.phys, vesa.width, vesa.height);
+          drv.update_rect(.{.x = 0, .y = 0, .width = vesa.width, .height = vesa.height});
+          os.drivers.vesa_log.set_updater(virtio_gpu.updater, @ptrToInt(&drv));
+        }
+      } else switch(subclass) {
         else => { os.log("Unknown display controller!\n", .{}); },
         0x00 => { os.log("VGA compatible controller\n", .{}); },
       }
@@ -207,3 +224,22 @@ pub fn register_mmio(bus: u8, physaddr: u64) !void {
 }
 
 var pci_mmio: [0x100]?*[1 << 20]u8 linksection(".bss") = undefined;
+
+pub const PCI_OFFSET_VENDOR_ID = 0x00;
+pub const PCI_OFFSET_DEVICE_ID = 0x02;
+pub const PCI_OFFSET_COMMAND = 0x04;
+pub const PCI_OFFSET_STATUS = 0x06;
+pub const PCI_OFFSET_PROG_IF = 0x09;
+pub const PCI_OFFSET_HEADER_TYPE = 0x0E;
+pub const PCI_OFFSET_BASE_CLASS = 0x0B;
+pub const PCI_OFFSET_SUB_CLASS = 0x0A;
+pub const PCI_OFFSET_SECONDARY_BUS = 0x19;
+pub const PCI_OFFSET_BAR0 = 0x10;
+pub const PCI_OFFSET_BAR1 = 0x14;
+pub const PCI_OFFSET_BAR2 = 0x18;
+pub const PCI_OFFSET_BAR3 = 0x1C;
+pub const PCI_OFFSET_BAR4 = 0x20;
+pub const PCI_OFFSET_BAR5 = 0x24;
+pub const PCI_OFFSET_CAP_PTR = 0x34;
+pub const PCI_OFFSET_INT_LINE = 0x3C;
+pub const PCI_OFFSET_INT_PIN = 0x3D;

@@ -334,7 +334,7 @@ fn translate_virt_impl(virt: usize, table: *page_table, comptime level: usize) !
   unreachable;
 }
 
-fn translate_virt(virt: usize, root: ?*platform.paging_root) !usize {
+pub fn translate_virt(virt: usize, root: ?*platform.paging_root) !usize {
   const root_ptr = platform.root_table(virt, if(root) |r| r.* else get_current_paging_root());
   return translate_virt_impl(virt, root_ptr, paging_levels - 1);
 }

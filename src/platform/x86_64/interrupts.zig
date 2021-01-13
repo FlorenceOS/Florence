@@ -11,6 +11,10 @@ const gdt = @import("gdt.zig");
 pub const num_handlers = 0x100;
 pub const handler_func = fn(*InterruptFrame)void;
 
+pub fn add_handler(idx: u8, f: handler_func) void {
+  handlers[idx] = f;
+}
+
 var handlers = [_]handler_func {unhandled_interrupt} ** num_handlers;
 
 pub fn init_interrupts() !void {
@@ -20,11 +24,10 @@ pub fn init_interrupts() !void {
   inline for(range(num_handlers)) |intnum| {
     itable[intnum] = idt.entry(make_handler(intnum), true, 0);
   }
-
-  handlers[0x0E] = page_fault_handler;
-  handlers[0x69] = bsp_handler;
-  handlers[0x6A] = platform.task_fork_handler;
-  handlers[0x6B] = yield_to_handler;
+  add_handler(0x0E, page_fault_handler);
+  add_handler(0x69, bsp_handler);
+  add_handler(0x6A, platform.task_fork_handler);
+  add_handler(0x6B, yield_to_handler);
 
   os.log("Interrupts: Enabling interrupts...\n", .{});
 
