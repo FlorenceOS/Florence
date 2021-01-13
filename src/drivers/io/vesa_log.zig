@@ -70,7 +70,7 @@ pub const FBInfo = struct { phys: u64, width: u32, height: u32 };
 
 pub fn get_info() ?FBInfo {
   if (framebuffer) |fb| {
-    var i = .{ .phys = fb.phys, .width = @truncate(u32, fb.width), .height = @truncate(u32, fb.height) };
+    var i = .{ .phys = fb.phys, .width = fb.width, .height = fb.height };
     return i;
   } else return null;
 }
@@ -153,7 +153,6 @@ fn blit_impl(comptime bpp: u64, ch: u8) void {
       }
     }
   }
-
   framebuffer.?.pos_x += 1;
 }
 

@@ -1,20 +1,24 @@
+/// virtio-gpu driver instance
 pub const Driver = struct {
   transport: virtio.Driver,
   inflight: u32 = 0,
   pitch: u32 = 0,
+
+  // Initialize the virtio transport, but don't change modes
   pub fn init(pciaddr: pci.Addr) !Driver {
     var v = try virtio.Driver.init(pciaddr, 0, 0);
     var d: Driver = .{ .transport = v };
     return d;
   }
 
+  // Do a modeswitch to the described mode
   pub fn modeset(self: *Driver, addr: u64, width: u32, height: u32) void {
     self.pitch = width * 4;
     var iter = self.transport.iter(0);
     {
       var msg: ResourceCreate2D = .{
         .hdr = .{ .cmdtype = VIRTIO_GPU_CMD_RESOURCE_CREATE_2D, .flags = 0, .fenceid = 0, .ctxid = 0 },
-        .resource_id = 1,
+        .resid = 1,
         .format = 1,
         .width = width,
         .height = height,
@@ -29,7 +33,7 @@ pub const Driver = struct {
     {
       var msg: ResourceAttachBacking = .{
         .hdr = .{ .cmdtype = VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING, .flags = 0, .fenceid = 0, .ctxid = 0 },
-        .resource_id = 1,
+        .resid = 1,
         .entrynum = 1,
       };
       var msg1: ResourceAttachBackingEntry = .{ .addr = addr, .len = width * height * 4 };
@@ -59,6 +63,7 @@ pub const Driver = struct {
     self.wait();
   }
 
+  /// Update *only* the rectangle
   pub fn update_rect(self: *Driver, rect: Rect) void {
     var iter = self.transport.iter(0);
     {
@@ -91,6 +96,7 @@ pub const Driver = struct {
     self.wait();
   }
 
+  /// Wait for request to finish.
   fn wait(self: *Driver) void {
     while (true) {
       var a: *volatile u32 = &self.inflight;
@@ -107,12 +113,14 @@ fn process(self: *Driver, i: u8, head: virtio.Descriptor) void {
   self.inflight -= 1;
 }
 
+/// General callback on an interrupt, context is a pointer to a Driver structure
 pub fn interrupt(frame: *os.platform.InterruptFrame, context: u64) void {
   var driver = @intToPtr(*Driver, context);
   driver.transport.acknowledge();
   driver.transport.process(0, process, driver);
 }
 
+/// Global rectangle update, but with a global context
 pub fn updater(x: u32, y: u32, w: u32, h: u32, ctx: u64) void {
   var self = @intToPtr(*Driver, ctx);
   self.update_rect(.{ .x = x, .y = y, .width = w, .height = h });
@@ -133,11 +141,11 @@ const ConfHdr = packed struct {
 };
 
 const ResourceCreate2D = packed struct {
-  hdr: ConfHdr, resource_id: u32, format: u32, width: u32, height: u32
+  hdr: ConfHdr, resid: u32, format: u32, width: u32, height: u32
 };
 
 const ResourceAttachBacking = packed struct {
-  hdr: ConfHdr, resource_id: u32, entrynum: u32
+  hdr: ConfHdr, resid: u32, entrynum: u32
 };
 
 const ResourceAttachBackingEntry = packed struct {
