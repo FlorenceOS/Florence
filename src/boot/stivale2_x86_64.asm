@@ -1,6 +1,6 @@
 .intel_syntax noprefix
 
-.section .stivale2hdr
+.section .stivale2hdr, "a"
 .8byte _start
 .8byte stack_top
 .8byte 0

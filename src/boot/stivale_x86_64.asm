@@ -2,7 +2,7 @@
 
 .set stivale_flags_value, 1 // we disable kaslr for now as the linker is not emitting relocations.
 
-.section .stivalehdr
+.section .stivalehdr, "a"
 .8byte stack_top // stack
 .2byte stivale_flags_value
 .2byte 0 // framebuffer_width
