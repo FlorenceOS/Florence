@@ -396,7 +396,11 @@ const PortState = struct {
 
         const commands_phys = try pmm.alloc_phys(port_io_size);
         const fis_phys = commands_phys + @sizeOf(CommandList);
-        try paging.map_phys_size(commands_phys, port_io_size, paging.mmio(), null);
+        try paging.remap_phys_size(.{
+            .phys = commands_phys,
+            .size = port_io_size,
+            .memtype = .Uncacheable,
+        });
         @memset(pmm.access_phys_volatile(u8, commands_phys), 0, port_io_size);
         write_u64(&self.mmio.command_list_base, commands_phys);
         write_u64(&self.mmio.fis_base, fis_phys);
@@ -409,7 +413,11 @@ const PortState = struct {
             if (reamining_table_size < @sizeOf(CommandTable)) {
                 reamining_table_size = page_size;
                 current_table_addr = try pmm.alloc_phys(page_size);
-                try paging.map_phys_size(current_table_addr, page_size, paging.mmio(), null);
+                try paging.remap_phys_size(.{
+                    .phys = current_table_addr,
+                    .size = page_size,
+                    .memtype = .Uncacheable,
+                });
                 @memset(pmm.access_phys_volatile(u8, current_table_addr), 0, page_size);
             }
 
@@ -422,7 +430,11 @@ const PortState = struct {
 
             // First PRD is just a small preallocated single page buffer
             const buf = try pmm.alloc_phys(page_size);
-            try paging.map_phys_size(buf, page_size, paging.mmio(), null);
+            try paging.remap_phys_size(.{
+                .phys = buf,
+                .size = page_size,
+                .memtype = .Uncacheable,
+            });
             @memset(pmm.access_phys_volatile(u8, buf), 0, page_size);
             write_u64(&header.table().prds[0].data_base_addr, buf);
             header.table().prds[0].sizem1 = page_size - 1;
@@ -699,7 +711,11 @@ pub fn register_controller(dev: pci.Device) void {
 
     log("AHCI: Got abar phys: 0x{X}\n", .{abar_phys});
 
-    paging.map_phys_size(abar_phys, abar_size, paging.mmio(), null) catch |err| {
+    paging.remap_phys_size(.{
+        .phys = abar_phys,
+        .size = abar_size,
+        .memtype = .Uncacheable,
+    }) catch |err| {
         log("AHCI: Failed to map ABAR: {}\n", .{@errorName(err)});
     };
 

@@ -94,7 +94,11 @@ pub fn register_fb(fb_phys: usize, fb_pitch: u16, fb_width: u16, fb_height: u16,
   const fb_page_low = os.lib.libalign.align_down(usize, page_size, fb_phys);
   const fb_page_high = os.lib.libalign.align_up(usize, page_size, fb_phys + fb_size);
 
-  paging.map_phys_range(fb_page_low, fb_page_high, paging.wc(paging.data()), null) catch |err| {
+  paging.remap_phys_range(.{
+    .phys = fb_page_low,
+    .phys_end = fb_page_high,
+    .memtype = .WriteCombining,
+  }) catch |err| {
     os.log("VESAlog: Couldn't map fb: {}\n", .{@errorName(err)});
     return;
   };

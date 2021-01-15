@@ -10,117 +10,125 @@ const range_reverse = os.lib.range.range_reverse;
 
 const pmm = os.memory.pmm;
 
-pub const make_page_table = platform.make_page_table;
-const page_table_entry = platform.page_table_entry;
-const page_table = platform.page_table;
-const page_sizes = platform.page_sizes;
-const paging_levels = page_sizes.len;
-const index_into_table = platform.index_into_table;
+//pub const make_page_table = platform.make_page_table;
+//const page_table_entry = platform.page_table_entry;
+//const page_table = platform.page_table;
+//const page_sizes = platform.page_sizes;
+//const paging_levels = page_sizes.len;
+//const index_into_table = platform.index_into_table;
 
-pub const map_args = struct {
+pub var CurrentContext: platform.paging.PagingContext = undefined;
+
+pub fn init() void {
+  CurrentContext = platform.paging.PagingContext.get_active();
+}
+
+pub fn map(args: struct {
   virt: usize,
   size: usize,
   perm: perms,
-  root: ?*platform.paging_root = null,
-};
-
-pub fn map(args: map_args) !void {
+  memtype: platform.paging.MemoryType,
+  context: *platform.paging.PagingContext = &CurrentContext,
+}) !void {
   var argc = args;
-  return map_loop(&argc.virt, null, &argc.size, argc.root, argc.perm);
+  return map_loop(.{
+    .virt = &argc.virt,
+    .phys = null,
+    .size = &argc.size,
+    .context = argc.context,
+    .perm = argc.perm,
+    .memtype = argc.memtype
+  });
 }
 
-pub const map_phys_args = struct {
+pub fn map_phys(args: struct {
   virt: usize,
   phys: usize,
   size: usize,
   perm: perms,
-  root: ?*platform.paging_root = null,
-};
-
-pub fn map_phys(args: map_phys_args) !void {
+  memtype: platform.paging.MemoryType,
+  context: *platform.paging.PagingContext = &CurrentContext,
+}) !void {
   var argc = args;
-  return map_loop(&argc.virt, &argc.phys, &argc.size, argc.root, argc.perm);
+  return map_loop(.{
+    .virt = &argc.virt,
+    .phys = &argc.phys,
+    .size = &argc.size,
+    .context = argc.context,
+    .perm = argc.perm,
+    .memtype = argc.memtype
+  });
 }
 
-pub const unmap_args = struct {
+pub fn unmap(args: struct {
   virt: usize,
   size: usize,
   reclaim_pages: bool,
-  root: ?*platform.paging_root = null,
-};
-
-pub fn unmap(args: unmap_args) !void {
+  context: *platform.paging.PagingContext = &CurrentContext,
+}) !void {
   var argc = args;
-  try unmap_impl(&argc.virt, &argc.size, argc.reclaim_pages, argc.root);
+  try unmap_loop(&argc.virt, &argc.size, argc.reclaim_pages, argc.context);
 }
 
 pub const perms = struct {
   writable: bool,
   executable: bool,
-  user: bool,
-  cacheable: bool,
-  writethrough: bool,
+  userspace: bool,
+
+  pub fn allows(self: @This(), other: @This()) bool {
+    if(!self.writable and other.writable)
+      return false;
+    if(!self.executable and other.executable)
+      return false;
+    if(!self.userspace and other.userspace)
+      return false;
+    return true;
+  }
+
+  pub fn add_perms(self: @This(), other: @This()) @This() {
+    return .{
+      .writable   = self.writable   or other.writable,
+      .executable = self.executable or other.executable,
+      .userspace  = self.userspace  or other.userspace,
+    };
+  }
 };
 
-pub fn mmio() perms {
-  return perms {
-    .writable = true,
-    .executable = false,
-    .user = false,
-    .cacheable = false,
-    .writethrough = true,
-  };
-}
-
-pub fn code() perms {
-  return perms {
+pub fn rx() perms {
+  return .{
     .writable = false,
     .executable = true,
-    .user = false,
-    .cacheable = true,
-    .writethrough = true,
+    .userspace = false,
   };
 }
 
-pub fn rodata() perms {
-  return perms {
+pub fn ro() perms {
+  return .{
     .writable = false,
     .executable = false,
-    .user = false,
-    .cacheable = true,
-    .writethrough = true,
+    .userspace = false,
   };
 }
 
-pub fn data() perms {
-  return perms {
+pub fn rw() perms {
+  return .{
     .writable = true,
     .executable = false,
-    .user = false,
-    .cacheable = true,
-    .writethrough = true,
+    .userspace = false,
   };
 }
 
 pub fn rwx() perms {
-  return perms {
+  return .{
     .writable = true,
     .executable = true,
-    .user = false,
-    .cacheable = true,
-    .writethrough = true,
+    .userspace = false,
   };
-}
-
-pub fn wc(curr: perms) perms {
-  var ret = curr;
-  ret.writethrough = true;
-  return ret;
 }
 
 pub fn user(p: perms) perms {
   var ret = curr;
-  ret.writethrough = true;
+  ret.user = true;
   return ret;
 }
 
@@ -128,9 +136,9 @@ pub fn get_current_paging_root() platform.paging_root {
   return platform.current_paging_root();
 }
 
-pub fn set_paging_root(new_root: *platform.paging_root, phys_base: u64) !void {
-  platform.set_paging_root(new_root);
-  pmm.set_phys_base(phys_base);
+pub fn set_context(new_context: *platform.paging.PagingContext) !void {
+  new_context.apply();
+  CurrentContext = new_context.*;
 }
 
 extern var __kernel_text_begin: u8;
@@ -140,104 +148,149 @@ extern var __kernel_data_end: u8;
 extern var __kernel_rodata_begin: u8;
 extern var __kernel_rodata_end: u8;
 
-const physical_base: usize = 0;
-
-pub fn bootstrap_kernel_paging() !platform.paging_root {
+pub fn bootstrap_kernel_paging() !platform.paging.PagingContext {
   // Setup some paging
-  var new_root = try platform.make_paging_root();
+  var new_context = try platform.paging.PagingContext.make_default();
 
-  try map_kernel_section(&new_root, &__kernel_text_begin, &__kernel_text_end, code());
-  try map_kernel_section(&new_root, &__kernel_data_begin, &__kernel_data_end, data());
-  try map_kernel_section(&new_root, &__kernel_rodata_begin, &__kernel_rodata_end, rodata());
+  try map_kernel_section(&new_context, &__kernel_text_begin, &__kernel_text_end, rx());
+  try map_kernel_section(&new_context, &__kernel_data_begin, &__kernel_data_end, rw());
+  try map_kernel_section(&new_context, &__kernel_rodata_begin, &__kernel_rodata_end, ro());
 
-  return new_root;
+  return new_context;
 }
 
-pub fn add_physical_mapping(new_root: *platform.paging_root, phys: usize, size: usize) !void {
-  try map_phys(.{
-    .virt = physical_base + phys,
-    .phys = phys,
-    .size = size,
-    .perm = data(),
-    .root = new_root,
-  });
-}
-
-pub fn map_phys_range(phys: usize, phys_end: usize, perm: perms, paging_root: ?*platform.paging_root) !void {
-  var beg = phys;
-  while(beg < phys_end): (beg += page_sizes[0]) {
-    try unmap(.{
-      .virt = physical_base + beg,
-      .size = page_sizes[0],
-      .reclaim_pages = false,
-      .root = paging_root,
-    });
-
-    try map_phys(.{
-      .virt = physical_base + beg,
-      .phys = beg,
-      .size = page_sizes[0],
-      .perm = perm,
-      .root = paging_root,
-    });
-  }
-}
-
-pub fn map_phys_struct(comptime T: type, phys: usize, perm: perms, paging_root: ?*platform.paging_root) !*T {
-  const struct_size = @sizeOf(T);
-  try map_phys_size(phys, struct_size, perm, paging_root);
-  return &pmm.access_phys(T, phys)[0];
-}
-
-pub fn map_phys_size(phys: usize, size: usize, perm: perms, paging_root: ?*platform.paging_root) !void {
-  const page_addr_low = libalign.align_down(usize, page_sizes[0], phys);
-  const page_addr_high = libalign.align_up(usize, page_sizes[0], phys + size);
-
-  try map_phys_range(page_addr_low, page_addr_high, perm, paging_root);
-}
-
-pub fn finalize_kernel_paging(new_root: *platform.paging_root) !void {
-  try platform.prepare_paging();
-  try set_paging_root(new_root, 0);
-}
-
-fn map_kernel_section(new_paging_root: *platform.paging_root, start: *u8, end: *u8, perm: perms) !void {
+fn map_kernel_section(new_paging_context: *platform.paging.PagingContext, start: *u8, end: *u8, perm: perms) !void {
   const step_size = platform.page_sizes[0];
 
   var remaining_bytes = libalign.align_up(usize, step_size, @ptrToInt(end) - @ptrToInt(start));
   var virt = @ptrToInt(start);
 
+
   while(remaining_bytes >= step_size) {
     os.vital(map_phys(.{
       .virt = virt,
-      .phys = os.vital(translate_virt(virt, null), "Translating kaddr"),
+      .phys = os.vital(translate_virt(.{.virt = virt}), "Translating kaddr"),
       .size = step_size,
       .perm = perm,
-      .root = new_paging_root,
+      .memtype = .Writethrough,
+      .context = new_paging_context,
     }), "Mapping kernel section");
     remaining_bytes -= step_size;
     virt += step_size;
   }
 }
 
-fn map_loop(virt: *usize, phys: ?*usize, size: *usize, root: ?*platform.paging_root, perm: perms) !void {
-  const start_virt = virt.*;
+// Will probably be replaced by phys_slice(T[]).map()
+/// Deprecated
+pub fn add_physical_mapping(args: struct {
+  context: *platform.paging.PagingContext,
+  phys: usize,
+  size: usize,
+  memtype: platform.paging.MemoryType,
+}) !void {
+  try map_phys(.{
+    .virt = args.context.phys_to_virt(args.phys),
+    .phys = args.phys,
+    .size = args.size,
+    .perm = rw(),
+    .context = args.context,
+    .memtype = args.memtype,
+  });
+}
 
-  if(!is_aligned(virt, phys, 0) or !libalign.is_aligned(usize, page_sizes[0], size.*)) {
-    // virt, phys and size all need to be aligned to page_sizes[0].
+// Will probably be replaced by phys_slice(T[]).map()
+/// Deprecated
+pub fn remap_phys_range(args: struct {
+  phys: usize,
+  phys_end: usize,
+  memtype: platform.paging.MemoryType,
+  context: *platform.paging.PagingContext = &CurrentContext,
+}) !void {
+  var beg = args.phys;
+  var virt = args.context.phys_to_virt(beg);
+  const psz = args.context.page_size(0, virt);
+  while(beg < args.phys_end): (beg += psz) {
+    virt = args.context.phys_to_virt(beg);
+
+    try unmap(.{
+      .virt = virt,
+      .size = psz,
+      .reclaim_pages = false,
+      .context = args.context,
+    });
+
+    try map_phys(.{
+      .virt = virt,
+      .phys = beg,
+      .size = psz,
+      .perm = rw(),
+      .memtype = args.memtype,
+      .context = args.context,
+    });
+  }
+}
+
+// Will probably be replaced by phys_ptr(T).map()
+/// Deprecated
+pub fn remap_phys_struct(comptime T: type, args: struct{
+  phys: usize,
+  memtype: platform.paging.MemoryType,
+  context: *platform.paging.PagingContext = &CurrentContext,
+}) !*T {
+  const struct_size = @sizeOf(T);
+  try remap_phys_size(.{
+    .phys = args.phys,
+    .size = struct_size,
+    .memtype = args.memtype,
+    .context = args.context,
+  });
+  return &pmm.access_phys(T, args.phys)[0];
+}
+
+// Will probably be replaced by phys_slice(T[]).map()
+/// Deprecated
+pub fn remap_phys_size(args: struct {
+  phys: usize,
+  size: usize,
+  memtype: platform.paging.MemoryType,
+  context: *platform.paging.PagingContext = &CurrentContext,
+}) !void {
+  const psz = args.context.page_size(0, args.context.phys_to_virt(args.phys));
+  const page_addr_low = libalign.align_down(usize, psz, args.phys);
+  const page_addr_high = libalign.align_up(usize, psz, args.phys + args.size);
+
+  try remap_phys_range(.{
+    .phys = page_addr_low,
+    .phys_end = page_addr_high,
+    .context = args.context,
+    .memtype = args.memtype,
+  });
+}
+
+fn map_loop(args: struct {
+  virt: *usize,
+  phys: ?*usize,
+  size: *usize,
+  perm: perms,
+  memtype: platform.paging.MemoryType,
+  context: *platform.paging.PagingContext,
+}) !void {
+  const start_virt = args.virt.*;
+
+  if(!is_aligned(args.virt.*, args.phys, 0, args.context) or
+     !libalign.is_aligned(usize, args.context.page_size(0, args.virt.*), args.size.*)) {
+    // virt, phys and size all need to be aligned
     return error.BadAlignment;
   }
 
-  const root_ptr = platform.root_table(virt.*, if(root) |r| r.* else get_current_paging_root());
-
   errdefer {
     // Unwind loop
-    if(start_virt != virt.*) {
+    if(start_virt != args.virt.*) {
       unmap(.{
         .virt = start_virt,
-        .size = virt.* - start_virt,
-        .reclaim_pages = phys == null,
-        .root = root,
+        .size = args.virt.* - start_virt,
+        .reclaim_pages = args.phys == null,
+        .context = args.context,
       }) catch |err| {
         log("Unable to unmap partially failed mapping: {}\n", .{@errorName(err)});
         @panic("");
@@ -245,144 +298,153 @@ fn map_loop(virt: *usize, phys: ?*usize, size: *usize, root: ?*platform.paging_r
     }
   }
 
-  while(size.* != 0)
-    try map_impl(virt, phys, size, root_ptr, perm);
+  const root = args.context.root_table(args.virt.*);
+  try map_impl(args.virt, args.phys, args.size, root, args.perm, args.memtype, args.context);
+
+  if(args.size.* != 0)
+    return error.IncompleteMapping;
 }
 
-fn is_aligned(virt: *usize, phys: ?*usize, comptime level: usize) bool {
-  if(!libalign.is_aligned(usize, page_sizes[level], virt.*)) {
+fn is_aligned(virt: usize, phys: ?*usize, level: anytype, context: *platform.paging.PagingContext) bool {
+  if(!libalign.is_aligned(usize, context.page_size(level, virt), virt))
     return false;
-  }
-  if(phys == null) {
-    return true;
-  }
-  return libalign.is_aligned(usize, page_sizes[level], phys.?.*);
+
+  if(phys) |p|
+    return libalign.is_aligned(usize, context.page_size(level, virt), p.*);
+
+  return true;
+  
 }
 
-fn map_impl(virt: *usize, phys: ?*usize, size: *usize, root: *page_table, perm: perms) !void {
-  var curr = root;
+const MapError = error{
+  AlreadyPresent,
+  OutOfMemory,
+  PhysAllocTooSmall,
+};
 
-  inline for(range_reverse(paging_levels)) |level| {
-    if(size.* >= page_sizes[level] and is_aligned(virt, phys, level) and level < platform.allowed_mapping_levels()) {
-      if(phys != null) {
-        try map_at_level(level, virt.*, phys.?.*, root, perm);
-      }
-      else {
-        try map_at_level(level, virt.*, try pmm.alloc_phys(page_sizes[level]), root, perm);
-      }
+fn map_impl(
+  virt: *usize,
+  phys: ?*usize,
+  size: *usize,
+  table: anytype,
+  perm: perms,
+  memtype: platform.paging.MemoryType,
+  context: *platform.paging.PagingContext,
+) MapError!void {
+  var curr = table;
 
-      if(phys != null)
-        phys.?.* += page_sizes[level];
+  const children = table.skip_to(virt.*);
 
-      virt.* += page_sizes[level];
-      size.* -= page_sizes[level];
+  for(children) |*child| {
+    switch(table.decode_child(child)) {
+      .Mapping => return error.AlreadyPresent,
+      .Table => |*tbl| {
+        try map_impl(virt, phys, size, tbl.*, perm, memtype, context);
+        if(!tbl.perms.allows(perm)) {
+          tbl.add_perms(perm);
+          context.invalidate(virt.*);
+        }
+      },
+      .Empty => {
+        const dom = table.child_domain(virt.*);
+
+        // Should we map at the current level?
+        if(dom.ptr == virt.* and dom.len <= size.*
+            and context.can_map_at_level(table.level() - 1)
+            and is_aligned(virt.*, phys, table.level() - 1, context)) {
+          const m = try table.make_child_mapping(child, if(phys) |p| p.* else null, perm, memtype);
+          const step = dom.len;
+          if(step >= size.*) {
+            size.* = 0;
+            return;
+          }
+          else {
+            size.* -= step;
+            virt.* += step;
+            if(phys) |p|
+              p.* += step;
+          }
+        } else {
+          const tbl = try table.make_child_table(child, perm);
+          try map_impl(virt, phys, size, tbl, perm, memtype, context);
+        }
+      },
+    }
+    if(size.* == 0)
       return;
-    }
   }
-  return error.map_impl;
 }
 
-fn map_at_level(comptime level: usize, virt: usize, phys: usize, root: *page_table, perm: perms) !void {
-  const pte = try make_pte(virt, level, perm, root);
-  try pte.set_mapping(level, phys, perm);
-}
+fn translate_virt_impl(
+  virt: usize,
+  table: anytype,
+  context: *platform.paging.PagingContext,
+) error{NotPresent}!usize {
+  const child = table.decode_child(&table.skip_to(virt)[0]);
+  const dom = table.child_domain(virt);
 
-fn make_pte(virt: usize, level: usize, perm: perms, root: *page_table) !*page_table_entry {
-  var current_table = root;
-  inline for(range_reverse(paging_levels)) |current_level| {
-    const pte = index_into_table(current_table, virt, current_level);
-    if(level == current_level)
-      return pte;
-
-    if(!pte.is_present(current_level)) {
-      const addr = try make_page_table();
-
-      pte.set_table(current_level, addr, perm) catch |err| switch(err) {
-        error.AlreadyPresent => unreachable,
-      };
-    }
-    else {
-      if(pte.is_mapping(current_level))
-        return error.AlreadyPresent;
-
-      pte.add_table_perms(current_level, perm) catch |err| switch(err) {
-        error.IsNotTable => unreachable,
-      };
-    }
-
-    current_table = pte.get_table(current_level) catch |err| switch(err) {
-      error.IsNotTable => unreachable,
-    };
+  switch(child) {
+    .Empty => return error.NotPresent,
+    .Mapping => |m| return m.mapped_bytes().ptr + virt - dom.ptr,
+    .Table => |t| return translate_virt_impl(virt, t, context),
   }
-  return error.make_pte;
 }
 
-fn translate_virt_impl(virt: usize, table: *page_table, comptime level: usize) !usize {
-  const pte = index_into_table(table, virt, level);
-
-  if(!pte.is_present(level))
-    return error.NotPresent;
-
-  if(pte.is_mapping(level)) {
-    const virt_base = libalign.align_down(usize, page_sizes[level], virt);
-    return pte.physaddr(level) + (virt - virt_base);
-  }
-
-  if(level > 0 and pte.is_table(level))
-    return translate_virt_impl(virt, pte.get_table(level) catch unreachable, level - 1);
-
-  unreachable;
+pub fn translate_virt(args: struct {
+  virt: usize,
+  context: *platform.paging.PagingContext = &CurrentContext,
+}) !usize {
+  const root = args.context.root_table(args.virt);
+  return translate_virt_impl(args.virt, root, args.context);
 }
 
-pub fn translate_virt(virt: usize, root: ?*platform.paging_root) !usize {
-  const root_ptr = platform.root_table(virt, if(root) |r| r.* else get_current_paging_root());
-  return translate_virt_impl(virt, root_ptr, paging_levels - 1);
-}
-
-fn unmap_impl(virt: *usize, size: *usize, reclaim_pages: bool, root_in: ?*platform.paging_root) !void {
-  const root = platform.root_table(virt.*, if(root_in) |root| root.* else get_current_paging_root());
-
+fn unmap_loop(
+  virt: *usize,
+  size: *usize,
+  reclaim_pages: bool,
+  context: *platform.paging.PagingContext,
+) !void {
+  const root = context.root_table(virt.*);
   while(size.* != 0)
-    try unmap_at_level(virt, size, reclaim_pages, root, paging_levels - 1);
+    try unmap_iter(virt, size, reclaim_pages, root, context);
 }
 
-fn unmap_at_level(virt: *usize, size: *usize, reclaim_pages: bool, table: *page_table, comptime level: usize) !void {
-  const pte = index_into_table(table, virt.*, level);
+fn unmap_iter(
+  virt: *usize,
+  size: *usize,
+  reclaim_pages: bool,
+  table: anytype,
+  context: *platform.paging.PagingContext,
+) error{NoPartialUnmapping}!void {
+  for(table.skip_to(virt.*)) |*child| {
+    const dom = table.child_domain(virt.*);
 
-  if(pte.is_present(level)) {
-    if(pte.is_mapping(level)) {
-      if(page_sizes[level] <= size.*) {
-        size.* -= page_sizes[level];
-        virt.* += page_sizes[level];
+    switch(table.decode_child(child)) {
+      .Empty => {
+        if(dom.len >= size.*){
+          size.* = 0;
+          return;
+        }
+        virt.* += dom.len;
+        size.* -= dom.len;
+      },
+      .Table => |tbl| try unmap_iter(virt, size, reclaim_pages, tbl, context),
+      .Mapping => |mapping| {
+        if(dom.len > size.* or dom.ptr != virt.*)
+          return error.NoPartialUnmapping;
 
         if(reclaim_pages)
-          pmm.free_phys(pte.physaddr(level), page_sizes[level]);
+          pmm.free_phys(mapping.phys, dom.len);
 
-        pte.clear(level);
-        
-        platform.invalidate_mapping(virt.*);
-        return;
-      }
-      else {
-        return error.NoPartialUnmapping;
-      }
+        child.* = context.encode_empty(mapping.level);
+        context.invalidate(virt.*);
+
+        virt.* += dom.len;
+        size.* -= dom.len;
+      },
     }
-    else { // Table
-      if(level == 0) {
-        return error.CorruptPageTables;
-      }
-      else {
-        return unmap_at_level(virt, size, reclaim_pages, pte.get_table(level) catch unreachable, level - 1);
-      }
-    }
-  } else {
-    if(size.* <= page_sizes[level]) {
-      virt.* += size.*;
-      size.* = 0;
+    if(size.* == 0)
       return;
-    }
-    size.* -= page_sizes[level];
-    virt.* += page_sizes[level];
   }
 }
 

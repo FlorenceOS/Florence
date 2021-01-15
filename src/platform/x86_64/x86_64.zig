@@ -1,3 +1,5 @@
+pub const paging = @import("paging.zig");
+
 const interrupts = @import("interrupts.zig");
 const setup_gdt = @import("gdt.zig").setup_gdt;
 const serial = @import("serial.zig");
@@ -6,7 +8,6 @@ const os = @import("root").os;
 
 const pmm    = os.memory.pmm;
 const vmm    = os.memory.vmm;
-const paging = os.memory.paging;
 
 const scheduler = os.thread.scheduler;
 const Task      = os.thread.Task;
@@ -30,212 +31,6 @@ pub const page_sizes =
     0x8000000000,
   };
 
-pub fn allowed_mapping_levels() u8 {
-  return 2;
-}
-
-const paging_perms = os.memory.paging.perms;
-
-// https://github.com/ziglang/zig/issues/2627
-// Just straight up doesn't work, everything breaks as page table entries has size 9
-// according to the compiler
-// present: u1,
-// writable: u1,
-// user: u1,
-// writethrough: u1,
-// cache_disable: u1,
-// accessed: u1,
-// ignored_6: u1,
-// is_mapping_bit: u1,
-// ignored_8: u4,
-// physaddr_bits: u51,
-// execute_disable: u1,
-
-const phys_bitmask: u64 = ((@as(u64, 1) << 51) - 1) << 12;
-const present_bit: u64 = 0x1;
-const writable_bit: u64 = 0x2;
-const user_bit: u64 = 0x4;
-const writethrough_bit: u64 = 0x8;
-const cache_disable_bit: u64 = 0x10;
-const accessed_bit: u64 = 0x20;
-const is_mapping_bit: u64 = 0x80;
-const execute_disable_bit: u64 = 1 << 63;
-
-pub const page_table_entry = packed struct {
-  raw: u64,
-
-  pub fn is_present(self: *const page_table_entry, comptime level: usize) bool {
-    return (self.raw & present_bit) != 0;
-  }
-
-  pub fn clear(self: *page_table_entry, comptime level: usize) void {
-    self.raw &= ~present_bit;
-  }
-
-  pub fn is_mapping(self: *const page_table_entry, comptime level: usize) bool {
-    if(!self.is_present(level))
-      return false;
-
-    if(level == 0)
-      return true;
-
-    return (self.raw & is_mapping_bit) != 0;
-  }
-
-  pub fn is_table(self: *const page_table_entry, comptime level: usize) bool {
-    if(!self.is_present(level) or level == 0)
-      return false;
-
-    return (self.raw & is_mapping_bit) == 0;
-  }
-
-  pub fn physaddr(self: *const page_table_entry, comptime level: usize) u64 {
-    return self.raw & phys_bitmask;
-  }
-
-  pub fn get_table(self: *const page_table_entry, comptime level: usize) !*page_table {
-    if(!self.is_table(level))
-      return error.IsNotTable;
-
-    return &pmm.access_phys(page_table, self.physaddr(level))[0];
-  }
-
-  fn set_physaddr(self: *page_table_entry, comptime level: usize, addr: u64) void {
-    self.raw &= ~phys_bitmask;
-    self.raw |=  addr;
-  }
-
-  pub fn set_table(self: *page_table_entry, comptime level: usize, addr: usize, perms: paging_perms) !void {
-    assert(level != 0);
-
-    if(self.is_present(level))
-      return error.AlreadyPresent;
-
-    self.raw |=  present_bit;
-    self.raw &= ~is_mapping_bit;
-    self.set_physaddr(level, addr);
-
-    self.raw &= ~writable_bit;
-    self.raw &= ~user_bit;
-    self.raw |=  execute_disable_bit;
-    self.raw |=  writethrough_bit;
-    self.raw &= ~cache_disable_bit;
-
-    self.add_table_perms(level, perms) catch unreachable;
-  }
-
-  pub fn set_mapping(self: *page_table_entry, comptime level: usize, addr: usize, perms: paging_perms) !void {
-    if(self.is_present(level))
-      return error.AlreadyPresent;
-
-    self.raw |= present_bit;
-    self.raw |= is_mapping_bit;
-    self.set_physaddr(level, addr);
-
-    self.raw |=  if(perms.writable)     writable_bit else 0;
-    self.raw &= ~if(perms.executable)   execute_disable_bit else 0;
-    self.raw |=  if(perms.user)         user_bit else 0;
-    self.raw |=  if(perms.writethrough) writethrough_bit else 0;
-    self.raw &= ~if(perms.cacheable)    cache_disable_bit else 0;
-  }
-
-  pub fn add_table_perms(self: *page_table_entry, comptime level: usize, perms: paging_perms) !void {
-    if(!self.is_table(level))
-      return error.IsNotTable;
-    
-    if(perms.writable)   self.raw |= writable_bit;
-    if(perms.user)       self.raw |= user_bit;
-    if(perms.executable) self.raw &= ~execute_disable_bit;
-  }
-
-  pub fn format(self: *const page_table_entry, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
-    if(!self.is_present(0)) {
-      try writer.writeAll("Empty");
-      return;
-    }
-
-    if(self.is_mapping(0)) {
-      try writer.print("Mapping{{.phys = 0x{x:0>16}, .writable={}, .execute={}, .cacheable={}", .{self.physaddr(0), @boolToInt(self.raw & writable_bit != 0), @boolToInt(self.raw & execute_disable_bit == 0), @boolToInt(self.raw & cache_disable_bit == 0)});
-
-      if((self.raw & writable_bit) != 0) {
-        try writer.print(", .writethrough={}", .{@boolToInt(self.raw & writethrough_bit != 0)});
-      }
-
-      try writer.print("}}", .{});
-      return;
-    }
-    if(self.is_table(0)) {
-      try writer.print("Table{{.phys = 0x{x:0>16}, .writable={}, .execute={}}}", .{self.physaddr(0), @boolToInt(self.raw & writable_bit != 0), @boolToInt(self.raw & execute_disable_bit == 0)});
-      return;
-    }
-    unreachable;
-  }
-};
-
-comptime {
-  assert(@bitSizeOf(page_table_entry) == 64);
-  assert(@sizeOf(page_table_entry) == 8);
-}
-
-pub const page_table = [512]page_table_entry;
-
-fn table_index(table: *page_table, ind: usize) *page_table_entry {
-  return &table.*[ind];
-}
-
-pub fn index_into_table(table: *page_table, vaddr: u64, level: usize) *page_table_entry {
-  const ind = (vaddr >> (12 + @intCast(u6, level * 9))) & 0x1FF;
-  return table_index(table, ind);
-}
-
-pub fn make_page_table() !u64 {
-  const pt = try pmm.alloc_phys(0x1000);
-  @memset(pmm.access_phys(u8, pt), 0x00, 0x1000);
-  return pt;
-}
-
-pub fn make_paging_root() !paging_root {
-  return make_page_table();
-}
-
-pub fn invalidate_mapping(virt: usize) void {
-  asm volatile(
-    \\invlpg (%[virt])
-    :
-    : [virt] "r" (virt)
-    : "memory"
-  );
-}
-
-pub fn set_paging_root(root: *paging_root) void {
-  asm volatile (
-    "mov %[paging_root], %%cr3\n\t"
-    :
-    : [paging_root] "X" (root.*)
-  );
-}
-
-pub fn current_paging_root() paging_root {
-  return asm volatile (
-    "mov %%cr3, %[paging_root]\n\t"
-    : [paging_root] "={rax}" (-> u64)
-  );
-}
-
-pub fn root_table(_: usize, root: paging_root) *page_table {
-  return pmm.access_phys_single(page_table, root);
-}
-
-pub fn root_tables(root: *paging_root) [1]*page_table {
-  return [_]*page_table {
-    pmm.access_phys_single(page_table, root.*),
-  };
-}
-
-pub fn prepare_paging() !void {
-  IA32_EFER.write(IA32_EFER.read() | (1 << 11)); // NXE
-}
-
 pub fn platform_init() !void {
   try os.platform.acpi.init_acpi();
   try os.platform.pci.init_pci();
@@ -245,6 +40,7 @@ pub fn platform_early_init() void {
   serial.init();
   try interrupts.init_interrupts();
   setup_gdt();
+  os.memory.paging.init();
 }
 
 pub fn read_msr(comptime T: type, msr_num: u32) T {
@@ -280,14 +76,14 @@ pub fn reg(comptime T: type, comptime name: []const u8) type {
   return struct {
     pub fn read() T {
       return asm volatile(
-        "mov %%" ++ name ++ " %[out]"
+        "mov %%" ++ name ++ ", %[out]"
         : [out]"=r"(-> T)
       );
     }
 
     pub fn write(val: T) void {
       asm volatile(
-        "mov %[in] %%" ++ name
+        "mov %[in], %%" ++ name
         :
         : [in]"r"(val)
       );
@@ -341,6 +137,47 @@ pub fn set_interrupts(s: InterruptState) void {
       \\cli
     );
   }
+}
+
+pub fn fill_cpuid(res: anytype, leaf: u32) bool {
+  if(leaf & 0x7FFFFFFF != 0) {
+    if(!check_has_cpuid_leaf(leaf))
+      return false;
+  }
+
+  var eax: u32 = undefined;
+  var ebx: u32 = undefined;
+  var edx: u32 = undefined;
+  var ecx: u32 = undefined;
+
+  asm volatile(
+    \\cpuid
+    : [eax] "={eax}" (eax)
+    , [ebx] "={ebx}" (ebx)
+    , [edx] "={edx}" (edx)
+    , [ecx] "={ecx}" (ecx)
+    : [leaf] "{eax}" (leaf)
+  );
+  return true;
+}
+
+pub fn check_has_cpuid_leaf(leaf: u32) bool {
+  const max_func = cpuid(leaf & 0x80000000).?.eax;
+  return leaf <= max_func;
+}
+
+const default_cpuid = struct {
+  eax: u32,
+  ebx: u32,
+  edx: u32,
+  ecx: u32,
+};
+
+pub fn cpuid(leaf: u32) ?default_cpuid {
+  var result: default_cpuid = undefined;
+  if(fill_cpuid(&result, leaf))
+    return result;
+  return null;
 }
 
 pub const TaskData = struct {
@@ -438,7 +275,6 @@ pub fn yield_to_task(t: *Task) void {
 pub const self_exited = interrupts.self_exited;
 
 pub const IA32_APIC_BASE = msr(u64, 0x0000001B);
-pub const IA32_EFER      = msr(u64, 0xC0000080);
 pub const KernelGSBase   = msr(u64, 0xC0000102);
 
 pub fn set_current_task(task_ptr: *Task) void {

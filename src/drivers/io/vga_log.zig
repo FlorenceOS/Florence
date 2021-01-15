@@ -21,7 +21,11 @@ pub fn register() void {
     const vga_page_low = libalign.align_down(usize, page_size, 0xB8000);
     const vga_page_high = libalign.align_up(usize, page_size, 0xB8000 + vga_size);
 
-    paging.map_phys_range(vga_page_low, vga_page_high, paging.wc(paging.data()), null) catch |err| {
+    paging.remap_phys_range(.{
+      .phys = vga_page_low,
+      .phys_end = vga_page_high,
+      .memtype = .WriteCombining,
+    }) catch |err| {
       os.log(":/ rip couldn't map vga: {}\n", .{@errorName(err)});
       return;
     };

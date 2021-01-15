@@ -220,7 +220,11 @@ pub fn init_pci() !void {
 }
 
 pub fn register_mmio(bus: u8, physaddr: u64) !void {
-  try paging.map_phys_size(physaddr, 1 << 20, paging.mmio(), null);
+  try paging.remap_phys_size(.{
+    .phys = physaddr,
+    .size = 1 << 20,
+    .memtype = .Uncacheable,
+  });
   pci_mmio[bus] = &os.memory.pmm.access_phys([1 << 20]u8, physaddr)[0];
 }
 

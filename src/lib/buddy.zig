@@ -56,7 +56,7 @@ pub fn buddy_alloc(comptime allocator_size: usize, comptime minsize: usize) type
       try paging.map(.{
         .virt = self.base,
         .size = page_size,
-        .perm = paging.data(),
+        .perm = paging.rw(),
       });
 
 
@@ -133,7 +133,7 @@ pub fn buddy_alloc(comptime allocator_size: usize, comptime minsize: usize) type
         paging.map(.{
           .virt = buddy,
           .size = page_size,
-          .perm = paging.data(),
+          .perm = paging.rw(),
         }) catch |err| switch(err) {
           error.AlreadyPresent => { }, // That's fine to us.
           else => return err,
@@ -142,7 +142,7 @@ pub fn buddy_alloc(comptime allocator_size: usize, comptime minsize: usize) type
         errdefer paging.unmap(.{
           .virt = buddy,
           .size = page_size,
-          .perm = paging.data(),
+          .perm = paging.rw(),
         });
 
         self.add_free(buddy, level);
