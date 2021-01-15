@@ -61,9 +61,13 @@ fn signature_value(sdt: anytype) u32 {
 }
 
 fn map_sdt(addr: u64) ![]u8 {
-  const sdt = @ptrCast([*]u8, try paging.map_phys_struct([8]u8, addr, paging.data(), null));
+  const sdt = @ptrCast([*]u8, try paging.remap_phys_struct([8]u8, .{.phys = addr, .memtype = .Writethrough}));
   const sz = sdt_size(sdt);
-  try paging.map_phys_size(addr, sz, paging.data(), null);
+  try paging.remap_phys_size(.{
+    .phys = addr,
+    .size = sz,
+    .memtype = .Writethrough,
+  });
   return sdt[0..sz];
 }
 
@@ -113,7 +117,7 @@ pub fn init_acpi() !void {
   if(rsdp_phys == 0)
     return error.NoRSDP;
 
-  rsdp = try paging.map_phys_struct(RSDP, rsdp_phys, paging.data(), null);
+  rsdp = try paging.remap_phys_struct(RSDP, .{.phys = rsdp_phys, .memtype = .Writethrough});
 
   os.log("ACPI: Revision: {}\n", .{rsdp.revision});
 

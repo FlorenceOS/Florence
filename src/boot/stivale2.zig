@@ -192,6 +192,7 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
   }
 
   platform.platform_early_init();
+  os.memory.paging.CurrentContext.set_phys_base(0);
 
   os.log(
     \\Bootloader: {}
@@ -213,25 +214,29 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     stivale.add_memmap(ent);
   }
 
-  var paging_root = os.vital(paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
-
-  if(arch == .x86_64)
-    stivale.map_bootloader_data(&paging_root);
+  var context = os.vital(paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
 
   for(info.memmap.?.get()) |*ent| {
-    stivale.map_phys(ent, &paging_root);
+    stivale.map_phys(ent, &context);
   }
 
   if(info.uart) |uart| {
     os.log("Mapping UART\n", .{});
-    os.vital(paging.map_phys_size(uart.uart_addr, platform.page_sizes[0], paging.mmio(), &paging_root), "mapping UART");
+    os.vital(paging.remap_phys_size(.{
+      .phys = uart.uart_addr,
+      .size = platform.page_sizes[0],
+      .memtype = .Uncacheable,
+      .context = &context,
+    }), "mapping UART");
   }
 
-  os.vital(paging.finalize_kernel_paging(&paging_root), "finalizing kernel paging");
+  const phys_high = stivale.phys_high(info.memmap.?.get());
+
+  context.apply();
 
   os.log("Doing vmm\n", .{});
 
-  os.vital(vmm.init(stivale.phys_high(info.memmap.?.get())), "initializing vmm");
+  os.vital(vmm.init(phys_high), "initializing vmm");
 
   os.log("Doing framebuffer\n", .{});
 

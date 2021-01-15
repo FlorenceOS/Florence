@@ -36,3 +36,13 @@ pub fn hang() noreturn {
     unreachable;
   }
 }
+
+pub const virt_slice = struct {
+  ptr: u64,
+  len: u64,
+};
+
+pub const phys_slice = struct {
+  ptr: u64,
+  len: u64,
+};

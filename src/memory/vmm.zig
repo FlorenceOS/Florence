@@ -24,7 +24,8 @@ pub fn sbrk(num_bytes: u64) ![]u8 {
   try paging.map(.{
     .virt = ret,
     .size = num_bytes,
-    .perm = paging.data(),
+    .perm = paging.rw(),
+    .memtype = .Writethrough,
   });
 
   sbrk_head += num_bytes;

@@ -17,7 +17,7 @@ pub const DescIter = struct {
     iter.curr = iter.next;
     iter.next = if ((flags & VRING_DESC_F_NEXT) != 0) iter.drv.descr(iter.i) else 0xFFFF;
     assert(len <= 0x1000);
-    const addr = paging.translate_virt(@ptrToInt(a), null) catch |err| {
+    const addr = paging.translate_virt(.{.virt = @ptrToInt(a)}) catch |err| {
       @panic("virtio-pci: can't get the physical address");
     };
     iter.drv.queues[iter.i].desc[iter.curr] = .{ .addr = addr, .len = len, .flags = flags, .next = iter.next };
@@ -182,7 +182,7 @@ pub const Driver = struct {
     }
     drv.queues[i].desc[m].next = 0xFFFF;
 
-    const phy = paging.translate_virt(virt, null) catch |err| return;
+    const phy = paging.translate_virt(.{.virt = virt}) catch |err| return;
     drv.cfg.queue_desc = phy;
     drv.cfg.queue_avail = phy + desc_siz;
     drv.cfg.queue_used = phy + aligned_siz;
@@ -274,7 +274,11 @@ const CommonCfg = packed struct {
 
 // map function helper
 fn map(phy: u64, len: u64) void {
-  paging.map_phys_size(phy, len, paging.mmio(), null) catch |err| {
+  paging.remap_phys_size(.{
+    .phys = phy,
+    .size = len,
+    .memtype = .Uncacheable
+  }) catch |err| {
     @panic("virtio-blk: can't map memory.");
   };
 }

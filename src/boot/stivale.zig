@@ -38,26 +38,23 @@ export fn stivale_main(input_info: *StivaleInfo) void {
   os.log("Stivale: Boot arguments: {s}\n", .{info.cmdline});
 
   os.platform.platform_early_init();
+  os.memory.paging.CurrentContext.set_phys_base(0);              
 
   for(info.memmap()) |*ent| {
-    stivale.add_memmap_low(ent);
+    stivale.add_memmap(ent);
   }
 
-  var paging_root = os.vital(paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
-
-  stivale.map_bootloader_data(&paging_root);
+  var context = os.vital(paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
 
   for(info.memmap()) |*ent| {
-    stivale.map_phys(ent, &paging_root);
+    stivale.map_phys(ent, &context);
   }
 
-  os.vital(paging.finalize_kernel_paging(&paging_root), "finalizing kernel paging");
+  const phys_high = stivale.phys_high(info.memmap());
 
-  for(info.memmap()) |*ent| {
-    stivale.add_memmap_high(ent);
-  }
+  context.apply();
 
-  os.vital(vmm.init(stivale.phys_high(info.memmap())), "initializing vmm");
+  os.vital(vmm.init(phys_high), "initializing vmm");
 
   if((stivale_flags & 1) == 1) {
     os.drivers.vesa_log.register_fb(info.framebuffer_addr, info.framebuffer_pitch, info.framebuffer_width, info.framebuffer_height, info.framebuffer_bpp);
