@@ -13,7 +13,7 @@ var source_blob: *std.build.RunStep = undefined;
 var source_blob_path: []u8 = undefined;
 
 fn make_source_blob(b: *Builder) void {
-    source_blob_path = b.fmt("{}/sources.tar", .{b.cache_root});
+    source_blob_path = b.fmt("{s}/sources.tar", .{b.cache_root});
 
     source_blob = b.addSystemCommand(
         &[_][]const u8{
@@ -84,7 +84,7 @@ fn add_libs(exec: *std.build.LibExeObjStep) void {
 
 fn make_exec(b: *Builder, arch: builtin.Arch, ctx: Context, filename: []const u8, main: []const u8) *std.build.LibExeObjStep {
     const exec = b.addExecutable(filename, main);
-    exec.addBuildOption([]const u8, "source_blob_path", b.fmt("../../{}", .{source_blob_path}));
+    exec.addBuildOption([]const u8, "source_blob_path", b.fmt("../../{s}", .{source_blob_path}));
     target(exec, arch, ctx);
     add_libs(exec);
     exec.setBuildMode(.ReleaseSafe);
@@ -100,11 +100,11 @@ fn make_exec(b: *Builder, arch: builtin.Arch, ctx: Context, filename: []const u8
 }
 
 fn build_kernel(b: *Builder, arch: builtin.Arch, name: []const u8) *std.build.LibExeObjStep {
-    const kernel_filename = b.fmt("Flork_{}_{}", .{ name, @tagName(arch) });
-    const main_file = b.fmt("src/boot/{}.zig", .{name});
+    const kernel_filename = b.fmt("Flork_{s}_{s}", .{ name, @tagName(arch) });
+    const main_file = b.fmt("src/boot/{s}.zig", .{name});
 
     const kernel = make_exec(b, arch, .kernel, kernel_filename, main_file);
-    kernel.addAssemblyFile(b.fmt("src/boot/{}_{}.asm", .{ name, @tagName(arch) }));
+    kernel.addAssemblyFile(b.fmt("src/boot/{s}_{s}.asm", .{ name, @tagName(arch) }));
     kernel.setLinkerScriptPath("src/kernel/kernel.ld");
 
     //kernel.step.dependOn(&build_dyld(b, arch).step);
@@ -128,8 +128,8 @@ fn qemu_run_aarch64_sabaton(b: *Builder, board_name: []const u8, desc: []const u
         "qemu-system-aarch64", 
         "-M", board_name, 
         "-cpu", "cortex-a57",
-        "-drive", b.fmt("if=pflash,format=raw,file=Sabaton/out/aarch64_{}.bin,readonly=on", .{board_name}),
-        "-drive", b.fmt("if=pflash,format=raw,file={},readonly=on", .{dep.getOutputPath()}),
+        "-drive", b.fmt("if=pflash,format=raw,file=Sabaton/out/aarch64_{s}.bin,readonly=on", .{board_name}),
+        "-drive", b.fmt("if=pflash,format=raw,file={s},readonly=on", .{dep.getOutputPath()}),
         "-m", "4G",
         "-serial", "stdio",
         //"-S", "-s",
@@ -157,8 +157,8 @@ fn qemu_run_riscv_sabaton(b: *Builder, board_name: []const u8, desc: []const u8,
         "qemu-system-riscv64",
         "-M", board_name,
         "-cpu", "rv64",
-        "-drive", b.fmt("if=pflash,format=raw,file=Sabaton/out/riscv64_{}.bin,readonly=on", .{board_name}),
-        "-drive", b.fmt("if=pflash,format=raw,file={},readonly=on", .{dep.getOutputPath()}),
+        "-drive", b.fmt("if=pflash,format=raw,file=Sabaton/out/riscv64_{s}.bin,readonly=on", .{board_name}),
+        "-drive", b.fmt("if=pflash,format=raw,file={s},readonly=on", .{dep.getOutputPath()}),
         "-m", "4G",
         "-serial", "stdio",
         //"-S", "-s",
@@ -183,7 +183,7 @@ fn qemu_run_image_x86_64(b: *Builder, image_path: []const u8) *std.build.RunStep
     const run_params = &[_][]const u8{
         "qemu-system-x86_64",
         "--enable-kvm",
-        "-drive", b.fmt("format=raw,file={}", .{image_path}),
+        "-drive", b.fmt("format=raw,file={s}", .{image_path}),
         "-debugcon", "stdio",
         "-vga", "virtio",
         //"-serial", "stdio",
@@ -265,7 +265,7 @@ pub fn build(b: *Builder) void {
         b,
         "x86_64-stivale2",
         "Run x86_64 kernel with limine stivale2",
-        b.fmt("{}/stivale2.img", .{b.cache_root}),
+        b.fmt("{s}/stivale2.img", .{b.cache_root}),
         "stivale2_image",
         build_kernel(b, builtin.Arch.x86_64, "stivale2"),
     );
@@ -274,7 +274,7 @@ pub fn build(b: *Builder) void {
         b,
         "x86_64-stivale",
         "Run x86_64 kernel with limine stivale",
-        b.fmt("{}/stivale.img", .{b.cache_root}),
+        b.fmt("{s}/stivale.img", .{b.cache_root}),
         "stivale_image",
         build_kernel(b, builtin.Arch.x86_64, "stivale"),
     );
