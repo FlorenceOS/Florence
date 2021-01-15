@@ -11,3 +11,5 @@ pub const range_alloc = @import("range_alloc.zig");
 pub const source      = @import("source.zig");
 pub const tar         = @import("tar.zig");
 pub const vital       = @import("vital.zig");
+pub const rbtree      = @import("rbtree.zig");
+pub const atmcqueue   = @import("atomic_queue.zig");

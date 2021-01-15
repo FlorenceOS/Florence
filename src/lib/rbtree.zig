@@ -3,21 +3,21 @@ const expect = std.testing.expect;
 const log = std.debug.warn;
 
 /// Features that should be enabled in the code for the red black tree
-const Features = struct {
+pub const Features = struct {
     enable_iterators_cache: bool,
     enable_kth_queries: bool,
     enable_not_associatve_augment: bool,
 };
 
 /// Config for red black tree. Includes enabled features and callbacks for comparison and augmenting
-const Config = struct {
+pub const Config = struct {
     augment_callback: ?type,
     comparator: type,
     features: Features,
 };
 
 /// Color type
-const Color = enum { Red, Black };
+pub const Color = enum { Red, Black };
 
 /// Node in the red black tree
 pub fn Node(comptime features: Features) type {
