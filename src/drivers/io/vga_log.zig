@@ -24,7 +24,7 @@ pub fn register() void {
     paging.remap_phys_range(.{
       .phys = vga_page_low,
       .phys_end = vga_page_high,
-      .memtype = .WriteCombining,
+      .memtype = .DeviceWriteCombining,
     }) catch |err| {
       os.log(":/ rip couldn't map vga: {}\n", .{@errorName(err)});
       return;

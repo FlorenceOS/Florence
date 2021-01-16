@@ -225,7 +225,7 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     os.vital(paging.remap_phys_size(.{
       .phys = uart.uart_addr,
       .size = platform.page_sizes[0],
-      .memtype = .Uncacheable,
+      .memtype = .DeviceUncacheable,
       .context = &context,
     }), "mapping UART");
   }

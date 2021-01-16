@@ -10,17 +10,10 @@ const range_reverse = os.lib.range.range_reverse;
 
 const pmm = os.memory.pmm;
 
-//pub const make_page_table = platform.make_page_table;
-//const page_table_entry = platform.page_table_entry;
-//const page_table = platform.page_table;
-//const page_sizes = platform.page_sizes;
-//const paging_levels = page_sizes.len;
-//const index_into_table = platform.index_into_table;
-
-pub var CurrentContext: platform.paging.PagingContext = undefined;
+pub var CurrentContext: os.platform.paging.PagingContext = undefined;
 
 pub fn init() void {
-  CurrentContext = platform.paging.PagingContext.get_active();
+  CurrentContext = os.platform.paging.PagingContext.get_active();
 }
 
 pub fn map(args: struct {
@@ -172,7 +165,7 @@ fn map_kernel_section(new_paging_context: *platform.paging.PagingContext, start:
       .phys = os.vital(translate_virt(.{.virt = virt}), "Translating kaddr"),
       .size = step_size,
       .perm = perm,
-      .memtype = .Writethrough,
+      .memtype = .MemoryWritethrough,
       .context = new_paging_context,
     }), "Mapping kernel section");
     remaining_bytes -= step_size;

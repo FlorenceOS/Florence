@@ -399,7 +399,7 @@ const PortState = struct {
         try paging.remap_phys_size(.{
             .phys = commands_phys,
             .size = port_io_size,
-            .memtype = .Uncacheable,
+            .memtype = .DeviceUncacheable,
         });
         @memset(pmm.access_phys_volatile(u8, commands_phys), 0, port_io_size);
         write_u64(&self.mmio.command_list_base, commands_phys);
@@ -416,7 +416,7 @@ const PortState = struct {
                 try paging.remap_phys_size(.{
                     .phys = current_table_addr,
                     .size = page_size,
-                    .memtype = .Uncacheable,
+                    .memtype = .DeviceUncacheable,
                 });
                 @memset(pmm.access_phys_volatile(u8, current_table_addr), 0, page_size);
             }
@@ -433,7 +433,7 @@ const PortState = struct {
             try paging.remap_phys_size(.{
                 .phys = buf,
                 .size = page_size,
-                .memtype = .Uncacheable,
+                .memtype = .DeviceUncacheable,
             });
             @memset(pmm.access_phys_volatile(u8, buf), 0, page_size);
             write_u64(&header.table().prds[0].data_base_addr, buf);
@@ -714,7 +714,7 @@ pub fn register_controller(dev: pci.Device) void {
     paging.remap_phys_size(.{
         .phys = abar_phys,
         .size = abar_size,
-        .memtype = .Uncacheable,
+        .memtype = .DeviceUncacheable,
     }) catch |err| {
         log("AHCI: Failed to map ABAR: {}\n", .{@errorName(err)});
     };

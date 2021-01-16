@@ -1,5 +1,4 @@
-// All decoded PTEs have to become one of these types.
-
+// PTEs have to be a tagged union of this enum type
 pub const PTEType = enum {
   Mapping,
   Table,
