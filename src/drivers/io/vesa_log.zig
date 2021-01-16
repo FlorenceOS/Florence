@@ -97,7 +97,7 @@ pub fn register_fb(fb_phys: usize, fb_pitch: u16, fb_width: u16, fb_height: u16,
   paging.remap_phys_range(.{
     .phys = fb_page_low,
     .phys_end = fb_page_high,
-    .memtype = .WriteCombining,
+    .memtype = .DeviceWriteCombining,
   }) catch |err| {
     os.log("VESAlog: Couldn't map fb: {}\n", .{@errorName(err)});
     return;

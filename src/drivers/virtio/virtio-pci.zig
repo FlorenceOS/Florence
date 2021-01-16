@@ -277,7 +277,7 @@ fn map(phy: u64, len: u64) void {
   paging.remap_phys_size(.{
     .phys = phy,
     .size = len,
-    .memtype = .Uncacheable
+    .memtype = .DeviceUncacheable
   }) catch |err| {
     @panic("virtio-blk: can't map memory.");
   };

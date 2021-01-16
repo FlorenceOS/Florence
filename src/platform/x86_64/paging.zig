@@ -12,9 +12,7 @@ fn PAT_context() type {
   const uncacheable_encoding     = 0x00;
   const write_combining_encoding = 0x01;
   const writethrough_encoding    = 0x04;
-  const write_protected_encoding = 0x05;
   const write_back_encoding      = 0x06;
-  const uncached_encoding        = 0x07;
 
   return struct {
     // The value of IA32_PAT itself
@@ -24,9 +22,7 @@ fn PAT_context() type {
     uncacheable: ?pat_index,
     write_combining: ?pat_index,
     writethrough: ?pat_index,
-    write_protected: ?pat_index,
     write_back: ?pat_index,
-    uncached: ?pat_index,
 
     pub fn init_from_pat_value(value: pat_value) @This() {
       return .{
@@ -34,9 +30,7 @@ fn PAT_context() type {
         .uncacheable     = find_pat_index(value, uncacheable_encoding),
         .write_combining = find_pat_index(value, write_combining_encoding),
         .writethrough    = find_pat_index(value, writethrough_encoding),
-        .write_protected = find_pat_index(value, write_protected_encoding),
         .write_back      = find_pat_index(value, write_back_encoding),
-        .uncached        = find_pat_index(value, uncached_encoding),
       };
     }
 
@@ -44,15 +38,13 @@ fn PAT_context() type {
       return @truncate(u8, value >> (@as(u6, idx) * 8));
     }
 
-    fn memory_type_at_index(self: *const @This(), idx: pat_index) MemoryType {
+    fn memory_type_at_index(self: *const @This(), idx: pat_index) ?MemoryType {
       return switch(encoding_at_index(self.value, idx)) {
-        uncacheable_encoding     => .Uncacheable,
-        write_combining_encoding => .WriteCombining,
-        writethrough_encoding    => .Writethrough,
-        write_protected_encoding => .WriteProtected,
-        write_back_encoding      => .WriteBack,
-        uncached_encoding        => .Uncached,
-        else => @panic("Unknown PAT value!"),
+        uncacheable_encoding     => .DeviceUncacheable,
+        write_combining_encoding => .DeviceWriteCombining,
+        writethrough_encoding    => .MemoryWritethrough,
+        write_back_encoding      => .MemoryWriteBack,
+        else => null,
       };
     }
 
@@ -98,9 +90,7 @@ fn PAT_context() type {
         // The order of the rest shouldn't matter
         | write_combining_encoding << 8
         | writethrough_encoding    << 16
-        | write_protected_encoding << 24
-        | uncacheable_encoding     << 32
-        | uncached_encoding        << 40
+        | uncacheable_encoding     << 24
       );
       return default;
     }
@@ -227,7 +217,7 @@ pub const PagingContext = struct {
     return .{.Mapping = self.decode_mapping(enc, level)};
   }
 
-  fn decode_memtype(self: *@This(), map: MappingEncoding, level: level_type) MemoryType {
+  fn decode_memtype(self: *@This(), map: MappingEncoding, level: level_type) ?MemoryType {
     // TODO: MTRR awareness (?)
     // right now we assume all MTRRs are WB
     if(self.pat) |pat| {
@@ -244,11 +234,11 @@ pub const PagingContext = struct {
       return pat.memory_type_at_index(pat_idx);
     } else {
       switch(map.cache_disable.read()) {
-        true  => return .Uncacheable,
+        true  => return MemoryType.DeviceUncacheable,
         false =>
           switch(map.writethrough.read()) {
-            true => return .Writethrough,
-            false => return .WriteBack,
+            true => return MemoryType.MemoryWritethrough,
+            false => return MemoryType.MemoryWriteBack,
           },
       }
     }
@@ -257,11 +247,11 @@ pub const PagingContext = struct {
   pub fn decode_mapping(self: *@This(), enc: *EncodedPTE, level: level_type) MappingPTE {
     const map = MappingEncoding{.raw = enc.*};
 
-    const memtype: MemoryType = self.decode_memtype(map, level);
+    const memtype: MemoryType = self.decode_memtype(map, level) orelse @panic("Unknown memory type");
 
     return .{
       .context = self,
-      .phys = enc.* & phys_bitmask,
+      .phys = if(level == 0) enc.* & phys_bitmask else enc.* & phys_bitmask_high,
       .level = level,
       .memtype = memtype,
       .underlying = @ptrCast(*MappingEncoding, enc),
@@ -309,9 +299,11 @@ pub const PagingContext = struct {
   fn encode_memory_type(self: *const @This(), enc: *MappingEncoding, pte: MappingPTE) void {
     // TODO: MTRR awareness (?)
     // right now we assume all MTRRs are WB
+    const mt = pte.memtype orelse @panic("Unknown memory type");
+
     if(self.pat) |pat| {
       // Formula for PAT index is 4*PAT + 2*CD + 1*WT
-      const idx = pat.find_memtype(pte.memtype) orelse @panic("Could not find PAT index");
+      const idx = pat.find_memtype(mt) orelse @panic("Could not find PAT index");
 
       if(idx & 4 != 0) {
         if(pte.level == 0) {
@@ -326,11 +318,11 @@ pub const PagingContext = struct {
       if(idx & 1 != 0)
         enc.writethrough.write(true);
     } else {
-      switch(pte.memtype) {
-        .Writethrough => enc.writethrough.write(true),
-        .Uncacheable => enc.cache_disable.write(true),
-        .WriteBack => { },
-        else => @panic("Cannot set memory type without PAT"),
+      switch(mt) {
+        .MemoryWritethrough => enc.writethrough.write(true),
+        .DeviceUncacheable => enc.cache_disable.write(true),
+        .MemoryWriteBack => { },
+        else => @panic("Cannot set memory type"),
       }
     }
   }
@@ -378,16 +370,17 @@ pub const PagingContext = struct {
   }
 };
 
-pub const MemoryType = enum {
-  Uncacheable,
-  WriteCombining,
-  Writethrough,
-  WriteProtected,
-  WriteBack,
-  Uncached,
+pub const MemoryType = extern enum {
+  // x86 doesn't differentiate between device and normal memory (?)
+  DeviceUncacheable = 0,
+  MemoryUncacheable = 0,
+  DeviceWriteCombining = 1,
+  MemoryWritethrough = 2,
+  MemoryWriteBack = 3,
 };
 
 const phys_bitmask = 0x7ffffffffffff000;
+const phys_bitmask_high = 0x7fffffffffffe000;
 const bf = os.lib.bitfields;
 
 const PTEEncoding = extern union {
@@ -430,7 +423,7 @@ fn virt_index_at_level(vaddr: u64, level: u6) u9 {
 const MappingPTE = struct {
   phys: u64,
   level: u3,
-  memtype: MemoryType,
+  memtype: ?MemoryType,
   context: *PagingContext,
   perms: os.memory.paging.perms,
   underlying: *MappingEncoding,
@@ -442,7 +435,7 @@ const MappingPTE = struct {
     };
   }
 
-  pub fn get_type(self: *const @This()) MemoryType {
+  pub fn get_type(self: *const @This()) ?MemoryType {
     return self.memtype;
   }
 };
@@ -535,17 +528,3 @@ pub const PTE = union(paging_common.PTEType) {
   Table: TablePTE,
   Empty: EmptyPte,
 };
-
-test "encode_table" {
-  var context: PagingContext = .{
-    .pat = PAT_context().init_from_pat_value(0x0000000000000000),
-    .cr3_val = undefined,
-    .level5paging = true,
-    .gigapage_allowed = true,
-    .physical_base = undefined,
-  };
-
-  const res = try context.encode_table(.{
-    .phys = 0x1337000,
-  });
-}

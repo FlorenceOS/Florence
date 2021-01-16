@@ -25,7 +25,7 @@ pub fn sbrk(num_bytes: u64) ![]u8 {
     .virt = ret,
     .size = num_bytes,
     .perm = paging.rw(),
-    .memtype = .Writethrough,
+    .memtype = .MemoryWritethrough,
   });
 
   sbrk_head += num_bytes;

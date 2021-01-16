@@ -223,7 +223,7 @@ pub fn register_mmio(bus: u8, physaddr: u64) !void {
   try paging.remap_phys_size(.{
     .phys = physaddr,
     .size = 1 << 20,
-    .memtype = .Uncacheable,
+    .memtype = .DeviceUncacheable,
   });
   pci_mmio[bus] = &os.memory.pmm.access_phys([1 << 20]u8, physaddr)[0];
 }
