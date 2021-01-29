@@ -42,9 +42,9 @@ pub fn good_size(size: u64) u64 {
   unreachable;
 }
 
-fn alloc_impl(comptime ind: u64) !u64 {
+fn alloc_impl(ind: u64) error{OutOfMemory}!u64 {
   if(free_roots[ind] == 0) {
-    if(ind + 1 >= page_sizes.len) 
+    if(ind + 1 >= page_sizes.len)
       return error.OutOfMemory;
 
     var next = try alloc_impl(ind + 1);
@@ -79,7 +79,7 @@ pub fn alloc_phys(size: u64) !u64 {
   return error.PhysAllocTooSmall;
 }
 
-fn free_impl(phys: u64, comptime ind: u64) void {
+fn free_impl(phys: u64, ind: u64) void {
   const last = free_roots[ind];
   free_roots[ind] = phys;
   access_phys(u64, phys)[0] = last;
@@ -105,11 +105,6 @@ pub fn phys_to_virt(phys: u64) u64 {
 
 pub fn access_phys(comptime t: type, phys: u64) [*]t {
   return @intToPtr([*]t, phys_to_virt(phys));
-}
-
-pub fn set_phys_base(phys_base: usize) void {
-  if(phys_base != 0)
-    @panic("set_phys_base");
 }
 
 pub fn access_phys_volatile(comptime t: type, phys: u64) [*]volatile t {

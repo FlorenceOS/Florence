@@ -25,6 +25,7 @@ SECTIONS {
   .text : ALIGN(64K) {
     __kernel_text_begin = .;
     *(.text*)
+    . = ALIGN(64K);
     __kernel_text_end = .;
   }:text
 
@@ -47,6 +48,7 @@ SECTIONS {
     __debug_ranges_start = .;
     KEEP(*(.debug_ranges))
     __debug_ranges_end = .;*/
+    . = ALIGN(64K);
     __kernel_rodata_end = .;
   }:rodata
 
@@ -54,6 +56,7 @@ SECTIONS {
     __kernel_data_begin = .;
     *(.data*)
     *(.bss*)
+    . = ALIGN(64K);
     __kernel_data_end = .;
   }:data
 

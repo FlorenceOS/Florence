@@ -153,24 +153,20 @@ pub fn bootstrap_kernel_paging() !platform.paging.PagingContext {
 }
 
 fn map_kernel_section(new_paging_context: *platform.paging.PagingContext, start: *u8, end: *u8, perm: perms) !void {
-  const step_size = platform.page_sizes[0];
+  const virt = @ptrToInt(start);
+  const phys = os.vital(translate_virt(.{.virt = virt}), "Translating kaddr");  
+  const region_size = @ptrToInt(end) - virt;
 
-  var remaining_bytes = libalign.align_up(usize, step_size, @ptrToInt(end) - @ptrToInt(start));
-  var virt = @ptrToInt(start);
+  os.log("Mapping region {} of size 0x{X} at 0x{X}\n", .{perm, region_size, virt});
 
-
-  while(remaining_bytes >= step_size) {
-    os.vital(map_phys(.{
-      .virt = virt,
-      .phys = os.vital(translate_virt(.{.virt = virt}), "Translating kaddr"),
-      .size = step_size,
-      .perm = perm,
-      .memtype = .MemoryWritethrough,
-      .context = new_paging_context,
-    }), "Mapping kernel section");
-    remaining_bytes -= step_size;
-    virt += step_size;
-  }
+  os.vital(map_phys(.{
+    .virt = virt,
+    .phys = phys,
+    .size = region_size,
+    .perm = perm,
+    .memtype = .MemoryWritethrough,
+    .context = new_paging_context,
+  }), "Mapping kernel section");
 }
 
 // Will probably be replaced by phys_slice(T[]).map()
