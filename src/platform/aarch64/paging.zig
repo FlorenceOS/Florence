@@ -327,7 +327,7 @@ pub const PagingContext = struct {
       .perms = .{
         .writable = !map.no_write.read(),
         .executable = !map.no_execute.read(),
-        .userspace = true, //map.user.read(),
+        .userspace = !map.no_user.read(),
       },
       .pszc = pszc,
     };
@@ -344,7 +344,7 @@ pub const PagingContext = struct {
       .perms = .{
         .writable = !tbl.no_write.read(),
         .executable = !tbl.no_execute.read(),
-        .userspace = true, //tbl.user.read(),
+        .userspace = !tbl.no_user.read(),
       },
       .pszc = pszc,
     };
@@ -363,8 +363,8 @@ pub const PagingContext = struct {
     tbl.nonsecure.write(false);
 
     tbl.no_write.write(!pte.perms.writable);
-    //tbl.user.write(pte.perms.userspace); // Ingore for now
     tbl.no_execute.write(!pte.perms.executable);
+    tbl.no_user.write(!pte.perms.userspace);
 
     return tbl.raw;
   }
@@ -379,6 +379,7 @@ pub const PagingContext = struct {
 
     map.no_write.write(!pte.perms.writable);
     map.no_execute.write(!pte.perms.executable);
+    map.no_user.write(!pte.perms.userspace);
 
     map.shareability.write(2);
 
@@ -442,6 +443,7 @@ const MappingEncoding = extern union {
   walk: bf.boolean(u64, 1),
   attr_index: bf.bitfield(u64, 2, 3),
   nonsecure: bf.boolean(u64, 5),
+  no_user:  bf.boolean(u64, 6),
   no_write:  bf.boolean(u64, 7),
   shareability: bf.bitfield(u64, 8, 2),
   access: bf.boolean(u64, 10),
@@ -454,6 +456,7 @@ const TableEncoding = extern union {
   present: bf.boolean(u64, 0),
   walk: bf.boolean(u64, 1),
   no_execute: bf.boolean(u64, 60),
+  no_user: bf.boolean(u64, 61),
   no_write: bf.boolean(u64, 62),
   nonsecure: bf.boolean(u64, 63),
 };
@@ -519,8 +522,8 @@ const TablePTE = struct {
       self.underlying.?.no_execute.write(false);
     if(perms.writable)
       self.underlying.?.no_write.write(false);
-    //if(perms.userspace)
-    //  self.underlying.?.user.write(true);
+    if(perms.userspace)
+      self.underlying.?.no_user.write(false);
   }
 
   pub fn make_child_table(self: *const @This(), enc: *u64, perms: os.memory.paging.perms) !TablePTE {
