@@ -157,8 +157,6 @@ fn map_kernel_section(new_paging_context: *platform.paging.PagingContext, start:
   const phys = os.vital(translate_virt(.{.virt = virt}), "Translating kaddr");  
   const region_size = @ptrToInt(end) - virt;
 
-  os.log("Mapping region {} of size 0x{X} at 0x{X}\n", .{perm, region_size, virt});
-
   os.vital(map_phys(.{
     .virt = virt,
     .phys = phys,
