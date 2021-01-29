@@ -52,29 +52,27 @@ fn parse_MCFG(sdt: []u8) void {
   }
 }
 
-fn sdt_size(sdt: anytype) u64 {
-  return std.mem.readInt(u32, sdt[4..8], builtin.endian);
-}
-
 fn signature_value(sdt: anytype) u32 {
   return std.mem.readInt(u32, sdt[0..4], builtin.endian);
 }
 
-fn map_sdt(addr: u64) ![]u8 {
-  const sdt = @ptrCast([*]u8, try paging.remap_phys_struct([8]u8, .{.phys = addr, .memtype = .MemoryWritethrough}));
-  const sz = sdt_size(sdt);
-  try paging.remap_phys_size(.{
-    .phys = addr,
-    .size = sz,
-    .memtype = .MemoryWritethrough,
-  });
-  return sdt[0..sz];
+fn map_sdt(addr: u64) !os.platform.phys_slice(u8) {
+  var result: os.platform.phys_slice(u8) = .{
+    .ptr = os.platform.phys_ptr([*]u8).from_int(addr),
+    .len = 8,
+  };
+
+  try result.remap(.MemoryWritethrough);
+  result.len = std.mem.readInt(u32, result.to_slice()[4..8], builtin.endian);
+  try result.remap(.MemoryWritethrough);
+
+  return result;
 }
 
 fn parse_sdt(addr: usize) !void {
   const sdt = try map_sdt(addr);
 
-  switch(signature_value(sdt)) {
+  switch(signature_value(sdt.to_slice())) {
     signature_value("FACP") => { }, // Ignore for now
     signature_value("SSDT") => { }, // Ignore for now
     signature_value("DMAR") => { }, // Ignore for now
@@ -84,18 +82,17 @@ fn parse_sdt(addr: usize) !void {
     signature_value("WAET") => { }, // Ignore for now
     signature_value("APIC") => {
       if(builtin.arch == .x86_64) {
-        @import("x86_64/apic.zig").handle_madt(sdt);
+        @import("x86_64/apic.zig").handle_madt(sdt.to_slice());
       }
       else {
         os.log("ACPI: MADT found on non-x86 architecture!\n", .{});
       }
     },
     signature_value("MCFG") => {
-      parse_MCFG(sdt);
+      parse_MCFG(sdt.to_slice());
     },
     else => {
-      os.log("ACPI: Unknown SDT: '{s}' with size {} bytes\n", .{sdt[0..4], sdt.len});
-      //hexdump(sdt);
+      os.log("ACPI: Unknown SDT: '{s}' with size {} bytes\n", .{sdt.to_slice()[0..4], sdt.len});
     },
   }
 }
@@ -105,8 +102,8 @@ fn parse_root_sdt(comptime T: type, addr: usize) !void {
 
   var offset: u64 = 36;
 
-  while(offset + @sizeOf(T) <= sdt_size(sdt)): (offset += @sizeOf(T)) {
-    try parse_sdt(std.mem.readInt(T, sdt[offset..][0..@sizeOf(T)], builtin.endian));
+  while(offset + @sizeOf(T) <= sdt.len): (offset += @sizeOf(T)) {
+    try parse_sdt(std.mem.readInt(T, sdt.to_slice()[offset..][0..@sizeOf(T)], builtin.endian));
   }
 }
 

@@ -64,6 +64,25 @@ pub fn phys_ptr(comptime ptr_type: type) type {
   };
 }
 
+pub fn phys_slice(comptime T: type) type {
+  return struct {
+    ptr: phys_ptr([*]T),
+    len: u64,
+
+    pub fn to_slice(self: *const @This()) []T {
+      return self.ptr.get()[0..self.len];
+    }
+
+    pub fn remap(self: *const @This(), memtype: os.platform.paging.MemoryType) !void {
+      return os.memory.paging.remap_phys_size(.{
+        .phys = self.ptr.addr,
+        .size = @sizeOf(T) * self.len,
+        .memtype = memtype,
+      });
+    }
+  };
+}
+
 pub const phys_bytes = struct {
   ptr: u64,
   len: u64,
