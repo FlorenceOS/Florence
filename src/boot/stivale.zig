@@ -53,8 +53,10 @@ export fn stivale_main(input_info: *StivaleInfo) void {
   const phys_high = stivale.phys_high(info.memmap());
 
   context.apply();
+  
+  const heap_base = os.memory.paging.CurrentContext.phys_to_virt(phys_high);
 
-  os.vital(vmm.init(phys_high), "initializing vmm");
+  os.vital(vmm.init(heap_base), "initializing vmm");
 
   if((stivale_flags & 1) == 1) {
     os.drivers.vesa_log.register_fb(info.framebuffer_addr, info.framebuffer_pitch, info.framebuffer_width, info.framebuffer_height, info.framebuffer_bpp);

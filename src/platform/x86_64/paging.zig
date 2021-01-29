@@ -203,10 +203,6 @@ pub const PagingContext = struct {
     };
   }
 
-  pub fn index_type() type {
-    return u9;
-  }
-
   pub fn decode(self: *@This(), enc: *EncodedPTE, level: level_type) PTE {
     var pte = PTEEncoding{.raw = enc.*};
 

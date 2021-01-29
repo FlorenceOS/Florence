@@ -181,6 +181,8 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     }
   }
 
+  os.memory.paging.CurrentContext.set_phys_base(0);
+
   if(info.uart) |uart| {
     mmio_serial.register_mmio32_serial(uart.uart_addr);
     os.log("Stivale2: Registered UART\n", .{});
@@ -236,7 +238,9 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
 
   os.log("Doing vmm\n", .{});
 
-  os.vital(vmm.init(phys_high), "initializing vmm");
+  const heap_base = os.memory.paging.CurrentContext.phys_to_virt(phys_high);
+
+  os.vital(vmm.init(heap_base), "initializing vmm");
 
   os.log("Doing framebuffer\n", .{});
 
