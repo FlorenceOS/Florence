@@ -69,6 +69,13 @@ pub fn phys_slice(comptime T: type) type {
     ptr: phys_ptr([*]T),
     len: u64,
 
+    pub fn init(addr: u64, len: u64) @This() {
+      return .{
+        .ptr = phys_ptr([*]T).from_int(addr),
+        .len = len,
+      };
+    }
+
     pub fn to_slice(self: *const @This()) []T {
       return self.ptr.get()[0..self.len];
     }
