@@ -471,7 +471,7 @@ const MappingPTE = struct {
   level: u3,
   memtype: ?MemoryType,
   context: *PagingContext,
-  perms: os.memory.paging.perms,
+  perms: os.memory.paging.Perms,
   underlying: *MappingEncoding,
   pszc: PageSizeContext,
 
@@ -493,7 +493,7 @@ const TablePTE = struct {
   phys: u64,
   curr_level: level_type,
   context: *PagingContext,
-  perms: os.memory.paging.perms,
+  perms: os.memory.paging.Perms,
   underlying: ?*TableEncoding,
   pszc: PageSizeContext,
 
@@ -517,7 +517,7 @@ const TablePTE = struct {
     return self.curr_level;
   }
 
-  pub fn add_perms(self: *const @This(), perms: os.memory.paging.perms) void {
+  pub fn add_perms(self: *const @This(), perms: os.memory.paging.Perms) void {
     if(perms.executable)
       self.underlying.?.no_execute.write(false);
     if(perms.writable)
@@ -526,7 +526,7 @@ const TablePTE = struct {
       self.underlying.?.no_user.write(false);
   }
 
-  pub fn make_child_table(self: *const @This(), enc: *u64, perms: os.memory.paging.perms) !TablePTE {
+  pub fn make_child_table(self: *const @This(), enc: *u64, perms: os.memory.paging.Perms) !TablePTE {
     const psz = self.pszc.page_size(0);
     const pmem = try make_page_table(psz);
     errdefer os.memory.pmm.free_phys(pmem, psz);
@@ -549,7 +549,7 @@ const TablePTE = struct {
     self: *const @This(),
     enc: *u64,
     phys: ?u64,
-    perms: os.memory.paging.perms,
+    perms: os.memory.paging.Perms,
     memtype: MemoryType,
   ) !MappingPTE {
     const page_size = self.pszc.page_size(self.level() - 1);

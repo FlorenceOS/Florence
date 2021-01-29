@@ -19,7 +19,7 @@ pub fn init() void {
 pub fn map(args: struct {
   virt: usize,
   size: usize,
-  perm: perms,
+  perm: Perms,
   memtype: platform.paging.MemoryType,
   context: *platform.paging.PagingContext = &CurrentContext,
 }) !void {
@@ -38,7 +38,7 @@ pub fn map_phys(args: struct {
   virt: usize,
   phys: usize,
   size: usize,
-  perm: perms,
+  perm: Perms,
   memtype: platform.paging.MemoryType,
   context: *platform.paging.PagingContext = &CurrentContext,
 }) !void {
@@ -63,7 +63,7 @@ pub fn unmap(args: struct {
   try unmap_loop(&argc.virt, &argc.size, argc.reclaim_pages, argc.context);
 }
 
-pub const perms = struct {
+pub const Perms = struct {
   writable: bool,
   executable: bool,
   userspace: bool,
@@ -87,7 +87,7 @@ pub const perms = struct {
   }
 };
 
-pub fn rx() perms {
+pub fn rx() Perms {
   return .{
     .writable = false,
     .executable = true,
@@ -95,7 +95,7 @@ pub fn rx() perms {
   };
 }
 
-pub fn ro() perms {
+pub fn ro() Perms {
   return .{
     .writable = false,
     .executable = false,
@@ -103,7 +103,7 @@ pub fn ro() perms {
   };
 }
 
-pub fn rw() perms {
+pub fn rw() Perms {
   return .{
     .writable = true,
     .executable = false,
@@ -111,7 +111,7 @@ pub fn rw() perms {
   };
 }
 
-pub fn rwx() perms {
+pub fn rwx() Perms {
   return .{
     .writable = true,
     .executable = true,
@@ -119,7 +119,7 @@ pub fn rwx() perms {
   };
 }
 
-pub fn user(p: perms) perms {
+pub fn user(p: Perms) Perms {
   var ret = curr;
   ret.user = true;
   return ret;
@@ -152,7 +152,7 @@ pub fn bootstrap_kernel_paging() !platform.paging.PagingContext {
   return new_context;
 }
 
-fn map_kernel_section(new_paging_context: *platform.paging.PagingContext, start: *u8, end: *u8, perm: perms) !void {
+fn map_kernel_section(new_paging_context: *platform.paging.PagingContext, start: *u8, end: *u8, perm: Perms) !void {
   const virt = @ptrToInt(start);
   const phys = os.vital(translate_virt(.{.virt = virt}), "Translating kaddr");  
   const region_size = @ptrToInt(end) - virt;
@@ -262,7 +262,7 @@ fn map_impl_with_rollback(args: struct {
   virt: *usize,
   phys: ?*usize,
   size: *usize,
-  perm: perms,
+  perm: Perms,
   memtype: platform.paging.MemoryType,
   context: *platform.paging.PagingContext,
 }) !void {
@@ -318,7 +318,7 @@ fn map_impl(
   phys: ?*usize,
   size: *usize,
   table: anytype,
-  perm: perms,
+  perm: Perms,
   memtype: platform.paging.MemoryType,
   context: *platform.paging.PagingContext,
 ) MapError!void {
