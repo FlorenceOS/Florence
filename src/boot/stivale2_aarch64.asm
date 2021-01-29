@@ -26,6 +26,7 @@ _start:
   B     stivale2_main
 
 .section .bss.stack, "a"
+.balign 16
 stack_bottom:
 .zero 1024 * 16 - 16
 stack_top:
