@@ -24,7 +24,7 @@ pub fn map(args: struct {
   context: *platform.paging.PagingContext = &CurrentContext,
 }) !void {
   var argc = args;
-  return map_loop(.{
+  return map_impl_with_rollback(.{
     .virt = &argc.virt,
     .phys = null,
     .size = &argc.size,
@@ -43,7 +43,7 @@ pub fn map_phys(args: struct {
   context: *platform.paging.PagingContext = &CurrentContext,
 }) !void {
   var argc = args;
-  return map_loop(.{
+  return map_impl_with_rollback(.{
     .virt = &argc.virt,
     .phys = &argc.phys,
     .size = &argc.size,
@@ -256,7 +256,9 @@ pub fn remap_phys_size(args: struct {
   });
 }
 
-fn map_loop(args: struct {
+/// Tries to map the range. If the mapping fails,
+/// it unmaps any memory it has touched.
+fn map_impl_with_rollback(args: struct {
   virt: *usize,
   phys: ?*usize,
   size: *usize,
@@ -273,7 +275,7 @@ fn map_loop(args: struct {
   }
 
   errdefer {
-    // Unwind loop
+    // Roll it back
     if(start_virt != args.virt.*) {
       unmap(.{
         .virt = start_virt,
