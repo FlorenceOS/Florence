@@ -42,7 +42,7 @@ pub const virt_slice = struct {
   len: u64,
 };
 
-pub const phys_slice = struct {
+pub const phys_bytes = struct {
   ptr: u64,
   len: u64,
 };

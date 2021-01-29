@@ -424,7 +424,7 @@ const MappingPTE = struct {
   perms: os.memory.paging.Perms,
   underlying: *MappingEncoding,
 
-  pub fn mapped_bytes(self: *const @This()) os.platform.phys_slice {
+  pub fn mapped_bytes(self: *const @This()) os.platform.phys_bytes {
     return .{
       .ptr = self.phys,
       .len = self.context.page_size(self.level, self.context.phys_to_virt(self.phys)),
