@@ -76,10 +76,6 @@ fn target(exec: *std.build.LibExeObjStep, arch: builtin.Arch, context: Context) 
 }
 
 fn add_libs(exec: *std.build.LibExeObjStep) void {
-    exec.addPackage(.{
-        .name = "rb",
-        .path = "src/external/std-lib-orphanage/std/rb.zig",
-    });
 }
 
 fn make_exec(b: *Builder, arch: builtin.Arch, ctx: Context, filename: []const u8, main: []const u8) *std.build.LibExeObjStep {

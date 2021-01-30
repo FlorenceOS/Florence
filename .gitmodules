@@ -4,9 +4,6 @@
 [submodule "Sabaton"]
 	path = Sabaton
 	url = https://github.com/N00byEdge/Sabaton.git
-[submodule "src/external/std-lib-orphanage"]
-	path = src/external/std-lib-orphanage
-	url = https://github.com/ziglang/std-lib-orphanage.git
 [submodule "echfs"]
 	path = echfs
 	url = https://github.com/echfs/echfs
