@@ -3,14 +3,37 @@ const os = @import("root").os;
 
 const Order = std.math.Order;
 
-const rb    = os.external.rb;
+const rb    = os.lib.rbtree;
 const sbrk  = os.memory.vmm.sbrk;
 const Mutex = os.thread.Mutex;
 
 const max_alloc_size = 0x1000 << 10;
-const node_block_size = 0x1000;
+const node_block_size = 0x100 * @sizeOf(Range);
 
 const debug = false;
+
+const rb_features: rb.Features = .{
+  .enable_iterators_cache = true,
+  .enable_kth_queries = false,
+  .enable_not_associatve_augment = false,
+};
+
+const addr_config: rb.Config = .{
+  .features = rb_features,
+  .augment_callback = null,
+  .comparator = compare_addr,
+};
+
+const size_config: rb.Config = .{
+  .features = rb_features,
+  .augment_callback = null,
+  .comparator = compare_size,
+};
+
+const AddrNode = rb.Node(rb_features);
+const SizeNode = rb.Node(rb_features);
+const AddrTree = rb.Tree(Range, "addr_node", addr_config);
+const SizeTree = rb.Tree(Range, "size_node", size_config);
 
 const PlacementResult = struct {
   effective_size: u64,
@@ -31,8 +54,8 @@ const RangePlacement = struct {
 };
 
 const Range = struct {
-  size_node: rb.Node = undefined,
-  addr_node: rb.Node = undefined,
+  size_node: SizeNode = undefined,
+  addr_node: AddrNode = undefined,
   base: usize,
   size: usize,
 
@@ -66,24 +89,17 @@ const Range = struct {
   }
 };
 
-fn compare_addr(node_l: *rb.Node, node_r: *rb.Node, _: *rb.Tree) Order {
-  const lhs = @fieldParentPtr(Range, "addr_node", node_l);
-  const rhs = @fieldParentPtr(Range, "addr_node", node_r);
+const compare_addr = struct {
+  pub fn compare(self: *const @This(), left: *const Range, right: *const Range) bool {
+    return left.base < right.base;
+  }
+};
 
-  return std.math.order(lhs.base, rhs.base);
-}
-
-fn compare_size(node_l: *rb.Node, node_r: *rb.Node, _: *rb.Tree) Order {
-  const lhs = @fieldParentPtr(Range, "size_node", node_l);
-  const rhs = @fieldParentPtr(Range, "size_node", node_r);
-
-  const size_cmp = std.math.order(lhs.size, rhs.size);
-  if(size_cmp != .eq)
-    return size_cmp;
-
-  return std.math.order(lhs.base, rhs.base);
-}
-
+const compare_size = struct {
+  pub fn compare(self: *const @This(), left: *const Range, right: *const Range) bool {
+    return left.size < right.size;
+  }
+};
 
 pub const RangeAlloc = struct {
   range_node_head: ?*Range = null,
@@ -92,14 +108,8 @@ pub const RangeAlloc = struct {
     .resizeFn = resize,
   },
 
-  by_addr: rb.Tree = .{
-    .root = null,
-    .compareFn = compare_addr,
-  },
-  by_size: rb.Tree = .{
-    .root = null,
-    .compareFn = compare_size,
-  },
+  by_addr: AddrTree = AddrTree.init(.{}, {}),
+  by_size: SizeTree = SizeTree.init(.{}, {}),
 
   mutex: Mutex = .{},
 
@@ -124,9 +134,6 @@ pub const RangeAlloc = struct {
 
     const placement = try self.find_placement(len, ptr_align, len_align);
 
-    //os.log("Calling alloc(sz=0x{X}, align=0x{X}, len_align=0x{X})\n", .{len, ptr_align, len_align});
-    //os.log("Got placement: {}\n", .{placement});
-
     const range = placement.range;
     const pmt = placement.placement;
 
@@ -149,18 +156,12 @@ pub const RangeAlloc = struct {
         .base = range.base + new_range_offset,
         .size = range.size - new_range_offset,
       });
-      errdefer self.by_addr.remove(&new_range.addr_node);
-      errdefer self.by_size.remove(&new_range.size_node);
-      errdefer self.free_node(new_range);
 
       // Overwrite the old entry
       // Update size node (requires reinsertion)
-      self.by_size.remove(&range.size_node);
+      self.by_size.remove(range);
       range.size = pmt.offset;
-      if(self.by_size.insert(&range.size_node) != null) {
-        os.log("Could not reinsert node after size update after split\n", .{});
-        @panic("");
-      }
+      self.by_size.insert(range);
     }
     else if(has_data_after or has_data_before) {
       // Reuse the single node
@@ -174,34 +175,24 @@ pub const RangeAlloc = struct {
         if(debug)
           os.log("Has data left after\n", .{});
         // Update addr node and reinsert
-        self.by_addr.remove(&range.addr_node);
-        self.by_addr.remove(&range.size_node);
+        self.by_addr.remove(range);
         range.size -= pmt.effective_size;
         range.base += pmt.effective_size;
-        if(self.by_addr.insert(&range.addr_node) != null) {
-          os.log("Could not reinsert node after addr update after reuse\n", .{});
-          @panic("");
-        }
+        self.by_addr.insert(range);
       }
 
       // No matter what, we have to update the size node.
-      self.by_size.remove(&range.size_node);
-      if(self.by_size.insert(&range.size_node) != null) {
-        os.log("Could not reinsert node after size update after reuse\n", .{});
-        @panic("");
-      }
+      self.by_size.remove(range);
+      self.by_size.insert(range);
     }
     else {
       if(debug)
         os.log("Removing the node\n", .{});
       // Remove the node entirely
-      self.by_addr.remove(&range.addr_node);
-      errdefer self.by_addr.insert(&range.addr_node);
+      self.by_addr.remove(range);
+      self.by_size.remove(range);
 
-      self.by_size.remove(&range.size_node);
-      errdefer self.by_size.insert(&range.size_node);
-
-      self.free_node(range);
+      self.free_range(range);
     }
 
     if(debug)
@@ -266,12 +257,18 @@ pub const RangeAlloc = struct {
   }
 
   fn find_placement(self: *@This(), size: usize, alignment: usize, size_alignment: usize) !RangePlacement {
-    // There is no rb.lower_bound or similar so we'll just iterate in linear time :(
     {
-      var node = self.by_size.first();
+      const size_finder: struct {
+        size: usize,
 
-      while(node) |n| {
-        const range = @fieldParentPtr(Range, "size_node", n);
+        pub fn check(finder: *const @This(), range: *Range) bool {
+          return range.size >= finder.size;
+        }
+      } = .{.size = size};
+
+      var current_range = self.by_size.lower_bound(@TypeOf(size_finder), &size_finder);
+
+      while(current_range) |range| {
         if(range.try_place(size, alignment, size_alignment)) |placement| {
           return RangePlacement{
             .range = range,
@@ -280,27 +277,25 @@ pub const RangeAlloc = struct {
         } else if(debug) {
           os.log("Could not place into {}\n", .{range});
         }
-        node = n.next();
-      }
-    }
-    {
-      // We found nothing, make a new one
-      if(debug)
-      os.log("Existing range not found, creating a new one\n", .{});
-      const range = try self.make_range();
-      if(range.try_place(size, alignment, size_alignment)) |placement| {
-        return RangePlacement{
-          .range = range,
-          .placement = placement,
-        };
+        current_range = self.by_size.iterators.next(range);
       }
     }
 
-    os.log("Unable to find a size placement\n", .{});
-    @panic("");
+    // We found nothing, make a new one
+    if(debug)
+      os.log("Existing range not found, creating a new one\n", .{});
+    const range = try self.make_range();
+    if(range.try_place(size, alignment, size_alignment)) |placement| {
+      return RangePlacement{
+        .range = range,
+        .placement = placement,
+      };
+    }
+
+    return error.OutOfMemory;
   }
 
-  fn free_node(self: *@This(), node: *Range) void {
+  fn free_range(self: *@This(), node: *Range) void {
     const new_head = @ptrCast(*?*Range, node);
     new_head.* = self.range_node_head;
     self.range_node_head = node;
@@ -309,30 +304,16 @@ pub const RangeAlloc = struct {
   fn consume_node_bytes(self: *@This()) !void {
     const base = try sbrk(node_block_size);
     for(@ptrCast([*]Range, @alignCast(@alignOf(Range), base))[0..node_block_size/@sizeOf(Range)]) |*n|
-      self.free_node(n);
+      self.free_range(n);
   }
 
-  fn add_range(self: *@This(), range: Range) !*Range {
-    const node = try self.alloc_node();
-    errdefer self.free_node(node);
+  fn add_range(self: *@This(), in_range: Range) !*Range {
+    const range = try self.alloc_range();
+    range.* = in_range;
 
-    node.* = range;
-
-    if(self.by_size.insert(&node.size_node) != null) {
-      self.dump_state();
-      os.log("While inserting {}\n", .{node});
-      @panic("by_size already exists!");
-    }
-    errdefer self.by_size.remove(&node.size_node);
-
-    if(self.by_addr.insert(&node.addr_node) != null) {
-      self.dump_state();
-      os.log("While inserting {}\n", .{node});
-      @panic("by_addr already exists!");
-    }
-    errdefer self.by_addr.remove(&node.addr_node);
-
-    return node;
+    self.by_size.insert(range);
+    self.by_addr.insert(range);
+    return range;
   }
 
   fn make_range(self: *@This()) !*Range {
@@ -344,7 +325,7 @@ pub const RangeAlloc = struct {
     return self.add_range(result);
   }
 
-  fn alloc_node(self: *@This()) !*Range {
+  fn alloc_range(self: *@This()) !*Range {
     if(self.range_node_head == null) {
       try self.consume_node_bytes();
     }
@@ -357,34 +338,29 @@ pub const RangeAlloc = struct {
   }
 
   // Needs to be a node in the addr tree
-  fn merge_ranges(self: *@This(), node_in: *Range) void {
-    var node = node_in;
-    {
-      // Try to merge to the left
-      while(node.addr_node.prev()) |prev_in| {
-        const prev = @fieldParentPtr(Range, "addr_node", prev_in);
-        if(self.try_merge(prev, node)) {
-          self.by_addr.remove(&node.addr_node);
-          self.by_size.remove(&node.size_node);
-          self.free_node(node);
-          node = prev;
-        } else {
-          break;
-        }
+  fn merge_ranges(self: *@This(), range_in: *Range) void {
+    var current = range_in;
+
+    // Try to merge to the left
+    while(self.by_addr.iterators.prev(current)) |prev| {
+      if(self.try_merge(prev, current)) {
+        self.by_addr.remove(current);
+        self.by_size.remove(current);
+        self.free_range(current);
+        current = prev;
+      } else {
+        break;
       }
     }
 
-    {
-      // Try to merge to the right
-      while(node.addr_node.next()) |next_in| {
-        const next = @fieldParentPtr(Range, "addr_node", next_in);
-        if(self.try_merge(node, next)) {
-          self.by_addr.remove(&next.addr_node);
-          self.by_size.remove(&next.size_node);
-          self.free_node(next);
-        } else {
-          break;
-        }
+    // Try to merge to the right
+    while(self.by_addr.iterators.next(current)) |next| {
+      if(self.try_merge(current, next)) {
+        self.by_addr.remove(next);
+        self.by_size.remove(next);
+        self.free_range(next);
+      } else {
+        break;
       }
     }
   }

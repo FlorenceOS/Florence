@@ -112,6 +112,16 @@ pub fn Tree(comptime T: type, comptime member_name: []const u8, comptime cfg: Co
                 pub fn last(self: *const @This()) *T {
                     return node_to_val(self.iterators.ends[1]);
                 }
+
+                /// Get the next node in left-to-right order
+                pub fn next(_: *const @This(), ref: *T) ?*T {
+                    return TreeType.node_to_ref_opt(TreeType.ref_to_node(ref).iterators[1]);
+                }
+
+                /// Get the previous node in left-to-right order
+                pub fn prev(_: *const @This(), ref: *T) ?*T {
+                    return TreeType.node_to_ref_opt(TreeType.ref_to_node(ref).iterators[0]);
+                }
             }
         else
             void,
