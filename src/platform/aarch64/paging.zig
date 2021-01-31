@@ -257,7 +257,7 @@ pub const PagingContext = struct {
 
     const curr = &os.memory.paging.CurrentContext;
 
-    curr.mair = MAIRContext().get_active(),
+    curr.mair = MAIRContext().get_active();
     curr.br0 = ttbr0.read();
     curr.br1 = ttbr1.read();
     curr.upper = PageSizeContext.get_active(.Upper, tcr);
