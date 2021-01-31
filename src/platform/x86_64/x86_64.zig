@@ -213,12 +213,14 @@ pub fn task_fork_handler(frame: *InterruptFrame) void {
   };
 }
 
+const stack_allocator = vmm.backed(.Ephemeral);
+
 pub fn new_task_call(new_task: *Task, func: anytype, args: anytype) !void {
   var had_error: u64 = undefined;
   var result: u64 = undefined;
 
-  new_task.platform_data.stack = try vmm.ephemeral.create([task_stack_size]u8);
-  errdefer vmm.ephemeral.destroy(new_task.platform_data.stack.?);
+  new_task.platform_data.stack = try stack_allocator.create([task_stack_size]u8);
+  errdefer stack_allocator.destroy(new_task.platform_data.stack.?);
 
   // task_fork()
   asm volatile(

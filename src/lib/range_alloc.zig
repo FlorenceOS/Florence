@@ -7,8 +7,8 @@ const rb    = os.lib.rbtree;
 const sbrk  = os.memory.vmm.sbrk;
 const Mutex = os.thread.Mutex;
 
-const max_alloc_size = 0x1000 << 10;
-const node_block_size = 0x100 * @sizeOf(Range);
+const min_materialize_size = 64 * 1024;
+const node_block_size = 0x1000 * @sizeOf(Range)/16;
 
 const debug = false;
 
@@ -112,6 +112,7 @@ pub const RangeAlloc = struct {
   by_size: SizeTree = SizeTree.init(.{}, {}),
 
   mutex: Mutex = .{},
+  materialize_bytes: fn(usize) anyerror![]u8,
 
   fn dump_state(self: *@This()) void {
     if(!debug)
@@ -284,7 +285,7 @@ pub const RangeAlloc = struct {
     // We found nothing, make a new one
     if(debug)
       os.log("Existing range not found, creating a new one\n", .{});
-    const range = try self.make_range();
+    const range = try self.make_range(size);
     if(range.try_place(size, alignment, size_alignment)) |placement| {
       return RangePlacement{
         .range = range,
@@ -316,10 +317,10 @@ pub const RangeAlloc = struct {
     return range;
   }
 
-  fn make_range(self: *@This()) !*Range {
+  fn make_range(self: *@This(), minBytes: usize) !*Range {
     const result: Range = .{
-      .base = @ptrToInt((try sbrk(max_alloc_size)).ptr),
-      .size = max_alloc_size,
+      .base = @ptrToInt((try self.materialize_bytes(std.math.max(min_materialize_size, minBytes))).ptr),
+      .size = min_materialize_size,
     };
 
     return self.add_range(result);

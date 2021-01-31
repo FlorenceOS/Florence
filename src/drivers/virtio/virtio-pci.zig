@@ -201,7 +201,7 @@ pub const Descriptor = u16; // descriptor id
 
 const os = @import("root").os;
 const libalign = os.lib.libalign;
-const allocator = os.memory.vmm.ephemeral;
+const allocator = os.memory.vmm.backed(.Ephemeral);
 const pmm = os.memory.pmm;
 const paging = os.memory.paging;
 const pci = os.platform.pci;
