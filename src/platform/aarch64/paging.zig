@@ -252,17 +252,16 @@ pub const PagingContext = struct {
     os.memory.paging.CurrentContext = self.*;
   }
 
-  pub fn get_active() @This() {
+  pub fn read_current() void {
     const tcr = TCR.read();
 
-    return .{
-      .mair = MAIRContext().get_active(),
-      .br0 = ttbr0.read(),
-      .br1 = ttbr1.read(),
-      .upper = PageSizeContext.get_active(.Upper, tcr),
-      .lower = PageSizeContext.get_active(.Lower, tcr),
-      .physical_base = undefined,
-    };
+    const curr = &os.memory.paging.CurrentContext;
+
+    curr.mair = MAIRContext().get_active(),
+    curr.br0 = ttbr0.read();
+    curr.br1 = ttbr1.read();
+    curr.upper = PageSizeContext.get_active(.Upper, tcr);
+    curr.lower = PageSizeContext.get_active(.Lower, tcr);
   }
 
   pub fn make_default() !@This() {
@@ -275,7 +274,7 @@ pub const PagingContext = struct {
       .br1 = try make_page_table(psz),
       .upper = pszc,
       .lower = pszc,
-      .physical_base = 0xFFFF000000000000,
+      .physical_base = os.memory.paging.CurrentContext.physical_base,
     };
   }
 

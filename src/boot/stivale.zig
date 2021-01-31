@@ -37,8 +37,8 @@ export fn stivale_main(input_info: *StivaleInfo) void {
   info = input_info.*;
   os.log("Stivale: Boot arguments: {s}\n", .{info.cmdline});
 
+  stivale.detect_phys_base();
   os.platform.platform_early_init();
-  os.memory.paging.CurrentContext.set_phys_base(0);              
 
   for(info.memmap()) |*ent| {
     stivale.add_memmap(ent);

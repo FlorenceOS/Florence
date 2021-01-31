@@ -117,6 +117,10 @@ pub fn make_page_table() !u64 {
   return pt;
 }
 
+pub fn is_5levelpaging() bool {
+  return cr4.read() & la64 != 0;
+}
+
 pub const PagingContext = struct {
   pat: ?PAT_context(),
   cr3_val: cr3_value,
@@ -146,22 +150,19 @@ pub const PagingContext = struct {
     os.memory.paging.CurrentContext = self.*;
   }
 
-  pub fn get_active() @This() {
+  pub fn read_current() void {
     const id = os.platform.cpuid(0x80000001);
 
-    return .{
-      .pat = PAT_context().get_active(),
-      .cr3_val = cr3.read(),
+    const curr = &os.memory.paging.CurrentContext;
 
-      // Test if 5 level paging currently is enabled
-      .level5paging = cr4.read() & la64 != 0,
+    curr.pat = PAT_context().get_active();
+    curr.cr3_val = cr3.read();
 
-      // To be set by bootloader after initializing
-      .physical_base = undefined,
+    // Test if 5 level paging currently is enabled
+    curr.level5paging = is_5levelpaging();
 
-      // Check CPUID to determine if enabled or not
-      .gigapage_allowed = if(id) |i| ((i.edx >> 26) & 1) == 1 else false,
-    };
+    // Check CPUID to determine if enabled or not
+    curr.gigapage_allowed = if(id) |i| ((i.edx >> 26) & 1) == 1 else false;
   }
 
   pub fn make_default() !@This() {
@@ -176,7 +177,7 @@ pub const PagingContext = struct {
       .pat = PAT_context().make_default(),
       .cr3_val = pt,
       .level5paging = enable_5level,
-      .physical_base = if(enable_5level) 0xFF00000000000000 else 0xFFFF800000000000,
+      .physical_base = curr.physical_base,
       .gigapage_allowed = curr.gigapage_allowed,
     };
   }

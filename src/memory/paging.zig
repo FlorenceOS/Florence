@@ -13,7 +13,7 @@ const pmm = os.memory.pmm;
 pub var CurrentContext: os.platform.paging.PagingContext = undefined;
 
 pub fn init() void {
-  CurrentContext = os.platform.paging.PagingContext.get_active();
+  os.platform.paging.PagingContext.read_current();
 }
 
 pub fn map(args: struct {

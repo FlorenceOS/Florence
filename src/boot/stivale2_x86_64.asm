@@ -16,8 +16,13 @@ framebuffer:
 
 smp:
 .8byte 0x1ab015085f3273df
-.8byte 0
+.8byte lv5paging
 .8byte 1
+
+.balign 8
+lv5paging:
+.8byte 0x932f477032007e8f
+.8byte 0
 
 .section .text
 .global _start

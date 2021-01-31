@@ -1,6 +1,6 @@
 .intel_syntax noprefix
 
-.set stivale_flags_value, 1 // we disable kaslr for now as the linker is not emitting relocations.
+.set stivale_flags_value, 0x3 // we disable kaslr for now as the linker is not emitting relocations.
 
 .section .stivalehdr, "a"
 .8byte stack_top // stack
