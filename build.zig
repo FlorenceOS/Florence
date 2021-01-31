@@ -3,6 +3,8 @@ const Builder = std.build.Builder;
 const builtin = std.builtin;
 const assert = std.debug.assert;
 
+const sabaton = @import("Sabaton/build.zig");
+
 const Context = enum {
     kernel,
     blobspace,
@@ -117,32 +119,31 @@ fn build_dyld(b: *Builder, arch: builtin.Arch) *std.build.LibExeObjStep {
     return dyld;
 }
 
-fn qemu_run_aarch64_sabaton(b: *Builder, board_name: []const u8, desc: []const u8, dep: *std.build.LibExeObjStep) void {
+fn qemu_run_aarch64_sabaton(b: *Builder, board_name: []const u8, desc: []const u8) !void {
+    const sabaton_blob = try sabaton.build_blob(b, .aarch64, board_name, "Sabaton/");
+
+    const flork = build_kernel(b, .aarch64, "stivale2");
+    const flork_blob = try sabaton.pad_file(b, &flork.step, flork.getOutputPath());
+
     const command_step = b.step(board_name, desc);
 
-    const params = &[_][]const u8{
-        "qemu-system-aarch64", 
+    const params = &[_][]const u8 {
+        "qemu-system-aarch64",
         "-M", board_name, 
         "-cpu", "cortex-a57",
-        "-drive", b.fmt("if=pflash,format=raw,file=Sabaton/out/aarch64_{s}.bin,readonly=on", .{board_name}),
-        "-drive", b.fmt("if=pflash,format=raw,file={s},readonly=on", .{dep.getOutputPath()}),
+        "-drive", b.fmt("if=pflash,format=raw,file={s},readonly=on", .{sabaton_blob.output_path}),
+        "-drive", b.fmt("if=pflash,format=raw,file={s},readonly=on", .{flork_blob.output_path}),
         "-m", "4G",
         "-serial", "stdio",
         //"-S", "-s",
         "-d", "int",
         "-smp", "4",
-        "-device", "virtio-gpu-pci"
+        "-device", "virtio-gpu-pci",
     };
 
-    const pad_step = b.addSystemCommand(
-        &[_][]const u8{
-            "truncate", "-s", "64M", dep.getOutputPath(),
-        },
-    );
-
     const run_step = b.addSystemCommand(params);
-    pad_step.step.dependOn(&dep.step);
-    run_step.step.dependOn(&pad_step.step);
+    run_step.step.dependOn(&sabaton_blob.step);
+    run_step.step.dependOn(&flork_blob.step);
     command_step.dependOn(&run_step.step);
 }
 
@@ -235,21 +236,19 @@ fn limine_target(b: *Builder, command: []const u8, desc: []const u8, image_path:
     command_step.dependOn(&run_step.step);
 }
 
-pub fn build(b: *Builder) void {
+pub fn build(b: *Builder) !void {
     const sources = make_source_blob(b);
 
-    qemu_run_aarch64_sabaton(
-        b,
-        "raspi3",
-        "(WIP) Run aarch64 kernel with Sabaton stivale2 on the raspi3 board",
-        build_kernel(b, builtin.Arch.aarch64, "stivale2"),
-    );
+    // try qemu_run_aarch64_sabaton(
+    //     b,
+    //     "raspi3",
+    //     "(WIP) Run aarch64 kernel with Sabaton stivale2 on the raspi3 board",
+    // );
 
-    qemu_run_aarch64_sabaton(
+    try qemu_run_aarch64_sabaton(
         b,
         "virt",
         "Run aarch64 kernel with Sabaton stivale2 on the virt board",
-        build_kernel(b, builtin.Arch.aarch64, "stivale2"),
     );
 
     // qemu_run_riscv_sabaton(b,
