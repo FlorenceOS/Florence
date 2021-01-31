@@ -7,6 +7,7 @@
 .8byte framebuffer
 
 .section .rodata.stivale
+.balign 8
 framebuffer:
 .8byte 0x3ecc1bc43d0f7971
 .8byte smp
@@ -14,6 +15,7 @@ framebuffer:
 .2byte 0
 .2byte 0
 
+.balign 8
 smp:
 .8byte 0x1ab015085f3273df
 .8byte lv5paging
@@ -34,7 +36,8 @@ _start:
   jmp   stivale2_main
 
 .section .bss
+.balign 16
 stack_bottom:
-.zero 1024 * 16 - 16
+.zero 4096 * 16 - 16
 stack_top:
 .zero 16

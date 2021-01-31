@@ -7,6 +7,7 @@
 .8byte framebuffer
 
 .section .rodata.stivale
+.balign 8
 framebuffer:
 .8byte 0x3ecc1bc43d0f7971
 .8byte smp
@@ -14,6 +15,7 @@ framebuffer:
 .2byte 0
 .2byte 0
 
+.balign 8
 smp:
 .8byte 0x1ab015085f3273df
 .8byte 0
@@ -22,13 +24,17 @@ smp:
 .section .text
 .global _start
 _start:
+  // LDR X5, =0x1C28000
+  // MOV W6, #0x21
+  // STR W6, [X5]
+
 .extern stivale2_main
   B     stivale2_main
 
 .section .bss.stack, "a"
 .balign 16
 stack_bottom:
-.zero 1024 * 16 - 16
+.zero 4096 * 16 - 16
 stack_top:
 .zero 16
 
