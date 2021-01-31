@@ -24,6 +24,7 @@ stivale_flags:
 .2byte stivale_flags_value
 
 .section .bss
+.balign 16
 stack_bottom:
 .zero 4096 * 16 - 16
 stack_top:
