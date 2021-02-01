@@ -1,9 +1,9 @@
 [submodule "limine"]
-	path = limine
+	path = boot/limine
 	url = https://github.com/limine-bootloader/limine.git
 [submodule "Sabaton"]
-	path = Sabaton
+	path = boot/Sabaton
 	url = https://github.com/N00byEdge/Sabaton.git
 [submodule "echfs"]
-	path = echfs
+	path = boot/echfs
 	url = https://github.com/echfs/echfs
