@@ -158,17 +158,17 @@ pub const Driver = struct {
     if (size == 0) return;
     const desc_siz: u32 = @sizeOf(VirtqDesc) * size;
     const avail_siz: u32 = @sizeOf(VirtqAvail) + 2 + 2 * size;
-    const aligned_siz: u32 = libalign.align_up(u32, 4096, desc_siz + avail_siz);
     const used_siz: u32 = @sizeOf(VirtqUsed) + 2 + @sizeOf(VirtqUsedItem) * size;
-    const total_siz = aligned_siz + used_siz;
-    const slice = allocator.allocAdvanced(u8, 4096, total_siz, .at_least) catch |err| return;
-    for (slice[0..total_siz]) |*b| b.* = 0;
-    const virt = @ptrToInt(slice.ptr);
+    const total_siz = desc_siz + avail_siz + used_siz;
+    const phys = os.memory.pmm.alloc_phys(size) catch unreachable;
+    paging.remap_phys_size(.{ .phys = phys, .size = size, .memtype = .DeviceUncacheable }) catch unreachable;
+    const virt = os.memory.pmm.access_phys_volatile(u8, phys);
+    @memset(virt, 0x00, total_siz);
 
     drv.queues[i] = .{
-      .desc = @intToPtr([*]VirtqDesc, virt),
-      .avail = @intToPtr(*VirtqAvail, virt + desc_siz),
-      .used = @intToPtr(*VirtqUsed, virt + aligned_siz),
+      .desc = @ptrCast([*]VirtqDesc, virt),
+      .avail = @ptrCast(*VirtqAvail, virt + desc_siz),
+      .used = @ptrCast(*VirtqUsed, virt + desc_siz + avail_siz),
       .size = size,
       .num_unused = size,
       .first_unused = 0,
@@ -182,10 +182,9 @@ pub const Driver = struct {
     }
     drv.queues[i].desc[m].next = 0xFFFF;
 
-    const phy = paging.translate_virt(.{.virt = virt}) catch |err| return;
-    drv.cfg.queue_desc = phy;
-    drv.cfg.queue_avail = phy + desc_siz;
-    drv.cfg.queue_used = phy + aligned_siz;
+    drv.cfg.queue_desc = phys;
+    drv.cfg.queue_avail = phys + desc_siz;
+    drv.cfg.queue_used = phys + desc_siz + avail_siz;
     drv.cfg.queue_enable = 1; // important: this enables the queue
   }
 
@@ -274,13 +273,11 @@ const CommonCfg = packed struct {
 
 // map function helper
 fn map(phy: u64, len: u64) void {
-  paging.remap_phys_size(.{
+  os.vital(paging.remap_phys_size(.{
     .phys = phy,
     .size = len,
     .memtype = .DeviceUncacheable
-  }) catch |err| {
-    @panic("virtio-blk: can't map memory.");
-  };
+  }), "mapping virtio-pci bars");
 }
 
 const VIRTIO_ACKNOWLEDGE: u8 = 1;
