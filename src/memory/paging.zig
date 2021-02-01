@@ -66,7 +66,7 @@ pub fn unmap(args: struct {
 pub const Perms = struct {
   writable: bool,
   executable: bool,
-  userspace: bool,
+  userspace: bool = false,
 
   pub fn allows(self: @This(), other: @This()) bool {
     if(!self.writable and other.writable)
@@ -91,7 +91,6 @@ pub fn rx() Perms {
   return .{
     .writable = false,
     .executable = true,
-    .userspace = false,
   };
 }
 
@@ -99,7 +98,6 @@ pub fn ro() Perms {
   return .{
     .writable = false,
     .executable = false,
-    .userspace = false,
   };
 }
 
@@ -107,7 +105,6 @@ pub fn rw() Perms {
   return .{
     .writable = true,
     .executable = false,
-    .userspace = false,
   };
 }
 
@@ -115,13 +112,12 @@ pub fn rwx() Perms {
   return .{
     .writable = true,
     .executable = true,
-    .userspace = false,
   };
 }
 
 pub fn user(p: Perms) Perms {
-  var ret = curr;
-  ret.user = true;
+  var ret = p;
+  ret.userspace = true;
   return ret;
 }
 
