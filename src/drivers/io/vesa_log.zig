@@ -31,6 +31,10 @@ const vesa_font = .{
 
 const font = font_fixed_6x13;
 
+comptime {
+  std.debug.assert(is_printable('?'));
+}
+
 const bgcol = 0x00;
 const fgcol = 0xaa;
 
