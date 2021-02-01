@@ -50,12 +50,12 @@ pub fn hexdump_obj(val: anytype) void {
 pub fn hexdump(in_bytes: []const u8) void {
   var bytes = in_bytes;
   while(bytes.len != 0) {
-    log("{x:0>16}: ", .{@ptrToInt(bytes.ptr)});
+    log("{X:0>16}: ", .{@ptrToInt(bytes.ptr)});
 
     inline for(range(0x10)) |offset| {
       if(offset < bytes.len) {
         const value = bytes[offset];
-        log("{x:0>2}{c}", .{value, if(offset == 7) '-' else ' '});
+        log("{X:0>2}{c}", .{value, if(offset == 7) '-' else ' '});
       } else {
         log("   ", .{});
       }
