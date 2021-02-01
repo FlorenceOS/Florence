@@ -3,7 +3,7 @@ const Builder = std.build.Builder;
 const builtin = std.builtin;
 const assert = std.debug.assert;
 
-const sabaton = @import("Sabaton/build.zig");
+const sabaton = @import("boot/Sabaton/build.zig");
 
 const Context = enum {
     kernel,
@@ -120,7 +120,7 @@ fn build_dyld(b: *Builder, arch: builtin.Arch) *std.build.LibExeObjStep {
 }
 
 fn qemu_run_aarch64_sabaton(b: *Builder, board_name: []const u8, desc: []const u8) !void {
-    const sabaton_blob = try sabaton.build_blob(b, .aarch64, board_name, "Sabaton/");
+    const sabaton_blob = try sabaton.build_blob(b, .aarch64, board_name, "boot/Sabaton/");
 
     const flork = build_kernel(b, .aarch64, "stivale2");
     const flork_blob = try sabaton.pad_file(b, &flork.step, flork.getOutputPath());
@@ -203,14 +203,14 @@ fn echfs_image(b: *Builder, image_path: []const u8, kernel_path: []const u8, ins
     const image_params = &[_][]const u8{
         "/bin/sh", "-c",
         std.mem.concat(b.allocator, u8, &[_][]const u8{
-            "make -C echfs && ",
+            "make -C boot/echfs && ",
             "rm ", image_path, " || true && ",
             "dd if=/dev/zero bs=1048576 count=0 seek=8 of=", image_path, " && ",
             "parted -s ", image_path, " mklabel msdos && ",
             "parted -s ", image_path, " mkpart primary 1 100% && ",
             "parted -s ", image_path, " set 1 boot on && ",
-            "./echfs/echfs-utils -m -p0 ", image_path, " quick-format 32768 && ",
-            "./echfs/echfs-utils -m -p0 ", image_path, " import '", kernel_path, "' flork.elf && ",
+            "./boot/echfs/echfs-utils -m -p0 ", image_path, " quick-format 32768 && ",
+            "./boot/echfs/echfs-utils -m -p0 ", image_path, " import '", kernel_path, "' flork.elf && ",
             install_command,
         }) catch unreachable,
     };
@@ -223,11 +223,10 @@ fn limine_target(b: *Builder, command: []const u8, desc: []const u8, image_path:
     const command_step = b.step(command, desc);
     const run_step = qemu_run_image_x86_64(b, image_path);
     const image_step = echfs_image(b, image_path, dep.getOutputPath(), std.mem.concat(b.allocator, u8, &[_][]const u8{
-        "make -C limine limine-install && ",
-        "make -C echfs && ",
-        "./echfs/echfs-utils -m -p0 ", image_path, " import ", root_path,
-        "/limine.cfg limine.cfg && ",
-        "./limine/limine-install ",
+        "make -C boot/limine limine-install && ",
+        "make -C boot/echfs && ",
+        "./boot/echfs/echfs-utils -m -p0 ", image_path, " import ", root_path, "/limine.cfg limine.cfg && ",
+        "./boot/limine/limine-install ",
         image_path,
     }) catch unreachable);
 
@@ -262,7 +261,7 @@ pub fn build(b: *Builder) !void {
         "x86_64-stivale2",
         "Run x86_64 kernel with limine stivale2",
         b.fmt("{s}/stivale2.img", .{b.cache_root}),
-        "stivale2_image",
+        "boot/stivale2_image",
         build_kernel(b, builtin.Arch.x86_64, "stivale2"),
     );
 
@@ -271,7 +270,7 @@ pub fn build(b: *Builder) !void {
         "x86_64-stivale",
         "Run x86_64 kernel with limine stivale",
         b.fmt("{s}/stivale.img", .{b.cache_root}),
-        "stivale_image",
+        "boot/stivale_image",
         build_kernel(b, builtin.Arch.x86_64, "stivale"),
     );
 }
