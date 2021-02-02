@@ -104,13 +104,13 @@ pub fn Tree(comptime T: type, comptime member_name: []const u8, comptime cfg: Co
             struct {
                 ends: [2]?*NodeType,
                 /// First element in a tree
-                pub fn first(self: *const @This()) *T {
-                    return node_to_val(self.iterators.ends[0]);
+                pub fn first(self: *const @This()) ?*T {
+                    return TreeType.node_to_ref_opt(self.ends[0]);
                 }
 
                 /// Last element in a tree
-                pub fn last(self: *const @This()) *T {
-                    return node_to_val(self.iterators.ends[1]);
+                pub fn last(self: *const @This()) ?*T {
+                    return TreeType.node_to_ref_opt(self.ends[1]);
                 }
 
                 /// Get the next node in left-to-right order
