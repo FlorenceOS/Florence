@@ -117,11 +117,11 @@ const Framebuffer = struct {
     // Yes this is slow but I don't care, I love it.
     var y: u64 = font.height;
     while(y < (self.height/font.height) * font.height): (y += 1) {
-      const dst = @ptrCast([*]u8, self.addr) + self.pitch * (y - font.height);
-      const src = @ptrCast([*]u8, self.addr) + self.pitch * y;
+      const dst = self.addr.ptr + self.pitch * (y - font.height);
+      const src = self.addr.ptr + self.pitch * y;
       @memcpy(dst, src, self.pitch);
     }
-    @memset(@ptrCast([*]u8, self.addr) + self.pitch * (y - font.height), 0x00, self.pitch * font.height);
+    @memset(self.addr.ptr + self.pitch * (y - font.height), 0x00, self.pitch * font.height);
     self.updater(0, 0, self.width, self.height, self.updater_ctx);
   }
 
@@ -209,7 +209,7 @@ pub fn register_fb(fb_phys: usize, fb_pitch: u16, fb_width: u16, fb_height: u16,
   };
 
   if(clear_screen) {
-    @memset(@ptrCast([*]u8, framebuffer.?.addr), bgcol, fb_size);
+    @memset(framebuffer.?.addr.ptr, bgcol, fb_size);
     os.log("VESAlog: Screen cleared.\n", .{});
   }
 
