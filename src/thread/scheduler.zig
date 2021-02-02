@@ -12,6 +12,10 @@ pub fn make_task(func: anytype, args: anytype) !void {
   try os.platform.new_task_call(task, func, args);
 }
 
+pub fn new_task() !*os.thread.Task {
+  return task_alloc.create(os.thread.Task);
+}
+
 pub fn exit_task() noreturn {
   const task = try os.platform.self_exited();
   if(task) |t|
