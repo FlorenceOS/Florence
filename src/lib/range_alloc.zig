@@ -75,7 +75,7 @@ const Range = struct {
     const rbase = self.returned_base(alignment);
     const es = effective_size(size, size_alignment);
     const offset = rbase - self.base;
-    if(offset + es < self.size) {
+    if(offset + es <= self.size) {
       return PlacementResult{
         .effective_size = es,
         .offset = offset,
