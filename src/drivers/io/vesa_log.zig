@@ -35,11 +35,14 @@ comptime {
   std.debug.assert(is_printable('?'));
 }
 
+fn is_printable(c: u8) bool {
+  return font.base <= c and c < font.base + font.data.len/8;
+}
+
 const bgcol = 0x00;
 const fgcol = 0xaa;
 
 const clear_screen = false;
-
 
 const Framebuffer = struct {
   addr: []u8,
@@ -56,12 +59,103 @@ const Framebuffer = struct {
   updater: Updater,
   updater_ctx: u64,
 
-  pub fn width_in_chars(self: *@This()) u64 {
+  fn width_in_chars(self: *@This()) u64 {
     return self.width / font.width;
   }
 
-  pub fn height_in_chars(self: *@This()) u64 {
+  fn height_in_chars(self: *@This()) u64 {
     return self.height / font.height;
+  }
+
+  fn px(self: *@This(), comptime bpp: u64, x: u64, y: u64) *[3]u8 {
+    const offset = self.pitch * y + x * bpp;
+    return self.addr[offset .. offset + 3][0..3];
+  }
+
+  fn blit_impl(self: *@This(), comptime bpp: u64, ch: u8) void {
+    inline for(range(font.height)) |y| {
+      const chr_line = font.data[y + (@as(u64, ch) - font.base) * font.height * ((font.width + 7)/8)];
+
+      const ypx = self.pos_y * font.height + y;
+
+      inline for(range(font.width)) |x| {
+        const xpx = self.pos_x * font.width + x;
+
+        const pixel = self.px(bpp, xpx, ypx);
+
+        const shift: u3 = font.width - 1 - x;
+        const has_pixel_set = ((chr_line >> shift) & 1) == 1;
+
+        if(has_pixel_set) {
+          pixel[0] = fgcol;
+          pixel[1] = fgcol;
+          pixel[2] = fgcol;
+        }
+        else {
+          pixel[0] = bgcol;
+          pixel[1] = bgcol;
+          pixel[2] = bgcol;
+        }
+      }
+    }
+    self.pos_x += 1;
+  }
+
+  fn blit_char(self: *@This(), ch: u8) void {
+    if(self.bpp == 4) {
+      self.blit_impl(4, ch);
+      return;
+    }
+    if(self.bpp == 3) {
+      self.blit_impl(3, ch);
+      return;
+    }
+    unreachable;
+  }
+
+  fn scroll_fb(self: *@This()) void {
+    // Yes this is slow but I don't care, I love it.
+    var y: u64 = font.height;
+    while(y < (self.height/font.height) * font.height): (y += 1) {
+      const dst = @ptrCast([*]u8, self.addr) + self.pitch * (y - font.height);
+      const src = @ptrCast([*]u8, self.addr) + self.pitch * y;
+      @memcpy(dst, src, self.pitch);
+    }
+    @memset(@ptrCast([*]u8, self.addr) + self.pitch * (y - font.height), 0x00, self.pitch * font.height);
+    self.updater(0, 0, self.width, self.height, self.updater_ctx);
+  }
+
+  fn feed_line(self: *@This()) void {
+    self.pos_x = 0;
+    if(self.pos_y == self.height_in_chars() - 1) {
+      self.scroll_fb();
+    }
+    else {
+      self.pos_y += 1;
+    }
+  }
+
+  fn update(self: *@This()) void {
+    var y = @truncate(u32, self.pos_y * font.height);
+    self.updater(0, y, self.width, @truncate(u32, font.height), self.updater_ctx);
+  }
+
+  pub fn putch(self: *@This(), ch: u8) void {
+    if(ch == '\n') {
+      self.update();
+      self.feed_line();
+      return;
+    }
+
+    if(self.pos_x == framebuffer.?.width_in_chars())
+      self.feed_line();
+
+    if(!is_printable(ch)) {
+      self.blit_char('?');
+    }
+    else {
+      self.blit_char(ch);
+    }
   }
 };
 
@@ -84,10 +178,6 @@ pub fn set_updater(u: Updater, ctx: u64) void {
     fb.updater = u;
     fb.updater_ctx = ctx;
   }
-}
-
-fn is_printable(c: u8) bool {
-  return font.base <= c and c < font.base + font.data.len/8;
 }
 
 pub fn register_fb(fb_phys: usize, fb_pitch: u16, fb_width: u16, fb_height: u16, fb_bpp_in: u16) void {
@@ -130,100 +220,9 @@ pub fn register_fb(fb_phys: usize, fb_pitch: u16, fb_width: u16, fb_height: u16,
   os.log("VESAlog:  BPP:    {}\n", .{fb_bpp});
 }
 
-fn px(comptime bpp: u64, x: u64, y: u64) *[3]u8 {
-  const offset = framebuffer.?.pitch * y + x * bpp;
-  return framebuffer.?.addr[offset .. offset + 3][0..3];
-}
-
-fn blit_impl(comptime bpp: u64, ch: u8) void {
-  inline for(range(font.height)) |y| {
-    const chr_line = font.data[y + (@as(u64, ch) - font.base) * font.height * ((font.width + 7)/8)];
-
-    const ypx = framebuffer.?.pos_y * font.height + y;
-
-    inline for(range(font.width)) |x| {
-      const xpx = framebuffer.?.pos_x * font.width + x;
-
-      const pixel = px(bpp, xpx, ypx);
-
-      const shift: u3 = font.width - 1 - x;
-      const has_pixel_set = ((chr_line >> shift) & 1) == 1;
-
-      if(has_pixel_set) {
-        pixel[0] = fgcol;
-        pixel[1] = fgcol;
-        pixel[2] = fgcol;
-      }
-      else {
-        pixel[0] = bgcol;
-        pixel[1] = bgcol;
-        pixel[2] = bgcol;
-      }
-    }
-  }
-  framebuffer.?.pos_x += 1;
-}
-
-fn blit_char(ch: u8) void {
-  if(framebuffer.?.bpp == 4) {
-    blit_impl(4, ch);
-    return;
-  }
-  if(framebuffer.?.bpp == 3) {
-    blit_impl(3, ch);
-    return;
-  }
-  unreachable;
-}
-
-fn scroll_fb() void {
-  // Speeds this up by like 8x, and I don't think there are bugs here
-  @setRuntimeSafety(false);
-
-  // Yes this is slow but I don't care, I love it.
-  var y: u64 = font.height;
-  while(y < (framebuffer.?.height/font.height) * font.height): (y += 1) {
-    const dst = @ptrCast([*]u8, framebuffer.?.addr) + framebuffer.?.pitch * (y - font.height);
-    const src = @ptrCast([*]u8, framebuffer.?.addr) + framebuffer.?.pitch * y;
-    @memcpy(dst, src, framebuffer.?.pitch);
-  }
-  @memset(@ptrCast([*]u8, framebuffer.?.addr) + framebuffer.?.pitch * (y - font.height), 0x00, framebuffer.?.pitch * font.height);
-  framebuffer.?.updater(0, 0, framebuffer.?.width, framebuffer.?.height, framebuffer.?.updater_ctx);
-}
-
-fn feed_line() void {
-  framebuffer.?.pos_x = 0;
-  if(framebuffer.?.pos_y == framebuffer.?.height_in_chars() - 1) {
-    scroll_fb();
-  }
-  else {
-    framebuffer.?.pos_y += 1;
-  }
-}
-
-pub fn update() void {
-  var y = @truncate(u32, framebuffer.?.pos_y * font.height);
-  framebuffer.?.updater(0, y, framebuffer.?.width, @truncate(u32, font.height), framebuffer.?.updater_ctx);
-}
-
 pub fn putch(ch: u8) void {
-  if(framebuffer != null) {
-    if(ch == '\n') {
-      update();
-      feed_line();
-      return;
-    }
-
-    if(framebuffer.?.pos_x == framebuffer.?.width_in_chars())
-      feed_line();
-
-    if(!is_printable(ch)) {
-      std.debug.assert(is_printable('?'));
-      blit_char('?');
-    }
-    else {
-      blit_char(ch);
-    }
+  if(framebuffer) |*fb| {
+    fb.putch(ch);
   }
 }
 
