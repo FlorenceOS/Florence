@@ -120,10 +120,9 @@ pub const RangeAlloc = struct {
       
     os.log("Dumping range_alloc state\n", .{});
 
-    var n = self.by_addr.first();
-    while(n) |node|: (n = node.next()) {
-      const range = @fieldParentPtr(Range, "addr_node", node);
-      os.log("{}\n", .{range});
+    var range = self.by_addr.iterators.first();
+    while(range) |r|: (range = self.by_addr.iterators.next(r)) {
+      os.log("{}\n", .{r});
     }
   }
 
@@ -291,6 +290,9 @@ pub const RangeAlloc = struct {
         .range = range,
         .placement = placement,
       };
+    } else if(debug) {
+      os.log("Could not place size = 0x{X}, alignment = {}, size_alignment = {} in new allocation {}\n",
+        .{size, alignment, size_alignment, range});
     }
 
     return error.OutOfMemory;
