@@ -318,9 +318,10 @@ pub const RangeAlloc = struct {
   }
 
   fn make_range(self: *@This(), minBytes: usize) !*Range {
+    const size = std.math.max(min_materialize_size, minBytes);
     const result: Range = .{
-      .base = @ptrToInt((try self.materialize_bytes(std.math.max(min_materialize_size, minBytes))).ptr),
-      .size = min_materialize_size,
+      .base = @ptrToInt((try self.materialize_bytes(size)).ptr),
+      .size = size,
     };
 
     return self.add_range(result);
