@@ -5,6 +5,7 @@ const std = @import("std");
 pub const acpi       = @import("acpi.zig");
 pub const pci        = @import("pci.zig");
 pub const devicetree = @import("devicetree.zig");
+pub const smp        = @import("smp.zig");
 
 // Anything else comes from this platform specific file
 const arch = @import("builtin").arch;
