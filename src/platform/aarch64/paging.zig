@@ -248,8 +248,6 @@ pub const PagingContext = struct {
       , [ttbr1] "r" (self.br1)
       , [mair]  "r" (self.mair.value)
     );
-
-    os.memory.paging.CurrentContext = self.*;
   }
 
   pub fn read_current() void {

@@ -55,6 +55,7 @@ export fn stivale_main(input_info: *StivaleInfo) void {
   const phys_high = stivale.phys_high(info.memmap());
 
   context.apply();
+  os.memory.paging.CurrentContext = context;
   
   const heap_base = os.memory.paging.CurrentContext.phys_to_virt(phys_high);
 

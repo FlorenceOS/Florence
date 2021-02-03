@@ -146,8 +146,6 @@ pub const PagingContext = struct {
     );
 
     @call(.{.modifier = .always_inline}, cr3.write, .{self.cr3_val});
-
-    os.memory.paging.CurrentContext = self.*;
   }
 
   pub fn read_current() void {
