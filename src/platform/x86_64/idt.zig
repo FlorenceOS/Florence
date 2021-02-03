@@ -16,8 +16,6 @@ var idt = [1]idt_entry{undefined} ** num_handlers;
 pub const InterruptHandler = fn func() callconv(.Naked) void;
 
 pub fn setup_idt() *[num_handlers]idt_entry {
-  os.log("IDT: Setting up IDT...\n", .{});
-
   const idtr = Idtr {
     .addr = @ptrToInt(&idt[0]),
     .limit = @sizeOf(@TypeOf(idt)) - 1,
