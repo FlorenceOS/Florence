@@ -129,7 +129,6 @@ pub const PagingContext = struct {
   physical_base: u64,
 
   pub fn apply(self: *@This()) void {
-    os.log("Applying {X}\n", .{self});
     // First apply the PAT, shouldn't cause any errors
     if(self.pat) |pat|
       @call(.{.modifier = .always_inline}, PAT_context().apply, .{&pat});
