@@ -41,10 +41,27 @@ pub fn platform_init() !void {
 pub fn platform_early_init() void {
   serial.init();
   try interrupts.init_interrupts();
+  os.thread.scheduler.init(&bsp_task);
   setup_gdt();
   os.memory.paging.init();
 
   asm volatile("sti");
+}
+
+var bsp_task: os.thread.Task = .{};
+
+pub fn self_exited() !?*os.thread.Task {
+  const curr = os.platform.get_current_task();
+  
+  if(curr == &bsp_task)
+    return null;
+
+  if(curr.platform_data.stack != null) {
+    // TODO: Figure out how to free the stack while returning using it??
+    // We can just leak it for now
+    //try vmm.free_single(curr.platform_data.stack.?);
+  }
+  return curr;
 }
 
 pub fn read_msr(comptime T: type, msr_num: u32) T {
@@ -277,8 +294,6 @@ pub fn yield_to_task(t: *Task) void {
     : "memory"
   );
 }
-
-pub const self_exited = interrupts.self_exited;
 
 pub const IA32_APIC_BASE = msr(u64, 0x0000001B);
 pub const KernelGSBase   = msr(u64, 0xC0000102);
