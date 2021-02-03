@@ -59,7 +59,7 @@ pub fn ap_init() void {
 
 var bsp_task: os.thread.Task = .{};
 
-pub fn self_exited() !?*os.thread.Task {
+pub fn self_exited() ?*os.thread.Task {
   const curr = os.platform.get_current_task();
   
   if(curr == &bsp_task)

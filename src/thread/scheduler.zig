@@ -17,7 +17,7 @@ pub fn new_task() !*os.thread.Task {
 }
 
 pub fn exit_task() noreturn {
-  const task = try os.platform.self_exited();
+  const task = os.platform.self_exited();
   if(task) |t|
     task_alloc.destroy(t);
 
