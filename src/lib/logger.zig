@@ -10,7 +10,7 @@ const Printer = struct {
   }
 
   pub fn print(self: *const Printer, comptime format: []const u8, args: anytype) !void {
-    log(format, args);
+    log_nolock(format, args);
   }
 
   pub fn writeByteNTimes(self: *const Printer, val: u8, num: usize) !void {
@@ -23,7 +23,16 @@ const Printer = struct {
   pub const Error = anyerror;
 };
 
+var log_lock: os.thread.Spinlock = .{};
+
 pub fn log(comptime format: []const u8, args: anytype) void {
+  const a = log_lock.lock();
+  defer log_lock.unlock(a);
+
+  return log_nolock(format, args);
+}
+
+fn log_nolock(comptime format: []const u8, args: anytype) void {
   var printer = Printer{};
   fmt.format(printer, format, args) catch unreachable;
 }
