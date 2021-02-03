@@ -201,8 +201,6 @@ pub const PagingContext = struct {
   physical_base: u64,
 
   pub fn apply(self: *@This()) void {
-    os.log("Applying {X}\n", .{self});
-
     var aa64mmfr0 = ID_AA64MMFR0.read();
 
     aa64mmfr0 &= 0x0F;
