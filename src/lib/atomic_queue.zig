@@ -38,7 +38,7 @@ pub fn MPSCUnboundedQueue(comptime T: type, comptime member_name: []const u8) ty
 
         /// Create lock-free queue
         pub fn init(self: *@This()) void {
-            self.head = self.dummy;
+            self.head = &self.dummy;
             self.tail = self.head;
             self.head.next = null;
         }
@@ -57,7 +57,7 @@ pub fn MPSCUnboundedQueue(comptime T: type, comptime member_name: []const u8) ty
         }
 
         /// Try to dequeue
-        fn dequeue(self: *@This()) ?*T {
+        pub fn dequeue(self: *@This()) ?*T {
             // Consumer thread will also have consistent
             // view of tail, as its the one
             // that reads it / writes to it
