@@ -117,7 +117,7 @@ test "insertion tests" {
     };
     var queue: MPSCUnboundedQueue(TestNode, "hook") = undefined;
     queue.init();
-    var elems = [_]TestNode {
+    var elems = [_]TestNode{
         .{ .val = 1 },
         .{ .val = 2 },
         .{ .val = 3 },
