@@ -81,11 +81,17 @@ const stivale2_rsdp = packed struct {
 
 const stivale2_smp = packed struct {
   tag: stivale2_tag,
+  flags: u64,
+  bsp_lapic_id: u32,
+  _: u32,
   entries: u64,
-  cpus: [*]stivale2_smp_info,
 
   pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
-    try writer.print("{} CPU(s)", .{self.entries});
+    try writer.print("{} CPU(s): {}", .{self.entries, self.get()});
+  }
+
+  pub fn get(self: *const @This()) []stivale2_smp_info {
+    return @intToPtr([*]stivale2_smp_info, @ptrToInt(&self.entries) + 8)[0..self.entries];
   }
 };
 
