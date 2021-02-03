@@ -89,7 +89,6 @@ fn unhandled_interrupt(frame: *InterruptFrame) void {
 }
 
 fn disable_pic() void {
-  os.log("Interrupts: Disabling PIC...\n", .{});
   {
     const outb = @import("x86_64.zig").outb;
     outb(0x20, 0x11);
