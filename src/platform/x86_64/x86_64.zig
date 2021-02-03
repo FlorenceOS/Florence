@@ -43,6 +43,8 @@ pub fn platform_early_init() void {
   try interrupts.init_interrupts();
   setup_gdt();
   os.memory.paging.init();
+
+  asm volatile("sti");
 }
 
 pub fn read_msr(comptime T: type, msr_num: u32) T {
