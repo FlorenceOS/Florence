@@ -41,19 +41,14 @@ pub fn msr(comptime T: type, comptime name: []const u8) type {
   };
 }
 
+const TPIDR_EL1 = msr(*os.thread.Task, "TPIDR_EL1");
+
 pub fn get_current_task() *os.thread.Task {
-  return asm volatile(
-    \\mrs %[result], TPIDR_EL1
-    : [result] "=r" (-> *os.thread.Task)
-  );
+  return TPIDR_EL1.read();
 }
 
 pub fn set_current_task(ptr: *os.thread.Task) void {
-  asm volatile(
-    \\msr TPIDR_EL1, %[result]
-    :
-    : [result] "r" (ptr)
-  );
+  TPIDR_EL1.write(ptr);
 }
 
 pub fn spin_hint() void {
