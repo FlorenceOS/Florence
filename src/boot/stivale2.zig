@@ -241,6 +241,7 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
   const phys_high = stivale.phys_high(info.memmap.?.get());
 
   context.apply();
+  os.memory.paging.CurrentContext = context;
 
   os.log("Doing vmm\n", .{});
 
