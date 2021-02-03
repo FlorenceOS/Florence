@@ -46,7 +46,7 @@ pub fn platform_early_init() void {
   setup_gdt();
   os.memory.paging.init();
 
-  asm volatile("sti");
+  set_interrupts(true);
 }
 
 pub fn ap_init() void {
@@ -54,7 +54,7 @@ pub fn ap_init() void {
   try interrupts.init_interrupts();
   setup_gdt();
 
-  asm volatile("sti");
+  set_interrupts(true);
 }
 
 var bsp_task: os.thread.Task = .{};
