@@ -406,8 +406,8 @@ pub fn inl(port: u16) u32 {
 
 pub fn debugputch(ch: u8) void {
   outb(0xe9, ch);
-  // serial.port(1).write(ch);
-  // serial.port(2).write(ch);
-  // serial.port(3).write(ch);
-  // serial.port(4).write(ch);
+  serial.port(1).write(ch);
+  serial.port(2).write(ch);
+  serial.port(3).write(ch);
+  serial.port(4).write(ch);
 }
