@@ -1,4 +1,5 @@
 const os = @import("root").os;
+const std = @import("std");
 
 // Submodules
 pub const acpi       = @import("acpi.zig");
