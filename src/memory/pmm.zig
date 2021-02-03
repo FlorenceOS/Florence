@@ -118,3 +118,7 @@ pub fn access_phys_single(comptime t: type, phys: u64) *t {
 pub fn access_phys_single_volatile(comptime t: type, phys: u64) *volatile t {
   return @ptrCast(*volatile t, access_phys_single(t, phys));
 }
+
+pub fn init() void {
+  pmm_mutex.init();
+}

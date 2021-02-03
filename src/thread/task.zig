@@ -1,7 +1,8 @@
 const os = @import("root").os;
+const atmcqueue = os.lib.atmcqueue;
 
 pub const Task = struct {
   registers: os.platform.InterruptFrame = undefined,
   platform_data: os.platform.TaskData = undefined,
-  next_task: ?*@This() = undefined,
+  atmcqueue_hook: atmcqueue.Node = undefined,
 };

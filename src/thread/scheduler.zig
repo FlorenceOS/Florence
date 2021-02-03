@@ -28,3 +28,8 @@ pub fn yield() void {
   // Always sleep in ready queue
   _ = ready.sleep(struct {fn f() bool { return true; }}.f, .{});
 }
+
+pub fn init(task: *os.thread.Task) void {
+  os.platform.set_current_task(task);
+  ready.init();
+}
