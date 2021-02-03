@@ -28,10 +28,6 @@ pub fn init_interrupts() !void {
   add_handler(0x69, bsp_handler);
   add_handler(0x6A, platform.task_fork_handler);
   add_handler(0x6B, yield_to_handler);
-
-  os.log("Interrupts: Enabling interrupts...\n", .{});
-
-  asm volatile("sti");
 }
 
 fn type_page_fault(error_code: usize) !platform.PageFaultAccess {
