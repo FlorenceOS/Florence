@@ -41,14 +41,22 @@ pub fn msr(comptime T: type, comptime name: []const u8) type {
   };
 }
 
-const TPIDR_EL1 = msr(*os.thread.Task, "TPIDR_EL1");
+const TPIDR_EL1 = msr(*os.platform.smp.CoreData, "TPIDR_EL1");
 
-pub fn get_current_task() *os.thread.Task {
+pub fn get_current_cpu() *os.platform.smp.CoreData {
   return TPIDR_EL1.read();
 }
 
-pub fn set_current_task(ptr: *os.thread.Task) void {
+pub fn get_current_task() *os.thread.Task {
+  return get_current_cpu().current_task.?;
+}
+
+pub fn set_current_cpu(ptr: *os.platform.smp.CoreData) void {
   TPIDR_EL1.write(ptr);
+}
+
+pub fn set_current_task(ptr: *os.thread.Task) void {
+  get_current_cpu().current_task = ptr;
 }
 
 pub fn spin_hint() void {
@@ -61,6 +69,10 @@ pub fn allowed_mapping_levels() usize {
 
 pub fn platform_init() !void {
   os.log("The platform is alive!\n", .{});
+}
+
+pub fn ap_init() void {
+  os.memory.paging.CurrentContext.apply();
 }
 
 pub fn debugputch(val: u8) void {
@@ -249,6 +261,7 @@ extern const exception_vector_table: [0x800]u8;
 
 pub fn platform_early_init() void {
   install_vector_table();
+  os.platform.smp.prepare();
   os.thread.scheduler.init(&bsp_task);
   os.memory.paging.init();
 }

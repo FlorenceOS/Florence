@@ -95,11 +95,12 @@ const stivale2_smp = packed struct {
   }
 };
 
-const stivale2_smp_info = packed struct {
+const stivale2_smp_info = extern struct {
   acpi_proc_uid: u32,
   lapic_id: u32,
   target_stack: u64,
   goto_address: u64,
+  argument: u64,
 };
 
 const stivale2_mmio32_uart = packed struct {
@@ -166,6 +167,28 @@ const parsed_info = struct {
       , .{self.memmap, self.framebuffer, self.rsdp, self.smp, self.dtb, self.uart, self.uart_status});
   }
 };
+
+export fn smp_entry(info_in: u64) callconv(.C) noreturn {
+  const smp_info = os.platform.phys_ptr(*stivale2_smp_info).from_int(info_in);
+  const core_id = smp_info.get().argument;
+
+  platform.ap_init();
+
+  const cpu = &os.platform.smp.cpus[core_id];
+
+  platform.set_current_cpu(cpu);
+  cpu.booted = true;
+
+  os.log("Core {} inited: {X}\n", .{core_id, cpu});
+  platform.hang();
+}
+
+fn map_smp(smp: os.platform.phys_ptr(*stivale2_smp)) !void {
+  var slc = os.platform.phys_slice(u8).init(smp.addr, @sizeOf(stivale2_smp));
+  try slc.remap(.MemoryWritethrough);
+  slc.len += smp.get().entries * @sizeOf(stivale2_smp_info);
+  try slc.remap(.MemoryWritethrough);
+}
 
 export fn stivale2_main(info_in: *stivale2_info) noreturn {
   os.log("Stivale2: Boot!\n", .{});
@@ -264,6 +287,36 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
   }
 
   os.vital(os.platform.platform_init(), "calling platform_init");
+
+  if(info.smp) |smp| {
+    os.vital(map_smp(smp), "mapping smp struct");
+
+    const cpus = smp.get().get();
+
+    os.vital(os.platform.smp.init(cpus.len), "init smp");
+
+    const bootstrap_stack_size =
+      os.memory.paging.CurrentContext.page_size(0, os.memory.pmm.phys_to_virt(0));
+
+    for(cpus) |*cpu_info, i| {
+      const cpu = &os.platform.smp.cpus[i];
+
+      cpu.acpi_id = cpu_info.acpi_proc_uid;
+
+      if(i == 0)
+        continue;
+
+      cpu.booted = false;
+      cpu.current_task = null;
+
+      // Boot it!
+      const stack = os.vital(os.memory.pmm.alloc_phys(bootstrap_stack_size), "allocating ap stack");
+
+      cpu_info.argument = i;
+      cpu_info.target_stack = os.memory.pmm.phys_to_virt(stack + bootstrap_stack_size - 16);
+      @atomicStore(u64, &cpu_info.goto_address, @ptrToInt(smp_entry), .Release);
+    }
+  }
 
   kmain();
 }

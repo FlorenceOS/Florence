@@ -41,9 +41,18 @@ pub fn platform_init() !void {
 pub fn platform_early_init() void {
   serial.init();
   try interrupts.init_interrupts();
+  os.platform.smp.prepare();
   os.thread.scheduler.init(&bsp_task);
   setup_gdt();
   os.memory.paging.init();
+
+  asm volatile("sti");
+}
+
+pub fn ap_init() void {
+  os.memory.paging.CurrentContext.apply();
+  try interrupts.init_interrupts();
+  setup_gdt();
 
   asm volatile("sti");
 }
@@ -298,12 +307,20 @@ pub fn yield_to_task(t: *Task) void {
 pub const IA32_APIC_BASE = msr(u64, 0x0000001B);
 pub const KernelGSBase   = msr(u64, 0xC0000102);
 
+pub fn set_current_cpu(cpu_ptr: *os.platform.smp.CoreData) void {
+  KernelGSBase.write(@ptrToInt(cpu_ptr));
+}
+
 pub fn set_current_task(task_ptr: *Task) void {
-  KernelGSBase.write(@ptrToInt(task_ptr));
+  get_current_cpu().current_task = task_ptr;
+}
+
+pub fn get_current_cpu() *os.platform.smp.CoreData {
+  return @intToPtr(*os.platform.smp.CoreData, KernelGSBase.read());
 }
 
 pub fn get_current_task() *Task {
-  return @intToPtr(*Task, KernelGSBase.read());
+  return get_current_cpu().current_task.?;
 }
 
 pub fn spin_hint() void {
