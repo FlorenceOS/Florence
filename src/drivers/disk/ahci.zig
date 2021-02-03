@@ -11,8 +11,6 @@ const pmm = os.memory.pmm;
 const scheduler = os.thread.scheduler;
 const page_size = os.platform.page_sizes[0];
 
-const Mutex = scheduler.Mutex;
-
 const abar_size = 0x1100;
 const port_control_registers_size = 0x80;
 

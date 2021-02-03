@@ -376,4 +376,8 @@ pub const RangeAlloc = struct {
     }
     return false;
   }
+
+  fn init(self: *@This()) void {
+    self.mutex.init();
+  }
 };

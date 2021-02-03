@@ -38,6 +38,8 @@ export fn stivale_main(input_info: *StivaleInfo) void {
   os.log("Stivale: Boot arguments: {s}\n", .{info.cmdline});
 
   stivale.detect_phys_base();
+
+  os.memory.pmm.init();
   os.platform.platform_early_init();
 
   for(info.memmap()) |*ent| {

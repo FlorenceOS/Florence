@@ -35,4 +35,8 @@ pub const Mutex = struct {
   pub fn held_by_me(self: *const @This()) bool {
     return self.held_by == os.platform.get_current_task();
   }
+
+  pub fn init(self: *@This()) void {
+    self.queue.init();
+  }
 };

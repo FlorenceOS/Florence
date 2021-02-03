@@ -19,4 +19,8 @@ pub const ConditionVariable = struct {
   pub fn broadcast(self: @This()) void {
     queue.wake_all();
   }
+
+  pub fn init(self: @This()) void {
+    queue.init();
+  }
 };

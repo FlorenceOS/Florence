@@ -9,6 +9,7 @@ var sbrk_head: u64 = undefined;
 
 pub fn init(phys_high: u64) !void {
   os.log("Initializing vmm with base 0x{X}\n", .{phys_high});
+  sbrk_mutex.init();
   sbrk_head = phys_high;
 }
 

@@ -50,7 +50,7 @@ fn bsp_handler(frame: *InterruptFrame) void {
   frame.cs = gdt.selector.code64;
   frame.ss = gdt.selector.data64;
 
-  platform.set_current_task(&bsp_task);
+  os.thread.scheduler.init(&bsp_task);
 }
 
 pub fn self_exited() !?*os.thread.Task {
