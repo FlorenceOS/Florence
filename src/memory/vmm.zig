@@ -51,49 +51,19 @@ const Lifetime = enum {
   Eternal,
 };
 
-fn locked_alloc() type {
-  const std_allocator =
-      std.heap.GeneralPurposeAllocator(.{.thread_safe = false}){
-        .backing_allocator = &range.allocator,
-      };
-
-  return struct {
-    frontend_alloc: std.mem.Allocator = .{
-      .allocFn = alloc,
-      .resizeFn = resize,
-    },
-
-    // We use our own mutex since we don't spinlock, we do other useful work
-    mutex: Mutex = .{},
-    gpalloc: @TypeOf(std_allocator) = std_allocator,
-
-    fn alloc(frontend_alloc: *std.mem.Allocator, len: usize, ptr_align: u29, len_align: u29, ret_addr: usize) ![]u8 {
-      const self = @fieldParentPtr(@This(), "frontend_alloc", frontend_alloc);
-      self.mutex.lock();
-      defer self.mutex.unlock();
-
-      return self.gpalloc.allocator.allocFn(&self.gpalloc.allocator, len, ptr_align, len_align, ret_addr);
-    }
-
-    fn resize(frontend_alloc: *std.mem.Allocator, old_mem: []u8, old_align: u29, new_size: usize, len_align: u29, ret_addr: usize) !usize {
-      const self = @fieldParentPtr(@This(), "frontend_alloc", frontend_alloc);
-      self.mutex.lock();
-      defer self.mutex.unlock();
-
-      return self.gpalloc.allocator.resizeFn(&self.gpalloc.allocator, old_mem, old_align, new_size, len_align, ret_addr);
-    }
-  };
-}
-
-// When you want to allocate memory you have to decide
-
 /// Range allocator for backed memory
 var range = RangeAlloc{.materialize_bytes = sbrk};
 
 /// Range allocator for nonbacked memory
 var nonbacked_range = RangeAlloc{.materialize_bytes = nonbacked_sbrk};
 
-var ephemeral_alloc = locked_alloc(){};
+var ephemeral_alloc =
+  std.heap.GeneralPurposeAllocator(.{
+    .thread_safe = true,
+    .MutexType = os.thread.Mutex,
+  }){
+    .backing_allocator = &range.allocator,
+  };
 
 /// The virtual memory is backed by physical pages.
 /// You can dereference these pointers just like in your
@@ -102,7 +72,7 @@ pub fn backed(
   lifetime: Lifetime,
 ) *std.mem.Allocator {
   switch(lifetime) {
-    .Ephemeral => return &ephemeral_alloc.frontend_alloc,
+    .Ephemeral => return &ephemeral_alloc.allocator,
     .Eternal   => return &range.allocator,
   }
 }
