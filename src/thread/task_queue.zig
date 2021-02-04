@@ -65,7 +65,7 @@ pub const WaitQueue = struct {
 
     if(self.q.remove_front()) |new_task| {
       // Enqueue the task into the ready queue
-      os.thread.scheduler.ready.enqueue(new_task);
+      os.platform.get_current_cpu().executable_tasks.enqueue(new_task);
       return true;
     }
     self.lock.unlock(s);

@@ -221,9 +221,11 @@ const task_stack_size = 1024 * 16;
 // Sets 
 fn task_fork_impl(frame: *InterruptFrame) !void {
   const new_task = @intToPtr(*Task, frame.rax);
-  const current_task = get_current_task();
+  const current_cpu = get_current_cpu();
 
-  scheduler.ready.enqueue(current_task);
+  const current_task = current_cpu.current_task.?;
+
+  current_cpu.executable_tasks.enqueue(current_task);
 
   frame.rax = 0;
 

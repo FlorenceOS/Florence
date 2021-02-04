@@ -9,6 +9,7 @@ pub const CoreData = struct {
   current_task: ?*os.thread.Task,
   booted: bool,
   acpi_id: u64,
+  executable_tasks: os.thread.ReadyQueue,
 };
 
 var core_datas: [max_cpus]CoreData = [1]CoreData{undefined} ** max_cpus;
@@ -27,5 +28,6 @@ pub fn init(num_cores: usize) !void {
 
   for(cpus[1..]) |*c| {
     c.current_task = null;
+    c.executable_tasks.init();
   }
 }
