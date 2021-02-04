@@ -7,11 +7,20 @@ pub fn breakpoint_panic(message: ?[]const u8, stack_trace: ?*StackTrace) noretur
     unreachable;
 }
 
+var panic_counter: usize = 0;
+/// You only panic once
+const YOPO = false;
+
 pub fn panic(message: ?[]const u8, stack_trace: ?*StackTrace) noreturn {
-    if (message != null) {
-        os.log("PANIC: {}!\n", .{message});
+    const panic_num = @atomicRmw(usize, &panic_counter, .Add, 1, .AcqRel) + 1;
+
+    if(YOPO and panic_num != 1)
+        os.platform.hang();
+
+    if (message) |m| {
+        os.log("PANIC {}: {}!\n", .{panic_num, m});
     } else {
-        os.log("PANIC!!\n", .{});
+        os.log("PANIC {}!!\n", .{panic_num});
     }
 
     if (stack_trace) |trace| {
