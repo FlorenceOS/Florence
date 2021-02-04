@@ -3,15 +3,17 @@ const os = @import("root").os;
 
 const CoreID = os.platform.CoreID;
 
+const max_cpus = 512;
+
 pub const CoreData = struct {
   current_task: ?*os.thread.Task,
   booted: bool,
   acpi_id: u64,
 };
 
-var bsp_data: [1]CoreData = [1]CoreData{undefined};
+var core_datas: [max_cpus]CoreData = [1]CoreData{undefined} ** max_cpus;
 
-pub var cpus: []CoreData = bsp_data[0..];
+pub var cpus: []CoreData = core_datas[0..1];
 
 pub fn prepare() void {
   os.platform.set_current_cpu(&cpus[0]);
@@ -21,7 +23,9 @@ pub fn init(num_cores: usize) !void {
   if(num_cores < 2)
     return;
 
-  cpus = try os.memory.vmm.backed(.Eternal).alloc(CoreData, num_cores);
-  cpus[0] = bsp_data[0];
-  os.platform.set_current_cpu(&cpus[0]);
+  cpus.len = std.math.min(num_cores, max_cpus);
+
+  for(cpus[1..]) |*c| {
+    c.current_task = null;
+  }
 }
