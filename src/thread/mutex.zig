@@ -4,6 +4,19 @@ pub const Mutex = struct {
   held_by: ?*os.thread.Task = null,
   queue: os.thread.WaitQueue = .{},
 
+  const Held = struct {
+    mtx: *Mutex,
+
+    pub fn release(self: *const @This()) void {
+      self.mtx.unlock();
+    }
+  };
+
+  pub fn acquire(self: *@This()) Held {
+    self.lock();
+    return .{.mtx = self};
+  }
+
   fn lock_impl(self: *@This()) bool {
     if(self.held())
       return false;
