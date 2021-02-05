@@ -185,9 +185,9 @@ export fn smp_entry(info_in: u64) callconv(.C) noreturn {
 
 fn map_smp(smp: os.platform.phys_ptr(*stivale2_smp)) !void {
   var slc = os.platform.phys_slice(u8).init(smp.addr, @sizeOf(stivale2_smp));
-  try slc.remap(.MemoryWritethrough);
+  try slc.remap(.MemoryWriteBack);
   slc.len += smp.get().entries * @sizeOf(stivale2_smp_info);
-  try slc.remap(.MemoryWritethrough);
+  try slc.remap(.MemoryWriteBack);
 }
 
 export fn stivale2_main(info_in: *stivale2_info) noreturn {

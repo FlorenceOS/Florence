@@ -59,9 +59,9 @@ fn signature_value(sdt: anytype) u32 {
 fn map_sdt(addr: u64) !os.platform.phys_slice(u8) {
   var result = os.platform.phys_slice(u8).init(addr, 8);
 
-  try result.remap(.MemoryWritethrough);
+  try result.remap(.MemoryWriteBack);
   result.len = std.mem.readInt(u32, result.to_slice()[4..8], builtin.endian);
-  try result.remap(.MemoryWritethrough);
+  try result.remap(.MemoryWriteBack);
 
   return result;
 }
@@ -111,7 +111,7 @@ pub fn init_acpi() !void {
   if(rsdp_phys == 0)
     return error.NoRSDP;
 
-  rsdp = try paging.remap_phys_struct(RSDP, .{.phys = rsdp_phys, .memtype = .MemoryWritethrough});
+  rsdp = try paging.remap_phys_struct(RSDP, .{.phys = rsdp_phys, .memtype = .MemoryWriteBack});
 
   os.log("ACPI: Revision: {}\n", .{rsdp.revision});
 

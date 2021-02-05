@@ -158,7 +158,7 @@ fn map_kernel_section(new_paging_context: *platform.paging.PagingContext, start:
     .phys = phys,
     .size = region_size,
     .perm = perm,
-    .memtype = .MemoryWritethrough,
+    .memtype = .MemoryWriteBack,
     .context = new_paging_context,
   }), "Mapping kernel section");
 }

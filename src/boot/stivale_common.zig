@@ -46,7 +46,7 @@ pub fn map_phys(ent: *const MemmapEntry, context: *platform.paging.PagingContext
     .context = context,
     .phys = new_ent.base,
     .size = new_ent.length,
-    .memtype = .MemoryWritethrough,
+    .memtype = .MemoryWriteBack,
   }), "mapping physical stivale mem");
 }
 

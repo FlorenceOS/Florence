@@ -34,7 +34,7 @@ pub fn sbrk(num_bytes: u64) ![]u8 {
     .virt = @ptrToInt(ret.ptr),
     .size = num_bytes,
     .perm = paging.rw(),
-    .memtype = .MemoryWritethrough,
+    .memtype = .MemoryWriteBack,
   });
 
   return ret;
