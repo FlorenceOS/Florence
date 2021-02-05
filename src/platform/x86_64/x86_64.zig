@@ -28,7 +28,9 @@ pub const paging_root = u64;
 pub const page_sizes =
   [_]u64 {
     0x1000, // 4K page
+    0x10000,
     0x200000, // 2M page
+    0x2000000,
     0x40000000, // 1G page
     0x8000000000, // 512G page
   };
