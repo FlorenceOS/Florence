@@ -124,7 +124,7 @@ fn bit_t(comptime field_type: type, comptime val_t: type, comptime shamt: usize)
         }
 
         pub fn read(self: anytype) val_t {
-            return @bitCast(val_t, @intCast(u1, (self.bits.field().* >> shamt) & 1));
+            return @bitCast(val_t, @truncate(u1, self.bits.field().* >> shamt));
         }
 
         // Since these are mostly used with MMIO, I want to avoid

@@ -322,7 +322,7 @@ export fn interrupt64_handler(frame: *InterruptFrame) void {
       // SVC instruction execution in AArch64 state
       // Figure out which call this is
 
-      switch(@intCast(u16, iss & 0xFFFF)) {
+      switch(@truncate(u16, iss)) {
         else => @panic("Unknown SVC"),
 
         'Y' => @panic("yield_to_task"),

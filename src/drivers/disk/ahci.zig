@@ -133,8 +133,8 @@ const Port = packed struct {
 };
 
 fn write_u64(mmio: anytype, value: u64) void {
-    mmio[0] = @intCast(u32, value & 0xFFFFFFFF);
-    mmio[1] = @intCast(u32, (value >> 32) & 0xFFFFFFFF);
+    mmio[0] = @truncate(u32, value);
+    mmio[1] = @truncate(u32, value >> 32);
 }
 
 fn read_u64(mmio: anytype) u64 {
@@ -499,8 +499,8 @@ const PortState = struct {
         fis.device = 0xA0 | (1 << 6);
         fis.control = 0x08;
 
-        fis.lba_low = @intCast(u24, lba & 0xFFFFFF);
-        fis.lba_high = @intCast(u24, (lba >> 24) & 0xFFFFFF);
+        fis.lba_low  = @truncate(u24, lba);
+        fis.lba_high = @truncate(u24, lba >> 24);
 
         fis.count = sector_count;
 

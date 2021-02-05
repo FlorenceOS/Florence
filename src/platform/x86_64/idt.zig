@@ -56,9 +56,9 @@ const idt_entry = packed struct {
 
 pub fn encode(addr: u64, ist: u8, gate_type: u4, storage: u1, priv_level: u2, present: u1) idt_entry {
   return idt_entry {
-    .addr_low = @intCast(u16, addr & 0xFFFF),
-    .addr_mid = @intCast(u16, (addr >> 16) & 0xFFFF),
-    .addr_high = @intCast(u32, (addr >> 32) & 0xFFFFFFFF),
+    .addr_low = @truncate(u16, addr),
+    .addr_mid = @truncate(u16, addr >> 16),
+    .addr_high = @truncate(u32, addr >> 32),
     .selector = gdt.selector.code64 | priv_level,
     .ist = ist,
     .gate_type = gate_type,

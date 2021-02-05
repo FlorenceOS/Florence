@@ -85,8 +85,8 @@ pub fn read_msr(comptime T: type, msr_num: u32) T {
 pub fn write_msr(comptime T: type, msr_num: u32, val: T) void {
   assert(T == u64);
 
-  const low = @intCast(u32, val & 0xFFFFFFFF);
-  const high = @intCast(u32, val >> 32);
+  const low = @truncate(u32, val);
+  const high = @truncate(u32, val >> 32);
   asm volatile("wrmsr" :: [_]"{eax}"(low), [_]"{edx}"(high), [_]"{ecx}"(msr_num));
 }
 
