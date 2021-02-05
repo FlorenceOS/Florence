@@ -179,8 +179,8 @@ export fn smp_entry(info_in: u64) callconv(.C) noreturn {
   platform.set_current_cpu(cpu);
   cpu.booted = true;
 
-  os.log("Core {} inited: {X}\n", .{core_id, cpu});
-  platform.hang();
+  os.log("Core {} inited\n", .{core_id});
+  cpu.executable_tasks.execute();
 }
 
 fn map_smp(smp: os.platform.phys_ptr(*stivale2_smp)) !void {
