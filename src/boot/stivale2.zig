@@ -168,7 +168,7 @@ const parsed_info = struct {
   }
 };
 
-export fn smp_entry(info_in: u64) callconv(.C) noreturn {
+fn smp_entry(info_in: u64) callconv(.C) noreturn {
   const smp_info = os.platform.phys_ptr(*stivale2_smp_info).from_int(info_in);
   const core_id = smp_info.get().argument;
 
