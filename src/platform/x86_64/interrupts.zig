@@ -46,12 +46,13 @@ fn proc_start_handler(frame: *InterruptFrame) void {
 }
 
 fn yield_to_handler(frame: *InterruptFrame) void {
-  const current_task = platform.get_current_task();
+  const current_task = platform.get_current_task_opt();
   const next_task = @intToPtr(*os.thread.Task, frame.rax);
 
   platform.set_current_task(next_task);
 
-  current_task.registers = frame.*;
+  if(current_task) |ct|
+    ct.registers = frame.*;
   frame.* = next_task.registers;
 }
 
