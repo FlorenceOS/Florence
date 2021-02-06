@@ -13,7 +13,7 @@ pub const CoreData = struct {
   executable_tasks: os.thread.ReadyQueue,
 
   pub fn id(self: *@This()) usize {
-    return (@ptrToInt(self) - @ptrToInt(cpus.ptr))/@sizeOf(@This());
+    return os.lib.get_index(self, cpus);
   }
 };
 
