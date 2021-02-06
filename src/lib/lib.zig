@@ -13,3 +13,7 @@ pub const tar = @import("tar.zig");
 pub const vital = @import("vital.zig");
 pub const rbtree = @import("rbtree.zig");
 pub const atmcqueue = @import("atomic_queue.zig");
+
+pub fn get_index(ptr: anytype, slice: []@TypeOf(ptr.*)) usize {
+  return (@ptrToInt(ptr) - @ptrToInt(slice.ptr))/@sizeOf(@TypeOf(ptr.*));
+}
