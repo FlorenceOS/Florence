@@ -26,7 +26,14 @@ pub fn init(num_cores: usize) void {
 
   cpus.len = std.math.min(num_cores, max_cpus);
 
-  for(cpus[1..]) |*c| {
+  // for(cpus[1..]) |*c| {
+  // AAAAAAAAAAAAAAAAAAAAA https://github.com/ziglang/zig/issues/7968
+  // Nope, can't do that. Instead we have to do the following:
+  var i: usize = 1;
+  while(i < cpus.len) : (i += 1) {
+    const c = &cpus[i];
+  // ugh.
+
     c.current_task = null;
     c.executable_tasks.init();
   }
