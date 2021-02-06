@@ -10,6 +10,10 @@ pub const CoreData = struct {
   booted: bool,
   acpi_id: u64,
   executable_tasks: os.thread.ReadyQueue,
+
+  pub fn id(self: *@This()) usize {
+    return (@ptrToInt(self) - @ptrToInt(cpus.ptr))/@sizeOf(@This());
+  }
 };
 
 var core_datas: [max_cpus]CoreData = [1]CoreData{undefined} ** max_cpus;
