@@ -19,9 +19,9 @@ pub const Mutex = struct {
 
   fn lock_impl(self: *@This()) bool {
     if(self.held())
-      return false;
+      return true;
     self.held_by = os.platform.get_current_task();
-    return true;
+    return false;
   }
 
   pub fn lock(self: *@This()) void {
