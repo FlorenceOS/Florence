@@ -47,16 +47,8 @@ pub fn get_current_cpu() *os.platform.smp.CoreData {
   return TPIDR_EL1.read();
 }
 
-pub fn get_current_task() *os.thread.Task {
-  return get_current_cpu().current_task.?;
-}
-
 pub fn set_current_cpu(ptr: *os.platform.smp.CoreData) void {
   TPIDR_EL1.write(ptr);
-}
-
-pub fn set_current_task(ptr: *os.thread.Task) void {
-  get_current_cpu().current_task = ptr;
 }
 
 pub fn spin_hint() void {
@@ -269,7 +261,7 @@ pub fn platform_early_init() void {
 var bsp_task: os.thread.Task = .{};
 
 pub fn self_exited() ?*os.thread.Task {
-  const curr = get_current_task();
+  const curr = os.platform.get_current_task();
   
   if(curr == &bsp_task)
     return null;

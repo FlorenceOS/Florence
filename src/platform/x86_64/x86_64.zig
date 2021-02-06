@@ -237,7 +237,7 @@ fn task_fork_impl(frame: *InterruptFrame) !void {
   current_task.registers.rbx = 0;
   frame.rbx = 1;
 
-  set_current_task(new_task);
+  os.platform.set_current_task(new_task);
 }
 
 pub fn task_fork_handler(frame: *InterruptFrame) void {
@@ -315,16 +315,8 @@ pub fn set_current_cpu(cpu_ptr: *os.platform.smp.CoreData) void {
   KernelGSBase.write(@ptrToInt(cpu_ptr));
 }
 
-pub fn set_current_task(task_ptr: *Task) void {
-  get_current_cpu().current_task = task_ptr;
-}
-
 pub fn get_current_cpu() *os.platform.smp.CoreData {
   return @intToPtr(*os.platform.smp.CoreData, KernelGSBase.read());
-}
-
-pub fn get_current_task() *Task {
-  return get_current_cpu().current_task.?;
 }
 
 pub fn spin_hint() void {

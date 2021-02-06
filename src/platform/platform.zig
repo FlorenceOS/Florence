@@ -41,6 +41,22 @@ pub fn hang() noreturn {
   }
 }
 
+pub fn set_current_task(task_ptr: *os.thread.Task) void {
+  get_current_cpu().current_task = task_ptr;
+}
+
+pub fn get_current_task() *os.thread.Task {
+  if(get_current_cpu().current_task) |t| {
+    return t;
+  }
+  else if(std.debug.runtime_safety) {
+    @panic("get_current_task() null!");
+  }
+  else {
+    unreachable;
+  }
+}
+
 pub const virt_slice = struct {
   ptr: u64,
   len: u64,
