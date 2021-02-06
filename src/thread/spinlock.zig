@@ -16,10 +16,7 @@ pub const Spinlock = struct {
   // Grabs lock and disables interrupts atomically.
   pub fn lock(self: *@This()) os.platform.InterruptState {
     while(true) {
-      const state = self.try_lock();
-
-      if(state) |s| { return s; }
-
+      if(self.try_lock()) |s| { return s; }
       os.platform.spin_hint();
     }
   }
