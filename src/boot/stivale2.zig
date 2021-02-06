@@ -286,7 +286,7 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
 
     const cpus = smp.get().get();
 
-    os.vital(os.platform.smp.init(cpus.len), "init smp");
+    os.platform.smp.init(cpus.len);
 
     const bootstrap_stack_size =
       os.memory.paging.CurrentContext.page_size(0, os.memory.pmm.phys_to_virt(0));

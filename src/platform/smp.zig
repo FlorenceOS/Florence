@@ -20,7 +20,7 @@ pub fn prepare() void {
   os.platform.set_current_cpu(&cpus[0]);
 }
 
-pub fn init(num_cores: usize) !void {
+pub fn init(num_cores: usize) void {
   if(num_cores < 2)
     return;
 
