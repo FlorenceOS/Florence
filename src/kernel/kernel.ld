@@ -26,6 +26,8 @@ SECTIONS {
     KEEP(*(.rodata.stivale))
     *(.rodata*)
 
+    /* https://github.com/ziglang/zig/issues/7962 */
+
     /*__debug_info_start = .;
     KEEP(*(.debug_info))
     __debug_info_end = .;
