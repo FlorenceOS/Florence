@@ -14,12 +14,13 @@ const YOPO = false;
 pub fn panic(message_in: ?[]const u8, stack_trace: ?*StackTrace) noreturn {
     const panic_num = @atomicRmw(usize, &panic_counter, .Add, 1, .AcqRel) + 1;
 
-    if(YOPO and panic_num != 1)
-        os.platform.hang();
-
     const cpu = os.platform.get_current_cpu();
+    cpu.panicked = true;
     const cpu_id = cpu.id();
     const message: []const u8 = message_in orelse "no message";
+
+    if(YOPO and panic_num != 1)
+        os.platform.hang();
 
     os.log("PANIC {}: CPU {}: {}!\n", .{panic_num, cpu_id, message});
 

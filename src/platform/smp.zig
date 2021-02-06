@@ -8,6 +8,7 @@ const max_cpus = 512;
 pub const CoreData = struct {
   current_task: ?*os.thread.Task,
   booted: bool,
+  panicked: bool,
   acpi_id: u64,
   executable_tasks: os.thread.ReadyQueue,
 
@@ -22,6 +23,7 @@ pub var cpus: []CoreData = core_datas[0..1];
 
 pub fn prepare() void {
   os.platform.set_current_cpu(&cpus[0]);
+  cpus[0].panicked = false;
 }
 
 pub fn init(num_cores: usize) void {
@@ -38,6 +40,7 @@ pub fn init(num_cores: usize) void {
     const c = &cpus[i];
   // ugh.
 
+    c.panicked = false;
     c.current_task = null;
     c.executable_tasks.init();
   }
