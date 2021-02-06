@@ -288,8 +288,12 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
 
     os.platform.smp.init(cpus.len);
 
-    const bootstrap_stack_size =
+    var bootstrap_stack_size =
       os.memory.paging.CurrentContext.page_size(0, os.memory.pmm.phys_to_virt(0));
+
+    // Just a single page of stack isn't enough for debug mode :^(
+    if(std.debug.runtime_safety)
+      bootstrap_stack_size *= 4;
 
     for(cpus) |*cpu_info, i| {
       const cpu = &os.platform.smp.cpus[i];
