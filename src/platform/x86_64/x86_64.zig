@@ -218,8 +218,6 @@ pub const TaskData = struct {
 
 const task_stack_size = 1024 * 16;
 
-// https://github.com/ziglang/zig/issues/3857
-
 // Sets 
 fn task_fork_impl(frame: *InterruptFrame) !void {
   const new_task = @intToPtr(*Task, frame.rax);
