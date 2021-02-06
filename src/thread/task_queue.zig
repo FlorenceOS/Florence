@@ -27,24 +27,6 @@ const QueueBase = struct {
     os.platform.set_interrupts(state);
   }
 
-  pub fn sleep(self: *@This(), comptime atomic_op: anytype, args: anytype) bool {
-    const state = os.platform.get_and_disable_interrupts();
-    if(!@call(.{.modifier = .always_inline}, atomic_op, args)) {
-      os.platform.set_interrupts(state);
-      return false;
-    }
-
-    if(self.remove_front()) |next_task| {
-      self.add_back(os.platform.get_current_task());
-      os.platform.set_interrupts(state);
-      os.platform.yield_to_task(next_task);
-    } else {
-      os.platform.set_interrupts(state);
-    }
-
-    return true;
-  }
-
   pub fn init(self: *@This()) void {
     self.queue.init();
   }
@@ -55,11 +37,27 @@ pub const WaitQueue = struct {
   lock: os.thread.Spinlock = .{},
 
   pub fn sleep(self: *@This(), comptime atomic_op: anytype, args: anytype) bool {
-    return self.q.sleep(atomic_op, args);
+    const state = self.lock.lock();
+
+    if(!@call(.{.modifier = .always_inline}, atomic_op, args)) {
+      self.lock.unlock(state);
+      return false;
+    }
+
+    if(self.q.remove_front()) |next_task| {
+      self.q.add_back(os.platform.get_current_task());
+      self.lock.unlock(state);
+      os.platform.yield_to_task(next_task);
+    } else {
+      self.lock.unlock(state);
+    }
+
+    return true;
   }
 
   pub fn wake(self: *@This(), comptime atomic_op: anytype, args: anytype) bool {
     const s = self.lock.lock();
+    defer self.lock.unlock(s);
 
     @call(.{.modifier = .always_inline}, atomic_op, args);
 
@@ -68,7 +66,6 @@ pub const WaitQueue = struct {
       os.platform.get_current_cpu().executable_tasks.enqueue(new_task);
       return true;
     }
-    self.lock.unlock(s);
     return false;
   }
 
@@ -84,8 +81,17 @@ pub const WaitQueue = struct {
 pub const ReadyQueue = struct {
   q: QueueBase = .{},
 
-  pub fn sleep(self: *@This(), comptime atomic_op: anytype, args: anytype) bool {
-    return self.q.sleep(atomic_op, args);
+  fn fetch_next(self: *@This()) ?*os.thread.Task {
+    const state = os.platform.get_and_disable_interrupts();
+    defer os.platform.set_interrupts(state);
+    return self.q.remove_front();
+  }
+
+  pub fn sleep(self: *@This(), comptime atomic_op: anytype, args: anytype) void {
+    if(self.fetch_next()) |next_task| {
+      self.q.add_back(os.platform.get_current_task());
+      os.platform.yield_to_task(next_task);
+    }
   }
 
   pub fn execute(self: *@This()) noreturn {
