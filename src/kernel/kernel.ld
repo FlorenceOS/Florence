@@ -12,7 +12,7 @@ SECTIONS {
   .stivale2hdr 0 : { KEEP(*(.stivale2hdr)) }
   .rela.dyn    0 : { KEEP(*(.rela*)) }
 
-  . = 0xFFFFFFFF90100000;
+  . = 0xFFFFFFFF80100000;
 
   __kernel_text_begin = .;
   .text . : {
