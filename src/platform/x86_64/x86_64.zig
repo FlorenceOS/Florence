@@ -41,10 +41,10 @@ pub fn platform_init() !void {
 }
 
 pub fn platform_early_init() void {
-  serial.init();
-  try interrupts.init_interrupts();
   os.platform.smp.prepare();
   os.thread.scheduler.init(&bsp_task);
+  serial.init();
+  try interrupts.init_interrupts();
   setup_gdt();
   os.memory.paging.init();
 

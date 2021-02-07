@@ -252,9 +252,9 @@ comptime {
 extern const exception_vector_table: [0x800]u8;
 
 pub fn platform_early_init() void {
-  install_vector_table();
   os.platform.smp.prepare();
   os.thread.scheduler.init(&bsp_task);
+  install_vector_table();
   os.memory.paging.init();
 }
 
