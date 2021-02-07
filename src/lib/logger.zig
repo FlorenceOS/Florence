@@ -24,10 +24,17 @@ const Printer = struct {
 };
 
 var log_lock: os.thread.Spinlock = .{};
+var lock_owner: ?*os.platform.smp.CoreData = null;
 
 pub fn log(comptime format: []const u8, args: anytype) void {
-    const a = log_lock.lock();
-    defer log_lock.unlock(a);
+    const current_cpu = os.platform.get_current_cpu();
+    const require_locking = current_cpu != lock_owner;
+
+    const a = if(require_locking) log_lock.lock() else undefined;
+    defer if(require_locking) log_lock.unlock(a);
+
+    if(require_locking) lock_owner = current_cpu;
+    defer if(require_locking) { lock_owner = null; };
 
     return log_nolock(format, args);
 }
@@ -43,12 +50,32 @@ fn print_str(str: []const u8) !void {
     }
 }
 
+fn protected_putchar(comptime putch_func: anytype) type {
+    return struct {
+        is_inside: bool = false,
+
+        pub fn putch(self: *@This(), ch: u8) void {
+            if(self.is_inside)
+                return;
+
+            self.is_inside = true;
+            defer self.is_inside = false;
+            putch_func(ch);
+        }
+    };
+}
+
+var platform: protected_putchar(os.platform.debugputch) = .{};
+var mmio_serial: protected_putchar(os.drivers.mmio_serial.putch) = .{};
+var vesa_log: protected_putchar(os.drivers.vesa_log.putch) = .{};
+var vga_log: protected_putchar(os.drivers.vga_log.putch) = .{};
+
 fn putch(ch: u8) void {
-    os.platform.debugputch(ch);
-    os.drivers.mmio_serial.putch(ch);
-    os.drivers.vesa_log.putch(ch);
+    platform.putch(ch);
+    mmio_serial.putch(ch);
+    vesa_log.putch(ch);
     if (arch == .x86_64) {
-        os.drivers.vga_log.putch(ch);
+        vga_log.putch(ch);
     }
 }
 
