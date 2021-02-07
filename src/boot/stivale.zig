@@ -32,6 +32,7 @@ const StivaleInfo = packed struct {
 var info: StivaleInfo = undefined;
 
 export fn stivale_main(input_info: *StivaleInfo) void {
+  os.platform.platform_early_init();
   os.log("Stivale: Boot!\n", .{});
 
   info = input_info.*;
@@ -40,7 +41,6 @@ export fn stivale_main(input_info: *StivaleInfo) void {
   stivale.detect_phys_base();
 
   os.memory.pmm.init();
-  os.platform.platform_early_init();
 
   for(info.memmap()) |*ent| {
     stivale.add_memmap(ent);
