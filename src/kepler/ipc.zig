@@ -171,11 +171,11 @@ pub const NoteQueue = struct {
     fn send(self: *@This(), note: *Note) !void {
         // Check queue state for the first time
         if (@atomicLoad(State, &self.state, .Acquire) != .Up) {
-            return error.IDK;
+            return error.Unreachable;
         }
         // Notify queue owner about a new message
         if (!self.event.trigger()) {
-            return error.IDK;
+            return error.Unreachable;
         }
         // Add note to the queue
         self.queue.enqueue(note);
@@ -248,7 +248,7 @@ pub const Endpoint = struct {
     /// Send a join request
     fn send_request(self: *@This(), note: *Note) !void {
         if (!self.is_active()) {
-            return error.IDK;
+            return error.Unreachable;
         }
         try self.queue.send(note);
     }
@@ -388,7 +388,7 @@ pub const Stream = struct {
         instance.notes[Peer.Producer.idx()].owner_ref = .{ .stream = instance.borrow() };
         endpoint.send_request(&instance.notes[Peer.Producer.idx()]) catch |err| {
             instance.drop();
-            return error.IDK;
+            return error.Unreachable;
         };
         return instance;
     }
@@ -400,9 +400,9 @@ pub const Stream = struct {
             // If we have sent a response already, return
             // .ResponseAlreadySent error
             if (self.assert_status(.Producer, .ResponseSent)) {
-                return error.IDK;
+                return error.ResponseAlreadySent;
             }
-            return error.IDK;
+            return error.ConnectionEstablished;
         }
         // Transition to .ResponseAlreadySent state
         @atomicStore(PeerStatus, &self.status[Peer.Producer.idx()], .ResponseSent, .Release);
@@ -410,7 +410,7 @@ pub const Stream = struct {
         self.notes[Peer.Consumer.idx()].typ = typ;
         self.notes[Peer.Consumer.idx()].owner_ref = .{ .stream = self.borrow() };
         self.note_queues[Peer.Consumer.idx()].send(&self.notes[Peer.Consumer.idx()]) catch {
-            return error.IDK;
+            return error.Unreachable;
         };
     }
 
@@ -423,7 +423,7 @@ pub const Stream = struct {
         @atomicStore(PeerStatus, &self.status[0], .Connected, .Release);
         @atomicStore(PeerStatus, &self.status[1], .Connected, .Release);
     }
-    
+
     /// Allow peer to resend notification
     pub fn unblock(self: *@This(), peer: Peer) void {
         @atomicStore(bool, &self.ready_to_resend[peer.idx()], true, .Release);
@@ -442,7 +442,7 @@ pub const Stream = struct {
             return;
         }
         self.notes[target.idx()].typ = if (peer == .Producer) .ProducerLeft else .ConsumerLeft;
-        self.notes[target.idx()].owner_ref = .{.stream = self.borrow()};
+        self.notes[target.idx()].owner_ref = .{ .stream = self.borrow() };
         try self.note_queues[target.idx()].send(&self.notes[target.idx()]);
     }
 
@@ -465,7 +465,7 @@ pub const Stream = struct {
     /// or more results being available
     pub fn notify(self: *@This(), peer: Peer) !void {
         if (!self.is_established()) {
-            return error.IDK;
+            return error.ConnectionNotEstablished;
         }
         // If notificaton was already sent and not yet handled, just ignore
         if (!@atomicLoad(bool, &self.ready_to_resend[peer.idx()], .Acquire)) {
