@@ -410,7 +410,7 @@ pub const Stream = struct {
         self.notes[Peer.Consumer.idx()].typ = typ;
         self.notes[Peer.Consumer.idx()].owner_ref = .{ .stream = self.borrow() };
         self.note_queues[Peer.Consumer.idx()].send(&self.notes[Peer.Consumer.idx()]) catch |err| {
-            return error.ThreadUnreachable;
+            return err;
         };
     }
 
