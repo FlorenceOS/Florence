@@ -171,11 +171,11 @@ pub const NoteQueue = struct {
     fn send(self: *@This(), note: *Note) !void {
         // Check queue state for the first time
         if (@atomicLoad(State, &self.state, .Acquire) != .Up) {
-            return error.Unreachable;
+            return error.ThreadUnreachable;
         }
         // Notify queue owner about a new message
         if (!self.event.trigger()) {
-            return error.Unreachable;
+            return error.ThreadUnreachable;
         }
         // Add note to the queue
         self.queue.enqueue(note);
@@ -248,7 +248,7 @@ pub const Endpoint = struct {
     /// Send a join request
     fn send_request(self: *@This(), note: *Note) !void {
         if (!self.is_active()) {
-            return error.Unreachable;
+            return error.EndpointUnreachable;
         }
         try self.queue.send(note);
     }
@@ -388,7 +388,7 @@ pub const Stream = struct {
         instance.notes[Peer.Producer.idx()].owner_ref = .{ .stream = instance.borrow() };
         endpoint.send_request(&instance.notes[Peer.Producer.idx()]) catch |err| {
             instance.drop();
-            return error.Unreachable;
+            return err;
         };
         return instance;
     }
@@ -409,8 +409,8 @@ pub const Stream = struct {
         // Send message
         self.notes[Peer.Consumer.idx()].typ = typ;
         self.notes[Peer.Consumer.idx()].owner_ref = .{ .stream = self.borrow() };
-        self.note_queues[Peer.Consumer.idx()].send(&self.notes[Peer.Consumer.idx()]) catch {
-            return error.Unreachable;
+        self.note_queues[Peer.Consumer.idx()].send(&self.notes[Peer.Consumer.idx()]) catch |err| {
+            return error.ThreadUnreachable;
         };
     }
 
