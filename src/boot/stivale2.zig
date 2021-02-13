@@ -191,6 +191,8 @@ fn map_smp(smp: os.platform.phys_ptr(*stivale2_smp)) !void {
 }
 
 export fn stivale2_main(info_in: *stivale2_info) noreturn {
+  platform.platform_early_init();
+  
   os.log("Stivale2: Boot!\n", .{});
 
   var info = parsed_info{};
@@ -223,7 +225,6 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
   }
 
   os.memory.pmm.init();
-  platform.platform_early_init();
 
   os.log(
     \\Bootloader: {}
