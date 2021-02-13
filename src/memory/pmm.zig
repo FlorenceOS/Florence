@@ -6,18 +6,18 @@ const platform = os.platform;
 const lalign   = os.lib.libalign;
 
 const page_sizes = platform.page_sizes;
-var free_roots   = [_]u64{0} ** page_sizes.len;
+var free_roots   = [_]usize{0} ** page_sizes.len;
 
 var pmm_mutex    = os.thread.Mutex{};
 
 const reverse_sizes = {
-  var result: [page_sizes.len]u64 = undefined;
+  var result: [page_sizes.len]usize = undefined;
   for(page_sizes) |psz, i|
     result[page_sizes.len - i - 1] = psz;
   return result;
 };
 
-pub fn consume(phys: u64, size: u64) void {
+pub fn consume(phys: usize, size: usize) void {
   pmm_mutex.lock();
   defer pmm_mutex.unlock();
 
@@ -27,7 +27,7 @@ pub fn consume(phys: u64, size: u64) void {
   outer: while(sz != 0) {
     inline for(reverse_sizes) |psz, ri| {
       const i = page_sizes.len - ri - 1;
-      if(sz >= psz and lalign.is_aligned(u64, psz, pp)) {
+      if(sz >= psz and lalign.is_aligned(usize, psz, pp)) {
         free_impl(pp, i);
         sz -= psz;
         pp += psz;
@@ -38,11 +38,11 @@ pub fn consume(phys: u64, size: u64) void {
   }
 }
 
-pub fn good_size(size: u64) u64 {
+pub fn good_size(size: usize) u64 {
   unreachable;
 }
 
-fn alloc_impl(ind: u64) error{OutOfMemory}!u64 {
+fn alloc_impl(ind: usize) error{OutOfMemory}!u64 {
   if(free_roots[ind] == 0) {
     if(ind + 1 >= page_sizes.len)
       return error.OutOfMemory;
@@ -63,12 +63,12 @@ fn alloc_impl(ind: u64) error{OutOfMemory}!u64 {
   else {
     const retval = free_roots[ind];
 
-    free_roots[ind] = access_phys(u64, retval)[0];
+    free_roots[ind] = access_phys(usize, retval)[0];
     return retval;
   }
 }
 
-pub fn alloc_phys(size: u64) !u64 {
+pub fn alloc_phys(size: usize) !usize {
   inline for(page_sizes) |psz, i| {
     if(size <= psz) {
       pmm_mutex.lock();
@@ -79,43 +79,43 @@ pub fn alloc_phys(size: u64) !u64 {
   return error.PhysAllocTooSmall;
 }
 
-fn free_impl(phys: u64, ind: u64) void {
+fn free_impl(phys: usize, ind: usize) void {
   const last = free_roots[ind];
   free_roots[ind] = phys;
-  access_phys(u64, phys)[0] = last;
+  access_phys(usize, phys)[0] = last;
 }
 
-pub fn free_phys(phys: u64, size: u64) void {
+pub fn free_phys(phys: usize, size: usize) void {
   pmm_mutex.lock();
   defer pmm_mutex.unlock();
 
   inline for(reverse_sizes) |psz, ri| {
     const i = page_sizes.len - ri - 1;
 
-    if(size <= psz and lalign.is_aligned(u64, psz, phys)) {
+    if(size <= psz and lalign.is_aligned(usize, psz, phys)) {
       return free_impl(phys, i);
     }
   }
   unreachable;
 }
 
-pub fn phys_to_virt(phys: u64) u64 {
+pub fn phys_to_virt(phys: usize) usize {
   return os.memory.paging.CurrentContext.phys_to_virt(phys);
 }
 
-pub fn access_phys(comptime t: type, phys: u64) [*]t {
+pub fn access_phys(comptime t: type, phys: usize) [*]t {
   return @intToPtr([*]t, phys_to_virt(phys));
 }
 
-pub fn access_phys_volatile(comptime t: type, phys: u64) [*]volatile t {
+pub fn access_phys_volatile(comptime t: type, phys: usize) [*]volatile t {
   return @ptrCast([*]volatile t, access_phys(t, phys));
 }
 
-pub fn access_phys_single(comptime t: type, phys: u64) *t {
+pub fn access_phys_single(comptime t: type, phys: usize) *t {
   return &access_phys(t, phys)[0];
 }
 
-pub fn access_phys_single_volatile(comptime t: type, phys: u64) *volatile t {
+pub fn access_phys_single_volatile(comptime t: type, phys: usize) *volatile t {
   return @ptrCast(*volatile t, access_phys_single(t, phys));
 }
 

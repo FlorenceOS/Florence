@@ -55,7 +55,7 @@ const Lifetime = enum {
 var range = RangeAlloc{.materialize_bytes = sbrk};
 
 /// Range allocator for nonbacked memory
-var nonbacked_range = RangeAlloc{.materialize_bytes = nonbacked_sbrk};
+pub var nonbacked_range = RangeAlloc{.materialize_bytes = nonbacked_sbrk};
 
 var ephemeral_alloc =
   std.heap.GeneralPurposeAllocator(.{
@@ -75,12 +75,4 @@ pub fn backed(
     .Ephemeral => return &ephemeral_alloc.allocator,
     .Eternal   => return &range.allocator,
   }
-}
-
-/// The virtual memory is _NOT_ backed by physical pages.
-/// If you dereference this memory, you _WILL_ get a page
-/// fault. The pointers into this memory cannot be dereferenced
-/// before mapping the memory to some physical memory.
-pub fn nonbacked() *std.mem.allocator {
-  return nonbacked_range.allocator;
 }

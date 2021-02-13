@@ -2,10 +2,10 @@ const std = @import("std");
 const os = @import("root").os;
 const kepler = os.kepler;
 
-pub fn basic() !void {
+fn basic() !void {
     var buffer: [4096]u8 = undefined;
     var fixed_buffer = std.heap.FixedBufferAllocator.init(&buffer);
-    const allocator = &fixed_buffer.allocator; 
+    const allocator = &fixed_buffer.allocator;
     // Server notificaiton queue
     const server_noteq = try kepler.ipc.NoteQueue.create(allocator);
     os.log("Created server queue!\n", .{});
@@ -71,4 +71,28 @@ pub fn basic() !void {
     // Close connection on the client's side as well
     conn.abandon(.Consumer);
     os.log("Connection terminated from the client side!\n", .{});
+}
+
+fn memory_objects() !void {
+    var buffer: [4096]u8 = undefined;
+    var fixed_buffer = std.heap.FixedBufferAllocator.init(&buffer);
+    const allocator = &fixed_buffer.allocator;
+
+    const test_obj = try kepler.memory.MemoryObject.create(allocator, 0x10000);
+    const base = try kepler.memory.kernel_mapper.map(test_obj, os.memory.paging.rw(), .MemoryWriteBack);
+    const arr = @intToPtr([*]u8, base);
+    arr[0] = 0x69;
+    kepler.memory.kernel_mapper.unmap(test_obj, base);
+
+    const base2 = try kepler.memory.kernel_mapper.map(test_obj, os.memory.paging.ro(), .MemoryWriteBack);
+    const arr2 = @intToPtr([*]u8, base2);
+    std.debug.assert(arr2[0] == 0x69);
+    kepler.memory.kernel_mapper.unmap(test_obj, base2);
+
+    test_obj.drop();
+}
+
+pub fn run_tests() !void {
+    try basic();
+    try memory_objects();
 }
