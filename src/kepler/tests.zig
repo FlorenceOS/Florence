@@ -2,7 +2,8 @@ const std = @import("std");
 const os = @import("root").os;
 const kepler = os.kepler;
 
-fn basic() !void {
+fn notifications() !void {
+    os.log("\nNotifications test...\n", .{});
     var buffer: [4096]u8 = undefined;
     var fixed_buffer = std.heap.FixedBufferAllocator.init(&buffer);
     const allocator = &fixed_buffer.allocator;
@@ -74,25 +75,97 @@ fn basic() !void {
 }
 
 fn memory_objects() !void {
+    os.log("\nMemory objects test...\n", .{});
     var buffer: [4096]u8 = undefined;
     var fixed_buffer = std.heap.FixedBufferAllocator.init(&buffer);
     const allocator = &fixed_buffer.allocator;
 
     const test_obj = try kepler.memory.MemoryObject.create(allocator, 0x10000);
+    os.log("Created memory object of size 0x10000!\n", .{});
     const base = try kepler.memory.kernel_mapper.map(test_obj, os.memory.paging.rw(), .MemoryWriteBack);
+    os.log("Mapped memory object!\n", .{});
     const arr = @intToPtr([*]u8, base);
     arr[0] = 0x69;
     kepler.memory.kernel_mapper.unmap(test_obj, base);
+    os.log("Unmapped memory object!\n", .{});
 
     const base2 = try kepler.memory.kernel_mapper.map(test_obj, os.memory.paging.ro(), .MemoryWriteBack);
+    os.log("Mapped memory object again!\n", .{});
     const arr2 = @intToPtr([*]u8, base2);
     std.debug.assert(arr2[0] == 0x69);
     kepler.memory.kernel_mapper.unmap(test_obj, base2);
+    os.log("Unmapped memory object again!\n", .{});
 
     test_obj.drop();
+    os.log("Dropped memory object!\n", .{});
+}
+
+fn object_passing() !void {
+    os.log("\nObject passing test...\n", .{});
+    var buffer: [4096]u8 = undefined;
+    var fixed_buffer = std.heap.FixedBufferAllocator.init(&buffer);
+    const allocator = &fixed_buffer.allocator;
+
+    const mailbox = try kepler.objects.ObjectRefMailbox.create(allocator, 2);
+    os.log("Created object reference mailbox!\n", .{});
+
+    // Create a dummy object to pass around
+    const dummy = try kepler.memory.MemoryObject.create(allocator, 0x1000);
+    os.log("Created dummy object!\n", .{});
+    const dummy_ref = kepler.objects.ObjectRef { .MemoryObject = .{ .ref = dummy.borrow(), .mapped_to = null, .mapper = null } };
+
+    // Test send from consumer and recieve from producer
+    if (mailbox.write_from_consumer(3, dummy_ref)) {
+        unreachable;
+    } else |err| { 
+        std.debug.assert(err == error.OutOfBounds); 
+    }
+    os.log("Out of bounds write passed!\n", .{});
+
+    try mailbox.write_from_consumer(0, dummy_ref);
+    os.log("Send passed!\n", .{});
+
+    if (mailbox.write_from_consumer(0, dummy_ref)) {
+        unreachable;
+    } else |err| { 
+        std.debug.assert(err == error.NotEnoughPermissions); 
+    }
+    os.log("Wrong send to the same cell passed!\n", .{});
+
+    if (mailbox.read_from_producer(1)) |_| {
+        unreachable;
+    } else |err| {
+        std.debug.assert(err == error.NotEnoughPermissions); 
+    }
+    os.log("Read with wrong permissions passed!\n", .{});
+
+    const recieved_dummy_ref = try mailbox.read_from_producer(0);
+    std.debug.assert(recieved_dummy_ref.MemoryObject.ref == dummy_ref.MemoryObject.ref);
+    recieved_dummy_ref.drop();
+    os.log("Read passed!\n", .{});
+
+    // Test grant from consumer, send from producer, and reciever from consumer
+    try mailbox.grant_write(0);
+
+    if (mailbox.write_from_producer(1, dummy_ref)) {
+        unreachable;
+    } else |err| {
+        std.debug.assert(err == error.NotEnoughPermissions); 
+    }
+    os.log("Write with wrong permissions passed!\n", .{});
+
+    try mailbox.write_from_producer(0, dummy_ref);
+
+    const new_recieved_dummy_ref = try mailbox.read_from_consumer(0);
+    std.debug.assert(new_recieved_dummy_ref.MemoryObject.ref == dummy_ref.MemoryObject.ref);
+    new_recieved_dummy_ref.drop();
+    os.log("Read passed!\n", .{});
+
+    dummy_ref.drop();
 }
 
 pub fn run_tests() !void {
-    try basic();
+    try notifications();
     try memory_objects();
+    try object_passing();
 }
