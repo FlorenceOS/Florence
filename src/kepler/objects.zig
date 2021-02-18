@@ -17,7 +17,11 @@ pub const ObjectType = enum {
     None,
 };
 
-/// Type that represents reference to the object
+/// Type that represents local reference to the object
+/// Unlike SharedObjectRef, it can represent references
+/// to not shareable objects such as streams. It can store
+/// local metadata (e.g. address of the mapping for memory objects)
+/// as well
 pub const ObjectRef = union(ObjectType) {
     /// Stream reference data
     Stream: struct {
@@ -40,19 +44,14 @@ pub const ObjectRef = union(ObjectType) {
         /// null if memory object was not mapped
         /// address of the mapping
         mapped_to: ?usize,
-        /// Mapper that was used to map the object
-        /// null if this object is a sharable reference
-        mapper: ?*kepler.memory.Mapper,
     },
     /// None means that there is no reference to any object
     None: void,
 
-    /// Drop reference
-    pub fn drop(self: @This()) void {
+    /// Drop reference. mapper is the Mapper used by the arena (for .MemoryObject objects)
+    pub fn drop(self: @This(), mapper: *kepler.memory.Mapper) void {
         switch (self) {
-            .Stream => |stream| {
-                stream.ref.abandon(stream.peer);
-            },
+            .Stream => |stream| stream.ref.abandon(stream.peer),
             .Endpoint => |endpoint| {
                 if (endpoint.is_owning) {
                     endpoint.ref.shutdown();
@@ -62,8 +61,7 @@ pub const ObjectRef = union(ObjectType) {
             },
             .MemoryObject => |memory_object| {
                 if (memory_object.mapped_to) |offset| {
-                    std.debug.assert(memory_object.mapper != null);
-                    memory_object.mapper.?.unmap(memory_object.ref, offset);
+                    mapper.unmap(memory_object.ref, offset);
                 }
             },
             .None => {},
@@ -76,13 +74,53 @@ pub const ObjectRef = union(ObjectType) {
         self.* = @This().None;
     }
 
-    /// Borrow shareable reference
-    pub fn borrow_shareable(self: @This()) !@This() {
+    /// Borrow shareable reference. Increments refcount
+    pub fn pack_shareable(self: @This()) !SharedObjectRef {
         switch (self) {
-            .Stream => return error.NotShareable,
-            .Endpoint => |endpoint| return ObjectRef{ .Endpoint = .{ .ref = endpoint.ref.borrow(), .is_owning = false } },
-            .MemoryObject => |memory_object| return ObjectRef{ .MemoryObject = .{ .ref = memory_object.ref.borrow(), .mapped_to = null, .mapper = null } },
-            .None => return .None,
+            .Stream => return error.ObjectNotShareable,
+            .Endpoint => |endpoint| return SharedObjectRef { .Endpoint = endpoint.ref.borrow() },
+            .MemoryObject => |memory_obj| return SharedObjectRef { .MemoryObject = memory_obj.ref.borrow() },
+            .None => return SharedObjectRef.None,
+        }
+    }
+
+    /// Unpack from shareable. Consumes ref, hence does not increment reference count
+    pub fn unpack_shareable(ref: SharedObjectRef) @This() {
+        switch (ref) {
+            .Endpoint => |endpoint| return @This() { .Endpoint = .{ .ref = endpoint, .is_owning = false } },
+            .MemoryObject => |memory_obj| return @This() { .MemoryObject = .{ .ref = memory_obj, .mapped_to = null } },
+            .None => return @This().None,
+        }
+    }
+};
+
+/// Type of the object that can be passed with IPC
+pub const SharedObjectType = enum {
+    /// Shareable endpoint reference
+    Endpoint,
+    /// Shareable memory object reference
+    MemoryObject,
+    /// Used to indicate that this reference cell is empty
+    None,
+};
+
+/// Shareable reference to the object. Smaller than ObjectRef
+/// as it doesn't store any local metadata. Can't store references
+/// to non-shareable objects such as streams as well. Used in IPC
+pub const SharedObjectRef = union(SharedObjectType) {
+    /// Shareable reference to the endpoint
+    Endpoint: *kepler.ipc.Endpoint,
+    /// Shareable reference to the memory objects
+    MemoryObject: *kepler.memory.MemoryObject,
+    /// Idk, just none :^)
+    None: void,
+
+    /// Drop reference
+    pub fn drop(self: @This()) void {
+        switch (self) {
+            .Endpoint => |endpoint| endpoint.drop(),
+            .MemoryObject => |memory_obj| memory_obj.drop(),
+            .None => {},
         }
     }
 };
@@ -109,7 +147,7 @@ pub const ObjectRefMailbox = struct {
     /// Cell is a combination of permissions and references
     const Cell = struct {
         perms: Permissions,
-        ref: ObjectRef,
+        ref: SharedObjectRef,
     };
 
     /// Array of cells
@@ -128,7 +166,7 @@ pub const ObjectRefMailbox = struct {
         for (instance.cells) |*ref| {
             // Initially consumer owns every cell, as it is the one that
             // initiates requests
-            ref.* = Cell{ .perms = .OwnedByConsumer, .ref = ObjectRef.None };
+            ref.* = Cell{ .perms = .OwnedByConsumer, .ref = SharedObjectRef.None };
         }
 
         instance.allocator = allocator;
@@ -181,8 +219,8 @@ pub const ObjectRefMailbox = struct {
         // Assert perms
         try self.check_bounds_and_status(index, old_perms);
         // Move reference and set reference at this cell to None
-        const result = self.cells[index].ref;
-        self.cells[index].ref = ObjectRef.None;
+        const result = ObjectRef.unpack_shareable(self.cells[index].ref);
+        self.cells[index].ref = SharedObjectRef.None;
         // Modify perms
         @atomicStore(Permissions, &self.cells[index].perms, new_perms, .Release);
         return result;
@@ -201,14 +239,14 @@ pub const ObjectRefMailbox = struct {
     /// Write reference from consumer side
     pub fn write_from_consumer(self: *@This(), index: usize, object: ObjectRef) !void {
         try self.check_bounds_and_status(index, .OwnedByConsumer);
-        self.cells[index].ref = try object.borrow_shareable();
+        self.cells[index].ref = try object.pack_shareable();
         @atomicStore(Permissions, &self.cells[index].perms, .GrantedReadRights, .Release);
     }
 
     /// Write reference from producer side
     pub fn write_from_producer(self: *@This(), index: usize, object: ObjectRef) !void {
         try self.check_bounds_and_status(index, .GrantedWriteRights);
-        self.cells[index].ref = try object.borrow_shareable();
+        self.cells[index].ref = try object.pack_shareable();
         @atomicStore(Permissions, &self.cells[index].perms, .ToBeReadByConsumer, .Release);
     }  
 };

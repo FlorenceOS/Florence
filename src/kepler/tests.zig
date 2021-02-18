@@ -112,7 +112,7 @@ fn object_passing() !void {
     // Create a dummy object to pass around
     const dummy = try kepler.memory.MemoryObject.create(allocator, 0x1000);
     os.log("Created dummy object!\n", .{});
-    const dummy_ref = kepler.objects.ObjectRef { .MemoryObject = .{ .ref = dummy.borrow(), .mapped_to = null, .mapper = null } };
+    const dummy_ref = kepler.objects.ObjectRef { .MemoryObject = .{ .ref = dummy.borrow(), .mapped_to = null } };
 
     // Test send from consumer and recieve from producer
     if (mailbox.write_from_consumer(3, dummy_ref)) {
@@ -141,7 +141,7 @@ fn object_passing() !void {
 
     const recieved_dummy_ref = try mailbox.read_from_producer(0);
     std.debug.assert(recieved_dummy_ref.MemoryObject.ref == dummy_ref.MemoryObject.ref);
-    recieved_dummy_ref.drop();
+    recieved_dummy_ref.drop(&kepler.memory.kernel_mapper);
     os.log("Read passed!\n", .{});
 
     // Test grant from consumer, send from producer, and reciever from consumer
@@ -158,10 +158,10 @@ fn object_passing() !void {
 
     const new_recieved_dummy_ref = try mailbox.read_from_consumer(0);
     std.debug.assert(new_recieved_dummy_ref.MemoryObject.ref == dummy_ref.MemoryObject.ref);
-    new_recieved_dummy_ref.drop();
+    new_recieved_dummy_ref.drop(&kepler.memory.kernel_mapper);
     os.log("Read passed!\n", .{});
 
-    dummy_ref.drop();
+    dummy_ref.drop(&kepler.memory.kernel_mapper);
 }
 
 pub fn run_tests() !void {
