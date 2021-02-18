@@ -13,6 +13,9 @@ pub const ObjectType = enum {
     /// Object which allows to access memory shared between arenas.
     /// See MemoryObject class description in kepler/memory.zig. Shareable
     MemoryObject,
+    /// LockedHandle is the object that stores one integer only
+    /// owner can access. See LockedHandle description in this file. Shareable
+    LockedHandle,
     /// Used to indicate that this reference cell is empty
     None,
 };
@@ -45,6 +48,8 @@ pub const ObjectRef = union(ObjectType) {
         /// address of the mapping
         mapped_to: ?usize,
     },
+    /// Locked handle reference
+    LockedHandle: *LockedHandle,
     /// None means that there is no reference to any object
     None: void,
 
@@ -64,6 +69,7 @@ pub const ObjectRef = union(ObjectType) {
                     mapper.unmap(memory_object.ref, offset);
                 }
             },
+            .LockedHandle => |locked_handle| locked_handle.drop(),
             .None => {},
         }
     }
@@ -80,6 +86,7 @@ pub const ObjectRef = union(ObjectType) {
             .Stream => return error.ObjectNotShareable,
             .Endpoint => |endpoint| return SharedObjectRef{ .Endpoint = endpoint.ref.borrow() },
             .MemoryObject => |memory_obj| return SharedObjectRef{ .MemoryObject = memory_obj.ref.borrow() },
+            .LockedHandle => |locked_handle| return SharedObjectRef{ .LockedHandle = locked_handle.borrow() },
             .None => return SharedObjectRef.None,
         }
     }
@@ -89,6 +96,7 @@ pub const ObjectRef = union(ObjectType) {
         switch (ref) {
             .Endpoint => |endpoint| return @This(){ .Endpoint = .{ .ref = endpoint, .is_owning = false } },
             .MemoryObject => |memory_obj| return @This(){ .MemoryObject = .{ .ref = memory_obj, .mapped_to = null } },
+            .LockedHandle => |locked_handle| return @This(){ .LockedHandle = locked_handle },
             .None => return @This().None,
         }
     }
@@ -100,6 +108,8 @@ pub const SharedObjectType = enum {
     Endpoint,
     /// Shareable memory object reference
     MemoryObject,
+    /// Shareable locked handle reference
+    LockedHandle,
     /// Used to indicate that this reference cell is empty
     None,
 };
@@ -112,6 +122,8 @@ pub const SharedObjectRef = union(SharedObjectType) {
     Endpoint: *kepler.ipc.Endpoint,
     /// Shareable reference to the memory objects
     MemoryObject: *kepler.memory.MemoryObject,
+    /// Shareable reference to the locked handle
+    LockedHandle: *LockedHandle,
     /// Idk, just none :^)
     None: void,
 
@@ -119,6 +131,7 @@ pub const SharedObjectRef = union(SharedObjectType) {
     pub fn drop(self: *const @This()) void {
         switch (self.*) {
             .Endpoint => |endpoint| endpoint.drop(),
+            .LockedHandle => |locked_handle| locked_handle.drop(),
             .MemoryObject => |memory_obj| memory_obj.drop(),
             .None => {},
         }
@@ -232,5 +245,48 @@ pub const ObjectRefMailbox = struct {
         try self.check_bounds_and_status(index, .GrantedWriteRights);
         self.cells[index].ref = try object.pack_shareable();
         @atomicStore(Permissions, &self.cells[index].perms, .ToBeReadByConsumer, .Release);
+    }
+};
+
+/// Locked handle object is the object that is capable of storing a single usize
+/// integer in a way that only allows threads from owning arena to get the
+/// integer value, while the object can be passed around freely
+pub const LockedHandle = struct {
+    /// Reference count
+    ref_count: usize,
+    /// Locked integer value
+    handle: usize,
+    /// Password. TODO: Set to arena ID or something
+    password: usize,
+    /// Allocator used to allocate the object
+    /// TODO: Consider storing allocator somewhere else, storing it here may
+    /// be too wasteful. For now I just add it to pad it to 32 bytes :^)
+    allocator: *std.mem.Allocator,
+
+    pub fn create(allocator: *std.mem.Allocator, handle: usize, password: usize) !*LockedHandle {
+        const instance = try allocator.create(@This());
+        instance.ref_count = 1;
+        instance.password = password;
+        instance.handle = handle;
+        return instance;
+    }
+
+    pub fn borrow(self: *@This()) *@This() {
+        _ = @atomicRmw(usize, &self.ref_count, .Add, 1, .AcqRel);
+        return self;
+    }
+
+    pub fn drop(self: *@This()) void {
+        if (@atomicRmw(usize, &self.ref_count, .Sub, 1, .AcqRel) > 1) {
+            return;
+        }
+        self.allocator.destroy(self);
+    }
+
+    pub fn peek(self: *const @This(), password: usize) !usize {
+        if (self.password != password) {
+            return error.AuthenticationFailed;
+        }
+        return self.handle;
     }
 };

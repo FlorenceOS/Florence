@@ -2,11 +2,8 @@ const std = @import("std");
 const os = @import("root").os;
 const kepler = os.kepler;
 
-fn notifications() !void {
+fn notifications(allocator: *std.mem.Allocator) !void {
     os.log("\nNotifications test...\n", .{});
-    var buffer: [4096]u8 = undefined;
-    var fixed_buffer = std.heap.FixedBufferAllocator.init(&buffer);
-    const allocator = &fixed_buffer.allocator;
     // Server notificaiton queue
     const server_noteq = try kepler.ipc.NoteQueue.create(allocator);
     os.log("Created server queue!\n", .{});
@@ -79,11 +76,8 @@ fn notifications() !void {
     os.log("Connection terminated from the client side!\n", .{});
 }
 
-fn memory_objects() !void {
+fn memory_objects(allocator: *std.mem.Allocator) !void {
     os.log("\nMemory objects test...\n", .{});
-    var buffer: [4096]u8 = undefined;
-    var fixed_buffer = std.heap.FixedBufferAllocator.init(&buffer);
-    const allocator = &fixed_buffer.allocator;
 
     const test_obj = try kepler.memory.MemoryObject.create(allocator, 0x10000);
     os.log("Created memory object of size 0x10000!\n", .{});
@@ -105,11 +99,8 @@ fn memory_objects() !void {
     os.log("Dropped memory object!\n", .{});
 }
 
-fn object_passing() !void {
+fn object_passing(allocator: *std.mem.Allocator) !void {
     os.log("\nObject passing test...\n", .{});
-    var buffer: [4096]u8 = undefined;
-    var fixed_buffer = std.heap.FixedBufferAllocator.init(&buffer);
-    const allocator = &fixed_buffer.allocator;
 
     var mailbox = try kepler.objects.ObjectRefMailbox.init(allocator, 2);
     os.log("Created object reference mailbox!\n", .{});
@@ -170,8 +161,21 @@ fn object_passing() !void {
     mailbox.drop();
 }
 
+fn locked_handles(allocator: *std.mem.Allocator) !void {
+    os.log("\nLocked handles test...\n", .{});
+    const handle = try kepler.objects.LockedHandle.create(allocator, 69, 420);
+    std.debug.assert((try handle.peek(420)) == 69);
+    if (handle.peek(412)) |_| unreachable else |err| std.debug.assert(err == error.AuthenticationFailed);
+    os.log("Locked handles test passed...\n", .{});
+}
+
 pub fn run_tests() !void {
-    try notifications();
-    try memory_objects();
-    try object_passing();
+    var buffer: [4096]u8 = undefined;
+    var fixed_buffer = std.heap.FixedBufferAllocator.init(&buffer);
+    const allocator = &fixed_buffer.allocator;
+
+    try notifications(allocator);
+    try memory_objects(allocator);
+    try object_passing(allocator);
+    try locked_handles(allocator);
 }
