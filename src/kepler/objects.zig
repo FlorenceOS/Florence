@@ -49,8 +49,8 @@ pub const ObjectRef = union(ObjectType) {
     None: void,
 
     /// Drop reference. mapper is the Mapper used by the arena (for .MemoryObject objects)
-    pub fn drop(self: @This(), mapper: *kepler.memory.Mapper) void {
-        switch (self) {
+    pub fn drop(self: *const @This(), mapper: *kepler.memory.Mapper) void {
+        switch (self.*) {
             .Stream => |stream| stream.ref.abandon(stream.peer),
             .Endpoint => |endpoint| {
                 if (endpoint.is_owning) {
@@ -75,11 +75,11 @@ pub const ObjectRef = union(ObjectType) {
     }
 
     /// Borrow shareable reference. Increments refcount
-    pub fn pack_shareable(self: @This()) !SharedObjectRef {
-        switch (self) {
+    pub fn pack_shareable(self: *const @This()) !SharedObjectRef {
+        switch (self.*) {
             .Stream => return error.ObjectNotShareable,
-            .Endpoint => |endpoint| return SharedObjectRef { .Endpoint = endpoint.ref.borrow() },
-            .MemoryObject => |memory_obj| return SharedObjectRef { .MemoryObject = memory_obj.ref.borrow() },
+            .Endpoint => |endpoint| return SharedObjectRef{ .Endpoint = endpoint.ref.borrow() },
+            .MemoryObject => |memory_obj| return SharedObjectRef{ .MemoryObject = memory_obj.ref.borrow() },
             .None => return SharedObjectRef.None,
         }
     }
@@ -87,8 +87,8 @@ pub const ObjectRef = union(ObjectType) {
     /// Unpack from shareable. Consumes ref, hence does not increment reference count
     pub fn unpack_shareable(ref: SharedObjectRef) @This() {
         switch (ref) {
-            .Endpoint => |endpoint| return @This() { .Endpoint = .{ .ref = endpoint, .is_owning = false } },
-            .MemoryObject => |memory_obj| return @This() { .MemoryObject = .{ .ref = memory_obj, .mapped_to = null } },
+            .Endpoint => |endpoint| return @This(){ .Endpoint = .{ .ref = endpoint, .is_owning = false } },
+            .MemoryObject => |memory_obj| return @This(){ .MemoryObject = .{ .ref = memory_obj, .mapped_to = null } },
             .None => return @This().None,
         }
     }
@@ -116,8 +116,8 @@ pub const SharedObjectRef = union(SharedObjectType) {
     None: void,
 
     /// Drop reference
-    pub fn drop(self: @This()) void {
-        switch (self) {
+    pub fn drop(self: *const @This()) void {
+        switch (self.*) {
             .Endpoint => |endpoint| endpoint.drop(),
             .MemoryObject => |memory_obj| memory_obj.drop(),
             .None => {},
@@ -154,42 +154,26 @@ pub const ObjectRefMailbox = struct {
     cells: []Cell,
     /// Allocator used to allocate this object
     allocator: *std.mem.Allocator,
-    /// Reference count
-    ref_count: usize,
 
-    /// Create shared memory object
-    pub fn create(allocator: *std.mem.Allocator, num: usize) !*@This() {
-        const instance = try allocator.create(@This());
-        errdefer allocator.destroy(instance);
-
-        instance.cells = try allocator.alloc(Cell, num);
-        for (instance.cells) |*ref| {
+    /// Create mailbox
+    pub fn init(allocator: *std.mem.Allocator, num: usize) !@This() {
+        var result: @This() = undefined;
+        result.cells = try allocator.alloc(Cell, num);
+        for (result.cells) |*ref| {
             // Initially consumer owns every cell, as it is the one that
             // initiates requests
             ref.* = Cell{ .perms = .OwnedByConsumer, .ref = SharedObjectRef.None };
         }
-
-        instance.allocator = allocator;
-        instance.ref_count = 1;
-
-        return instance;
+        result.allocator = allocator;
+        return result;
     }
 
-    /// Borrow reference to SharedRefArray object
-    pub fn borrow(self: *@This()) *@This() {
-        _ = @atomicRmw(usize, &self.ref_count, .Add, 1, .AcqRel);
-    }
-
-    /// Drop reference to SharedRefArray object
-    pub fn drop(self: *@This()) void {
-        if (@atomicRmw(usize, &self.ref_count, .Sub, 1, .AcqRel) > 1) {
-            return;
+    /// Dispose internal structures
+    pub fn drop(self: *const @This()) void {
+        for (self.cells) |ref| {
+            ref.ref.drop();
         }
-        for (self.refs) |*ref| {
-            ref.drop();
-        }
-        self.allocator.free(self.refs);
-        self.allocator.destroy(self);
+        self.allocator.free(self.cells);
     }
 
     /// Checks that
@@ -248,5 +232,5 @@ pub const ObjectRefMailbox = struct {
         try self.check_bounds_and_status(index, .GrantedWriteRights);
         self.cells[index].ref = try object.pack_shareable();
         @atomicStore(Permissions, &self.cells[index].perms, .ToBeReadByConsumer, .Release);
-    }  
+    }
 };

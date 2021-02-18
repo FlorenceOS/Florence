@@ -3,6 +3,7 @@ const std = @import("std");
 const builtin = std.builtin;
 const atmcqueue = os.lib.atmcqueue;
 const thread = os.thread;
+const kepler = os.kepler;
 
 /// Note is the object that represents a notification.
 /// They are allocated in place in other types, such as
@@ -354,6 +355,16 @@ pub const Stream = struct {
         Abandoned,
     };
 
+    /// Stream info exposed to userspace
+    pub const UserspaceInfo = struct {
+        /// Size of virtual memory for a consumer-rw producer-ro buffer
+        consumer_rw_buf_size: usize,
+        /// Size of virtual memory for a producer-rw consumer-ro buffer
+        producer_rw_buf_size: usize,
+        /// Size of object mailbox
+        obj_mailbox_size: usize,
+    };
+
     /// Notes that will be used to notify
     /// producer/consumer about more data to process
     notes: [2]Note,
@@ -372,22 +383,49 @@ pub const Stream = struct {
     allocator: *std.mem.Allocator,
     /// Endpoint stream is attached to
     endpoint: *Endpoint,
+    /// Memory objects for buffers
+    memory_objs: [2]*kepler.memory.MemoryObject,
+    /// Mailbox object for passing references
+    mailbox: *kepler.objects.ObjectRefMailbox,
+    /// Info for userspace
+    info: UserspaceInfo,
 
     /// Create stream object
     /// All stored resources are borrowed
-    pub fn create(allocator: *std.mem.Allocator, consumer_queue: *NoteQueue, endpoint: *Endpoint) !*@This() {
+    pub fn create(allocator: *std.mem.Allocator, consumer_queue: *NoteQueue, endpoint: *Endpoint, info: UserspaceInfo) !*@This() {
+        // Allocate all structures as requested by the stream
+        // Producer RW buffer
+        const producer_rw_object = try kepler.memory.MemoryObject.create(allocator, info.producer_rw_buf_size);
+        errdefer producer_rw_object.drop();
+        // Consumer RW buffer
+        const consumer_rw_object = try kepler.memory.MemoryObject.create(allocator, info.consumer_rw_buf_size);
+        errdefer consumer_rw_object.drop();
+        // Mailbox
+        const mailbox = try kepler.objects.ObjectRefMailbox.init(allocator, info.obj_mailbox_size);
+        errdefer mailbox.drop();
+        // Create the instance and fill out fields
         const instance = try allocator.create(@This());
+        errdefer allocator.destroy(instance);
         instance.ready_to_resend = [2]bool{ false, false };
         instance.ref_count = 1;
         instance.status = [2]PeerStatus{ .Pending, .Pending };
         instance.allocator = allocator;
+        instance.info = info;
+        // and queues
         instance.note_queues = [2]*NoteQueue{ consumer_queue.borrow(), endpoint.queue.borrow() };
+        errdefer consumer_queue.drop();
+        errdefer endpoint.queue.drop();
+        // and endpoint
         instance.endpoint = endpoint.borrow();
-        // Send request
+        errdefer endpoint.drop();
+        // and info
+        instance.info = info;
+        // Prepare message
         instance.notes[Peer.Producer.idx()].typ = .RequestPending;
         instance.notes[Peer.Producer.idx()].owner_ref = .{ .stream = instance.borrow() };
+        // No need to drop instance on errdefer, that will be collected anyway
+        // Send request
         endpoint.send_request(&instance.notes[Peer.Producer.idx()]) catch |err| {
-            instance.drop();
             return err;
         };
         return instance;
@@ -497,6 +535,9 @@ pub const Stream = struct {
         self.note_queues[0].drop();
         self.note_queues[1].drop();
         self.endpoint.drop();
+        self.memory_objs[0].drop();
+        self.memory_objs[1].drop();
+        self.mailbox.drop();
         self.allocator.destroy(self);
     }
 

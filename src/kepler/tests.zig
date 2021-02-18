@@ -17,7 +17,12 @@ fn notifications() !void {
     const endpoint = try kepler.ipc.Endpoint.create(allocator, server_noteq);
     os.log("Created server endpoint!\n", .{});
     // Stream connection object
-    const conn = try kepler.ipc.Stream.create(allocator, client_noteq, endpoint);
+    const conn_params = kepler.ipc.Stream.UserspaceInfo{
+        .consumer_rw_buf_size = 1024,
+        .producer_rw_buf_size = 1024,
+        .obj_mailbox_size = 16,
+    };
+    const conn = try kepler.ipc.Stream.create(allocator, client_noteq, endpoint, conn_params);
     os.log("Created connection!\n", .{});
     // Server note queue should get the .Request note
     const connect_note = server_noteq.try_recv() orelse unreachable;
@@ -106,19 +111,19 @@ fn object_passing() !void {
     var fixed_buffer = std.heap.FixedBufferAllocator.init(&buffer);
     const allocator = &fixed_buffer.allocator;
 
-    const mailbox = try kepler.objects.ObjectRefMailbox.create(allocator, 2);
+    var mailbox = try kepler.objects.ObjectRefMailbox.init(allocator, 2);
     os.log("Created object reference mailbox!\n", .{});
 
     // Create a dummy object to pass around
     const dummy = try kepler.memory.MemoryObject.create(allocator, 0x1000);
     os.log("Created dummy object!\n", .{});
-    const dummy_ref = kepler.objects.ObjectRef { .MemoryObject = .{ .ref = dummy.borrow(), .mapped_to = null } };
+    const dummy_ref = kepler.objects.ObjectRef{ .MemoryObject = .{ .ref = dummy.borrow(), .mapped_to = null } };
 
     // Test send from consumer and recieve from producer
     if (mailbox.write_from_consumer(3, dummy_ref)) {
         unreachable;
-    } else |err| { 
-        std.debug.assert(err == error.OutOfBounds); 
+    } else |err| {
+        std.debug.assert(err == error.OutOfBounds);
     }
     os.log("Out of bounds write passed!\n", .{});
 
@@ -127,15 +132,15 @@ fn object_passing() !void {
 
     if (mailbox.write_from_consumer(0, dummy_ref)) {
         unreachable;
-    } else |err| { 
-        std.debug.assert(err == error.NotEnoughPermissions); 
+    } else |err| {
+        std.debug.assert(err == error.NotEnoughPermissions);
     }
     os.log("Wrong send to the same cell passed!\n", .{});
 
     if (mailbox.read_from_producer(1)) |_| {
         unreachable;
     } else |err| {
-        std.debug.assert(err == error.NotEnoughPermissions); 
+        std.debug.assert(err == error.NotEnoughPermissions);
     }
     os.log("Read with wrong permissions passed!\n", .{});
 
@@ -150,7 +155,7 @@ fn object_passing() !void {
     if (mailbox.write_from_producer(1, dummy_ref)) {
         unreachable;
     } else |err| {
-        std.debug.assert(err == error.NotEnoughPermissions); 
+        std.debug.assert(err == error.NotEnoughPermissions);
     }
     os.log("Write with wrong permissions passed!\n", .{});
 
@@ -162,6 +167,7 @@ fn object_passing() !void {
     os.log("Read passed!\n", .{});
 
     dummy_ref.drop(&kepler.memory.kernel_mapper);
+    mailbox.drop();
 }
 
 pub fn run_tests() !void {
