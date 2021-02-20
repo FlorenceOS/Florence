@@ -160,11 +160,11 @@ pub const NoteQueue = struct {
         if (@atomicRmw(usize, &self.ref_count, .Sub, 1, .AcqRel) > 1) {
             return;
         }
-        self.dispose();
+        self.deinit();
     }
 
     /// Dispose queue
-    fn dispose(self: *@This()) void {
+    fn deinit(self: *@This()) void {
         self.allocator.destroy(self);
     }
 
@@ -304,11 +304,11 @@ pub const Endpoint = struct {
         if (@atomicRmw(usize, &self.own_ref_count, .Sub, 1, .AcqRel) > 1) {
             return;
         }
-        self.dispose();
+        self.deinit();
     }
 
     /// Dispose endpoint object
-    fn dispose(self: *@This()) void {
+    fn deinit(self: *@This()) void {
         self.queue.drop();
         self.allocator.destroy(self);
     }
@@ -527,11 +527,11 @@ pub const Stream = struct {
         if (@atomicRmw(usize, &self.ref_count, .Sub, 1, .AcqRel) > 1) {
             return;
         }
-        self.dispose();
+        self.deinit();
     }
 
     /// Dispose queue object
-    pub fn dispose(self: *@This()) void {
+    pub fn deinit(self: *@This()) void {
         self.note_queues[0].drop();
         self.note_queues[1].drop();
         self.endpoint.drop();
