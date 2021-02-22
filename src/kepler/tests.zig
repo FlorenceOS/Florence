@@ -169,6 +169,41 @@ fn locked_handles(allocator: *std.mem.Allocator) !void {
     os.log("Locked handles test passed...\n", .{});
 }
 
+fn locked_handle_table(allocator: *std.mem.Allocator) !void {
+    os.log("\nLocked handle table test...\n", .{});
+    var instance: os.lib.handle_table.LockedHandleTable(u64) = undefined;
+    instance.init(allocator);
+
+    const result1 = try instance.new_cell();
+    result1.ref.* = 69;
+    std.debug.assert(result1.id == 0);
+
+
+    const result2 = try instance.new_cell();
+    result2.ref.* = 420;
+    std.debug.assert(result2.id == 1);
+
+    os.log("Finished allocating new cells! Unlocking...\n", .{});
+    instance.unlock();    
+    
+    const TestDisposer = struct {
+        called: u64,
+
+        pub fn init() @This() {
+            return .{ .called = 0 };
+        }
+
+        pub fn dispose(self: *@This(), loc: os.lib.handle_table.LockedHandleTable(u64).Location) void {
+            self.called += 1;
+        }
+    };
+
+    var disposer = TestDisposer.init();
+    os.log("Disposing handle table...\n", .{});
+    instance.deinit(TestDisposer, &disposer);
+    std.testing.expect(disposer.called == 2);
+}
+
 pub fn run_tests() !void {
     var buffer: [4096]u8 = undefined;
     var fixed_buffer = std.heap.FixedBufferAllocator.init(&buffer);
@@ -178,4 +213,7 @@ pub fn run_tests() !void {
     try memory_objects(allocator);
     try object_passing(allocator);
     try locked_handles(allocator);
+    try locked_handle_table(allocator);
+
+    os.log("\nAll tests passing!\n", .{});
 }

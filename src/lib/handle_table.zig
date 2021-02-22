@@ -1,4 +1,5 @@
 const std = @import("std");
+const os = @import("root").os;
 
 /// HandleTable is the class for table of generic handles
 /// It manages a map from integers to handles (type T)
@@ -88,7 +89,7 @@ pub fn HandleTable(comptime T: type) type {
         pub fn deinit(self: *@This(), comptime disposer_type: type, disposer: *disposer_type) void {
             comptime {
                 if (!@hasDecl(disposer_type, "dispose")) {
-                    @compileError("Disposer type should define \"check\" function");
+                    @compileError("Disposer type should define \"dispose\" function");
                 }
                 const expect_disposer_type = fn (*disposer_type, Location) void;
                 if (@TypeOf(disposer_type.dispose) != expect_disposer_type) {
@@ -154,4 +155,62 @@ test "handle_table" {
     var disposer = TestDisposer.init();
     instance.deinit(TestDisposer, &disposer);
     std.testing.expect(disposer.called);
+}
+
+/// Locked handle table is a wrapper on HandleTable that
+/// allows only one reader/writer using os.thread.Mutex
+/// TODO: generic Lock trait for migration from kernel code
+pub fn LockedHandleTable(comptime T: type) type {
+    return struct {
+        /// Location type that is reused from HandleTable
+        pub const Location = HandleTable(T).Location;
+
+        /// Handle table itself
+        table: HandleTable(T) = undefined,
+        /// Protecting lock
+        mutex: os.thread.Mutex = undefined,
+
+        /// Initialize LockedHandleTable
+        pub fn init(self: *@This(), allocator: *std.mem.Allocator) void {
+            self.mutex.init();
+            self.table = HandleTable(T).init(allocator);
+        }
+
+        /// Allocate a new cell for a new handle and
+        /// leave the table locked
+        /// NOTE: Don't forget to call unlock lol :^)
+        pub fn new_cell(self: *@This()) !Location {
+            self.mutex.lock();
+            errdefer self.mutex.unlock();
+            return self.table.new_cell();
+        }
+
+        /// Free cell.
+        pub fn free_cell(self: *@This(), id: usize) !void {
+            self.mutex.lock();
+            defer self.mutex.unlock();
+            return self.table.free_cell(id);
+        }
+
+        /// Get cell data and leave the table locked
+        pub fn get_data(self: *@This(), id: usize) !*T {
+            self.mutex.lock();
+            errdefer self.mutex.unlock();
+            return self.table.get_data(id);
+        }
+
+        /// Deinitialize the table
+        pub fn deinit(self: *@This(), comptime disposer_type: type, disposer: *disposer_type) void {
+            self.mutex.lock();
+            self.table.deinit(disposer_type, disposer);
+        }
+
+        /// Unlock the table
+        pub fn unlock(self: *@This()) void {
+            if (!self.mutex.held_by_me()) {
+                @panic("LMAO");
+            }
+            self.mutex.unlock();
+        }
+    };
 }
