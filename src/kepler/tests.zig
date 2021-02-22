@@ -178,14 +178,16 @@ fn locked_handle_table(allocator: *std.mem.Allocator) !void {
     result1.ref.* = 69;
     std.debug.assert(result1.id == 0);
 
+    instance.unlock();
+    os.log("First alloc done!...\n", .{});
 
     const result2 = try instance.new_cell();
     result2.ref.* = 420;
     std.debug.assert(result2.id == 1);
 
-    os.log("Finished allocating new cells! Unlocking...\n", .{});
-    instance.unlock();    
-    
+    instance.unlock();
+    os.log("Second alloc done!...\n", .{});
+
     const TestDisposer = struct {
         called: u64,
 
