@@ -171,7 +171,7 @@ fn locked_handles(allocator: *std.mem.Allocator) !void {
 
 fn locked_handle_table(allocator: *std.mem.Allocator) !void {
     os.log("\nLocked handle table test...\n", .{});
-    var instance: os.lib.handle_table.LockedHandleTable(u64) = undefined;
+    var instance: os.lib.handle_table.LockedHandleTable(u64) = .{};
     instance.init(allocator);
 
     const result1 = try instance.new_cell();

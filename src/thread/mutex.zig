@@ -1,7 +1,7 @@
 const os = @import("root").os;
 
 pub const Mutex = struct {
-  held_by: ?*os.thread.Task = undefined,
+  held_by: ?*os.thread.Task = null,
   queue: os.thread.WaitQueue = .{},
 
   const Held = struct {
@@ -50,7 +50,6 @@ pub const Mutex = struct {
   }
 
   pub fn init(self: *@This()) void {
-    self.held_by = null;
     self.queue.init();
   }
 };

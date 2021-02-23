@@ -168,7 +168,7 @@ pub fn LockedHandleTable(comptime T: type) type {
         /// Handle table itself
         table: HandleTable(T) = undefined,
         /// Protecting lock
-        mutex: os.thread.Mutex = undefined,
+        mutex: os.thread.Mutex = .{},
 
         /// Initialize LockedHandleTable
         pub fn init(self: *@This(), allocator: *std.mem.Allocator) void {
