@@ -62,7 +62,7 @@ pub const Addr = struct {
 
   pub fn read(self: Addr, comptime T: type, offset: regoff) T {
     if(pci_mmio[self.bus] != null)
-      return std.mem.readIntNative(T, mmio(self, offset)[0..@sizeOf(T)]);
+      return std.mem.readIntLittle(T, mmio(self, offset)[0..@sizeOf(T)]);
     if(@hasDecl(os.platform, "pci_read"))
       return os.platform.pci_read(T, self, offset);
     @panic("No pci_read method!");
@@ -70,7 +70,7 @@ pub const Addr = struct {
 
   pub fn write(self: Addr, comptime T: type, offset: regoff, value: T) void {
     if(pci_mmio[self.bus] != null) {
-      std.mem.writeIntNative(T, mmio(self, offset)[0..@sizeOf(T)], value);
+      std.mem.writeIntLittle(T, mmio(self, offset)[0..@sizeOf(T)], value);
       return;
     }
     if(@hasDecl(os.platform, "pci_write"))
