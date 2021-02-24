@@ -297,11 +297,11 @@ fn new_task_call_part_2(func: anytype, args_ptr: anytype) noreturn {
   scheduler.exit_task();
 }
 
-pub fn yield_to_task(t: *Task) void {
+pub fn yield(enqueue: bool) void {
   asm volatile(
     \\int $0x6B
     :
-    : [_] "{rax}" (t)
+    : [_] "{rbx}" (@boolToInt(enqueue))
     : "memory"
   );
 }

@@ -1,8 +1,10 @@
 const os = @import("root").os;
+const std = @import("std");
 
 pub const Mutex = struct {
   held_by: ?*os.thread.Task = null,
-  queue: os.thread.WaitQueue = .{},
+  queue: os.thread.QueueBase = .{},
+  spinlock: os.thread.Spinlock = .{},
 
   const Held = struct {
     mtx: *Mutex,
@@ -17,17 +19,17 @@ pub const Mutex = struct {
     return .{.mtx = self};
   }
 
-  fn lock_impl(self: *@This()) bool {
-    if(self.held())
-      return true;
-    self.held_by = os.platform.get_current_task();
-    return false;
-  }
-
   pub fn lock(self: *@This()) void {
-    while(!self.queue.sleep(lock_impl, .{self})) {
-
+    const lock_state = self.spinlock.lock();
+    if (self.held_by == null) {
+      self.held_by = os.platform.get_current_task();
+      self.spinlock.unlock(lock_state);
+      return;
     }
+    self.queue.add_back(os.platform.get_current_task());
+    self.spinlock.ungrab();
+    os.thread.scheduler.wait();
+    os.platform.set_interrupts(lock_state);
   }
 
   fn unlock_impl(self: *@This()) void {
@@ -36,7 +38,15 @@ pub const Mutex = struct {
   }
 
   pub fn unlock(self: *@This()) void {
-    _ = self.queue.wake(unlock_impl, .{self});
+    const lock_state = self.spinlock.lock();
+    std.debug.assert(self.held_by_me());
+    if (self.queue.remove_front()) |task| {
+      self.held_by = task;
+      os.thread.scheduler.wake(task);
+    } else {
+      self.held_by = null;
+    }
+    self.spinlock.unlock(lock_state);
   }
 
   pub fn held(self: *const @This()) bool {

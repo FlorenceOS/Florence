@@ -13,29 +13,76 @@ pub const Handler = struct {
 
 var handlers: [0x100]Handler = undefined;
 
+pub const Cap = struct {
+  addr: Addr,
+  off: u8, 
+  pub fn next(self: *Cap) void { self.off = self.addr.read(u8, self.off + 0x01); }
+  pub fn vndr(self: *const Cap) u8 { return self.addr.read(u8, self.off + 0x00); }
+  pub fn read(self: *const Cap, comptime T: type, off: regoff) T { return self.addr.read(T, self.off + off); }
+  pub fn write(self: *const Cap, comptime T: type, off: regoff, value: T) void { self.addr.write(T, self.off + off, value); }
+};
 
 pub const Addr = struct {
   bus: u8,
   device: u5,
   function: u3,
 
-  pub fn format(self: *const Addr, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
-    try writer.print("[{x:0>2}:{x:0>2}:{x:0>1}]", .{self.bus, self.device, self.function});
+  const vendor_id = cfgreg(u16, 0x00);
+  const device_id = cfgreg(u16, 0x02);
+  const command = cfgreg(u16, 0x04);
+  const status = cfgreg(u16, 0x06);
+  const prog_if = cfgreg(u8, 0x09);
+  const header_type = cfgreg(u8, 0x0E);
+  const base_class = cfgreg(u8, 0x0B);
+  const sub_class = cfgreg(u8, 0x0A);
+  const secondary_bus = cfgreg(u8, 0x19);
+  const cap_ptr = cfgreg(u8, 0x34);
+  const int_line = cfgreg(u8, 0x3C);
+  const int_pin = cfgreg(u8, 0x3D);
+  
+  pub fn cap(self: Addr) Cap { return .{ .addr = self, .off = self.cap_ptr().read() & 0xFC }; }
+
+  pub fn barinfo(self: Addr, bar_idx: u8) BarInfo {
+    var orig: u64 = self.read(u32, 0x10 + bar_idx * 4) & 0xFFFFFFF0;
+    self.write(u32, 0x10 + bar_idx * 4 , 0xFFFFFFFF);
+    var pci_out = self.read(u32, 0x10 + bar_idx * 4);
+    const is64 = ((pci_out & 0b110) >> 1) == 2; // bits 1:2, bar type (0 = 32bit, 1 = 64bit)
+
+    // The BARs can be either 64 or 32 bit, but the trick works for both
+    var response: u64 = @as(u64, pci_out & 0xFFFFFFF0) | 0xFFFFFFFF00000000; 
+    if (is64) {
+      orig |= @as(u64, self.read(u32, 0x14 + bar_idx * 4)) << 32;
+      self.write(u32, 0x10 + bar_idx * 4, 0xFFFFFFFF); // 64bit bar = two 32-bit bars 
+      response |= @as(u64, self.read(u32, 0x14 + bar_idx * 4)) << 32;
+      self.write(u32, 0x14 + bar_idx * 4, @truncate(u32, orig >> 32));
+    }
+    self.write(u32, 0x10 + bar_idx * 4 , @truncate(u32, orig));
+    return .{.phy = orig, .size = ~response + 1};
   }
-};
 
-pub const Device = struct {
-  addr: Addr,
-  vendor_id: u16,
-  device_id: u16,
-  class: u8,
-  subclass: u8,
-  prog_if: u8,
+  pub fn read(self: Addr, comptime T: type, offset: regoff) T {
+    if(pci_mmio[self.bus] != null)
+      return std.mem.readIntLittle(T, mmio(self, offset)[0..@sizeOf(T)]);
+    if(@hasDecl(os.platform, "pci_read"))
+      return os.platform.pci_read(T, self, offset);
+    @panic("No pci_read method!");
+  }
 
-  pub fn format(self: *const Device, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
-    try writer.print("{} ", .{self.addr});
-    try writer.print("{{{x:0>4}:{x:0>4}}} ", .{self.vendor_id, self.device_id});
-    try writer.print("({x:0>2}:{x:0>2}:{x:0>2})", .{self.class, self.subclass, self.prog_if});
+  pub fn write(self: Addr, comptime T: type, offset: regoff, value: T) void {
+    if(pci_mmio[self.bus] != null) {
+      std.mem.writeIntLittle(T, mmio(self, offset)[0..@sizeOf(T)], value);
+      return;
+    }
+    if(@hasDecl(os.platform, "pci_write"))
+        return os.platform.pci_write(T, self, offset, value);
+    @panic("No pci_write method!");
+  }
+
+
+  pub fn format(self: Addr, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+    try writer.print("[{x:0>2}:{x:0>2}:{x:0>1}]", .{self.bus, self.device, self.function});
+    try writer.print("{{{x:0>4}:{x:0>4}}} ", .{self.vendor_id().read(), self.device_id().read()});
+    try writer.print("({x:0>2}:{x:0>2}:{x:0>2})", .{self.base_class().read(), self.sub_class().read(), self.prog_if().read()});
   }
 };
 
@@ -45,77 +92,45 @@ fn mmio(addr: Addr, offset: regoff) [*]u8 {
   return @ptrCast([*]u8, pci_mmio[addr.bus].?) + (@as(u64, addr.device) << 15 | @as(u64, addr.function) << 12 | @as(u64, offset));
 }
 
-pub fn pci_read(comptime T: type, addr: Addr, offset: regoff) T {
-  if(pci_mmio[addr.bus] != null)
-    return std.mem.readIntNative(T, mmio(addr, offset)[0..@sizeOf(T)]);
-
-  if(@hasDecl(os.platform, "pci_read"))
-    return os.platform.pci_read(T, addr, offset);
-
-  @panic("No pci_read method!");
-}
-
-pub fn pci_write(comptime T: type, addr: Addr, offset: regoff, value: T) void {
-  if(pci_mmio[addr.bus] != null) {
-    std.mem.writeIntNative(T, mmio(addr, offset)[0..@sizeOf(T)], value);
-    return;
-  }
-
-  if(@hasDecl(os.platform, "pci_write"))
-    return os.platform.pci_write(T, addr, offset, value);
-
-  @panic("No pci_write method!");
-}
-
 const virtio_gpu = os.drivers.virtio_gpu;
 
+
+const BarInfo = struct {
+  phy: u64,
+  size: u64,
+};
+
 fn function_scan(addr: Addr) void {
-  const class = get_class(addr);
-  const subclass = get_subclass(addr);
-  const prog_if = get_prog_if(addr);
-
-  const vendor_id = get_vendor_id(addr);
-  const device_id = get_device_id(addr);
-
-  if(vendor_id == 0xFFFF)
+  if(addr.vendor_id().read() == 0xFFFF)
     return;
 
-  const dev = Device {
-    .addr = addr,
-    .vendor_id = vendor_id,
-    .device_id = device_id,
-    .class = class,
-    .subclass = subclass,
-    .prog_if = prog_if,
-  };
+  os.log("PCI: {} ", .{addr});
 
-  os.log("PCI: {} ", .{dev});
-
-  switch(class) {
+  switch(addr.base_class().read()) {
     else => { os.log("Unknown class!\n", .{}); },
     0x00 => {
-      switch(subclass) {
+      switch(addr.sub_class().read()) {
         else => { os.log("Unknown unclassified device!\n", .{}); },
       }
     },
     0x01 => {
-      switch(subclass) {
+      switch(addr.sub_class().read()) {
         else => { os.log("Unknown storage controller!\n", .{}); },
         0x06 => {
           os.log("SATA controller\n", .{});
-          os.drivers.ahci.register_controller(dev);
+          os.drivers.ahci.register_controller(addr);
         },
       }
     },
     0x02 => {
-      switch(subclass) {
+      switch(addr.sub_class().read()) {
         else => { os.log("Unknown network controller!\n", .{}); },
         0x00 => { os.log("Ethernet controller\n", .{}); },
         0x80 => { os.log("Other network controller\n", .{}); },
       }
     },
     0x03 => {
-      if (vendor_id == 0x1AF4 or device_id == 0x1050) {
+      if (addr.vendor_id().read() == 0x1AF4 or addr.device_id().read() == 0x1050) {
         os.log("Virtio display controller\n", .{});
         if (os.drivers.vesa_log.get_info()) |vesa| {
           const ephemeral = os.memory.vmm.backed(.Eternal);
@@ -131,28 +146,28 @@ fn function_scan(addr: Addr) void {
           drv.update_rect(.{.x = 0, .y = 0, .width = vesa.width, .height = vesa.height});
           os.drivers.vesa_log.set_updater(virtio_gpu.updater, @ptrToInt(drv));
         }
-      } else switch(subclass) {
+      } else switch(addr.sub_class().read()) {
         else => { os.log("Unknown display controller!\n", .{}); },
         0x00 => { os.log("VGA compatible controller\n", .{}); },
-      }
+       }
     },
     0x04 => {
-      switch(subclass) {
+      switch(addr.sub_class().read()) {
         else => { os.log("Unknown multimedia controller!\n", .{}); },
         0x03 => { os.log("Audio device\n", .{}); },
       }
     },
     0x06 => {
-      switch(subclass) {
+      switch(addr.sub_class().read()) {
         else => { os.log("Unknown bridge device!\n", .{}); },
         0x00 => { os.log("Host bridge\n", .{}); },
         0x01 => { os.log("ISA bridge\n", .{}); },
         0x04 => { os.log("PCI-to-PCI bridge", .{});
-          if((get_header_type(addr) & 0x7F) != 0x01) {
+          if((addr.header_type().read() & 0x7F) != 0x01) {
             os.log(": Not PCI-to-PCI bridge header type!\n", .{});
           }
           else {
-            const secondary_bus = pci_read(u8, addr, 0x19);
+            const secondary_bus = addr.secondary_bus().read();
             os.log(", recursively scanning bus {x:0>2}\n", .{secondary_bus});
             bus_scan(secondary_bus);
           }
@@ -160,10 +175,10 @@ fn function_scan(addr: Addr) void {
       }
     },
     0x0c => {
-      switch(subclass) {
+      switch(addr.sub_class().read()) {
         else => { os.log("Unknown serial bus controller!\n", .{}); },
         0x03 => {
-          switch(prog_if) {
+          switch(addr.prog_if().read()) {
             else => { os.log("Unknown USB controller!\n", .{}); },
             0x20 => { os.log("USB2 EHCI controller\n", .{}); },
             0x30 => {
@@ -176,40 +191,16 @@ fn function_scan(addr: Addr) void {
   }
 }
 
-pub fn get_vendor_id(addr: Addr) u16 {
-  return pci_read(u16, addr, 0x00);
-}
-
-pub fn get_device_id(addr: Addr) u16 {
-  return pci_read(u16, addr, 0x02);
-}
-
-fn get_header_type(addr: Addr) u8 {
-  return pci_read(u8, addr, 0x0E);
-}
-
-fn get_class(addr: Addr) u8 {
-  return pci_read(u8, addr, 0x0B);
-}
-
-fn get_subclass(addr: Addr) u8 {
-  return pci_read(u8, addr, 0x0A);
-}
-
-fn get_prog_if(addr: Addr) u8 {
-  return pci_read(u8, addr, 0x09);
-}
-
 fn device_scan(bus: u8, device: u5) void {
-  const nullfunc = .{ .bus = bus, .device = device, .function = 0 };
+  const nullfunc: Addr = .{ .bus = bus, .device = device, .function = 0 };
 
-  if(get_vendor_id(nullfunc) == 0xFFFF)
+  if(nullfunc.vendor_id().read() == 0xFFFF)
     return;
 
   function_scan(nullfunc);
 
   // Return already if this isn't a multi-function device
-  if(get_header_type(nullfunc) & 0x80 == 0)
+  if(nullfunc.header_type().read() & 0x80 == 0)
     return;
 
   inline for(range((1 << 3) - 1)) |function| {
@@ -238,21 +229,23 @@ pub fn register_mmio(bus: u8, physaddr: u64) !void {
 
 var pci_mmio: [0x100]?*[1 << 20]u8 linksection(".bss") = undefined;
 
-pub const PCI_OFFSET_VENDOR_ID = 0x00;
-pub const PCI_OFFSET_DEVICE_ID = 0x02;
-pub const PCI_OFFSET_COMMAND = 0x04;
-pub const PCI_OFFSET_STATUS = 0x06;
-pub const PCI_OFFSET_PROG_IF = 0x09;
-pub const PCI_OFFSET_HEADER_TYPE = 0x0E;
-pub const PCI_OFFSET_BASE_CLASS = 0x0B;
-pub const PCI_OFFSET_SUB_CLASS = 0x0A;
-pub const PCI_OFFSET_SECONDARY_BUS = 0x19;
-pub const PCI_OFFSET_BAR0 = 0x10;
-pub const PCI_OFFSET_BAR1 = 0x14;
-pub const PCI_OFFSET_BAR2 = 0x18;
-pub const PCI_OFFSET_BAR3 = 0x1C;
-pub const PCI_OFFSET_BAR4 = 0x20;
-pub const PCI_OFFSET_BAR5 = 0x24;
-pub const PCI_OFFSET_CAP_PTR = 0x34;
-pub const PCI_OFFSET_INT_LINE = 0x3C;
-pub const PCI_OFFSET_INT_PIN = 0x3D;
+fn PciFn(comptime T: type, comptime off: regoff) type {
+  return struct {
+    self: Addr,
+    pub fn read(self: @This()) T { return self.self.read(T, off); }
+    pub fn write(self: @This(), val: T) void { self.self.write(T, off, val); }
+  };
+}
+
+fn cfgreg(comptime T: type, comptime off: regoff) fn(self:Addr) PciFn(T, off) {
+  return struct {
+    fn function(self: Addr) PciFn(T, off) { return .{ .self = self }; }
+  }.function;
+}
+
+pub const PCI_CAP_MSIX_MSGCTRL = 0x02;
+pub const PCI_CAP_MSIX_TABLE = 0x04;
+pub const PCI_CAP_MSIX_PBA = 0x08;
+
+pub const PCI_COMMAND_BUSMASTER = 1<<2;
+pub const PCI_COMMAND_LEGACYINT_DISABLE = 1<<10;

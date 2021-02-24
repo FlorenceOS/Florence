@@ -701,11 +701,11 @@ fn controller_task(abar: *volatile ABAR) !void {
     }
 }
 
-pub fn register_controller(dev: pci.Device) void {
+pub fn register_controller(addr: pci.Addr) void {
     // Busty master bit
-    pci.pci_write(u32, dev.addr, 0x4, pci.pci_read(u32, dev.addr, 0x4) | 0x6);
+    addr.command().write(addr.command().read() | 0x6);
 
-    const abar_phys = pci.pci_read(u32, dev.addr, 0x24) & 0xFFFFF000;
+    const abar_phys = addr.barinfo(5).phy & 0xFFFFF000;
 
     log("AHCI: Got abar phys: 0x{X}\n", .{abar_phys});
 

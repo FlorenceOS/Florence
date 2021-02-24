@@ -180,7 +180,7 @@ fn smp_entry(info_in: u64) callconv(.C) noreturn {
   cpu.booted = true;
 
   os.log("Core {} inited\n", .{core_id});
-  cpu.executable_tasks.execute();
+  cpu.executable_tasks.leave();
 }
 
 fn map_smp(smp: os.platform.phys_ptr(*stivale2_smp)) !void {
