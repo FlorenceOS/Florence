@@ -333,8 +333,8 @@ pub const TaskData = struct {
 
 const task_stack_size = 1024 * 16;
 
-pub fn yield_to_task(new_task: *os.thread.Task) void {
-  asm volatile("SVC #'Y'" :: [_] "{x0}" (new_task));
+pub fn yield(should_enqueue: bool) void {
+  asm volatile("SVC #'Y'" :: [_] "{x0}" (@boolToInt(should_enqueue)));
 }
 
 pub fn new_task_call(new_task: *os.thread.Task, func: anytype, args: anytype) !void {

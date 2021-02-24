@@ -27,7 +27,7 @@ pub fn init_interrupts() !void {
   add_handler(0x0E, page_fault_handler);
   add_handler(0x69, proc_start_handler);
   add_handler(0x6A, platform.task_fork_handler);
-  add_handler(0x6B, yield_to_handler);
+  add_handler(0x6B, yield_handler);
 }
 
 fn type_page_fault(error_code: usize) !platform.PageFaultAccess {
@@ -45,14 +45,23 @@ fn proc_start_handler(frame: *InterruptFrame) void {
   frame.ss = gdt.selector.data64;
 }
 
-fn yield_to_handler(frame: *InterruptFrame) void {
+fn yield_handler(frame: *InterruptFrame) void {
   const current_task = platform.get_current_task_opt();
-  const next_task = @intToPtr(*os.thread.Task, frame.rax);
+
+  if(current_task) |ct| {
+    ct.registers = frame.*;
+    if (frame.rbx == 1) {
+      os.platform.smp.cpus[ct.allocated_core_id].executable_tasks.enqueue(ct);
+    }
+  }
+  
+  var next_task: *os.thread.Task = undefined;
+  while (true) {
+    next_task = os.platform.get_current_cpu().executable_tasks.dequeue() orelse continue;
+    break;
+  }
 
   platform.set_current_task(next_task);
-
-  if(current_task) |ct|
-    ct.registers = frame.*;
   frame.* = next_task.registers;
 }
 
