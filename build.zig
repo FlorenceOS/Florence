@@ -263,13 +263,4 @@ pub fn build(b: *Builder) !void {
         "boot/stivale2_image",
         build_kernel(b, builtin.Arch.x86_64, "stivale2"),
     );
-
-    limine_target(
-        b,
-        "x86_64-stivale",
-        "Run x86_64 kernel with limine stivale",
-        b.fmt("{s}/stivale.img", .{b.cache_root}),
-        "boot/stivale_image",
-        build_kernel(b, builtin.Arch.x86_64, "stivale"),
-    );
 }
