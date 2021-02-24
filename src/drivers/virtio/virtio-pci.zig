@@ -112,17 +112,16 @@ pub const Driver = struct {
   /// Detect BARs and capabilities and set up the cfg/notify/isr/dev structures
   fn detectbars(a: pci.Addr) Driver {
     var drv: Driver = undefined;
-    var cap_ptr = pci.pci_read(u8, a, pci.PCI_OFFSET_CAP_PTR) & 0xFC;
-    while (cap_ptr != 0) {
-      const cap_vndr = pci.pci_read(u8, a, cap_ptr + VIRTIO_PCI_CAP_VNDR);
-      const cap_next = pci.pci_read(u8, a, cap_ptr + VIRTIO_PCI_CAP_NEXT);
-      if (cap_vndr == 0x09) {
-        const cfg_typ = pci.pci_read(u8, a, cap_ptr + VIRTIO_PCI_CAP_CFG_TYPE);
-        const bar = pci.pci_read(u8, a, cap_ptr + VIRTIO_PCI_CAP_BAR);
-        const off = pci.pci_read(u32, a, cap_ptr + VIRTIO_PCI_CAP_OFFSET);
-        const len = pci.pci_read(u32, a, cap_ptr + VIRTIO_PCI_CAP_LENGTH);
+    var cap = a.cap();
+    while (cap.off != 0) {
+      const vndr = cap.vndr();
+      if (vndr == 0x09) {
+        const cfg_typ = cap.read(u8, VIRTIO_PCI_CAP_CFG_TYPE);
+        const bar = cap.read(u8, VIRTIO_PCI_CAP_BAR);
+        const off = cap.read(u32, VIRTIO_PCI_CAP_OFFSET);
+        const len = cap.read(u32, VIRTIO_PCI_CAP_LENGTH);
 
-        const phy = (pci.pci_read(u32, a, pci.PCI_OFFSET_BAR0 + bar*4) & 0xFFFFFFF0) + off;
+        const phy = a.barinfo(bar).phy + off;
         switch (cfg_typ) {
           VIRTIO_PCI_CAP_COMMON_CFG => {
             map(phy, len);
@@ -130,7 +129,7 @@ pub const Driver = struct {
           },
           VIRTIO_PCI_CAP_NOTIFY_CFG => {
             map(phy, len);
-            drv.notify_mul = pci.pci_read(u32, a, cap_ptr + VIRTIO_PCI_NOTIFY_CAP_MULT) / 2; // VIRTIO_PCI_NOTIFY_CAP_MULT is a byte offset, each field is u16
+            drv.notify_mul = cap.read(u32, VIRTIO_PCI_NOTIFY_CAP_MULT) / 2; // VIRTIO_PCI_NOTIFY_CAP_MULT is a byte offset, each field is u16
             drv.notify = pmm.access_phys_volatile(u16, phy);
           },
           VIRTIO_PCI_CAP_ISR_CFG => {
@@ -146,7 +145,7 @@ pub const Driver = struct {
           else => {}, // ignore
         }
       }
-      cap_ptr = cap_next;
+      cap.next();
     }
     return drv;
   }
@@ -295,8 +294,6 @@ const VIRTIO_PCI_CAP_DEVICE_CFG = 4;
 const VIRTIO_PCI_CAP_PCI_CFG = 5;
 
 // PCI capability list record offsets
-const VIRTIO_PCI_CAP_VNDR = 0;
-const VIRTIO_PCI_CAP_NEXT = 1;
 const VIRTIO_PCI_CAP_LEN = 2;
 const VIRTIO_PCI_CAP_CFG_TYPE = 3;
 const VIRTIO_PCI_CAP_BAR = 4;
