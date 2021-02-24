@@ -198,6 +198,11 @@ pub const NoteQueue = struct {
         }
         return null;
     }
+    
+    /// Wait for new notes
+    pub fn wait(self: *@This()) void {
+        self.event.wait();
+    }
 
     /// Terminate the queue
     pub fn terminate(self: *@This()) void {

@@ -2,6 +2,95 @@ const std = @import("std");
 const os = @import("root").os;
 const kepler = os.kepler;
 
+fn server_task(allocator: *std.mem.Allocator, server_noteq: *kepler.ipc.NoteQueue) !void {
+    // Server note queue should get the .Request note
+    server_noteq.wait();
+    const connect_note = server_noteq.try_recv() orelse unreachable;
+    std.debug.assert(connect_note.typ == .RequestPending);
+    const conn = connect_note.owner_ref.stream;
+    os.log(".Request note recieved!\n", .{});
+
+    // Accept the request
+    try connect_note.owner_ref.stream.accept();
+    os.log("Request was accepted!\n", .{});
+
+    // Server should get .Submit note
+    server_noteq.wait();
+    const submit_note = server_noteq.try_recv() orelse unreachable;
+    std.debug.assert(submit_note.typ == .TasksAvailable);
+    std.debug.assert(submit_note.owner_ref.stream == conn);
+    os.log("Server recieved .Submit note!\n", .{});
+
+    // Allow client to resent its note
+    submit_note.drop();
+    conn.unblock(.Consumer);
+
+    // Notify consumer about completed tasks
+    try conn.notify(.Consumer);
+
+    // Terminate connection from the server
+    conn.abandon(.Producer);
+    os.log("Connection terminated from the server side!\n", .{});
+}
+
+fn client_task(allocator: *std.mem.Allocator, client_noteq: *kepler.ipc.NoteQueue, endpoint: *kepler.ipc.Endpoint) !void {
+    // Stream connection object
+    const conn_params = kepler.ipc.Stream.UserspaceInfo{
+        .consumer_rw_buf_size = 1024,
+        .producer_rw_buf_size = 1024,
+        .obj_mailbox_size = 16,
+    };
+    const conn = try kepler.ipc.Stream.create(allocator, client_noteq, endpoint, conn_params);
+    os.log("Created connection!\n", .{}); 
+
+    // Client note queue should get the .Accept note
+    client_noteq.wait();
+    const accept_note = client_noteq.try_recv() orelse unreachable;
+    std.debug.assert(accept_note.typ == .RequestAccepted);
+    std.debug.assert(accept_note.owner_ref.stream == conn);
+    accept_note.drop();
+    os.log(".Accept note recieved!\n", .{});
+
+    // Finalize accept/request sequence
+    conn.finalize_connection();
+    os.log("Connection finalized!\n", .{});
+
+    // Let's notify server about more tasks
+    try conn.notify(.Producer);
+    os.log("Producer was notified!\n", .{});
+
+    // Try again to test if resend is handled
+    try conn.notify(.Producer);
+    os.log("Producer was notified again!\n", .{});
+
+    // Client should get .Complete note
+    client_noteq.wait();
+    const complete_note = client_noteq.try_recv() orelse unreachable;
+    std.debug.assert(complete_note.typ == .ResultsAvailable);
+    std.debug.assert(complete_note.owner_ref.stream == conn);
+    os.log("Client recieved .Submit note!\n", .{});
+    complete_note.drop();
+
+    // Allow server to resend its note
+    complete_note.drop();
+    conn.unblock(.Producer);
+
+    // Client should get ping of death message
+    client_noteq.wait();
+    const server_death_note = client_noteq.try_recv() orelse unreachable;
+    std.debug.assert(server_death_note.owner_ref.stream == conn);
+    std.debug.assert(server_death_note.typ == .ProducerLeft);
+    os.log("Ping of death recieved!\n", .{});
+    server_death_note.drop();
+
+    // Close connection on the client's side as well
+    conn.abandon(.Consumer);
+    os.log("Connection terminated from the client side!\n", .{});
+
+    // Exit client task
+    os.thread.scheduler.exit_task();
+}
+
 fn notifications(allocator: *std.mem.Allocator) !void {
     os.log("\nNotifications test...\n", .{});
     // Server notificaiton queue
@@ -13,67 +102,13 @@ fn notifications(allocator: *std.mem.Allocator) !void {
     // Server endpoint
     const endpoint = try kepler.ipc.Endpoint.create(allocator, server_noteq);
     os.log("Created server endpoint!\n", .{});
-    // Stream connection object
-    const conn_params = kepler.ipc.Stream.UserspaceInfo{
-        .consumer_rw_buf_size = 1024,
-        .producer_rw_buf_size = 1024,
-        .obj_mailbox_size = 16,
-    };
-    const conn = try kepler.ipc.Stream.create(allocator, client_noteq, endpoint, conn_params);
-    os.log("Created connection!\n", .{});
-    // Server note queue should get the .Request note
-    const connect_note = server_noteq.try_recv() orelse unreachable;
-    std.debug.assert(connect_note.typ == .RequestPending);
-    std.debug.assert(connect_note.owner_ref.stream == conn);
-    os.log(".Request note recieved!\n", .{});
-    // Accept the request
-    try connect_note.owner_ref.stream.accept();
-    os.log("Request was accepted!\n", .{});
-    // Client note queue should get the .Accept note
-    const accept_note = client_noteq.try_recv() orelse unreachable;
-    std.debug.assert(accept_note.typ == .RequestAccepted);
-    std.debug.assert(accept_note.owner_ref.stream == conn);
-    accept_note.drop();
-    os.log(".Accept note recieved!\n", .{});
-    // Finalize accept/request sequence
-    conn.finalize_connection();
-    os.log("Connection finalized!\n", .{});
-    // Let's notify server about more tasks
-    try conn.notify(.Producer);
-    os.log("Producer was notified!\n", .{});
-    // Try again to test if resend is handled
-    try conn.notify(.Producer);
-    os.log("Producer was notified again!\n", .{});
-    // Server should get .Submit note
-    const submit_note = server_noteq.try_recv() orelse unreachable;
-    std.debug.assert(submit_note.typ == .TasksAvailable);
-    std.debug.assert(submit_note.owner_ref.stream == conn);
-    os.log("Server recieved .Submit note!\n", .{});
-    // Allow client to resent its note
-    conn.unblock(.Consumer);
-    submit_note.drop();
-    // Notify consumer about completed tasks
-    try conn.notify(.Consumer);
-    // Client should get .Complete note
-    const complete_note = client_noteq.try_recv() orelse unreachable;
-    std.debug.assert(complete_note.typ == .ResultsAvailable);
-    std.debug.assert(submit_note.owner_ref.stream == conn);
-    os.log("Client recieved .Submit note!\n", .{});
-    // Allow server to resend its note
-    conn.unblock(.Producer);
-    complete_note.drop();
-    // Terminate connection from the server
-    conn.abandon(.Producer);
-    os.log("Connection terminated from the server side!\n", .{});
-    // Client should get ping of death message
-    const server_death_note = client_noteq.try_recv() orelse unreachable;
-    std.debug.assert(submit_note.owner_ref.stream == conn);
-    std.debug.assert(server_death_note.typ == .ProducerLeft);
-    os.log("Ping of death recieved!\n", .{});
-    complete_note.drop();
-    // Close connection on the client's side as well
-    conn.abandon(.Consumer);
-    os.log("Connection terminated from the client side!\n", .{});
+
+    // Run client task separately
+    try os.thread.scheduler.make_task(client_task, .{allocator, client_noteq, endpoint});
+
+    // Launch server task inline
+    try server_task(allocator, server_noteq);
+    os.log("Server has terminated! Let's hope that client would finish as needed", .{});
 }
 
 fn memory_objects(allocator: *std.mem.Allocator) !void {
