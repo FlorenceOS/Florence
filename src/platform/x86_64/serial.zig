@@ -1,6 +1,6 @@
 const os = @import("root").os;
-
 const platform = os.platform;
+const ports = @import("ports.zig");
 
 var inited = [1]bool{false} ** 4;
 
@@ -27,23 +27,22 @@ pub fn port(comptime port_num: usize) type {
 
       // First let's try to detect if the serial port is present
       {
-        platform.outb(io_base + 7, 0x00);
-        if(platform.inb(io_base + 7) != 0x00)
+        ports.outb(io_base + 7, 0x00);
+        if(ports.inb(io_base + 7) != 0x00)
           return;
-        platform.outb(io_base + 7, 0xff);
-        if(platform.inb(io_base + 7) != 0xff)
+        ports.outb(io_base + 7, 0xff);
+        if(ports.inb(io_base + 7) != 0xff)
           return;
       }
 
-      platform.outb(io_base + 1, 0x00);
-      platform.outb(io_base + 3, 0x80);
-      platform.outb(io_base + 0, 0x01);
-      platform.outb(io_base + 1, 0x00);
-      platform.outb(io_base + 3, 0x03);
-      platform.outb(io_base + 2, 0xC7);
-      platform.outb(io_base + 4, 0x0B);
+      ports.outb(io_base + 3, 0x80);
+      ports.outb(io_base + 0, 0x01);
+      ports.outb(io_base + 1, 0x00);
+      ports.outb(io_base + 3, 0x03);
+      ports.outb(io_base + 2, 0xC7);
+      ports.outb(io_base + 4, 0x0B);
 
-      if(platform.inb(io_base + 6) & 0xb0 != 0xb0)
+      if(ports.inb(io_base + 6) & 0xb0 != 0xb0)
         return;
 
       // Don't enable any serial ports on x86 for now
@@ -56,7 +55,7 @@ pub fn port(comptime port_num: usize) type {
       if(!inited[port_num - 1])
         return false;
 
-      return platform.inb(io_base + 5) & 0x20 != 0;
+      return ports.inb(io_base + 5) & 0x20 != 0;
     }
 
     pub fn read() u8 {
@@ -66,7 +65,7 @@ pub fn port(comptime port_num: usize) type {
       while(!read_ready()) {
         platform.spin_hint();
       }
-      return platform.inb(io_base);
+      return ports.inb(io_base);
     }
 
     pub fn try_read() ?u8 {
@@ -79,7 +78,7 @@ pub fn port(comptime port_num: usize) type {
       if(!inited[port_num - 1])
         return false;
 
-      return platform.inb(io_base + 5) & 0x01 != 0;
+      return ports.inb(io_base + 5) & 0x01 != 0;
     }
 
     pub fn write(val: u8) void {
@@ -92,7 +91,7 @@ pub fn port(comptime port_num: usize) type {
       while(!write_ready()) {
         platform.spin_hint();
       }
-      platform.outb(io_base, val);
+      ports.outb(io_base, val);
     }
   };
 }

@@ -56,7 +56,7 @@ pub fn make_task(func: anytype, args: anytype) !void {
 }
 
 pub fn exit_task() noreturn {
-  const task = os.platform.self_exited();
+  const task = os.platform.thread.self_exited();
   const id = if (task) |t| t.allocated_core_id else 0;
 
   const state = balancer_lock.lock();

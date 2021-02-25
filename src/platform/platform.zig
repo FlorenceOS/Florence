@@ -112,7 +112,7 @@ pub fn phys_slice(comptime T: type) type {
   };
 }
 
-pub const phys_bytes = struct {
+pub const PhysBytes = struct {
   ptr: u64,
   len: u64,
 };

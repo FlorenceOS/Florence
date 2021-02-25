@@ -5,7 +5,7 @@ const assert   = std.debug.assert;
 const platform = os.platform;
 const lalign   = os.lib.libalign;
 
-const page_sizes = platform.page_sizes;
+const page_sizes = platform.paging.page_sizes;
 var free_roots   = [_]u64{0} ** page_sizes.len;
 
 var pmm_mutex    = os.thread.Mutex{};

@@ -212,8 +212,6 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     }
   }
 
-  stivale.detect_phys_base();
-
   if(info.uart) |uart| {
     mmio_serial.register_mmio32_serial(uart.uart_addr);
     os.log("Stivale2: Registered UART\n", .{});
@@ -256,7 +254,7 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     os.log("Mapping UART\n", .{});
     os.vital(paging.remap_phys_size(.{
       .phys = uart.uart_addr,
-      .size = platform.page_sizes[0],
+      .size = platform.paging.page_sizes[0],
       .memtype = .DeviceUncacheable,
       .context = &context,
     }), "mapping UART");
