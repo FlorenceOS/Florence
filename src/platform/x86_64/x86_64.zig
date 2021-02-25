@@ -39,7 +39,7 @@ pub fn platform_init() !void {
 
 pub fn platform_early_init() void {
   os.platform.smp.prepare();
-  os.thread.scheduler.init(&bsp_task);
+  os.thread.scheduler.init(&thread.bsp_task);
   serial.init();
   try interrupts.init_interrupts();
   gdt.setup_gdt();
