@@ -7,18 +7,20 @@ const scheduler = os.thread.scheduler;
 
 const idt = @import("idt.zig");
 const gdt = @import("gdt.zig");
+const pic = @import("pic.zig");
 
 pub const num_handlers = 0x100;
 pub const handler_func = fn(*InterruptFrame)void;
+pub const InterruptState = bool;
+
+var handlers = [_]handler_func {unhandled_interrupt} ** num_handlers;
 
 pub fn add_handler(idx: u8, f: handler_func) void {
   handlers[idx] = f;
 }
 
-var handlers = [_]handler_func {unhandled_interrupt} ** num_handlers;
-
 pub fn init_interrupts() !void {
-  disable_pic();
+  pic.disable();
   var itable = idt.setup_idt();
 
   inline for(range(num_handlers)) |intnum| {
@@ -96,25 +98,6 @@ fn unhandled_interrupt(frame: *InterruptFrame) void {
   frame.dump();
   frame.trace_stack();
   os.platform.hang();
-}
-
-fn disable_pic() void {
-  {
-    const outb = @import("x86_64.zig").outb;
-    outb(0x20, 0x11);
-    outb(0xa0, 0x11);
-    outb(0x21, 0x20);
-    outb(0xa1, 0x28);
-    outb(0x21, 0b0000_0100);
-    outb(0xa1, 0b0000_0010);
-
-    outb(0x21, 0x01);
-    outb(0xa1, 0x01);
-
-    // Mask out all interrupts
-    outb(0x21, 0xFF);
-    outb(0xa1, 0xFF);
-  }
 }
 
 fn is_exception(intnum: u64) bool {

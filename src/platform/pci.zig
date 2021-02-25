@@ -63,9 +63,9 @@ pub const Addr = struct {
   pub fn read(self: Addr, comptime T: type, offset: regoff) T {
     if(pci_mmio[self.bus] != null)
       return std.mem.readIntLittle(T, mmio(self, offset)[0..@sizeOf(T)]);
-    if(@hasDecl(os.platform, "pci_read"))
-      return os.platform.pci_read(T, self, offset);
-    @panic("No pci_read method!");
+    if(@hasDecl(os.platform, "pci_space"))
+      return os.platform.pci_space.read(T, self, offset);
+    @panic("No pci module!");
   }
 
   pub fn write(self: Addr, comptime T: type, offset: regoff, value: T) void {
@@ -73,9 +73,9 @@ pub const Addr = struct {
       std.mem.writeIntLittle(T, mmio(self, offset)[0..@sizeOf(T)], value);
       return;
     }
-    if(@hasDecl(os.platform, "pci_write"))
-        return os.platform.pci_write(T, self, offset, value);
-    @panic("No pci_write method!");
+    if(@hasDecl(os.platform, "pci_space"))
+        return os.platform.pci_space.write(T, self, offset, value);
+    @panic("No pci module!");
   }
 
 

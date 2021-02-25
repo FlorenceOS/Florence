@@ -1,13 +1,29 @@
 const os = @import("root").os;
-const paging_common = @import("../paging.zig");
+const regs = @import("regs.zig");
+const paging = @import("../paging.zig");
 
-const pat_index = u3;
+pub const page_sizes = [_]u64 {
+    0x1000, // 4K page
+    0x10000,
+    0x200000, // 2M page
+    0x2000000,
+    0x40000000, // 1G page
+    0x8000000000, // 512G page
+};
 
-fn PAT_context() type {
-  const pat_encoding = u8;
-  const pat_value = u64;
+const LevelType = u3;
+const PatIndex = u3;
 
-  const IA32_PAT = os.platform.msr(pat_value, 0x00000277);
+const la64: u64 = 1 << 12;
+const cr3 = regs.ControlRegister(u64, "cr3");
+const cr4 = regs.ControlRegister(u64, "cr4");
+const ia32_efer = regs.MSR(u64, 0xC0000080);
+
+fn PATContext() type {
+  const PATEncoding = u8;
+  const PATValue = u64;
+
+  const ia32_pat = regs.MSR(PATValue, 0x00000277);
 
   const uncacheable_encoding     = 0x00;
   const write_combining_encoding = 0x01;
@@ -16,15 +32,15 @@ fn PAT_context() type {
 
   return struct {
     // The value of IA32_PAT itself
-    value: pat_value,
+    value: PATValue,
 
     // Cache the indices for each memory type
-    uncacheable: ?pat_index,
-    write_combining: ?pat_index,
-    writethrough: ?pat_index,
-    write_back: ?pat_index,
+    uncacheable: ?PatIndex,
+    write_combining: ?PatIndex,
+    writethrough: ?PatIndex,
+    write_back: ?PatIndex,
 
-    pub fn init_from_pat_value(value: pat_value) @This() {
+    pub fn init_from_pat_value(value: PATValue) @This() {
       return .{
         .value = value,
         .uncacheable     = find_pat_index(value, uncacheable_encoding),
@@ -34,11 +50,11 @@ fn PAT_context() type {
       };
     }
 
-    fn encoding_at_index(value: pat_value, idx: pat_index) pat_encoding {
+    fn encoding_at_index(value: PATValue, idx: PatIndex) PATEncoding {
       return @truncate(u8, value >> (@as(u6, idx) * 8));
     }
 
-    fn memory_type_at_index(self: *const @This(), idx: pat_index) ?MemoryType {
+    fn memory_type_at_index(self: *const @This(), idx: PatIndex) ?MemoryType {
       return switch(encoding_at_index(self.value, idx)) {
         uncacheable_encoding     => .DeviceUncacheable,
         write_combining_encoding => .DeviceWriteCombining,
@@ -48,8 +64,8 @@ fn PAT_context() type {
       };
     }
 
-    fn find_pat_index(pat: pat_value, enc: pat_encoding) ?pat_index {
-      var idx: pat_index = 0;
+    fn find_pat_index(pat: PATValue, enc: PATEncoding) ?PatIndex {
+      var idx: PatIndex = 0;
       while(true): (idx += 1) {
         if(encoding_at_index(pat, idx) == enc)
           return idx;
@@ -59,8 +75,8 @@ fn PAT_context() type {
       }
     }
 
-    pub fn find_memtype(self: *const @This(), memtype: MemoryType) ?pat_index {
-      var idx: pat_index = 0;
+    pub fn find_memtype(self: *const @This(), memtype: MemoryType) ?PatIndex {
+      var idx: PatIndex = 0;
       while(true): (idx += 1) {
         if(self.memory_type_at_index(idx) == memtype)
           return idx;
@@ -71,14 +87,14 @@ fn PAT_context() type {
     }
 
     pub fn apply(self: *const @This()) void {
-      IA32_PAT.write(self.value);
+      ia32_pat.write(self.value);
     }
 
     pub fn get_active() ?@This() {
-      const id = os.platform.cpuid(0x00000001);
+      const id = regs.cpuid(0x00000001);
       if(id) |i| {
         if(((i.edx >> 16) & 1) != 0)
-          return init_from_pat_value(IA32_PAT.read());
+          return init_from_pat_value(ia32_pat.read());
       }
       return null;
     }
@@ -97,19 +113,9 @@ fn PAT_context() type {
   };
 }
 
-fn level_size(level: level_type) u64 {
+fn level_size(level: LevelType) u64 {
   return @as(u64, 0x1000) << (@as(u6, level) * 9);
 }
-
-const level_type = u3;
-
-const cr3_value = u64;
-const cr3 = os.platform.reg(cr3_value, "cr3");
-
-const cr4 = os.platform.reg(u64, "cr4");
-const la64: u64 = 1 << 12;
-
-const IA32_EFER = os.platform.msr(u64, 0xC0000080);
 
 pub fn make_page_table() !u64 {
   const pt = try os.memory.pmm.alloc_phys(0x1000);
@@ -122,8 +128,8 @@ pub fn is_5levelpaging() bool {
 }
 
 pub const PagingContext = struct {
-  pat: ?PAT_context(),
-  cr3_val: cr3_value,
+  pat: ?PATContext(),
+  cr3_val: u64,
   level5paging: bool,
   gigapage_allowed: bool,
   physical_base: u64,
@@ -131,9 +137,9 @@ pub const PagingContext = struct {
   pub fn apply(self: *@This()) void {
     // First apply the PAT, shouldn't cause any errors
     if(self.pat) |pat|
-      @call(.{.modifier = .always_inline}, PAT_context().apply, .{&pat});
+      @call(.{.modifier = .always_inline}, PATContext().apply, .{&pat});
 
-    IA32_EFER.write(IA32_EFER.read() | (1 << 11)); // NXE
+    ia32_efer.write(ia32_efer.read() | (1 << 11)); // NXE
 
     // Set 5 level paging bit
     const old_cr4 = cr4.read();
@@ -148,11 +154,11 @@ pub const PagingContext = struct {
   }
 
   pub fn read_current() void {
-    const id = os.platform.cpuid(0x80000001);
+    const id = regs.cpuid(0x80000001);
 
     const curr = &os.memory.paging.CurrentContext;
 
-    curr.pat = PAT_context().get_active();
+    curr.pat = PATContext().get_active();
     curr.cr3_val = cr3.read();
 
     // Test if 5 level paging currently is enabled
@@ -171,7 +177,7 @@ pub const PagingContext = struct {
     const pt = try make_page_table();
 
     return @This(){
-      .pat = PAT_context().make_default(),
+      .pat = PATContext().make_default(),
       .cr3_val = pt,
       .level5paging = enable_5level,
       .physical_base = curr.physical_base,
@@ -179,8 +185,8 @@ pub const PagingContext = struct {
     };
   }
 
-  pub fn can_map_at_level(self: *const @This(), level: level_type) bool {
-    return level < @as(level_type, 3) + @boolToInt(self.gigapage_allowed);
+  pub fn can_map_at_level(self: *const @This(), level: LevelType) bool {
+    return level < @as(LevelType, 3) + @boolToInt(self.gigapage_allowed);
   }
 
   pub fn set_phys_base(self: *@This(), phys_base: u64) void {
@@ -201,7 +207,7 @@ pub const PagingContext = struct {
     };
   }
 
-  pub fn decode(self: *@This(), enc: *EncodedPTE, level: level_type) PTE {
+  pub fn decode(self: *@This(), enc: *EncodedPTE, level: LevelType) PTE {
     var pte = PTEEncoding{.raw = enc.*};
 
     if(!pte.present.read())
@@ -211,12 +217,12 @@ pub const PagingContext = struct {
     return .{.Mapping = self.decode_mapping(enc, level)};
   }
 
-  fn decode_memtype(self: *@This(), map: MappingEncoding, level: level_type) ?MemoryType {
+  fn decode_memtype(self: *@This(), map: MappingEncoding, level: LevelType) ?MemoryType {
     // TODO: MTRR awareness (?)
     // right now we assume all MTRRs are WB
     if(self.pat) |pat| {
       // Formula for PAT index is 4*PAT + 2*CD + 1*WT
-      var pat_idx: pat_index = 0;
+      var pat_idx: PatIndex = 0;
       const pat_bit = if(level == 0) map.is_mapping_or_pat_low.read() else map.pat_high.read();
       if(pat_bit)
         pat_idx += 4;
@@ -238,7 +244,7 @@ pub const PagingContext = struct {
     }
   }
 
-  pub fn decode_mapping(self: *@This(), enc: *EncodedPTE, level: level_type) MappingPTE {
+  pub fn decode_mapping(self: *@This(), enc: *EncodedPTE, level: LevelType) MappingPTE {
     const map = MappingEncoding{.raw = enc.*};
 
     const memtype: MemoryType = self.decode_memtype(map, level) orelse @panic("Unknown memory type");
@@ -257,7 +263,7 @@ pub const PagingContext = struct {
     };
   }
 
-  pub fn decode_table(self: *@This(), enc: *EncodedPTE, level: level_type) TablePTE {
+  pub fn decode_table(self: *@This(), enc: *EncodedPTE, level: LevelType) TablePTE {
     const tbl = TableEncoding{.raw = enc.*};
 
     return .{
@@ -273,7 +279,7 @@ pub const PagingContext = struct {
     };
   }
 
-  pub fn encode_empty(self: *const @This(), level: level_type) EncodedPTE {
+  pub fn encode_empty(self: *const @This(), level: LevelType) EncodedPTE {
     return 0;
   }
 
@@ -343,7 +349,7 @@ pub const PagingContext = struct {
     return map.raw;
   }
 
-  pub fn domain(self: *const @This(), level: level_type, virtaddr: u64) os.platform.virt_slice {
+  pub fn domain(self: *const @This(), level: LevelType, virtaddr: u64) os.platform.virt_slice {
     return .{
       .ptr = virtaddr & ~(self.page_size(level, virtaddr) - 1),
       .len = self.page_size(level, virtaddr),
@@ -359,7 +365,7 @@ pub const PagingContext = struct {
     );
   }
 
-  pub fn page_size(_: *const @This(), level: level_type, virtaddr: u64) u64 {
+  pub fn page_size(_: *const @This(), level: LevelType, virtaddr: u64) u64 {
     return level_size(level);
   }
 };
@@ -422,7 +428,7 @@ const MappingPTE = struct {
   perms: os.memory.paging.Perms,
   underlying: *MappingEncoding,
 
-  pub fn mapped_bytes(self: *const @This()) os.platform.phys_bytes {
+  pub fn mapped_bytes(self: *const @This()) os.platform.PhysBytes {
     return .{
       .ptr = self.phys,
       .len = self.context.page_size(self.level, self.context.phys_to_virt(self.phys)),
@@ -438,7 +444,7 @@ const EncodedPTE = u64;
 
 const TablePTE = struct {
   phys: u64,
-  curr_level: level_type,
+  curr_level: LevelType,
   context: *PagingContext,
   perms: os.memory.paging.Perms,
   underlying: ?*TableEncoding,
@@ -459,7 +465,7 @@ const TablePTE = struct {
     return self.context.decode(pte, self.curr_level - 1);
   }
 
-  pub fn level(self: *const @This()) level_type {
+  pub fn level(self: *const @This()) LevelType {
     return self.curr_level;
   }
 
@@ -517,7 +523,7 @@ const TablePTE = struct {
 
 const EmptyPte = struct { };
 
-pub const PTE = union(paging_common.PTEType) {
+pub const PTE = union(paging.PTEType) {
   Mapping: MappingPTE,
   Table: TablePTE,
   Empty: EmptyPte,

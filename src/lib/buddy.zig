@@ -6,7 +6,7 @@ const range = os.lib.range.range;
 const assert = @import("std").debug.assert;
 
 const paging = os.memory.paging;
-const page_size = os.platform.page_sizes[0];
+const page_size = os.platform.paging.page_sizes[0];
 
 // O(1) worst case alloc() and free() buddy allocator I came up with (idk if anyone has done this before)
 const free_node = struct {

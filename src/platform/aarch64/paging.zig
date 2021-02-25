@@ -470,7 +470,7 @@ const MappingPTE = struct {
   underlying: *MappingEncoding,
   pszc: PageSizeContext,
 
-  pub fn mapped_bytes(self: *const @This()) os.platform.phys_bytes {
+  pub fn mapped_bytes(self: *const @This()) os.platform.PhysBytes {
     return .{
       .ptr = self.phys,
       .len = self.context.page_size(self.level, self.context.phys_to_virt(self.phys)),

@@ -6,7 +6,7 @@ const libalign = os.lib.libalign;
 const paging = os.memory.paging;
 const pmm    = os.memory.pmm;
 
-const page_size = os.platform.page_sizes[0];
+const page_size = os.platform.paging.page_sizes[0];
 
 const Framebuffer = struct {
   x_pos: u64 = 0,
