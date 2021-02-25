@@ -1,4 +1,8 @@
-var bsp_task: os.thread.Task = .{};
+const os = @import("root").os;
+const std = @import("std");
+const interrupts = @import("interrupts.zig");
+
+pub var bsp_task: os.thread.Task = .{};
 
 pub fn self_exited() ?*os.thread.Task {
   const curr = os.platform.get_current_task();
@@ -18,9 +22,9 @@ pub const TaskData = struct {
 
 const task_stack_size = 1024 * 16;
 
-fn task_fork_impl(frame: *InterruptFrame) !void {
+fn task_fork_impl(frame: *interrupts.InterruptFrame) !void {
   const new_task = @intToPtr(*os.thread.Task, frame.rax);
-  const current_cpu = get_current_cpu();
+  const current_cpu = os.platform.get_current_cpu();
 
   const current_task = current_cpu.current_task.?;
 
@@ -37,7 +41,7 @@ fn task_fork_impl(frame: *InterruptFrame) !void {
   os.platform.set_current_task(new_task);
 }
 
-pub fn task_fork_handler(frame: *InterruptFrame) void {
+pub fn task_fork_handler(frame: *interrupts.InterruptFrame) void {
   task_fork_impl(frame) catch |err| {
     frame.rax = 1;
     frame.rbx = @errorToInt(err);

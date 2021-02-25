@@ -8,6 +8,7 @@ const scheduler = os.thread.scheduler;
 const idt = @import("idt.zig");
 const gdt = @import("gdt.zig");
 const pic = @import("pic.zig");
+const thread = @import("thread.zig");
 
 pub const num_handlers = 0x100;
 pub const handler_func = fn(*InterruptFrame)void;
@@ -28,7 +29,7 @@ pub fn init_interrupts() !void {
   }
   add_handler(0x0E, page_fault_handler);
   add_handler(0x69, proc_start_handler);
-  add_handler(0x6A, platform.task_fork_handler);
+  add_handler(0x6A, thread.task_fork_handler);
   add_handler(0x6B, yield_handler);
 }
 

@@ -2,11 +2,11 @@ const std = @import("std");
 const os = @import("root").os;
 
 pub fn yield() void {
-  os.platform.yield(true);
+  os.platform.thread.yield(true);
 }
 
 pub fn wait() void {
-  os.platform.yield(false);
+  os.platform.thread.yield(false);
 }
 
 pub fn leave() noreturn {
@@ -52,7 +52,7 @@ pub fn make_task(func: anytype, args: anytype) !void {
   }
 
   errdefer task_alloc.destroy(task);
-  try os.platform.new_task_call(task, func, args);
+  try os.platform.thread.new_task_call(task, func, args);
 }
 
 pub fn exit_task() noreturn {
