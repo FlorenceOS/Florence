@@ -176,7 +176,7 @@ fn smp_entry(info_in: u64) callconv(.C) noreturn {
 
   const cpu = &os.platform.smp.cpus[core_id];
 
-  platform.set_current_cpu(cpu);
+  os.platform.thread.set_current_cpu(cpu);
   cpu.booted = true;
 
   os.log("Core {} inited\n", .{core_id});

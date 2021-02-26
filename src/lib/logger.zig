@@ -27,7 +27,7 @@ var log_lock: os.thread.Spinlock = .{};
 var lock_owner: ?*os.platform.smp.CoreData = null;
 
 pub fn log(comptime format: []const u8, args: anytype) void {
-    const current_cpu = os.platform.get_current_cpu();
+    const current_cpu = os.platform.thread.get_current_cpu();
     const require_locking = current_cpu != lock_owner;
 
     const a = if(require_locking) log_lock.lock() else undefined;

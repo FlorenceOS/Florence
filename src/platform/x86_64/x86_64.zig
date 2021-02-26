@@ -1,4 +1,3 @@
-
 const os = @import("root").os;
 const std = @import("std");
 
@@ -54,16 +53,6 @@ pub fn ap_init() void {
   gdt.setup_gdt();
 
   set_interrupts(true);
-}
-
-pub const kernel_gs_base = regs.MSR(u64, 0xC0000102);
-
-pub fn set_current_cpu(cpu_ptr: *os.platform.smp.CoreData) void {
-  kernel_gs_base.write(@ptrToInt(cpu_ptr));
-}
-
-pub fn get_current_cpu() *os.platform.smp.CoreData {
-  return @intToPtr(*os.platform.smp.CoreData, kernel_gs_base.read());
 }
 
 pub fn spin_hint() void {

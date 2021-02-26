@@ -10,7 +10,7 @@ pub fn wait() void {
 }
 
 pub fn leave() noreturn {
-  os.platform.get_current_cpu().executable_tasks.leave();
+  os.platform.thread.get_current_cpu().executable_tasks.leave();
 }
 
 pub fn wake(task: *os.thread.Task) void {
@@ -71,5 +71,5 @@ pub fn exit_task() noreturn {
 
 pub fn init(task: *os.thread.Task) void {
   os.platform.set_current_task(task);
-  os.platform.get_current_cpu().executable_tasks.init();
+  os.platform.thread.get_current_cpu().executable_tasks.init();
 }

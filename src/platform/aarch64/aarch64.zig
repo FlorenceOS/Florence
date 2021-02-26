@@ -28,16 +28,6 @@ pub fn msr(comptime T: type, comptime name: []const u8) type {
   };
 }
 
-const TPIDR_EL1 = msr(*os.platform.smp.CoreData, "TPIDR_EL1");
-
-pub fn get_current_cpu() *os.platform.smp.CoreData {
-  return TPIDR_EL1.read();
-}
-
-pub fn set_current_cpu(ptr: *os.platform.smp.CoreData) void {
-  TPIDR_EL1.write(ptr);
-}
-
 pub fn spin_hint() void {
   asm volatile("YIELD");
 }

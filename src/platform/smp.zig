@@ -23,7 +23,7 @@ var core_datas: [max_cpus]CoreData = [1]CoreData{undefined} ** max_cpus;
 pub var cpus: []CoreData = core_datas[0..1];
 
 pub fn prepare() void {
-  os.platform.set_current_cpu(&cpus[0]);
+  os.platform.thread.set_current_cpu(&cpus[0]);
   cpus[0].panicked = false;
   cpus[0].tasks_count = 1;
 }
