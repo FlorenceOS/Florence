@@ -8,20 +8,6 @@ const bf        = os.lib.bitfields;
 
 const assert = std.debug.assert;
 
-pub const page_sizes =
-  [_]u64 {
-    0x1000, // 4K << 0
-    0x4000, // 16K << 0
-    0x10000, // 32K << 0
-    0x200000, // 4K << 9
-    0x2000000, // 16K << 11
-    0x10000000, // 32K << 12
-    0x40000000, // 4K << 18
-    0x1000000000, // 16K << 22
-    0x8000000000, // 4K << 27
-    0x10000000000, // 32K << 24
-  };
-
 pub fn msr(comptime T: type, comptime name: []const u8) type {
   return struct {
     pub fn read() T {
