@@ -2,6 +2,7 @@ const os = @import("root").os;
 const std = @import("std");
 
 pub const paging = @import("paging.zig");
+pub const thread = @import("thread.zig");
 
 const pmm       = os.memory.pmm;
 const bf        = os.lib.bitfields;
@@ -239,25 +240,9 @@ extern const exception_vector_table: [0x800]u8;
 
 pub fn platform_early_init() void {
   os.platform.smp.prepare();
-  os.thread.scheduler.init(&bsp_task);
+  os.thread.scheduler.init(&thread.bsp_task);
   install_vector_table();
   os.memory.paging.init();
-}
-
-var bsp_task: os.thread.Task = .{};
-
-pub fn self_exited() ?*os.thread.Task {
-  const curr = os.platform.get_current_task();
-  
-  if(curr == &bsp_task)
-    return null;
-
-  if(curr.platform_data.stack != null) {
-    // TODO: Figure out how to free the stack while returning using it??
-    // We can just leak it for now
-    //try vmm.free_single(curr.platform_data.stack.?);
-  }
-  return curr;
 }
 
 pub fn install_vector_table() void {
@@ -311,20 +296,6 @@ export fn interrupt64_handler(frame: *InterruptFrame) void {
 
 export fn interrupt32_handler(frame: *InterruptFrame) void {
   @panic("Got a 32 bit interrupt or something idk");
-}
-
-pub const TaskData = struct {
-  stack: ?*[task_stack_size]u8 = null,
-};
-
-const task_stack_size = 1024 * 16;
-
-pub fn yield(should_enqueue: bool) void {
-  asm volatile("SVC #'Y'" :: [_] "{x0}" (@boolToInt(should_enqueue)));
-}
-
-pub fn new_task_call(new_task: *os.thread.Task, func: anytype, args: anytype) !void {
-  @panic("yield");
 }
 
 pub fn prepare_paging() !void {
