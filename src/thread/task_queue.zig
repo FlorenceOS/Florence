@@ -42,7 +42,7 @@ pub const ReadyQueue = struct {
 
   /// Go to sleep without the hope of someone waking as up
   pub fn leave(self: *@This()) noreturn {
-    os.platform.yield(false);
+    os.platform.thread.yield(false);
     unreachable;
   }
 

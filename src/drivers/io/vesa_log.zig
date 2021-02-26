@@ -3,7 +3,7 @@ const std = @import("std");
 
 const range = os.lib.range.range;
 
-const page_size = os.platform.page_sizes[0];
+const page_size = os.platform.paging.page_sizes[0];
 
 const paging = os.memory.paging;
 const pmm    = os.memory.pmm;

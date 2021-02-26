@@ -31,12 +31,12 @@ pub fn map_phys(ent: *const MemmapEntry, context: *platform.paging.PagingContext
 
   var new_ent = ent.*;
 
-  new_ent.base = libalign.align_down(u64, platform.page_sizes[0], new_ent.base);
+  new_ent.base = libalign.align_down(u64, platform.paging.page_sizes[0], new_ent.base);
   // If there is nothing left of the entry
   if(new_ent.base >= ent.base + ent.length)
     return;
 
-  new_ent.length = libalign.align_up(u64, platform.page_sizes[0], new_ent.length);
+  new_ent.length = libalign.align_up(u64, platform.paging.page_sizes[0], new_ent.length);
   if(new_ent.length == 0)
     return;
 
@@ -67,7 +67,7 @@ pub fn detect_phys_base() void {
       os.memory.paging.CurrentContext.set_phys_base(0xFFFF800000000000);
     },
     .x86_64 => {
-      if(os.platform.is_5levelpaging()) {
+      if(os.platform.paging.is_5levelpaging()) {
         os.log("5 level paging detected!\n", .{});
         os.memory.paging.CurrentContext.set_phys_base(0xFF00000000000000);
       }

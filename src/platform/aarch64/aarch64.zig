@@ -2,25 +2,12 @@ const os = @import("root").os;
 const std = @import("std");
 
 pub const paging = @import("paging.zig");
+pub const thread = @import("thread.zig");
 
 const pmm       = os.memory.pmm;
 const bf        = os.lib.bitfields;
 
 const assert = std.debug.assert;
-
-pub const page_sizes =
-  [_]u64 {
-    0x1000, // 4K << 0
-    0x4000, // 16K << 0
-    0x10000, // 32K << 0
-    0x200000, // 4K << 9
-    0x2000000, // 16K << 11
-    0x10000000, // 32K << 12
-    0x40000000, // 4K << 18
-    0x1000000000, // 16K << 22
-    0x8000000000, // 4K << 27
-    0x10000000000, // 32K << 24
-  };
 
 pub fn msr(comptime T: type, comptime name: []const u8) type {
   return struct {
@@ -39,16 +26,6 @@ pub fn msr(comptime T: type, comptime name: []const u8) type {
       );
     }
   };
-}
-
-const TPIDR_EL1 = msr(*os.platform.smp.CoreData, "TPIDR_EL1");
-
-pub fn get_current_cpu() *os.platform.smp.CoreData {
-  return TPIDR_EL1.read();
-}
-
-pub fn set_current_cpu(ptr: *os.platform.smp.CoreData) void {
-  TPIDR_EL1.write(ptr);
 }
 
 pub fn spin_hint() void {
@@ -253,25 +230,9 @@ extern const exception_vector_table: [0x800]u8;
 
 pub fn platform_early_init() void {
   os.platform.smp.prepare();
-  os.thread.scheduler.init(&bsp_task);
+  os.thread.scheduler.init(&thread.bsp_task);
   install_vector_table();
   os.memory.paging.init();
-}
-
-var bsp_task: os.thread.Task = .{};
-
-pub fn self_exited() ?*os.thread.Task {
-  const curr = os.platform.get_current_task();
-  
-  if(curr == &bsp_task)
-    return null;
-
-  if(curr.platform_data.stack != null) {
-    // TODO: Figure out how to free the stack while returning using it??
-    // We can just leak it for now
-    //try vmm.free_single(curr.platform_data.stack.?);
-  }
-  return curr;
 }
 
 pub fn install_vector_table() void {
@@ -325,20 +286,6 @@ export fn interrupt64_handler(frame: *InterruptFrame) void {
 
 export fn interrupt32_handler(frame: *InterruptFrame) void {
   @panic("Got a 32 bit interrupt or something idk");
-}
-
-pub const TaskData = struct {
-  stack: ?*[task_stack_size]u8 = null,
-};
-
-const task_stack_size = 1024 * 16;
-
-pub fn yield(should_enqueue: bool) void {
-  asm volatile("SVC #'Y'" :: [_] "{x0}" (@boolToInt(should_enqueue)));
-}
-
-pub fn new_task_call(new_task: *os.thread.Task, func: anytype, args: anytype) !void {
-  @panic("yield");
 }
 
 pub fn prepare_paging() !void {

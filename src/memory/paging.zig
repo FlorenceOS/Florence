@@ -430,7 +430,7 @@ fn unmap_iter(
   }
 }
 
-pub fn print_paging(root: *platform.paging_root) void {
+pub fn print_paging(root: *platform.PagingRoot) void {
   log("Paging: {x}\n", .{root});
   for(platform.root_tables(root)) |table| {
     log("Dumping page tables from root {x}\n", .{table});
@@ -441,7 +441,7 @@ pub fn print_paging(root: *platform.paging_root) void {
 fn print_impl(root: *page_table, comptime level: usize) void {
   var offset: u32 = 0;
   var had_any: bool = false;
-  while(offset < platform.page_sizes[0]): (offset += 8) {
+  while(offset < platform.paging.page_sizes[0]): (offset += 8) {
     const ent = @intToPtr(*page_table_entry, @ptrToInt(root) + offset);
     if(ent.is_present(level)) {
       had_any = true;

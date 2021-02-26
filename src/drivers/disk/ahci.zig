@@ -9,7 +9,7 @@ const pci = os.platform.pci;
 const paging = os.memory.paging;
 const pmm = os.memory.pmm;
 const scheduler = os.thread.scheduler;
-const page_size = os.platform.page_sizes[0];
+const page_size = os.platform.paging.page_sizes[0];
 
 const abar_size = 0x1100;
 const port_control_registers_size = 0x80;

@@ -42,11 +42,11 @@ pub fn hang() noreturn {
 }
 
 pub fn set_current_task(task_ptr: *os.thread.Task) void {
-  get_current_cpu().current_task = task_ptr;
+  thread.get_current_cpu().current_task = task_ptr;
 }
 
 pub fn get_current_task_opt() ?*os.thread.Task {
-  return get_current_cpu().current_task;
+  return thread.get_current_cpu().current_task;
 }
 
 pub fn get_current_task() *os.thread.Task {
@@ -112,7 +112,7 @@ pub fn phys_slice(comptime T: type) type {
   };
 }
 
-pub const phys_bytes = struct {
+pub const PhysBytes = struct {
   ptr: u64,
   len: u64,
 };

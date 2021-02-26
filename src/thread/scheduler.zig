@@ -2,15 +2,15 @@ const std = @import("std");
 const os = @import("root").os;
 
 pub fn yield() void {
-  os.platform.yield(true);
+  os.platform.thread.yield(true);
 }
 
 pub fn wait() void {
-  os.platform.yield(false);
+  os.platform.thread.yield(false);
 }
 
 pub fn leave() noreturn {
-  os.platform.get_current_cpu().executable_tasks.leave();
+  os.platform.thread.get_current_cpu().executable_tasks.leave();
 }
 
 pub fn wake(task: *os.thread.Task) void {
@@ -52,11 +52,11 @@ pub fn make_task(func: anytype, args: anytype) !void {
   }
 
   errdefer task_alloc.destroy(task);
-  try os.platform.new_task_call(task, func, args);
+  try os.platform.thread.new_task_call(task, func, args);
 }
 
 pub fn exit_task() noreturn {
-  const task = os.platform.self_exited();
+  const task = os.platform.thread.self_exited();
   const id = if (task) |t| t.allocated_core_id else 0;
 
   const state = balancer_lock.lock();
@@ -71,5 +71,5 @@ pub fn exit_task() noreturn {
 
 pub fn init(task: *os.thread.Task) void {
   os.platform.set_current_task(task);
-  os.platform.get_current_cpu().executable_tasks.init();
+  os.platform.thread.get_current_cpu().executable_tasks.init();
 }

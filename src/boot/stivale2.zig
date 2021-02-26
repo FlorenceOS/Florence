@@ -176,7 +176,7 @@ fn smp_entry(info_in: u64) callconv(.C) noreturn {
 
   const cpu = &os.platform.smp.cpus[core_id];
 
-  platform.set_current_cpu(cpu);
+  os.platform.thread.set_current_cpu(cpu);
   cpu.booted = true;
 
   os.log("Core {} inited\n", .{core_id});
@@ -256,7 +256,7 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     os.log("Mapping UART\n", .{});
     os.vital(paging.remap_phys_size(.{
       .phys = uart.uart_addr,
-      .size = platform.page_sizes[0],
+      .size = platform.paging.page_sizes[0],
       .memtype = .DeviceUncacheable,
       .context = &context,
     }), "mapping UART");
