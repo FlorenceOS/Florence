@@ -12,6 +12,7 @@ pub const CoreData = struct {
   acpi_id: u64,
   executable_tasks: os.thread.ReadyQueue,
   tasks_count: usize,
+  platform_data: os.platform.thread.CoreData,
 
   pub fn id(self: *@This()) usize {
     return os.lib.get_index(self, cpus);
@@ -26,6 +27,7 @@ pub fn prepare() void {
   os.platform.thread.set_current_cpu(&cpus[0]);
   cpus[0].panicked = false;
   cpus[0].tasks_count = 1;
+  cpus[0].platform_data = .{};
 }
 
 pub fn init(num_cores: usize) void {
@@ -46,5 +48,6 @@ pub fn init(num_cores: usize) void {
     c.current_task = null;
     c.tasks_count = 0;
     c.executable_tasks.init();
+    c.platform_data = .{};
   }
 }

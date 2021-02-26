@@ -41,7 +41,7 @@ pub fn platform_early_init() void {
   os.thread.scheduler.init(&thread.bsp_task);
   serial.init();
   try interrupts.init_interrupts();
-  gdt.setup_gdt();
+  os.platform.smp.cpus[0].platform_data.gdt.load();
   os.memory.paging.init();
 
   set_interrupts(true);
@@ -50,7 +50,7 @@ pub fn platform_early_init() void {
 pub fn ap_init() void {
   os.memory.paging.CurrentContext.apply();
   try interrupts.init_interrupts();
-  gdt.setup_gdt();
+  os.platform.thread.get_current_cpu().platform_data.gdt.load();
 
   set_interrupts(true);
 }
