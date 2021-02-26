@@ -18,8 +18,8 @@ pub const MemoryObject = struct {
         instance.allocator = allocator;
         errdefer allocator.destroy(instance);
 
-        std.debug.assert(platform.page_sizes.len > 0);
-        const page_size = platform.page_sizes[0];
+        std.debug.assert(platform.paging.page_sizes.len > 0);
+        const page_size = platform.paging.page_sizes[0];
         const page_count = os.lib.libalign.align_up(usize, size, page_size) / page_size;
         instance.page_size = page_size;
 
