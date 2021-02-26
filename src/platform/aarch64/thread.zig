@@ -2,6 +2,16 @@ pub const os = @import("root").os;
 
 pub var bsp_task: os.thread.Task = .{};
 
+const TPIDR_EL1 = os.platform.msr(*os.platform.smp.CoreData, "TPIDR_EL1");
+
+pub fn get_current_cpu() *os.platform.smp.CoreData {
+  return TPIDR_EL1.read();
+}
+
+pub fn set_current_cpu(ptr: *os.platform.smp.CoreData) void {
+  TPIDR_EL1.write(ptr);
+}
+
 pub const TaskData = struct {
   stack: ?*[task_stack_size]u8 = null,
 };

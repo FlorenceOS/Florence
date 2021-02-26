@@ -60,7 +60,7 @@ fn yield_handler(frame: *InterruptFrame) void {
   
   var next_task: *os.thread.Task = undefined;
   while (true) {
-    next_task = os.platform.get_current_cpu().executable_tasks.dequeue() orelse continue;
+    next_task = os.platform.thread.get_current_cpu().executable_tasks.dequeue() orelse continue;
     break;
   }
 

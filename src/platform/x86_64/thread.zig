@@ -1,8 +1,20 @@
 const os = @import("root").os;
 const std = @import("std");
+
+const regs = @import("regs.zig");
 const interrupts = @import("interrupts.zig");
 
 pub var bsp_task: os.thread.Task = .{};
+
+pub const kernel_gs_base = regs.MSR(u64, 0xC0000102);
+
+pub fn set_current_cpu(cpu_ptr: *os.platform.smp.CoreData) void {
+  kernel_gs_base.write(@ptrToInt(cpu_ptr));
+}
+
+pub fn get_current_cpu() *os.platform.smp.CoreData {
+  return @intToPtr(*os.platform.smp.CoreData, kernel_gs_base.read());
+}
 
 pub fn self_exited() ?*os.thread.Task {
   const curr = os.platform.get_current_task();
@@ -24,7 +36,7 @@ const task_stack_size = 1024 * 16;
 
 fn task_fork_impl(frame: *interrupts.InterruptFrame) !void {
   const new_task = @intToPtr(*os.thread.Task, frame.rax);
-  const current_cpu = os.platform.get_current_cpu();
+  const current_cpu = os.platform.thread.get_current_cpu();
 
   const current_task = current_cpu.current_task.?;
 
