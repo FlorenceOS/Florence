@@ -31,6 +31,9 @@ pub fn register_mmio32_serial(phys: u64) void {
 }
 
 pub fn putch(ch: u8) void {
+  if(ch == '\n')
+    putch('\r');
+
   if(write_status) |s| {
     while((s.status_ptr.get().* & s.status_mask) != s.status_value) {
       os.platform.spin_hint();
