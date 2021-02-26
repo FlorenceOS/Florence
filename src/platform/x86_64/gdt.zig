@@ -30,7 +30,7 @@ pub fn setup_gdt() void {
     :
     : [p] "*p" (&gdt_ptr)
   );
- 
+
   // Use the data selectors
   asm volatile(
     \\  mov %[dsel], %%ds
@@ -41,7 +41,7 @@ pub fn setup_gdt() void {
     :
     : [dsel] "rm" (@as(u16, selector.data64))
   );
- 
+
   // Use the code selector
   asm volatile(
     \\ push %[csel]
