@@ -24,18 +24,31 @@ pub fn setup_gdt() void {
     .base = @ptrToInt(&gdt[0]),
   };
 
-  // Switch to the new descriptors
+  // Load the GDT
   asm volatile(
-    \\  lgdt (%[p])
-    \\  int $0x69
-    \\  movw %[data64], %%ax
-    \\  mov %%ax, %%ds
-    \\  mov %%ax, %%fs
-    \\  mov %%ax, %%gs
-    \\  mov %%ax, %%es
+    \\  lgdt %[p]
     :
-    : [data64] "X" (@as(u16, selector.data64))
-    , [p] "X" (&gdt_ptr)
-    : "rax"
+    : [p] "*p" (&gdt_ptr)
+  );
+ 
+  // Use the data selectors
+  asm volatile(
+    \\  mov %[dsel], %%ds
+    \\  mov %[dsel], %%fs
+    \\  mov %[dsel], %%gs
+    \\  mov %[dsel], %%es
+    \\  mov %[dsel], %%ss
+    :
+    : [dsel] "rm" (@as(u16, selector.data64))
+  );
+ 
+  // Use the code selector
+  asm volatile(
+    \\ push %[csel]
+    \\ push $1f
+    \\ .byte 0x48, 0xCB // Far return
+    \\ 1:
+    :
+    : [csel] "i" (@as(u16, selector.code64))
   );
 }

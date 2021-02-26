@@ -28,7 +28,6 @@ pub fn init_interrupts() !void {
     itable[intnum] = idt.entry(make_handler(intnum), true, 0);
   }
   add_handler(0x0E, page_fault_handler);
-  add_handler(0x69, proc_start_handler);
   add_handler(0x6A, thread.task_fork_handler);
   add_handler(0x6B, yield_handler);
 }
@@ -41,11 +40,6 @@ fn type_page_fault(error_code: usize) !platform.PageFaultAccess {
   if(error_code & 0x2 != 0)
     return .Write;
   return .Read;
-}
-
-fn proc_start_handler(frame: *InterruptFrame) void {
-  frame.cs = gdt.selector.code64;
-  frame.ss = gdt.selector.data64;
 }
 
 fn yield_handler(frame: *InterruptFrame) void {
