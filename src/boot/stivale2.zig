@@ -313,7 +313,6 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
         continue;
 
       cpu.booted = false;
-      cpu.current_task = null;
 
       // Boot it!
       const stack = stacks + bootstrap_stack_size * i;

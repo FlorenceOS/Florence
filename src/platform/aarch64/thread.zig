@@ -28,14 +28,9 @@ pub fn new_task_call(new_task: *os.thread.Task, func: anytype, args: anytype) !v
 
 pub fn self_exited() ?*os.thread.Task {
   const curr = os.platform.get_current_task();
-  
-  if(curr == &bsp_task)
-    return null;
 
-  if(curr.platform_data.stack != null) {
-    // TODO: Figure out how to free the stack while returning using it??
-    // We can just leak it for now
-    //try vmm.free_single(curr.platform_data.stack.?);
-  }
+  // TODO: Figure out how to free the stack while returning using it??
+  // We can just leak it for now
+  //try vmm.free_single(curr.platform_data.stack.?);
   return curr;
 }

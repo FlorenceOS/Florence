@@ -14,7 +14,7 @@ pub var cpus_left: usize = undefined;
 const int_stack_size = 65536;
 
 pub const CoreData = struct {
-  current_task: ?*os.thread.Task,
+  current_task: *os.thread.Task = undefined,
   booted: bool,
   panicked: bool,
   acpi_id: u64,
@@ -70,7 +70,6 @@ pub fn init(num_cores: usize) void {
   // ugh.
 
     c.panicked = false;
-    c.current_task = null;
     c.tasks_count = 0;
     c.executable_tasks.init();
     c.bootstrap_int_stack();

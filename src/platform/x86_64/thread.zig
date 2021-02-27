@@ -43,7 +43,7 @@ fn task_fork_impl(frame: *interrupts.InterruptFrame) !void {
   const new_task = @intToPtr(*os.thread.Task, frame.rax);
   const current_cpu = os.platform.thread.get_current_cpu();
 
-  const current_task = current_cpu.current_task.?;
+  const current_task = current_cpu.current_task;
 
   current_cpu.executable_tasks.enqueue(current_task);
 
@@ -124,4 +124,26 @@ pub fn yield(enqueue: bool) void {
     : [_] "{rbx}" (@boolToInt(enqueue))
     : "memory"
   );
+}
+
+pub fn yield_handler(frame: *interrupts.InterruptFrame) void {
+  const current_task = os.platform.get_current_task();
+
+  current_task.registers = frame.*;
+  if (frame.rbx == 1) {
+    os.platform.smp.cpus[current_task.allocated_core_id].executable_tasks.enqueue(current_task);
+  }
+  
+  await_handler(frame);
+}
+
+pub fn await_handler(frame: *interrupts.InterruptFrame) void {
+  var next_task: *os.thread.Task = undefined;
+  while (true) {
+    next_task = os.platform.thread.get_current_cpu().executable_tasks.dequeue() orelse continue;
+    break;
+  }
+
+  os.platform.set_current_task(next_task);
+  frame.* = next_task.registers;
 }

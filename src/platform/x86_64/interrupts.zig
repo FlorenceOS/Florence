@@ -29,7 +29,8 @@ pub fn init_interrupts() !void {
   }
   add_handler(0x0E, page_fault_handler);
   add_handler(0x6A, thread.task_fork_handler);
-  add_handler(0x6B, yield_handler);
+  add_handler(0x6B, thread.yield_handler);
+  add_handler(0x6C, thread.await_handler);
 }
 
 fn type_page_fault(error_code: usize) !platform.PageFaultAccess {
@@ -40,26 +41,6 @@ fn type_page_fault(error_code: usize) !platform.PageFaultAccess {
   if(error_code & 0x2 != 0)
     return .Write;
   return .Read;
-}
-
-fn yield_handler(frame: *InterruptFrame) void {
-  const current_task = platform.get_current_task_opt();
-
-  if(current_task) |ct| {
-    ct.registers = frame.*;
-    if (frame.rbx == 1) {
-      os.platform.smp.cpus[ct.allocated_core_id].executable_tasks.enqueue(ct);
-    }
-  }
-  
-  var next_task: *os.thread.Task = undefined;
-  while (true) {
-    next_task = os.platform.thread.get_current_cpu().executable_tasks.dequeue() orelse continue;
-    break;
-  }
-
-  platform.set_current_task(next_task);
-  frame.* = next_task.registers;
 }
 
 fn page_fault_handler(frame: *InterruptFrame) void {
