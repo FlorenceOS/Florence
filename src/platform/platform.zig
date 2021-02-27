@@ -91,7 +91,7 @@ pub fn phys_slice(comptime T: type) type {
     ptr: phys_ptr([*]T),
     len: usize,
 
-    pub fn init(addr: usize, len: ysize) @This() {
+    pub fn init(addr: usize, len: usize) @This() {
       return .{
         .ptr = phys_ptr([*]T).from_int(addr),
         .len = len,
