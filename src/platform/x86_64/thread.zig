@@ -1,6 +1,7 @@
 const os = @import("root").os;
 const std = @import("std");
 
+const gdt = @import("gdt.zig");
 const regs = @import("regs.zig");
 const interrupts = @import("interrupts.zig");
 
@@ -30,6 +31,10 @@ pub fn self_exited() ?*os.thread.Task {
 
 pub const TaskData = struct {
   stack: ?*[task_stack_size]u8 = null,
+};
+
+pub const CoreData = struct {
+  gdt: gdt.Gdt = .{},
 };
 
 const task_stack_size = 1024 * 16;

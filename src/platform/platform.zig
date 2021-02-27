@@ -62,19 +62,19 @@ pub fn get_current_task() *os.thread.Task {
 }
 
 pub const virt_slice = struct {
-  ptr: u64,
-  len: u64,
+  ptr: usize,
+  len: usize,
 };
 
 pub fn phys_ptr(comptime ptr_type: type) type {
   return struct {
-    addr: u64,
+    addr: usize,
 
     pub fn get(self: *const @This()) ptr_type {
       return @intToPtr(ptr_type, os.memory.pmm.phys_to_virt(self.addr));
     }
 
-    pub fn from_int(a: u64) @This() {
+    pub fn from_int(a: usize) @This() {
       return .{
         .addr = a,
       };
@@ -89,9 +89,9 @@ pub fn phys_ptr(comptime ptr_type: type) type {
 pub fn phys_slice(comptime T: type) type {
   return struct {
     ptr: phys_ptr([*]T),
-    len: u64,
+    len: usize,
 
-    pub fn init(addr: u64, len: u64) @This() {
+    pub fn init(addr: usize, len: ysize) @This() {
       return .{
         .ptr = phys_ptr([*]T).from_int(addr),
         .len = len,
@@ -113,6 +113,6 @@ pub fn phys_slice(comptime T: type) type {
 }
 
 pub const PhysBytes = struct {
-  ptr: u64,
-  len: u64,
+  ptr: usize,
+  len: usize,
 };

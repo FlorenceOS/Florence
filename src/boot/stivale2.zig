@@ -172,11 +172,10 @@ fn smp_entry(info_in: u64) callconv(.C) noreturn {
   const smp_info = os.platform.phys_ptr(*stivale2_smp_info).from_int(info_in);
   const core_id = smp_info.get().argument;
 
-  platform.ap_init();
-
   const cpu = &os.platform.smp.cpus[core_id];
-
   os.platform.thread.set_current_cpu(cpu);
+
+  platform.ap_init();
   cpu.booted = true;
 
   os.log("Core {} inited\n", .{core_id});
