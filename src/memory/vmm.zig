@@ -81,6 +81,6 @@ pub fn backed(
 /// If you dereference this memory, you _WILL_ get a page
 /// fault. The pointers into this memory cannot be dereferenced
 /// before mapping the memory to some physical memory.
-pub fn nonbacked() *std.mem.allocator {
-  return nonbacked_range.allocator;
+pub fn nonbacked() *std.mem.Allocator {
+  return &nonbacked_range.allocator;
 }

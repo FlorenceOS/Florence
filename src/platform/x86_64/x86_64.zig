@@ -50,9 +50,27 @@ pub fn platform_early_init() void {
 pub fn ap_init() void {
   os.memory.paging.CurrentContext.apply();
   try interrupts.init_interrupts();
-  os.platform.thread.get_current_cpu().platform_data.gdt.load();
 
-  set_interrupts(true);
+  const cpu = os.platform.thread.get_current_cpu();
+  cpu.platform_data.gdt.load();
+
+  asm volatile(
+    \\mov %[stack], %%rsp
+    \\jmp *%[dest]
+    :
+    : [stack] "rm" (cpu.int_stack)
+    , [_] "{rdi}" (cpu)
+    , [dest] "r" (ap_init_stage2)
+  );
+  unreachable;
+}
+
+fn ap_init_stage2() void {
+  os.log("Here, lol\n", .{});
+  _ = @atomicRmw(usize, &os.platform.smp.cpus_left, .Sub, 1, .AcqRel);
+  while (true) {
+    os.platform.spin_hint();
+  }
 }
 
 pub fn spin_hint() void {
