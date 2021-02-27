@@ -66,7 +66,6 @@ pub fn ap_init() void {
 }
 
 fn ap_init_stage2() void {
-  os.log("Here, lol\n", .{});
   _ = @atomicRmw(usize, &os.platform.smp.cpus_left, .Sub, 1, .AcqRel);
   // Wait for tasks
   asm volatile("int $0x6C");

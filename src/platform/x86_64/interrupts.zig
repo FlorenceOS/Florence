@@ -28,7 +28,6 @@ pub fn init_interrupts() !void {
     itable[intnum] = idt.entry(make_handler(intnum), true, 0);
   }
   add_handler(0x0E, page_fault_handler);
-  add_handler(0x6A, thread.task_fork_handler);
   add_handler(0x6B, thread.yield_handler);
   add_handler(0x6C, thread.await_handler);
 }

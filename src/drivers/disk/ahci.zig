@@ -625,7 +625,7 @@ fn command_with_buffer(port: *volatile Port, slot: u5, buf: usize, bufsize: usiz
 
 var test_buf: [4096]u8 = undefined;
 
-fn sata_port_task(comptime port_type: sata_port_type, port: *volatile Port) !void {
+fn sata_port_task(port_type: sata_port_type, port: *volatile Port) !void {
     switch (port_type) {
         .ata, .atapi => {},
         else => return,
