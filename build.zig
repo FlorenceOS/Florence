@@ -138,7 +138,7 @@ fn qemu_run_aarch64_sabaton(b: *Builder, board_name: []const u8, desc: []const u
         //"-S", "-s",
         "-d", "int",
         "-smp", "4",
-        "-device", "virtio-gpu-pci",
+        "-device", "ramfb",
     };
 
     const run_step = b.addSystemCommand(params);
