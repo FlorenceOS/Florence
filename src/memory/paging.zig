@@ -58,9 +58,9 @@ pub fn unmap(args: struct {
   size: usize,
   reclaim_pages: bool,
   context: *platform.paging.PagingContext = &kernel_context,
-}) !void {
+}) void {
   var argc = args;
-  try unmap_loop(&argc.virt, &argc.size, argc.reclaim_pages, argc.context);
+  unmap_loop(&argc.virt, &argc.size, argc.reclaim_pages, argc.context);
 }
 
 pub const Perms = struct {
@@ -195,7 +195,7 @@ pub fn remap_phys_range(args: struct {
   while(beg < args.phys_end): (beg += psz) {
     virt = args.context.phys_to_virt(beg);
 
-    try unmap(.{
+    unmap(.{
       .virt = virt,
       .size = psz,
       .reclaim_pages = false,
@@ -276,10 +276,7 @@ fn map_impl_with_rollback(args: struct {
         .size = args.virt.* - start_virt,
         .reclaim_pages = args.phys == null,
         .context = args.context,
-      }) catch |err| {
-        log("Unable to unmap partially failed mapping: {}\n", .{@errorName(err)});
-        @panic("");
-      };
+      });
     }
   }
 
@@ -388,10 +385,10 @@ fn unmap_loop(
   size: *usize,
   reclaim_pages: bool,
   context: *platform.paging.PagingContext,
-) !void {
+) void {
   const root = context.root_table(virt.*);
   while(size.* != 0)
-    try unmap_iter(virt, size, reclaim_pages, root, context);
+    unmap_iter(virt, size, reclaim_pages, root, context);
 }
 
 fn unmap_iter(
@@ -400,7 +397,7 @@ fn unmap_iter(
   reclaim_pages: bool,
   table: anytype,
   context: *platform.paging.PagingContext,
-) error{NoPartialUnmapping}!void {
+) void {
   for(table.skip_to(virt.*)) |*child| {
     const dom = table.child_domain(virt.*);
 
@@ -413,10 +410,10 @@ fn unmap_iter(
         virt.* += dom.len;
         size.* -= dom.len;
       },
-      .Table => |tbl| try unmap_iter(virt, size, reclaim_pages, tbl, context),
+      .Table => |tbl| unmap_iter(virt, size, reclaim_pages, tbl, context),
       .Mapping => |mapping| {
         if(dom.len > size.* or dom.ptr != virt.*)
-          return error.NoPartialUnmapping;
+          @panic("No partial unmapping");
 
         if(reclaim_pages)
           pmm.free_phys(mapping.phys, dom.len);
