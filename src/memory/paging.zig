@@ -10,7 +10,7 @@ const range_reverse = os.lib.range.range_reverse;
 
 const pmm = os.memory.pmm;
 
-pub var CurrentContext: os.platform.paging.PagingContext = undefined;
+pub var kernel_context: os.platform.paging.PagingContext = undefined;
 
 pub fn init() void {
   os.platform.paging.PagingContext.read_current();
@@ -21,7 +21,7 @@ pub fn map(args: struct {
   size: usize,
   perm: Perms,
   memtype: platform.paging.MemoryType,
-  context: *platform.paging.PagingContext = &CurrentContext,
+  context: *platform.paging.PagingContext = &kernel_context,
 }) !void {
   var argc = args;
   return map_impl_with_rollback(.{
@@ -40,7 +40,7 @@ pub fn map_phys(args: struct {
   size: usize,
   perm: Perms,
   memtype: platform.paging.MemoryType,
-  context: *platform.paging.PagingContext = &CurrentContext,
+  context: *platform.paging.PagingContext = &kernel_context,
 }) !void {
   var argc = args;
   return map_impl_with_rollback(.{
@@ -57,7 +57,7 @@ pub fn unmap(args: struct {
   virt: usize,
   size: usize,
   reclaim_pages: bool,
-  context: *platform.paging.PagingContext = &CurrentContext,
+  context: *platform.paging.PagingContext = &kernel_context,
 }) !void {
   var argc = args;
   try unmap_loop(&argc.virt, &argc.size, argc.reclaim_pages, argc.context);
@@ -127,7 +127,7 @@ pub fn get_current_paging_root() platform.paging_root {
 
 pub fn set_context(new_context: *platform.paging.PagingContext) !void {
   new_context.apply();
-  CurrentContext = new_context.*;
+  kernel_context = new_context.*;
 }
 
 extern var __kernel_text_begin: u8;
@@ -187,7 +187,7 @@ pub fn remap_phys_range(args: struct {
   phys: usize,
   phys_end: usize,
   memtype: platform.paging.MemoryType,
-  context: *platform.paging.PagingContext = &CurrentContext,
+  context: *platform.paging.PagingContext = &kernel_context,
 }) !void {
   var beg = args.phys;
   var virt = args.context.phys_to_virt(beg);
@@ -218,7 +218,7 @@ pub fn remap_phys_range(args: struct {
 pub fn remap_phys_struct(comptime T: type, args: struct{
   phys: usize,
   memtype: platform.paging.MemoryType,
-  context: *platform.paging.PagingContext = &CurrentContext,
+  context: *platform.paging.PagingContext = &kernel_context,
 }) !*T {
   const struct_size = @sizeOf(T);
   try remap_phys_size(.{
@@ -236,7 +236,7 @@ pub fn remap_phys_size(args: struct {
   phys: usize,
   size: usize,
   memtype: platform.paging.MemoryType,
-  context: *platform.paging.PagingContext = &CurrentContext,
+  context: *platform.paging.PagingContext = &kernel_context,
 }) !void {
   const psz = args.context.page_size(0, args.context.phys_to_virt(args.phys));
   const page_addr_low = libalign.align_down(usize, psz, args.phys);
@@ -377,7 +377,7 @@ fn translate_virt_impl(
 
 pub fn translate_virt(args: struct {
   virt: usize,
-  context: *platform.paging.PagingContext = &CurrentContext,
+  context: *platform.paging.PagingContext = &kernel_context,
 }) !usize {
   const root = args.context.root_table(args.virt);
   return translate_virt_impl(args.virt, root, args.context);
@@ -468,4 +468,11 @@ fn print_impl(root: *page_table, comptime level: usize) void {
     }
     log("Empty table\n", .{});
   }
+}
+
+pub fn switch_to_context(context: *platform.paging.PagingContext) void {
+  const state = os.platform.get_and_disable_interrupts();
+  context.apply();
+  os.platform.get_current_task().paging_context = context;
+  os.platform.set_interrupts(state);
 }

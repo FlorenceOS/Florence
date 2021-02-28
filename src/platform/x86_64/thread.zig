@@ -39,82 +39,35 @@ pub const CoreData = struct {
 
 const task_stack_size = 1024 * 16;
 
-fn task_fork_impl(frame: *interrupts.InterruptFrame) !void {
-  const new_task = @intToPtr(*os.thread.Task, frame.rax);
-  const current_cpu = os.platform.thread.get_current_cpu();
-
-  const current_task = current_cpu.current_task.?;
-
-  current_cpu.executable_tasks.enqueue(current_task);
-
-  frame.rax = 0;
-
-  new_task.registers = frame.*;
-  current_task.registers = frame.*;
-
-  current_task.registers.rbx = 0;
-  frame.rbx = 1;
-
-  os.platform.set_current_task(new_task);
-}
-
-pub fn task_fork_handler(frame: *interrupts.InterruptFrame) void {
-  task_fork_impl(frame) catch |err| {
-    frame.rax = 1;
-    frame.rbx = @errorToInt(err);
-  };
-}
-
-const stack_allocator = os.memory.vmm.backed(.Ephemeral);
+const ephemeral = os.memory.vmm.backed(.Ephemeral);
 
 pub fn new_task_call(new_task: *os.thread.Task, func: anytype, args: anytype) !void {
+  const Args = @TypeOf(args);
   var had_error: u64 = undefined;
   var result: u64 = undefined;
+ 
+  const cpu = &os.platform.smp.cpus[new_task.allocated_core_id];
+ 
+  new_task.platform_data.stack = try ephemeral.create([task_stack_size]u8);
+  errdefer ephemeral.destroy(new_task.platform_data.stack.?);
+ 
+  const stack_bottom = @ptrToInt(new_task.platform_data.stack);
+  var stack_top = stack_bottom + task_stack_size;
+  const entry = os.thread.NewTaskEntry.alloc_on_stack(func, args, stack_top, stack_bottom);
+  stack_top = os.lib.libalign.align_down(usize, 16, @ptrToInt(entry));
 
-  new_task.platform_data.stack = try stack_allocator.create([task_stack_size]u8);
-  errdefer stack_allocator.destroy(new_task.platform_data.stack.?);
-
-  // task_fork()
-  asm volatile(
-    \\int $0x6A
-    : [err] "={rax}" (had_error)
-    , [res] "={rbx}" (result)
-    : [new_task] "{rax}" (new_task)
-  );
-
-  if(had_error == 1)
-    return @intToError(@intCast(std.meta.Int(.unsigned, @sizeOf(anyerror) * 8), result));
-
-  // Guaranteed to be run first
-  if(result == 1) {
-    // Switch stack
-    // https://github.com/ziglang/zig/issues/3857
-    // @call(.{
-    //   .modifier = .always_inline,
-    //   .stack = @alignCast(16, new_task.platform_data.stack.?)[0..task_stack_size - 16],
-    // }, new_task_call_part_2, .{func, args_ptr});
-    var args_ptr = &args;
-    asm volatile(
-      ""
-      : [_] "={rax}" (args_ptr)
-      : [_] "{rsp}" (@ptrToInt(&new_task.platform_data.stack.?[task_stack_size - 16]))
-      , [_] "{rax}" (args_ptr)
-      : "memory"
-    );
-    new_task_call_part_2(func, args_ptr);
-  }
-}
-
-fn new_task_call_part_2(func: anytype, args_ptr: anytype) noreturn {
-  const new_args = args_ptr.*;
-  // Let our parent task resume now that we've safely copied
-  // the function arguments onto our stack
-  os.thread.scheduler.yield();
-  @call(.{}, func, new_args) catch |err| {
-    os.log("Task exited with error: {}\n", .{@errorName(err)});
-    os.platform.hang();
-  };
-  os.thread.scheduler.exit_task();
+  new_task.registers.eflags = regs.eflags();
+  new_task.registers.rdi = @ptrToInt(entry);
+  new_task.registers.rsp = stack_top;
+  new_task.registers.cs = gdt.selector.code64;
+  new_task.registers.ss = gdt.selector.data64;
+  new_task.registers.fs = gdt.selector.data64;
+  new_task.registers.es = gdt.selector.data64;
+  new_task.registers.gs = gdt.selector.data64;
+  new_task.registers.ds = gdt.selector.data64;
+  new_task.registers.rip = @ptrToInt(entry.function);
+ 
+  os.platform.smp.cpus[new_task.allocated_core_id].executable_tasks.enqueue(new_task);
 }
 
 pub fn yield(enqueue: bool) void {
@@ -124,4 +77,30 @@ pub fn yield(enqueue: bool) void {
     : [_] "{rbx}" (@boolToInt(enqueue))
     : "memory"
   );
+}
+
+pub fn yield_handler(frame: *interrupts.InterruptFrame) void {
+  const current_task = os.platform.get_current_task();
+
+  current_task.registers = frame.*;
+  if (frame.rbx == 1) {
+    os.platform.smp.cpus[current_task.allocated_core_id].executable_tasks.enqueue(current_task);
+  }
+  
+  await_handler(frame);
+}
+
+pub fn await_handler(frame: *interrupts.InterruptFrame) void {
+  const current_task = os.platform.get_current_task();
+  const curent_context = current_task.paging_context;
+
+  var next_task: *os.thread.Task = undefined;
+  while (true) {
+    next_task = os.platform.thread.get_current_cpu().executable_tasks.dequeue() orelse continue;
+    break;
+  }
+
+  os.platform.set_current_task(next_task);
+  next_task.paging_context.apply();
+  frame.* = next_task.registers;
 }

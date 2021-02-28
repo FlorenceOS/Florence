@@ -99,8 +99,8 @@ pub fn free_phys(phys: usize, size: usize) void {
   unreachable;
 }
 
-pub fn phys_to_virt(phys: usize) usize {
-  return os.memory.paging.CurrentContext.phys_to_virt(phys);
+pub fn phys_to_virt(phys: usize) u64 {
+  return os.memory.paging.kernel_context.phys_to_virt(phys);
 }
 
 pub fn access_phys(comptime t: type, phys: usize) [*]t {
