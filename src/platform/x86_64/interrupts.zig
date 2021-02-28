@@ -194,57 +194,61 @@ pub const InterruptFrame = packed struct {
 
 export fn interrupt_common() callconv(.Naked) void {
   asm volatile(
-    \\.intel_syntax noprefix
-    \\push rax
-    \\push rbx
-    \\push rcx
-    \\push rdx
-    \\push rbp
-    \\push rsi
-    \\push rdi
-    \\push r8
-    \\push r9
-    \\push r10
-    \\push r11
-    \\push r12
-    \\push r13
-    \\push r14
-    \\push r15
-    \\mov rax, gs
-    \\push rax
-    \\mov rax, fs
-    \\push rax
-    \\mov rax, ds
-    \\push rax
-    \\mov rax, es
-    \\push rax
-    \\mov rdi, rsp
+    \\push %%rax
+    \\push %%rbx
+    \\push %%rcx
+    \\push %%rdx
+    \\push %%rbp
+    \\push %%rsi
+    \\push %%rdi
+    \\push %%r8
+    \\push %%r9
+    \\push %%r10
+    \\push %%r11
+    \\push %%r12
+    \\push %%r13
+    \\push %%r14
+    \\push %%r15
+    \\mov %%gs, %%rax
+    \\push %%rax
+    \\mov %%fs, %%rax
+    \\push %%rax
+    \\mov %%ds, %%rax
+    \\push %%rax
+    \\mov %%es, %%rax
+    \\push %%rax
+    \\mov %%rsp, %%rdi
+    \\mov %[dsel], %%ax
+    \\mov %%ax, %%es
+    \\mov %%ax, %%ds
+    \\mov %%ax, %%fs
+    \\mov %%ax, %%gs
     \\call interrupt_handler
-    \\pop rax
-    \\mov es, rax
-    \\pop rax
-    \\mov ds, rax
-    \\pop rax
-    \\mov fs, rax
-    \\pop rax
-    \\mov gs, rax
-    \\pop  r15
-    \\pop  r14
-    \\pop  r13
-    \\pop  r12
-    \\pop  r11
-    \\pop  r10
-    \\pop  r9
-    \\pop  r8
-    \\pop  rdi
-    \\pop  rsi
-    \\pop  rbp
-    \\pop  rdx
-    \\pop  rcx
-    \\pop  rbx
-    \\pop  rax
-    \\add  rsp, 16 // Pop error code and interrupt number
+    \\pop %%rax
+    \\mov %%es, %%rax
+    \\pop %%rax
+    \\mov %%ds, %%rax
+    \\pop %%fs
+    \\pop %%gs
+    \\pop %%r15
+    \\pop %%r14
+    \\pop %%r13
+    \\pop %%r12
+    \\pop %%r11
+    \\pop %%r10
+    \\pop %%r9
+    \\pop %%r8
+    \\pop %%rdi
+    \\pop %%rsi
+    \\pop %%rbp
+    \\pop %%rdx
+    \\pop %%rcx
+    \\pop %%rbx
+    \\pop %%rax
+    \\add $16, %%rsp // Pop error code and interrupt number
     \\iretq
+    :
+    : [dsel] "i" (gdt.selector.data64)
   );
   unreachable;
 }
