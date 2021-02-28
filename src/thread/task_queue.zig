@@ -35,15 +35,8 @@ pub const QueueBase = struct {
 pub const ReadyQueue = struct {
   q: QueueBase = .{},
 
-  /// Get next task to run
   pub fn dequeue(self: *@This()) ?*os.thread.Task {
     return self.q.remove_front();
-  }
-
-  /// Go to sleep without the hope of someone waking as up
-  pub fn leave(self: *@This()) noreturn {
-    os.platform.thread.yield(false);
-    unreachable;
   }
 
   pub fn enqueue(self: *@This(), t: *os.thread.Task) void {

@@ -70,22 +70,14 @@ pub fn new_task_call(new_task: *os.thread.Task, func: anytype, args: anytype) !v
   os.platform.smp.cpus[new_task.allocated_core_id].executable_tasks.enqueue(new_task);
 }
 
-pub fn yield(enqueue: bool) void {
-  asm volatile(
-    \\int $0x6B
-    :
-    : [_] "{rbx}" (@boolToInt(enqueue))
-    : "memory"
-  );
+pub fn yield() void {
+  asm volatile("int $0x6B");
 }
 
 pub fn yield_handler(frame: *interrupts.InterruptFrame) void {
   const current_task = os.platform.get_current_task();
 
   current_task.registers = frame.*;
-  if (frame.rbx == 1) {
-    os.platform.smp.cpus[current_task.allocated_core_id].executable_tasks.enqueue(current_task);
-  }
   
   await_handler(frame);
 }
