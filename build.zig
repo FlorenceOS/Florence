@@ -123,7 +123,6 @@ fn qemu_run_aarch64_sabaton(b: *Builder, board_name: []const u8, desc: []const u
     const sabaton_blob = try sabaton.build_blob(b, .aarch64, board_name, "boot/Sabaton/");
 
     const flork = build_kernel(b, .aarch64, "stivale2");
-    const flork_blob = try sabaton.pad_file(b, &flork.step, flork.getOutputPath());
 
     const command_step = b.step(board_name, desc);
 
@@ -132,18 +131,18 @@ fn qemu_run_aarch64_sabaton(b: *Builder, board_name: []const u8, desc: []const u
         "-M", board_name, 
         "-cpu", "cortex-a57",
         "-drive", b.fmt("if=pflash,format=raw,file={s},readonly=on", .{sabaton_blob.output_path}),
-        "-drive", b.fmt("if=pflash,format=raw,file={s},readonly=on", .{flork_blob.output_path}),
+        "-fw_cfg", b.fmt("opt/Sabaton/kernel,file={s}", .{flork.getOutputPath()}),
         "-m", "4G",
         "-serial", "stdio",
         //"-S", "-s",
         "-d", "int",
         "-smp", "4",
-        "-device", "virtio-gpu-pci",
+        "-device", "ramfb",
     };
 
     const run_step = b.addSystemCommand(params);
     run_step.step.dependOn(&sabaton_blob.step);
-    run_step.step.dependOn(&flork_blob.step);
+    run_step.step.dependOn(&flork.step);
     command_step.dependOn(&run_step.step);
 }
 

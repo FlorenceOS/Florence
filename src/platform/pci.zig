@@ -48,16 +48,19 @@ pub const Addr = struct {
     var pci_out = self.read(u32, 0x10 + bar_idx * 4);
     const is64 = ((pci_out & 0b110) >> 1) == 2; // bits 1:2, bar type (0 = 32bit, 1 = 64bit)
 
+    self.write(u32, 0x10 + bar_idx * 4 , @truncate(u32, orig));
+
     // The BARs can be either 64 or 32 bit, but the trick works for both
-    var response: u64 = @as(u64, pci_out & 0xFFFFFFF0) | 0xFFFFFFFF00000000; 
+    var response: u64 = @as(u64, pci_out & 0xFFFFFFF0); 
     if (is64) {
       orig |= @as(u64, self.read(u32, 0x14 + bar_idx * 4)) << 32;
-      self.write(u32, 0x10 + bar_idx * 4, 0xFFFFFFFF); // 64bit bar = two 32-bit bars 
+      self.write(u32, 0x14 + bar_idx * 4, 0xFFFFFFFF); // 64bit bar = two 32-bit bars 
       response |= @as(u64, self.read(u32, 0x14 + bar_idx * 4)) << 32;
       self.write(u32, 0x14 + bar_idx * 4, @truncate(u32, orig >> 32));
+      return .{.phy = orig, .size = ~response +% 1};
+    } else {
+      return .{.phy = orig, .size = (~response +% 1) & 0xFFFFFFFF};
     }
-    self.write(u32, 0x10 + bar_idx * 4 , @truncate(u32, orig));
-    return .{.phy = orig, .size = ~response + 1};
   }
 
   pub fn read(self: Addr, comptime T: type, offset: regoff) T {

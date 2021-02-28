@@ -4,6 +4,10 @@ pub var bsp_task: os.thread.Task = .{};
 
 const TPIDR_EL1 = os.platform.msr(*os.platform.smp.CoreData, "TPIDR_EL1");
 
+pub const CoreData = struct {
+
+};
+
 pub fn get_current_cpu() *os.platform.smp.CoreData {
   return TPIDR_EL1.read();
 }
