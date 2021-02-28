@@ -48,7 +48,7 @@ pub fn platform_early_init() void {
 }
 
 pub fn ap_init() void {
-  os.memory.paging.CurrentContext.apply();
+  os.memory.paging.kernel_context.apply();
   try interrupts.init_interrupts();
 
   const cpu = os.platform.thread.get_current_cpu();

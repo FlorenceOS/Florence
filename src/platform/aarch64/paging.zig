@@ -265,7 +265,7 @@ pub const PagingContext = struct {
   pub fn read_current() void {
     const tcr = TCR.read();
 
-    const curr = &os.memory.paging.CurrentContext;
+    const curr = &os.memory.paging.kernel_context;
 
     curr.mair = MAIRContext().get_active();
     curr.br0 = ttbr0.read();
@@ -284,7 +284,7 @@ pub const PagingContext = struct {
       .br1 = try make_page_table(psz),
       .upper = pszc,
       .lower = pszc,
-      .physical_base = os.memory.paging.CurrentContext.physical_base,
+      .physical_base = os.memory.paging.kernel_context.physical_base,
     };
   }
 

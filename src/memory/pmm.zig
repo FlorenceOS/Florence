@@ -100,7 +100,7 @@ pub fn free_phys(phys: u64, size: u64) void {
 }
 
 pub fn phys_to_virt(phys: u64) u64 {
-  return os.memory.paging.CurrentContext.phys_to_virt(phys);
+  return os.memory.paging.kernel_context.phys_to_virt(phys);
 }
 
 pub fn access_phys(comptime t: type, phys: u64) [*]t {

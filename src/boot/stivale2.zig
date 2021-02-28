@@ -263,12 +263,12 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
 
   const phys_high = stivale.phys_high(info.memmap.?.get());
 
-  context.apply();
-  os.memory.paging.CurrentContext = context;
+  os.memory.paging.switch_to_context(&context);
+  os.memory.paging.kernel_context = context;
 
   os.log("Doing vmm\n", .{});
 
-  const heap_base = os.memory.paging.CurrentContext.phys_to_virt(phys_high);
+  const heap_base = os.memory.paging.kernel_context.phys_to_virt(phys_high);
 
   os.vital(vmm.init(heap_base), "initializing vmm");
 
@@ -291,7 +291,7 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     os.platform.smp.init(cpus.len);
 
     var bootstrap_stack_size =
-      os.memory.paging.CurrentContext.page_size(0, os.memory.pmm.phys_to_virt(0));
+      os.memory.paging.kernel_context.page_size(0, os.memory.pmm.phys_to_virt(0));
 
     // Just a single page of stack isn't enough for debug mode :^(
     if(std.debug.runtime_safety) {

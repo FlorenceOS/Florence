@@ -41,7 +41,7 @@ pub fn platform_init() !void {
 }
 
 pub fn ap_init() void {
-  os.memory.paging.CurrentContext.apply();
+  os.memory.paging.kernel_context.apply();
 }
 
 pub fn debugputch(val: u8) void {

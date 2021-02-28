@@ -91,6 +91,9 @@ pub fn yield_handler(frame: *interrupts.InterruptFrame) void {
 }
 
 pub fn await_handler(frame: *interrupts.InterruptFrame) void {
+  const current_task = os.platform.get_current_task();
+  const curent_context = current_task.paging_context;
+
   var next_task: *os.thread.Task = undefined;
   while (true) {
     next_task = os.platform.thread.get_current_cpu().executable_tasks.dequeue() orelse continue;
@@ -98,5 +101,6 @@ pub fn await_handler(frame: *interrupts.InterruptFrame) void {
   }
 
   os.platform.set_current_task(next_task);
+  next_task.paging_context.apply();
   frame.* = next_task.registers;
 }
