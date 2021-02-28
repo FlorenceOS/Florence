@@ -61,6 +61,10 @@ pub fn new_task_call(new_task: *os.thread.Task, func: anytype, args: anytype) !v
   new_task.registers.rsp = stack_top;
   new_task.registers.cs = gdt.selector.code64;
   new_task.registers.ss = gdt.selector.data64;
+  new_task.registers.fs = gdt.selector.data64;
+  new_task.registers.es = gdt.selector.data64;
+  new_task.registers.gs = gdt.selector.data64;
+  new_task.registers.ds = gdt.selector.data64;
   new_task.registers.rip = @ptrToInt(entry.function);
  
   os.platform.smp.cpus[new_task.allocated_core_id].executable_tasks.enqueue(new_task);
