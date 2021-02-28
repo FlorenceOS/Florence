@@ -58,7 +58,7 @@ pub fn unmap(args: struct {
   size: usize,
   reclaim_pages: bool,
   context: *platform.paging.PagingContext = &kernel_context,
-}) !void {
+}) void {
   var argc = args;
   unmap_loop(&argc.virt, &argc.size, argc.reclaim_pages, argc.context);
 }
@@ -413,7 +413,7 @@ fn unmap_iter(
       .Table => |tbl| unmap_iter(virt, size, reclaim_pages, tbl, context),
       .Mapping => |mapping| {
         if(dom.len > size.* or dom.ptr != virt.*)
-          @panic("No partial unmapping support yet =(");
+          @panic("No partial unmapping");
 
         if(reclaim_pages)
           pmm.free_phys(mapping.phys, dom.len);

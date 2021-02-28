@@ -39,10 +39,10 @@ fn is_printable(c: u8) bool {
   return font.base <= c and c < font.base + font.data.len/8;
 }
 
-const bgcol = 0x00;
-const fgcol = 0xaa;
+const bgcol = 0x20;
+const fgcol = 0xbf;
 
-const clear_screen = false;
+const clear_screen = true;
 
 const Framebuffer = struct {
   addr: []u8,
@@ -121,7 +121,7 @@ const Framebuffer = struct {
       const src = self.addr.ptr + self.pitch * y;
       @memcpy(dst, src, self.pitch);
     }
-    @memset(self.addr.ptr + self.pitch * (y - font.height), 0x00, self.pitch * font.height);
+    @memset(self.addr.ptr + self.pitch * (y - font.height), bgcol, self.pitch * font.height);
     self.updater(0, 0, self.width, self.height, self.updater_ctx);
   }
 
