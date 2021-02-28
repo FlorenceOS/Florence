@@ -64,15 +64,15 @@ pub fn map_bootloader_data(context: *platform.paging.PagingContext) void {
 pub fn detect_phys_base() void {
   switch(std.builtin.arch) {
     .aarch64 => {
-      os.memory.paging.CurrentContext.set_phys_base(0xFFFF800000000000);
+      os.memory.paging.kernel_context.set_phys_base(0xFFFF800000000000);
     },
     .x86_64 => {
       if(os.platform.paging.is_5levelpaging()) {
         os.log("5 level paging detected!\n", .{});
-        os.memory.paging.CurrentContext.set_phys_base(0xFF00000000000000);
+        os.memory.paging.kernel_context.set_phys_base(0xFF00000000000000);
       }
       else {
-        os.memory.paging.CurrentContext.set_phys_base(0xFFFF800000000000);
+        os.memory.paging.kernel_context.set_phys_base(0xFFFF800000000000);
       }
     },
     else => {

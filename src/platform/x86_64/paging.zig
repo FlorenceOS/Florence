@@ -156,7 +156,7 @@ pub const PagingContext = struct {
   pub fn read_current() void {
     const id = regs.cpuid(0x80000001);
 
-    const curr = &os.memory.paging.CurrentContext;
+    const curr = &os.memory.paging.kernel_context;
 
     curr.pat = PATContext().get_active();
     curr.cr3_val = cr3.read();
@@ -169,7 +169,7 @@ pub const PagingContext = struct {
   }
 
   pub fn make_default() !@This() {
-    const curr = &os.memory.paging.CurrentContext;
+    const curr = &os.memory.paging.kernel_context;
 
     // Check if we can upgrade
     const enable_5level = curr.level5paging or false;

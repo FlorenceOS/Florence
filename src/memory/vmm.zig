@@ -5,9 +5,9 @@ const paging     = os.memory.paging;
 const RangeAlloc = os.lib.range_alloc.RangeAlloc;
 const Mutex      = os.thread.Mutex;
 
-var sbrk_head: u64 = undefined;
+var sbrk_head: usize = undefined;
 
-pub fn init(phys_high: u64) !void {
+pub fn init(phys_high: usize) !void {
   os.log("Initializing vmm with base 0x{X}\n", .{phys_high});
   sbrk_mutex.init();
   sbrk_head = phys_high;
@@ -15,7 +15,7 @@ pub fn init(phys_high: u64) !void {
 
 var sbrk_mutex = Mutex{};
 
-pub fn nonbacked_sbrk(num_bytes: u64) ![]u8 {
+pub fn nonbacked_sbrk(num_bytes: usize) ![]u8 {
   sbrk_mutex.lock();
   defer sbrk_mutex.unlock();
 
@@ -27,7 +27,7 @@ pub fn nonbacked_sbrk(num_bytes: u64) ![]u8 {
   return @intToPtr([*]u8, ret)[0..num_bytes];
 }
 
-pub fn sbrk(num_bytes: u64) ![]u8 {
+pub fn sbrk(num_bytes: usize) ![]u8 {
   const ret = try nonbacked_sbrk(num_bytes);
 
   try paging.map(.{
@@ -75,4 +75,12 @@ pub fn backed(
     .Ephemeral => return &ephemeral_alloc.allocator,
     .Eternal   => return &range.allocator,
   }
+}
+
+/// The virtual memory is _NOT_ backed by physical pages.
+/// If you dereference this memory, you _WILL_ get a page
+/// fault. The pointers into this memory cannot be dereferenced
+/// before mapping the memory to some physical memory.
+pub fn nonbacked() *std.mem.Allocator {
+  return &nonbacked_range.allocator;
 }

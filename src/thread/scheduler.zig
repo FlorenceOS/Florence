@@ -29,6 +29,7 @@ pub fn new_task() !*os.thread.Task {
 /// from an existing task, e.g can't be called from an interrupt context
 pub fn make_task(func: anytype, args: anytype) !void {
   const task = try new_task();
+  task.paging_context = os.platform.get_current_task().paging_context;
   // Find the best CPU for the task
   var best_cpu_idx: usize = 0;
 

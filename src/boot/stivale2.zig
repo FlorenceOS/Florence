@@ -172,11 +172,10 @@ fn smp_entry(info_in: u64) callconv(.C) noreturn {
   const smp_info = os.platform.phys_ptr(*stivale2_smp_info).from_int(info_in);
   const core_id = smp_info.get().argument;
 
-  platform.ap_init();
-
   const cpu = &os.platform.smp.cpus[core_id];
-
   os.platform.thread.set_current_cpu(cpu);
+
+  platform.ap_init();
   cpu.booted = true;
 
   os.log("Core {} inited\n", .{core_id});
@@ -264,12 +263,12 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
 
   const phys_high = stivale.phys_high(info.memmap.?.get());
 
-  context.apply();
-  os.memory.paging.CurrentContext = context;
+  os.memory.paging.switch_to_context(&context);
+  os.memory.paging.kernel_context = context;
 
   os.log("Doing vmm\n", .{});
 
-  const heap_base = os.memory.paging.CurrentContext.phys_to_virt(phys_high);
+  const heap_base = os.memory.paging.kernel_context.phys_to_virt(phys_high);
 
   os.vital(vmm.init(heap_base), "initializing vmm");
 
@@ -282,6 +281,8 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     vga_log.register();
   }
 
+  os.platform.smp.cpus[0].bootstrap_int_stack();
+
   if(info.smp) |smp| {
     os.vital(map_smp(smp), "mapping smp struct");
 
@@ -290,12 +291,21 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     os.platform.smp.init(cpus.len);
 
     var bootstrap_stack_size =
-      os.memory.paging.CurrentContext.page_size(0, os.memory.pmm.phys_to_virt(0));
+      os.memory.paging.kernel_context.page_size(0, os.memory.pmm.phys_to_virt(0));
 
     // Just a single page of stack isn't enough for debug mode :^(
-    if(std.debug.runtime_safety)
+    if(std.debug.runtime_safety) {
       bootstrap_stack_size *= 4;
+    }
 
+    // Allocate stacks for all CPUs
+    var bootstrap_stack_pool_sz = bootstrap_stack_size * cpus.len;
+    var stacks = os.vital(os.memory.pmm.alloc_phys(bootstrap_stack_pool_sz), "allocating ap stacks");
+
+    // Setup counter used for waiting
+    @atomicStore(usize, &os.platform.smp.cpus_left, cpus.len - 1, .Release);
+
+    // Initiate startup sequence for all cores in parallel
     for(cpus) |*cpu_info, i| {
       const cpu = &os.platform.smp.cpus[i];
 
@@ -305,15 +315,23 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
         continue;
 
       cpu.booted = false;
-      cpu.current_task = null;
 
       // Boot it!
-      const stack = os.vital(os.memory.pmm.alloc_phys(bootstrap_stack_size), "allocating ap stack");
+      const stack = stacks + bootstrap_stack_size * i;
 
       cpu_info.argument = i;
       cpu_info.target_stack = os.memory.pmm.phys_to_virt(stack + bootstrap_stack_size - 16);
       @atomicStore(u64, &cpu_info.goto_address, @ptrToInt(smp_entry), .Release);
     }
+
+    // Wait for the counter to become 0
+    while (@atomicLoad(usize, &os.platform.smp.cpus_left, .Acquire) != 0) {
+      os.platform.spin_hint();
+    }
+
+    // Free memory pool used for stacks. Unreachable for now
+    os.memory.pmm.free_phys(stacks, bootstrap_stack_pool_sz);
+    os.log("All cores are ready for tasks!\n", .{});
   }
 
   if(info.rsdp) |rsdp| {

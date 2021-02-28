@@ -6,7 +6,7 @@ const platform = os.platform;
 const lalign   = os.lib.libalign;
 
 const page_sizes = platform.paging.page_sizes;
-var free_roots   = [_]u64{0} ** page_sizes.len;
+var free_roots   = [_]usize{0} ** page_sizes.len;
 
 var pmm_mutex    = os.thread.Mutex{};
 
@@ -38,11 +38,11 @@ pub fn consume(phys: usize, size: usize) void {
   }
 }
 
-pub fn good_size(size: usize) u64 {
+pub fn good_size(size: usize) usize {
   unreachable;
 }
 
-fn alloc_impl(ind: usize) error{OutOfMemory}!u64 {
+fn alloc_impl(ind: usize) error{OutOfMemory}!usize {
   if(free_roots[ind] == 0) {
     if(ind + 1 >= page_sizes.len)
       return error.OutOfMemory;
@@ -99,8 +99,8 @@ pub fn free_phys(phys: usize, size: usize) void {
   unreachable;
 }
 
-pub fn phys_to_virt(phys: usize) usize {
-  return os.memory.paging.CurrentContext.phys_to_virt(phys);
+pub fn phys_to_virt(phys: usize) u64 {
+  return os.memory.paging.kernel_context.phys_to_virt(phys);
 }
 
 pub fn access_phys(comptime t: type, phys: usize) [*]t {

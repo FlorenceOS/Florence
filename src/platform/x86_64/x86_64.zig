@@ -41,18 +41,35 @@ pub fn platform_early_init() void {
   os.thread.scheduler.init(&thread.bsp_task);
   serial.init();
   try interrupts.init_interrupts();
-  gdt.setup_gdt();
+  os.platform.smp.cpus[0].platform_data.gdt.load();
   os.memory.paging.init();
 
   set_interrupts(true);
 }
 
 pub fn ap_init() void {
-  os.memory.paging.CurrentContext.apply();
+  os.memory.paging.kernel_context.apply();
   try interrupts.init_interrupts();
-  gdt.setup_gdt();
 
-  set_interrupts(true);
+  const cpu = os.platform.thread.get_current_cpu();
+  cpu.platform_data.gdt.load();
+
+  asm volatile(
+    \\mov %[stack], %%rsp
+    \\jmp *%[dest]
+    :
+    : [stack] "rm" (cpu.int_stack)
+    , [_] "{rdi}" (cpu)
+    , [dest] "r" (ap_init_stage2)
+  );
+  unreachable;
+}
+
+fn ap_init_stage2() void {
+  _ = @atomicRmw(usize, &os.platform.smp.cpus_left, .Sub, 1, .AcqRel);
+  // Wait for tasks
+  asm volatile("int $0x6C");
+  unreachable;
 }
 
 pub fn spin_hint() void {
