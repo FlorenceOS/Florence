@@ -1,16 +1,18 @@
 const std = @import("std");
 const os = @import("root").os;
 
-pub fn yield() void {
-  os.platform.thread.yield(true);
-}
-
 pub fn wait() void {
-  os.platform.thread.yield(false);
+  os.platform.thread.yield();
 }
 
 pub fn leave() noreturn {
-  os.platform.thread.get_current_cpu().executable_tasks.leave();
+  wait();
+  unreachable;
+}
+
+pub fn yield() void {
+  os.platform.thread.get_current_cpu().executable_tasks.enqueue(os.platform.get_current_task());
+  os.platform.thread.yield();
 }
 
 pub fn wake(task: *os.thread.Task) void {
