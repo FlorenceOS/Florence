@@ -76,16 +76,16 @@ pub fn yield() void {
 
 pub fn yield_handler(frame: *interrupts.InterruptFrame) void {
   const current_task = os.platform.get_current_task();
-
+  const curent_context = current_task.paging_context;
   current_task.registers = frame.*;
-  
-  await_handler(frame);
+
+  const next_task = switch_task(frame);
+  if (current_task.paging_context != next_task.paging_context) {
+    next_task.paging_context.apply();
+  }
 }
 
-pub fn await_handler(frame: *interrupts.InterruptFrame) void {
-  const current_task = os.platform.get_current_task();
-  const curent_context = current_task.paging_context;
-
+fn switch_task(frame: *interrupts.InterruptFrame) *os.thread.Task {
   var next_task: *os.thread.Task = undefined;
   while (true) {
     next_task = os.platform.thread.get_current_cpu().executable_tasks.dequeue() orelse continue;
@@ -93,6 +93,11 @@ pub fn await_handler(frame: *interrupts.InterruptFrame) void {
   }
 
   os.platform.set_current_task(next_task);
-  next_task.paging_context.apply();
   frame.* = next_task.registers;
+  return next_task;
+}
+
+pub fn await_handler(frame: *interrupts.InterruptFrame) void {
+  const next_task = switch_task(frame);
+  next_task.paging_context.apply();
 }
