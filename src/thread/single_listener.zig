@@ -1,4 +1,5 @@
 const std = @import("std");
+const os = @import("root").os;
 
 /// SingleListener is a helper that allows one thread
 /// to listen for events triggered by many producers
@@ -35,6 +36,7 @@ pub const SingleListener = struct {
     pub fn wait(self: *const @This()) void {
         while (self.diff() == 0) {
             // TODO: Rewrite with sleep support
+            os.thread.scheduler.yield();
         }
     }
 

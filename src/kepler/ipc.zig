@@ -511,7 +511,7 @@ pub const Stream = struct {
             return error.ConnectionNotEstablished;
         }
         // If notificaton was already sent and not yet handled, just ignore
-        if (!@atomicLoad(bool, &self.ready_to_resend[peer.idx()], .Acquire)) {
+        if (@atomicLoad(bool, &self.ready_to_resend[peer.idx()], .Acquire)) {
             return;
         }
         @atomicStore(bool, &self.ready_to_resend[peer.idx()], true, .Release);
