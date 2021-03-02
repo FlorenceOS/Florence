@@ -391,7 +391,7 @@ pub const Stream = struct {
     /// Memory objects for buffers
     memory_objs: [2]*kepler.memory.MemoryObject,
     /// Mailbox object for passing references
-    mailbox: *kepler.objects.ObjectRefMailbox,
+    mailbox: kepler.objects.ObjectRefMailbox,
     /// Info for userspace
     info: UserspaceInfo,
 
@@ -425,6 +425,10 @@ pub const Stream = struct {
         errdefer endpoint.drop();
         // and info
         instance.info = info;
+        // and objects
+        instance.mailbox = mailbox;
+        instance.memory_objs[Peer.Producer.idx()] = producer_rw_object;
+        instance.memory_objs[Peer.Consumer.idx()] = consumer_rw_object;
         // Prepare message
         instance.notes[Peer.Producer.idx()].typ = .RequestPending;
         instance.notes[Peer.Producer.idx()].owner_ref = .{ .stream = instance.borrow() };

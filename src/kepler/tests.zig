@@ -14,19 +14,24 @@ fn server_task(allocator: *std.mem.Allocator, server_noteq: *kepler.ipc.NoteQueu
     try connect_note.owner_ref.stream.accept();
     os.log("Request was accepted!\n", .{});
 
-    // Server should get .Submit note
-    server_noteq.wait();
-    const submit_note = server_noteq.try_recv() orelse unreachable;
-    std.debug.assert(submit_note.typ == .TasksAvailable);
-    std.debug.assert(submit_note.owner_ref.stream == conn);
-    os.log("Server recieved .Submit note!\n", .{});
+    // Test 1000000 requests
+    var i: usize = 0;
+    os.log("Server task enters stress test!\n", .{});
+    while (i < 1000000) : (i += 1) {
+        // Server should get .Submit note
+        server_noteq.wait();
+        const submit_note = server_noteq.try_recv() orelse unreachable;
+        std.debug.assert(submit_note.typ == .TasksAvailable);
+        std.debug.assert(submit_note.owner_ref.stream == conn);
 
-    // Allow client to resent its note
-    submit_note.drop();
-    conn.unblock(.Consumer);
+        // Allow client to resent its note
+        submit_note.drop();
+        conn.unblock(.Consumer);
 
-    // Notify consumer about completed tasks
-    try conn.notify(.Consumer);
+        // Notify consumer about completed tasks
+        try conn.notify(.Consumer);
+    }
+    os.log("Server task exits stress test!\n", .{});
 
     // Terminate connection from the server
     conn.abandon(.Producer);
@@ -55,25 +60,24 @@ fn client_task(allocator: *std.mem.Allocator, client_noteq: *kepler.ipc.NoteQueu
     conn.finalize_connection();
     os.log("Connection finalized!\n", .{});
 
-    // Let's notify server about more tasks
-    try conn.notify(.Producer);
-    os.log("Producer was notified!\n", .{});
+    // Test 1000000 requests
+    var i: usize = 0;
+    os.log("Client task enters stress test!\n", .{});
+    while (i < 1000000) : (i += 1) {
+        // Let's notify server about more tasks
+        try conn.notify(.Producer);
 
-    // Try again to test if resend is handled
-    try conn.notify(.Producer);
-    os.log("Producer was notified again!\n", .{});
+        // Client should get .Complete note
+        client_noteq.wait();
+        const complete_note = client_noteq.try_recv() orelse unreachable;
+        std.debug.assert(complete_note.typ == .ResultsAvailable);
+        std.debug.assert(complete_note.owner_ref.stream == conn);
+        complete_note.drop();
 
-    // Client should get .Complete note
-    client_noteq.wait();
-    const complete_note = client_noteq.try_recv() orelse unreachable;
-    std.debug.assert(complete_note.typ == .ResultsAvailable);
-    std.debug.assert(complete_note.owner_ref.stream == conn);
-    os.log("Client recieved .Submit note!\n", .{});
-    complete_note.drop();
-
-    // Allow server to resend its note
-    complete_note.drop();
-    conn.unblock(.Producer);
+        // Allow server to resend its note
+        conn.unblock(.Producer);
+    }
+    os.log("Client task exits stress test!\n", .{});
 
     // Client should get ping of death message
     client_noteq.wait();
