@@ -511,10 +511,10 @@ pub const Stream = struct {
             return error.ConnectionNotEstablished;
         }
         // If notificaton was already sent and not yet handled, just ignore
-        if (@atomicLoad(bool, &self.ready_to_resend[peer.idx()], .Acquire)) {
+        if (!@atomicLoad(bool, &self.ready_to_resend[peer.idx()], .Acquire)) {
             return;
         }
-        @atomicStore(bool, &self.ready_to_resend[peer.idx()], true, .Release);
+        @atomicStore(bool, &self.ready_to_resend[peer.idx()], false, .Release);
         // Send notifiaction
         self.notes[peer.idx()].typ = if (peer == .Consumer) .ResultsAvailable else .TasksAvailable;
         self.notes[peer.idx()].owner_ref = .{ .stream = self.borrow() };
