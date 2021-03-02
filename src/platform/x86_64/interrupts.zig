@@ -30,6 +30,10 @@ pub fn init_interrupts() !void {
   add_handler(0x0E, page_fault_handler);
   add_handler(0x6B, thread.yield_handler);
   add_handler(0x6C, thread.await_handler);
+  add_handler(0xFF, spurious_handler);
+}
+
+fn spurious_handler(frame: *InterruptFrame) void {
 }
 
 fn type_page_fault(error_code: usize) !platform.PageFaultAccess {

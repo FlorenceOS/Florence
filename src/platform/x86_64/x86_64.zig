@@ -6,6 +6,7 @@ const gdt = @import("gdt.zig");
 const serial = @import("serial.zig");
 const ports = @import("ports.zig");
 const regs = @import("regs.zig");
+const apic = @import("apic.zig");
 const pci = os.platform.pci;
 
 pub const paging = @import("paging.zig");
@@ -14,6 +15,8 @@ pub const thread = @import("thread.zig");
 pub const PagingRoot = u64;
 pub const InterruptFrame = interrupts.InterruptFrame;
 pub const InterruptState = interrupts.InterruptState;
+
+pub const irq_eoi = apic.eoi; 
 
 pub fn get_and_disable_interrupts() InterruptState {
   return regs.eflags() & 0x200 == 0x200;
@@ -33,6 +36,7 @@ pub fn set_interrupts(s: InterruptState) void {
 
 pub fn platform_init() !void {
   try os.platform.acpi.init_acpi();
+  apic.enable();
   try os.platform.pci.init_pci();
 }
 
