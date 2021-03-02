@@ -85,7 +85,7 @@ fn make_exec(b: *Builder, arch: builtin.Arch, ctx: Context, filename: []const u8
     exec.addBuildOption([]const u8, "source_blob_path", b.fmt("../../{s}", .{source_blob_path}));
     target(exec, arch, ctx);
     add_libs(exec);
-    exec.setBuildMode(.ReleaseSafe);
+    exec.setBuildMode(.ReleaseFast);
     exec.strip = false;
     exec.setMainPkgPath("src/");
     exec.setOutputDir(b.cache_root);

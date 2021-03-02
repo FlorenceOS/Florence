@@ -2,6 +2,10 @@ const std = @import("std");
 const os = @import("root").os;
 const kepler = os.kepler;
 
+fn rdtsc() u64 {
+    return asm volatile("rdtsc" : [_]"={rax}" (-> u64));
+}
+
 fn server_task(allocator: *std.mem.Allocator, server_noteq: *kepler.ipc.NoteQueue) !void {
     // Server note queue should get the .Request note
     server_noteq.wait();
@@ -16,6 +20,7 @@ fn server_task(allocator: *std.mem.Allocator, server_noteq: *kepler.ipc.NoteQueu
 
     // Test 1000000 requests
     var i: usize = 0;
+    var server_rdtsc: u64 = 0;
     os.log("Server task enters stress test!\n", .{});
     while (i < 1000000) : (i += 1) {
         // Server should get .Submit note
@@ -29,9 +34,11 @@ fn server_task(allocator: *std.mem.Allocator, server_noteq: *kepler.ipc.NoteQueu
         conn.unblock(.Consumer);
 
         // Notify consumer about completed tasks
+        const starting_time = rdtsc();
         try conn.notify(.Consumer);
+        server_rdtsc += rdtsc() - starting_time;
     }
-    os.log("Server task exits stress test!\n", .{});
+    os.log("Server task exits stress test! Clock cycles per send on average: {}\n", .{server_rdtsc / 1000000});
 
     // Terminate connection from the server
     conn.abandon(.Producer);
@@ -62,10 +69,13 @@ fn client_task(allocator: *std.mem.Allocator, client_noteq: *kepler.ipc.NoteQueu
 
     // Test 1000000 requests
     var i: usize = 0;
+    var client_rdtsc: usize = 0;
     os.log("Client task enters stress test!\n", .{});
     while (i < 1000000) : (i += 1) {
         // Let's notify server about more tasks
+        const start = rdtsc();
         try conn.notify(.Producer);
+        client_rdtsc += rdtsc() - start;
 
         // Client should get .Complete note
         client_noteq.wait();
@@ -77,7 +87,7 @@ fn client_task(allocator: *std.mem.Allocator, client_noteq: *kepler.ipc.NoteQueu
         // Allow server to resend its note
         conn.unblock(.Producer);
     }
-    os.log("Client task exits stress test!\n", .{});
+    os.log("Client task exits stress test! Clock cycles per send on average: {}\n", .{client_rdtsc / 1000000});
 
     // Client should get ping of death message
     client_noteq.wait();
