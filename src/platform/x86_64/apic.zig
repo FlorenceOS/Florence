@@ -2,7 +2,6 @@ const os = @import("root").os;
 const std = @import("std");
 const builtin = @import("builtin");
 
-
 var lapic: *volatile [0x100]u32 = undefined;
 
 const IA32_APIC_BASE = @import("regs.zig").MSR(u64, 0x0000001B);

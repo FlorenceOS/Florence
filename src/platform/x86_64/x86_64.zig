@@ -37,6 +37,7 @@ pub fn set_interrupts(s: InterruptState) void {
 pub fn platform_init() !void {
   try os.platform.acpi.init_acpi();
   apic.enable();
+  set_interrupts(true);
   try os.platform.pci.init_pci();
 }
 
