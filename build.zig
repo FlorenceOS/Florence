@@ -189,7 +189,7 @@ fn qemu_run_image_x86_64(b: *Builder, image_path: []const u8) *std.build.RunStep
         "-machine", "q35",
         "-device", "qemu-xhci",
         "-smp", "8",
-        //"-cpu", "host", "-enable-kvm",
+        "-cpu", "host", "-enable-kvm",
         //"-d", "int",
         //"-s", "-S",
         //"-trace", "ahci_*",

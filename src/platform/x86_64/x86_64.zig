@@ -48,7 +48,7 @@ pub fn platform_early_init() void {
   os.platform.smp.cpus[0].platform_data.gdt.load();
   os.memory.paging.init();
 
-  set_interrupts(true);
+  //set_interrupts(true);
 }
 
 pub fn ap_init() void {
