@@ -3,7 +3,10 @@ const os = @import("root").os;
 const kepler = os.kepler;
 
 fn rdtsc() u64 {
-    return asm volatile("rdtsc" : [_]"={rax}" (-> u64));
+    var eax: u32 = undefined;
+    var edx: u32 = undefined;
+    asm volatile("rdtsc": [_]"={eax}"(eax), [_]"={edx}"(edx));
+    return @as(u64, eax) + (@as(u64, edx) << 32);
 }
 
 fn server_task(allocator: *std.mem.Allocator, server_noteq: *kepler.ipc.NoteQueue) !void {
@@ -14,7 +17,7 @@ fn server_task(allocator: *std.mem.Allocator, server_noteq: *kepler.ipc.NoteQueu
     const conn = connect_note.owner_ref.stream;
     os.log(".Request note recieved!\n", .{});
 
-    // Accept the request
+    // Accept the requests
     try connect_note.owner_ref.stream.accept();
     os.log("Request was accepted!\n", .{});
 
