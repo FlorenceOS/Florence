@@ -2,9 +2,10 @@ const os = @import("root").os;
 const std = @import("std");
 const builtin = @import("builtin");
 
+// LAPIC
+
 var lapic: *volatile [0x100]u32 = undefined;
 
-const IA32_APIC_BASE = @import("regs.zig").MSR(u64, 0x0000001B);
 pub fn enable() void {
   const phy = IA32_APIC_BASE.read() & 0xFFFFF000; // ignore flags
   os.memory.paging.remap_phys_size(.{ .phys = phy , .size = 0x400, .memtype = .DeviceUncacheable }) catch unreachable;
@@ -22,12 +23,8 @@ pub fn timer(ticks: u32, div: u32, vec: u32) void {
   lapic[TIMER_INITCNT] = ticks;
 }
 
-const LVT_TIMER = 0x320 / 4;
-const TIMER_MODE_PERIODIC = 1 << 17;
-const TIMER_DIV = 0x3E0 / 4;
-const TIMER_INITCNT = 0x380 / 4;
-const SPURIOUS = 0xF0 / 4;
-const EOI = 0xB0 / 4;
+
+// ACPI information
 
 fn handle_processor(apic_id: u32) void {
   os.log("APIC: Processor LAPIC ID {}\n", .{apic_id});
@@ -103,3 +100,11 @@ pub fn handle_madt(madt: []u8) void {
     offset += size;
   }
 }
+
+const IA32_APIC_BASE = @import("regs.zig").MSR(u64, 0x0000001B);
+const LVT_TIMER = 0x320 / 4;
+const TIMER_MODE_PERIODIC = 1 << 17;
+const TIMER_DIV = 0x3E0 / 4;
+const TIMER_INITCNT = 0x380 / 4;
+const SPURIOUS = 0xF0 / 4;
+const EOI = 0xB0 / 4;
