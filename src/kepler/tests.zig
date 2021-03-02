@@ -9,6 +9,8 @@ fn rdtsc() u64 {
     return @as(u64, eax) + (@as(u64, edx) << 32);
 }
 
+const tries = 1_000_000;
+
 fn server_task(allocator: *std.mem.Allocator, server_noteq: *kepler.ipc.NoteQueue) !void {
     // Server note queue should get the .Request note
     server_noteq.wait();
@@ -21,14 +23,19 @@ fn server_task(allocator: *std.mem.Allocator, server_noteq: *kepler.ipc.NoteQueu
     try connect_note.owner_ref.stream.accept();
     os.log("Request was accepted!\n", .{});
 
-    // Test 1000000 requests
+    // Test 10000000 requests
     var i: usize = 0;
-    var server_rdtsc: u64 = 0;
+    var server_send_rdtsc: u64 = 0;
+    var server_recv_rdtsc: u64 = 0;
     os.log("Server task enters stress test!\n", .{});
-    while (i < 1000000) : (i += 1) {
+    while (i < tries) : (i += 1) {
         // Server should get .Submit note
         server_noteq.wait();
+
+        const recv_starting_time = rdtsc();
         const submit_note = server_noteq.try_recv() orelse unreachable;
+        server_recv_rdtsc += rdtsc() - recv_starting_time;
+
         std.debug.assert(submit_note.typ == .TasksAvailable);
         std.debug.assert(submit_note.owner_ref.stream == conn);
 
@@ -37,11 +44,11 @@ fn server_task(allocator: *std.mem.Allocator, server_noteq: *kepler.ipc.NoteQueu
         conn.unblock(.Consumer);
 
         // Notify consumer about completed tasks
-        const starting_time = rdtsc();
+        const send_starting_time = rdtsc();
         try conn.notify(.Consumer);
-        server_rdtsc += rdtsc() - starting_time;
+        server_send_rdtsc += rdtsc() - send_starting_time;
     }
-    os.log("Server task exits stress test! Clock cycles per send on average: {}\n", .{server_rdtsc / 1000000});
+    os.log("Server task exits stress test! Send: {} clk. Recieve: {} clk\n", .{server_send_rdtsc / tries, server_recv_rdtsc / tries});
 
     // Terminate connection from the server
     conn.abandon(.Producer);
@@ -70,19 +77,24 @@ fn client_task(allocator: *std.mem.Allocator, client_noteq: *kepler.ipc.NoteQueu
     conn.finalize_connection();
     os.log("Connection finalized!\n", .{});
 
-    // Test 1000000 requests
+    // Test 10000000 requests
     var i: usize = 0;
-    var client_rdtsc: usize = 0;
+    var client_send_rdtsc: usize = 0;
+    var client_recv_rdtsc: usize = 0;
     os.log("Client task enters stress test!\n", .{});
-    while (i < 1000000) : (i += 1) {
+    while (i < tries) : (i += 1) {
         // Let's notify server about more tasks
-        const start = rdtsc();
+        const send_starting_time = rdtsc();
         try conn.notify(.Producer);
-        client_rdtsc += rdtsc() - start;
+        client_send_rdtsc += rdtsc() - send_starting_time;
 
         // Client should get .Complete note
         client_noteq.wait();
+
+        const recv_starting_time = rdtsc();
         const complete_note = client_noteq.try_recv() orelse unreachable;
+        client_recv_rdtsc += rdtsc() - recv_starting_time;
+
         std.debug.assert(complete_note.typ == .ResultsAvailable);
         std.debug.assert(complete_note.owner_ref.stream == conn);
         complete_note.drop();
@@ -90,7 +102,7 @@ fn client_task(allocator: *std.mem.Allocator, client_noteq: *kepler.ipc.NoteQueu
         // Allow server to resend its note
         conn.unblock(.Producer);
     }
-    os.log("Client task exits stress test! Clock cycles per send on average: {}\n", .{client_rdtsc / 1000000});
+    os.log("Client task exits stress test! Send: {} clk. Recieve: {} clk\n", .{client_send_rdtsc / tries, client_recv_rdtsc / tries});
 
     // Client should get ping of death message
     client_noteq.wait();
