@@ -46,35 +46,47 @@ const clear_screen = true;
 
 const Framebuffer = struct {
   addr: []u8,
-  pitch: u64,
+  pitch: usize,
   width: u32,
   height: u32,
-  bpp: u64,
+  bpp: usize,
 
-  pos_x: u64 = 0,
-  pos_y: u64 = 0,
+  pos_x: usize = 0,
+  pos_y: usize = 0,
 
-  phys: u64,
+  phys: usize,
 
   updater: Updater,
-  updater_ctx: u64,
+  updater_ctx: usize,
 
-  fn width_in_chars(self: *@This()) u64 {
+  backbuffer: []u8,
+
+  fn width_in_chars(self: *@This()) usize {
     return self.width / font.width;
   }
 
-  fn height_in_chars(self: *@This()) u64 {
+  fn height_in_chars(self: *@This()) usize {
     return self.height / font.height;
   }
 
-  fn px(self: *@This(), comptime bpp: u64, x: u64, y: u64) *[3]u8 {
-    const offset = self.pitch * y + x * bpp;
-    return self.addr[offset .. offset + 3][0..3];
+  fn offset(self: *@This(), comptime bpp: usize, x: usize, y: usize) usize {
+    return self.pitch * y + x * bpp;
   }
 
-  fn blit_impl(self: *@This(), comptime bpp: u64, ch: u8) void {
+  fn px(self: *@This(), comptime bpp: usize, x: usize, y: usize) *[3]u8 {
+    const off = self.offset(bpp, x, y);
+    return self.addr[off .. off + 3][0 .. 3];
+  }
+
+  fn back_px(self: *@This(), comptime bpp: usize, x: usize, y: usize) *[3]u8 {
+    const off = self.offset(bpp, x, y);
+    return self.backbuffer[off .. off + 3][0 .. 3];
+  }
+
+  fn blit_impl(self: *@This(), comptime bpp: usize, ch: u8) void {
+    @setRuntimeSafety(false);
     inline for(range(font.height)) |y| {
-      const chr_line = font.data[y + (@as(u64, ch) - font.base) * font.height * ((font.width + 7)/8)];
+      const chr_line = font.data[y + (@as(usize, ch) - font.base) * font.height * ((font.width + 7)/8)];
 
       const ypx = self.pos_y * font.height + y;
 
@@ -82,19 +94,20 @@ const Framebuffer = struct {
         const xpx = self.pos_x * font.width + x;
 
         const pixel = self.px(bpp, xpx, ypx);
+        const bg_pixel = self.back_px(bpp, xpx, ypx);
 
         const shift: u3 = font.width - 1 - x;
         const has_pixel_set = ((chr_line >> shift) & 1) == 1;
 
         if(has_pixel_set) {
-          pixel[0] = fgcol;
-          pixel[1] = fgcol;
-          pixel[2] = fgcol;
+          bg_pixel[0] = fgcol;
+          bg_pixel[1] = fgcol;
+          bg_pixel[2] = fgcol;
         }
         else {
-          pixel[0] = bgcol;
-          pixel[1] = bgcol;
-          pixel[2] = bgcol;
+          bg_pixel[0] = bgcol;
+          bg_pixel[1] = bgcol;
+          bg_pixel[2] = bgcol;
         }
       }
     }
@@ -110,18 +123,18 @@ const Framebuffer = struct {
       self.blit_impl(3, ch);
       return;
     }
-    unreachable;
+    @panic("Unimplemented BPP");
   }
 
   fn scroll_fb(self: *@This()) void {
-    // Yes this is slow but I don't care, I love it.
-    var y: u64 = font.height;
+    @setRuntimeSafety(false);
+    var y: usize = font.height;
     while(y < (self.height/font.height) * font.height): (y += 1) {
-      const dst = self.addr.ptr + self.pitch * (y - font.height);
-      const src = self.addr.ptr + self.pitch * y;
+      const dst = self.backbuffer.ptr + self.pitch * (y - font.height);
+      const src = self.backbuffer.ptr + self.pitch * y;
       @memcpy(dst, src, self.pitch);
     }
-    @memset(self.addr.ptr + self.pitch * (y - font.height), bgcol, self.pitch * font.height);
+    @memset(self.backbuffer.ptr + self.pitch * (y - font.height), bgcol, self.pitch * font.height);
     self.updater(0, 0, self.width, self.height, self.updater_ctx);
   }
 
@@ -140,10 +153,15 @@ const Framebuffer = struct {
     self.updater(0, y, self.width, @truncate(u32, font.height), self.updater_ctx);
   }
 
+  fn flush_backbuffer(self: *@This()) void {
+    @memcpy(self.addr.ptr, self.backbuffer.ptr, self.pitch * self.height);
+  }
+
   pub fn putch(self: *@This(), ch: u8) void {
     if(ch == '\n') {
       self.update();
       self.feed_line();
+      self.flush_backbuffer();
       return;
     }
 
@@ -159,12 +177,12 @@ const Framebuffer = struct {
   }
 };
 
-fn default_updater(x: u32, y: u32, w: u32, h: u32, ctx: u64) void {} // Do nothing
+fn default_updater(x: u32, y: u32, w: u32, h: u32, ctx: usize) void {} // Do nothing
 
 var framebuffer: ?Framebuffer = null;
 
-pub const Updater = fn(x: u32, y: u32, width: u32, height: u32, ctx: u64)void;
-pub const FBInfo = struct { phys: u64, width: u32, height: u32 }; 
+pub const Updater = fn(x: u32, y: u32, width: u32, height: u32, ctx: usize)void;
+pub const FBInfo = struct { phys: usize, width: u32, height: u32 }; 
 
 pub fn get_info() ?FBInfo {
   if (framebuffer) |fb| {
@@ -173,7 +191,7 @@ pub fn get_info() ?FBInfo {
   } else return null;
 }
 
-pub fn set_updater(u: Updater, ctx: u64) void {
+pub fn set_updater(u: Updater, ctx: usize) void {
   if (framebuffer) |*fb| {
     fb.updater = u;
     fb.updater_ctx = ctx;
@@ -184,9 +202,15 @@ pub fn register_fb(fb_phys: usize, fb_pitch: u16, fb_width: u16, fb_height: u16,
   std.debug.assert(fb_bpp_in == 24 or fb_bpp_in == 32);
   // Bits are lies, I do bytes.
   const fb_bpp = fb_bpp_in / 8;
-  const fb_size = @as(u64, fb_pitch) * @as(u64, fb_height);
+  const fb_size = @as(usize, fb_pitch) * @as(usize, fb_height);
   const fb_page_low = os.lib.libalign.align_down(usize, page_size, fb_phys);
   const fb_page_high = os.lib.libalign.align_up(usize, page_size, fb_phys + fb_size);
+
+  // Allocate backbuffer
+  const backbuffer = os.memory.vmm.backed(.Eternal).alloc(u8, fb_size) catch |err| {
+    os.log("VESAlog: Couldn't map fb: {}\n", .{@errorName(err)});
+    return;
+  };
 
   paging.remap_phys_range(.{
     .phys = fb_page_low,
@@ -194,6 +218,7 @@ pub fn register_fb(fb_phys: usize, fb_pitch: u16, fb_width: u16, fb_height: u16,
     .memtype = .DeviceWriteCombining,
   }) catch |err| {
     os.log("VESAlog: Couldn't map fb: {}\n", .{@errorName(err)});
+    // Backbuffer is leaked =(
     return;
   };
 
@@ -206,10 +231,12 @@ pub fn register_fb(fb_phys: usize, fb_pitch: u16, fb_width: u16, fb_height: u16,
     .phys = fb_phys,
     .updater = default_updater,
     .updater_ctx = 0,
+    .backbuffer = backbuffer,
   };
 
   if(clear_screen) {
     @memset(framebuffer.?.addr.ptr, bgcol, fb_size);
+    @memset(framebuffer.?.backbuffer.ptr, bgcol, fb_size);
     os.log("VESAlog: Screen cleared.\n", .{});
   }
 
