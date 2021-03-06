@@ -37,6 +37,8 @@ pub fn allowed_mapping_levels() usize {
 }
 
 pub fn platform_init() !void {
+  try os.platform.acpi.init_acpi();
+  try os.platform.pci.init_pci();
   os.log("The platform is alive!\n", .{});
 }
 
