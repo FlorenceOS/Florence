@@ -40,9 +40,7 @@ pub const CoreData = struct {
 
 const ephemeral = os.memory.vmm.backed(.Ephemeral);
 
-pub fn new_task_call(new_task: *os.thread.Task, func: anytype, args: anytype) !void {
-  const entry = os.thread.NewTaskEntry.alloc(new_task, func, args);
-
+pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry) !void {
   new_task.registers.eflags = regs.eflags();
   new_task.registers.rdi = @ptrToInt(entry);
   new_task.registers.rsp = os.lib.libalign.align_down(usize, 16, @ptrToInt(entry));
@@ -53,8 +51,6 @@ pub fn new_task_call(new_task: *os.thread.Task, func: anytype, args: anytype) !v
   new_task.registers.gs = gdt.selector.data64;
   new_task.registers.ds = gdt.selector.data64;
   new_task.registers.rip = @ptrToInt(entry.function);
-
-  os.platform.smp.cpus[new_task.allocated_core_id].executable_tasks.enqueue(new_task);
 }
 
 pub fn yield() void {

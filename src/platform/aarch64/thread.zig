@@ -31,7 +31,7 @@ pub fn yield() void {
   asm volatile("SVC #'Y'");
 }
 
-pub fn new_task_call(new_task: *os.thread.Task, func: anytype, args: anytype) !void {
+pub fn init_task_call(new_task: *os.thread.Task, func: anytype, args: anytype) !void {
   @panic("yield");
 }
 

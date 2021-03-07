@@ -1,6 +1,9 @@
 const std = @import("std");
 const os = @import("root").os;
 
+const task_alloc = os.memory.vmm.backed(.Ephemeral);
+var balancer_lock = os.thread.Spinlock{};
+
 pub fn wait() void {
   os.platform.thread.yield();
 }
@@ -21,25 +24,18 @@ pub fn wake(task: *os.thread.Task) void {
   os.platform.smp.cpus[task.allocated_core_id].executable_tasks.enqueue(task);
 }
 
-const task_alloc = os.memory.vmm.backed(.Ephemeral);
-var balancer_lock = os.thread.Spinlock{};
+/// Create a new task that calls a function with given arguments.
+/// Uses heap, so don't call in interrupt context
+pub fn make_task(func: anytype, args: anytype) !*os.thread.Task {
+  const task = try task_alloc.create(os.thread.Task);
+  errdefer task_alloc.destroy(task);
 
-/// Allocating memory for the new task
-pub fn new_task() !*os.thread.Task {
-  return task_alloc.create(os.thread.Task);
-}
-
-/// Creating a new task that calls a function. Should be called
-/// from an existing task, e.g can't be called from an interrupt context
-pub fn make_task(func: anytype, args: anytype) !void {
-  const task = try new_task();
   try task.allocate_stack();
   errdefer task.free_stack();
 
   task.paging_context = os.platform.get_current_task().paging_context;
   // Find the best CPU for the task
   var best_cpu_idx: usize = 0;
-
   {
     const state = balancer_lock.lock();
     // TODO: maybe something more sophisticated?
@@ -59,8 +55,16 @@ pub fn make_task(func: anytype, args: anytype) !void {
     balancer_lock.unlock(state);
   }
 
-  errdefer task_alloc.destroy(task);
-  try os.platform.thread.new_task_call(task, func, args);
+
+  const entry = os.thread.NewTaskEntry.alloc(task, func, args);
+  try os.platform.thread.init_task_call(task, entry);
+  return task;
+}
+
+/// Create and start a new task that calls a function with given arguments.
+pub fn spawn_task(func: anytype, args: anytype) !void {
+  const task = try make_task(func, args);
+  os.platform.smp.cpus[task.allocated_core_id].executable_tasks.enqueue(task);
 }
 
 pub fn exit_task() noreturn {
