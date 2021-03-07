@@ -11,8 +11,10 @@ pub fn leave() noreturn {
 }
 
 pub fn yield() void {
+  const state = os.platform.get_and_disable_interrupts();
   os.platform.thread.get_current_cpu().executable_tasks.enqueue(os.platform.get_current_task());
   os.platform.thread.yield();
+  os.platform.set_interrupts(state);
 }
 
 pub fn wake(task: *os.thread.Task) void {
