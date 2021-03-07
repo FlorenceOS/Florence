@@ -5,6 +5,11 @@ const gdt = @import("gdt.zig");
 const regs = @import("regs.zig");
 const interrupts = @import("interrupts.zig");
 
+pub const sched_stack_size = 0x10000;
+pub const int_stack_size = 0x10000;
+pub const task_stack_size = 0x10000;
+pub const stack_guard_size = 0x1000;
+
 pub var bsp_task: os.thread.Task = .{};
 
 pub const kernel_gs_base = regs.MSR(u64, 0xC0000102);
@@ -23,42 +28,24 @@ pub fn self_exited() ?*os.thread.Task {
   if(curr == &bsp_task)
     return null;
 
-  if(curr.platform_data.stack != null) {
-    // TODO: Add URM
-  }
   return curr;
 }
 
 pub const TaskData = struct {
-  stack: ?*[task_stack_size]u8 = null,
 };
 
 pub const CoreData = struct {
   gdt: gdt.Gdt = .{},
 };
 
-const task_stack_size = 1024 * 16;
-
 const ephemeral = os.memory.vmm.backed(.Ephemeral);
 
 pub fn new_task_call(new_task: *os.thread.Task, func: anytype, args: anytype) !void {
-  const Args = @TypeOf(args);
-  var had_error: u64 = undefined;
-  var result: u64 = undefined;
- 
-  const cpu = &os.platform.smp.cpus[new_task.allocated_core_id];
- 
-  new_task.platform_data.stack = try ephemeral.create([task_stack_size]u8);
-  errdefer ephemeral.destroy(new_task.platform_data.stack.?);
- 
-  const stack_bottom = @ptrToInt(new_task.platform_data.stack);
-  var stack_top = stack_bottom + task_stack_size;
-  const entry = os.thread.NewTaskEntry.alloc_on_stack(func, args, stack_top, stack_bottom);
-  stack_top = os.lib.libalign.align_down(usize, 16, @ptrToInt(entry));
+  const entry = os.thread.NewTaskEntry.alloc(new_task, func, args);
 
   new_task.registers.eflags = regs.eflags();
   new_task.registers.rdi = @ptrToInt(entry);
-  new_task.registers.rsp = stack_top;
+  new_task.registers.rsp = os.lib.libalign.align_down(usize, 16, @ptrToInt(entry));
   new_task.registers.cs = gdt.selector.code64;
   new_task.registers.ss = gdt.selector.data64;
   new_task.registers.fs = gdt.selector.data64;
@@ -66,7 +53,7 @@ pub fn new_task_call(new_task: *os.thread.Task, func: anytype, args: anytype) !v
   new_task.registers.gs = gdt.selector.data64;
   new_task.registers.ds = gdt.selector.data64;
   new_task.registers.rip = @ptrToInt(entry.function);
- 
+
   os.platform.smp.cpus[new_task.allocated_core_id].executable_tasks.enqueue(new_task);
 }
 

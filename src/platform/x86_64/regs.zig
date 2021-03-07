@@ -51,7 +51,6 @@ pub fn ControlRegister(comptime T: type, comptime name: []const u8) type {
 pub fn eflags() u64 {
   return asm volatile(
     \\pushfq
-    \\cli
     \\pop %[flags]
     : [flags] "=r" (-> u64)
   );

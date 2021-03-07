@@ -8,7 +8,7 @@ pub const NewTaskEntry = struct {
     /// Callback that should be executed in a new task
     function: fn (*NewTaskEntry) void,
 
-    pub fn alloc_on_stack(func: anytype, args: anytype, stack_top: usize, stack_botton: usize) *NewTaskEntry {
+    pub fn alloc(task: *os.thread.Task, func: anytype, args: anytype) *NewTaskEntry {
         comptime const Args = @TypeOf(args);
         comptime const Func = @TypeOf(func);
         // Method: specify subtype with specific types of func and args
@@ -36,6 +36,8 @@ pub const NewTaskEntry = struct {
                 return wrapper_ptr;
             }
         };
-        return &Wrapper.create(func, args, stack_top, stack_botton).entry;
+        const stack_top = task.stack;
+        const stack_bottom = stack_top - os.platform.thread.task_stack_size;
+        return &Wrapper.create(func, args, stack_top, stack_bottom).entry;
     }
 };

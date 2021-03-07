@@ -10,9 +10,6 @@ const max_cpus = 512;
 /// Assigned in stivale2.zig
 pub var cpus_left: usize = undefined;
 
-/// Interrupt stack size
-const int_stack_size = 65536;
-
 pub const CoreData = struct {
   current_task: *os.thread.Task = undefined,
   booted: bool,
@@ -28,16 +25,16 @@ pub const CoreData = struct {
     return os.lib.get_index(self, cpus);
   }
 
-  fn bootstrap_stack() usize {
-    const guard_size = int_stack_size;
-    const total_size = guard_size + int_stack_size;
+  fn bootstrap_stack(size: usize) usize {
+    const guard_size = os.platform.thread.stack_guard_size;
+    const total_size = guard_size + size;
     // Allocate non-backing virtual memory
     const nonbacked = os.memory.vmm.nonbacked();
     const virt = @ptrToInt(os.vital(nonbacked.allocFn(nonbacked, total_size, 1, 1, 0), "bootstrap stack valloc").ptr);
     // Map pages
     os.vital(os.memory.paging.map(.{
       .virt = virt + guard_size,
-      .size = int_stack_size,
+      .size = size,
       .perm = os.memory.paging.rw(),
       .memtype = os.platform.paging.MemoryType.MemoryWritethrough
     }), "bootstrap stack map");
@@ -45,8 +42,8 @@ pub const CoreData = struct {
   }
 
   pub fn bootstrap_stacks(self: *@This()) void {
-    self.int_stack = CoreData.bootstrap_stack();
-    self.sched_stack = CoreData.bootstrap_stack();
+    self.int_stack = CoreData.bootstrap_stack(os.platform.thread.int_stack_size);
+    self.sched_stack = CoreData.bootstrap_stack(os.platform.thread.sched_stack_size);
   }
 };
 
