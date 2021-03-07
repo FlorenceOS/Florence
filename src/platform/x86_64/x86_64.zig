@@ -61,7 +61,7 @@ pub fn ap_init() void {
     \\mov %[stack], %%rsp
     \\jmp *%[dest]
     :
-    : [stack] "rm" (cpu.int_stack)
+    : [stack] "rm" (cpu.sched_stack)
     , [_] "{rdi}" (cpu)
     , [dest] "r" (ap_init_stage2)
   );

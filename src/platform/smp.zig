@@ -22,12 +22,13 @@ pub const CoreData = struct {
   tasks_count: usize,
   platform_data: os.platform.thread.CoreData,
   int_stack: usize,
+  sched_stack: usize,
 
   pub fn id(self: *@This()) usize {
     return os.lib.get_index(self, cpus);
   }
 
-  pub fn bootstrap_int_stack(self: *@This()) void {
+  fn bootstrap_stack() usize {
     const guard_size = int_stack_size;
     const total_size = guard_size + int_stack_size;
     // Allocate non-backing virtual memory
@@ -40,7 +41,12 @@ pub const CoreData = struct {
       .perm = os.memory.paging.rw(),
       .memtype = os.platform.paging.MemoryType.MemoryWritethrough
     }), "bootstrap stack map");
-    self.int_stack = virt + total_size;
+    return virt + total_size;
+  }
+
+  pub fn bootstrap_stacks(self: *@This()) void {
+    self.int_stack = CoreData.bootstrap_stack();
+    self.sched_stack = CoreData.bootstrap_stack();
   }
 };
 
@@ -72,7 +78,7 @@ pub fn init(num_cores: usize) void {
     c.panicked = false;
     c.tasks_count = 0;
     c.executable_tasks.init();
-    c.bootstrap_int_stack();
+    c.bootstrap_stacks();
     c.platform_data = .{};
   }
 }
