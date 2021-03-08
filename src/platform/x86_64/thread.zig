@@ -14,23 +14,6 @@ pub var bsp_task: os.thread.Task = .{};
 
 pub const kernel_gs_base = regs.MSR(u64, 0xC0000102);
 
-pub fn set_current_cpu(cpu_ptr: *os.platform.smp.CoreData) void {
-  kernel_gs_base.write(@ptrToInt(cpu_ptr));
-}
-
-pub fn get_current_cpu() *os.platform.smp.CoreData {
-  return @intToPtr(*os.platform.smp.CoreData, kernel_gs_base.read());
-}
-
-pub fn self_exited() ?*os.thread.Task {
-  const curr = os.platform.get_current_task();
-  
-  if(curr == &bsp_task)
-    return null;
-
-  return curr;
-}
-
 pub const TaskData = struct {
 };
 
@@ -39,6 +22,18 @@ pub const CoreData = struct {
 };
 
 const ephemeral = os.memory.vmm.backed(.Ephemeral);
+
+fn switch_task(frame: *interrupts.InterruptFrame) *os.thread.Task {
+  var next_task: *os.thread.Task = undefined;
+  while (true) {
+    next_task = os.platform.thread.get_current_cpu().executable_tasks.dequeue() orelse continue;
+    break;
+  }
+
+  os.platform.set_current_task(next_task);
+  frame.* = next_task.registers;
+  return next_task;
+}
 
 pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry) !void {
   new_task.registers.eflags = regs.eflags();
@@ -57,30 +52,19 @@ pub fn yield() void {
   asm volatile("int $0x6B");
 }
 
-pub fn yield_handler(frame: *interrupts.InterruptFrame) void {
-  const current_task = os.platform.get_current_task();
-  const curent_context = current_task.paging_context;
-  current_task.registers = frame.*;
-
-  const next_task = switch_task(frame);
-  if (current_task.paging_context != next_task.paging_context) {
-    next_task.paging_context.apply();
-  }
+pub fn set_current_cpu(cpu_ptr: *os.platform.smp.CoreData) void {
+  kernel_gs_base.write(@ptrToInt(cpu_ptr));
 }
 
-fn switch_task(frame: *interrupts.InterruptFrame) *os.thread.Task {
-  var next_task: *os.thread.Task = undefined;
-  while (true) {
-    next_task = os.platform.thread.get_current_cpu().executable_tasks.dequeue() orelse continue;
-    break;
-  }
-
-  os.platform.set_current_task(next_task);
-  frame.* = next_task.registers;
-  return next_task;
+pub fn get_current_cpu() *os.platform.smp.CoreData {
+  return @intToPtr(*os.platform.smp.CoreData, kernel_gs_base.read());
 }
 
-pub fn await_handler(frame: *interrupts.InterruptFrame) void {
-  const next_task = switch_task(frame);
-  next_task.paging_context.apply();
+pub fn self_exited() ?*os.thread.Task {
+  const curr = os.platform.get_current_task();
+  
+  if(curr == &bsp_task)
+    return null;
+
+  return curr;
 }

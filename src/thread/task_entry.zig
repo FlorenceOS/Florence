@@ -11,11 +11,13 @@ pub const NewTaskEntry = struct {
     pub fn alloc(task: *os.thread.Task, func: anytype, args: anytype) *NewTaskEntry {
         comptime const Args = @TypeOf(args);
         comptime const Func = @TypeOf(func);
+
         // Method: specify subtype with specific types of func and args
         const Wrapper = struct {
             entry: NewTaskEntry = .{ .function = invoke },
             function: Func,
             args: Args,
+
             /// Implementation of invoke
             fn invoke(entry: *NewTaskEntry) void {
                 const self = @fieldParentPtr(@This(), "entry", entry);
@@ -24,6 +26,7 @@ pub const NewTaskEntry = struct {
                 };
                 os.thread.scheduler.exit_task();
             }
+
             /// Creates Wrapper on the stack
             fn create(function: anytype, arguments: anytype, boot_stack_top: usize, boot_stack_bottom: usize) *@This() {
                 const addr = libalign.align_down(usize, @alignOf(@This()), boot_stack_top - @sizeOf(@This()));
@@ -36,8 +39,10 @@ pub const NewTaskEntry = struct {
                 return wrapper_ptr;
             }
         };
+
         const stack_top = task.stack;
         const stack_bottom = stack_top - os.platform.thread.task_stack_size;
+
         return &Wrapper.create(func, args, stack_top, stack_bottom).entry;
     }
 };

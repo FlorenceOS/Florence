@@ -21,7 +21,7 @@ pub const CoreData = struct {
   booted: bool,
   panicked: bool,
   acpi_id: u64,
-  executable_tasks: os.thread.TaskQueue,
+  executable_tasks: os.thread.ReadyQueue,
   tasks_count: usize,
   platform_data: os.platform.thread.CoreData,
   int_stack: usize,

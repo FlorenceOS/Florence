@@ -1,18 +1,27 @@
 const std = @import("std");
 const os = @import("root").os;
 
+/// Allocator used to allocate memory for new tasks
 const task_alloc = os.memory.vmm.backed(.Ephemeral);
+
+/// Load balancer lock. Locked when scheduler finds the best CPU for the task
+/// or when task terminates
 var balancer_lock = os.thread.Spinlock{};
 
+/// Move to the next task.
+/// NOTE: Should be called in interrupt disabled context if its
+/// not the last time task runs
 pub fn wait() void {
   os.platform.thread.yield();
 }
 
+/// Terminate current task to never run it again
 pub fn leave() noreturn {
   wait();
   unreachable;
 }
 
+/// Preempt to the next task
 pub fn yield() void {
   const state = os.platform.get_and_disable_interrupts();
   os.platform.thread.get_current_cpu().executable_tasks.enqueue(os.platform.get_current_task());
@@ -20,12 +29,13 @@ pub fn yield() void {
   os.platform.set_interrupts(state);
 }
 
+/// Wake a task that has called `wait`
 pub fn wake(task: *os.thread.Task) void {
   os.platform.smp.cpus[task.allocated_core_id].executable_tasks.enqueue(task);
 }
 
 /// Create a new task that calls a function with given arguments.
-/// Uses heap, so don't call in interrupt context
+/// Uses heap, so don't create tasks in interrupt context
 pub fn make_task(func: anytype, args: anytype) !*os.thread.Task {
   const task = try task_alloc.create(os.thread.Task);
   errdefer task_alloc.destroy(task);
@@ -55,7 +65,7 @@ pub fn make_task(func: anytype, args: anytype) !*os.thread.Task {
     balancer_lock.unlock(state);
   }
 
-
+  // Initialize task in a way that it will execute func with args on the startup
   const entry = os.thread.NewTaskEntry.alloc(task, func, args);
   try os.platform.thread.init_task_call(task, entry);
   return task;
@@ -67,6 +77,8 @@ pub fn spawn_task(func: anytype, args: anytype) !void {
   os.platform.smp.cpus[task.allocated_core_id].executable_tasks.enqueue(task);
 }
 
+/// Exit current task
+/// TODO: Should be reimplemented with URM
 pub fn exit_task() noreturn {
   const task = os.platform.thread.self_exited();
   const id = if (task) |t| t.allocated_core_id else 0;
@@ -75,12 +87,14 @@ pub fn exit_task() noreturn {
   os.platform.smp.cpus[id].tasks_count -= 1;
   balancer_lock.unlock(state);
 
-  if(task) |t|
+  if(task) |t| {
     task_alloc.destroy(t);
+  }
 
   leave();
 }
 
+/// Initialize scheduler
 pub fn init(task: *os.thread.Task) void {
   os.platform.set_current_task(task);
   os.platform.thread.get_current_cpu().executable_tasks.init();

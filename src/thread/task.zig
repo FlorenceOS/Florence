@@ -1,14 +1,22 @@
 const os = @import("root").os;
 const atmcqueue = os.lib.atmcqueue;
 
+/// Separate execution unit
 pub const Task = struct {
+  /// General task registers that are preserved on every interrupt
   registers: os.platform.InterruptFrame = undefined,
+  /// Core ID task is allocated to
   allocated_core_id: usize = undefined,
+  /// Platform-specific data related to the task (e.g. TSS on x86_64)
   platform_data: os.platform.thread.TaskData = undefined,
+  /// Hook for the task queue
   atmcqueue_hook: atmcqueue.Node = undefined,
+  /// Virtual memory space task runs in
   paging_context: *os.platform.paging.PagingContext = undefined,
+  /// Top of the stack used by the task
   stack: usize = undefined,
 
+  /// Allocate stack for the task. Used in scheduler make_task routine
   pub fn allocate_stack(self: *@This()) !void {
     const guard_size = os.platform.thread.stack_guard_size;
     const map_size = os.platform.thread.task_stack_size;
@@ -28,6 +36,7 @@ pub const Task = struct {
     self.stack = virt + total_size;
   }
 
+  /// Free stack used by the task. Used in User Request Monitor on task termination
   pub fn free_stack(self: *@This()) void {
     const guard_size = os.platform.thread.stack_guard_size;
     const total_size = guard_size + os.platform.thread.task_stack_size;
