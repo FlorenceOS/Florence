@@ -3,7 +3,7 @@ const std = @import("std");
 
 pub const Mutex = struct {
   held_by: ?*os.thread.Task = null,
-  queue: os.thread.QueueBase = .{},
+  queue: os.thread.TaskQueue = .{},
   spinlock: os.thread.Spinlock = .{},
 
   const Held = struct {
@@ -26,21 +26,21 @@ pub const Mutex = struct {
       self.spinlock.unlock(lock_state);
       return;
     }
-    self.queue.add_back(os.platform.get_current_task());
+    self.queue.enqueue(os.platform.get_current_task());
     self.spinlock.ungrab();
     os.thread.scheduler.wait();
     os.platform.set_interrupts(lock_state);
   }
 
   fn unlock_impl(self: *@This()) void {
-    @import("std").debug.assert(self.held_by_me());
+    std.debug.assert(self.held_by_me());
     self.held_by = null;
   }
 
   pub fn unlock(self: *@This()) void {
     const lock_state = self.spinlock.lock();
     std.debug.assert(self.held_by_me());
-    if (self.queue.remove_front()) |task| {
+    if (self.queue.dequeue()) |task| {
       self.held_by = task;
       os.thread.scheduler.wake(task);
     } else {

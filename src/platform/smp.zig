@@ -6,16 +6,22 @@ const CoreID = os.platform.CoreID;
 /// Maximum number of supported CPUs
 const max_cpus = 512;
 
+/// CPUs data
+var core_datas: [max_cpus]CoreData = [1]CoreData{undefined} ** max_cpus;
+
 /// Count of CPUs that have not finished booting.
 /// Assigned in stivale2.zig
 pub var cpus_left: usize = undefined;
+
+/// Pointer to CPUS data
+pub var cpus: []CoreData = core_datas[0..1];
 
 pub const CoreData = struct {
   current_task: *os.thread.Task = undefined,
   booted: bool,
   panicked: bool,
   acpi_id: u64,
-  executable_tasks: os.thread.ReadyQueue,
+  executable_tasks: os.thread.TaskQueue,
   tasks_count: usize,
   platform_data: os.platform.thread.CoreData,
   int_stack: usize,
@@ -46,10 +52,6 @@ pub const CoreData = struct {
     self.sched_stack = CoreData.bootstrap_stack(os.platform.thread.sched_stack_size);
   }
 };
-
-var core_datas: [max_cpus]CoreData = [1]CoreData{undefined} ** max_cpus;
-
-pub var cpus: []CoreData = core_datas[0..1];
 
 pub fn prepare() void {
   os.platform.thread.set_current_cpu(&cpus[0]);

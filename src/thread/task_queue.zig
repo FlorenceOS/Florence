@@ -1,12 +1,12 @@
 const os = @import("root").os;
 const atmcqueue = os.lib.atmcqueue;
 
-pub const QueueBase = struct {
+pub const TaskQueue = struct {
   queue: atmcqueue.MPSCUnboundedQueue(os.thread.Task, "atmcqueue_hook") = undefined,
   last_ack: usize = 0,
   last_triggered: usize = 0,
 
-  pub fn remove_front(self: *@This()) ?*os.thread.Task {
+  pub fn dequeue(self: *@This()) ?*os.thread.Task {
     const state = os.platform.get_and_disable_interrupts();
     if (self.last_ack < @atomicLoad(usize, &self.last_triggered, .Acquire)) {
       while (true) {
@@ -20,7 +20,7 @@ pub const QueueBase = struct {
     return null;
   }
 
-  pub fn add_back(self: *@This(), t: *os.thread.Task) void {
+  pub fn enqueue(self: *@This(), t: *os.thread.Task) void {
     const state = os.platform.get_and_disable_interrupts();
     _ = @atomicRmw(usize, &self.last_triggered, .Add, 1, .AcqRel);
     self.queue.enqueue(t);
@@ -29,21 +29,5 @@ pub const QueueBase = struct {
 
   pub fn init(self: *@This()) void {
     self.queue.init();
-  }
-};
-
-pub const ReadyQueue = struct {
-  q: QueueBase = .{},
-
-  pub fn dequeue(self: *@This()) ?*os.thread.Task {
-    return self.q.remove_front();
-  }
-
-  pub fn enqueue(self: *@This(), t: *os.thread.Task) void {
-    self.q.add_back(t);
-  }
-
-  pub fn init(self: *@This()) void {
-    self.q.init();
   }
 };
