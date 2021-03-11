@@ -149,7 +149,7 @@ const Framebuffer = struct {
   }
 
   fn update(self: *@This()) void {
-    var y = @truncate(u32, self.pos_y * font.height);
+    var y = @truncate(u32, (self.pos_y - 1) * font.height);
     self.updater(0, y, self.width, @truncate(u32, font.height), self.updater_ctx);
   }
 
