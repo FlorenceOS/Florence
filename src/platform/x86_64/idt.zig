@@ -54,7 +54,7 @@ pub const IdtEntry = packed struct {
 };
 
 pub fn encode(addr: u64, ist: u3, gate_type: u4, storage: u1, priv_level: u2, present: u1) IdtEntry {
-   const result = IdtEntry {
+  return .{
     .addr_low = @truncate(u16, addr),
     .addr_mid = @truncate(u16, addr >> 16),
     .addr_high = @truncate(u32, addr >> 32),
@@ -65,7 +65,6 @@ pub fn encode(addr: u64, ist: u3, gate_type: u4, storage: u1, priv_level: u2, pr
     .priv_level = priv_level,
     .present = present,
   };
-  const intrepr = @ptrCast(*u64, &result).*;
 }
 
 comptime {
