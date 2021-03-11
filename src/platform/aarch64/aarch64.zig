@@ -75,7 +75,7 @@ pub fn set_interrupts(s: InterruptState) void {
 
 pub const InterruptFrame = struct {
   mode: u64,
-  _: u64,
+  pc: u64,
   x31: u64,
   x30: u64,
   x29: u64,
@@ -129,10 +129,12 @@ export fn interrupt64_common() callconv(.Naked) void {
     \\STP X29, X28, [SP, #-0x10]!
     \\STP X31, X30, [SP, #-0x10]!
     \\MOV X0, #64
-    \\STP X0,  XZR, [SP, #-0x10]!
+    \\MRS X1, ELR_EL1
+    \\STP X0,  X1, [SP, #-0x10]!
     \\MOV X0,  SP
     \\BL interrupt64_handler
-    \\LDP XZR, XZR, [SP], 0x10
+    \\LDP XZR, X1, [SP], 0x10
+    \\MSR ELR_EL1, X1
     \\LDP X31, X30, [SP], 0x10
     \\LDP X29, X28, [SP], 0x10
     \\LDP X27, X26, [SP], 0x10
@@ -180,9 +182,12 @@ export fn interrupt32_common() callconv(.Naked) void {
     \\STP XZR, XZR, [SP, #-0x10]! // 28, 29
     \\STP XZR, XZR, [SP, #-0x10]! // 30, 31
     \\MOV X0, #64
-    \\STP X0,  XZR, [SP, #-0x10]!
+    \\MRS X1, ELR_EL1
+    \\STP X0,  X1, [SP, #-0x10]!
     \\MOV X0,  SP
     \\BL interrupt32_handler
+    \\LDP XZR, X1, [SP], 0x10
+    \\MSR ELR_EL1, X1
     \\ADD SP,  SP,  0x80 // 16 - 31
     \\LDP W15, WZR, [SP], 0x8
     \\LDP W14, WZR, [SP], 0x8
