@@ -77,12 +77,12 @@ fn parse_sdt(addr: usize) !void {
     signature_value("SBST") => { }, // Ignore for now
     signature_value("HPET") => { }, // Ignore for now
     signature_value("WAET") => { }, // Ignore for now
+    signature_value("SPCR") => { }, // Ignore for now
+    signature_value("GTDT") => { }, // Ignore for now
     signature_value("APIC") => {
-      if(builtin.arch == .x86_64) {
-        @import("x86_64/apic.zig").handle_madt(sdt.to_slice());
-      }
-      else {
-        os.log("ACPI: MADT found on non-x86 architecture!\n", .{});
+      switch(builtin.arch) {
+        .x86_64 => @import("x86_64/apic.zig").handle_madt(sdt.to_slice()),
+        else => os.log("ACPI: MADT found on unsupported architecture!\n", .{}),
       }
     },
     signature_value("MCFG") => {
