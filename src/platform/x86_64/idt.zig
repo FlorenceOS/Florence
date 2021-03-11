@@ -66,7 +66,6 @@ pub fn encode(addr: u64, ist: u3, gate_type: u4, storage: u1, priv_level: u2, pr
     .present = present,
   };
   const intrepr = @ptrCast(*u64, &result).*;
-  os.log("")
 }
 
 comptime {
