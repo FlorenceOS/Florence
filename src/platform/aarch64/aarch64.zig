@@ -232,7 +232,6 @@ extern const exception_vector_table: [0x800]u8;
 
 pub fn platform_early_init() void {
   os.platform.smp.prepare();
-  os.thread.scheduler.init(&thread.bsp_task);
   install_vector_table();
   os.memory.paging.init();
 }

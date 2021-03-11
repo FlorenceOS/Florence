@@ -59,6 +59,8 @@ pub fn make_task(func: anytype, args: anytype) !*os.thread.Task {
     balancer_lock.unlock(state);
   }
 
+  os.log("Task allocated to core {}\n", .{best_cpu_idx});
+
   errdefer {
     const state = balancer_lock.lock();
     os.platform.smp.cpus[best_cpu_idx].tasks_count -= 1;
@@ -96,6 +98,7 @@ pub fn exit_task() noreturn {
 
 /// Initialize scheduler
 pub fn init(task: *os.thread.Task) void {
+  os.platform.bsp_pre_scheduler_init();
   os.platform.set_current_task(task);
   os.platform.thread.get_current_cpu().executable_tasks.init();
 }

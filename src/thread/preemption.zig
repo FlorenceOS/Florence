@@ -11,6 +11,8 @@ fn yield_to(frame: *os.platform.InterruptFrame, task: *os.thread.Task) void {
     if (current_task.paging_context != task.paging_context) {
         task.paging_context.apply();
     }
+
+    task.platform_data.load_state();
 }
 
 /// Yield to the next task or stay in the same task
@@ -25,15 +27,19 @@ pub fn yield_or_not(frame: *os.platform.InterruptFrame) void {
 /// Wait for queue to become non-empty and yield to the next task
 /// Use for yield
 pub fn wait_yield(frame: *os.platform.InterruptFrame) void {
+    os.log("WAIT YIELD!\n", .{});
     const cpu = os.platform.thread.get_current_cpu();
     yield_to(frame, cpu.executable_tasks.dequeue());
 }
 
 /// Wait for the task on bootstrap
 pub fn bootstrap(frame: *os.platform.InterruptFrame) void {
+    os.log("Started bootstrap\n", .{});
     const cpu = os.platform.thread.get_current_cpu();
     const task = cpu.executable_tasks.dequeue();
     frame.* = task.registers;
     task.paging_context.apply();
     os.platform.set_current_task(task);
+    task.platform_data.load_state();
+    os.log("Finished bootstrap\n", .{});
 }

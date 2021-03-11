@@ -263,8 +263,11 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
 
   const phys_high = stivale.phys_high(info.memmap.?.get());
 
-  os.memory.paging.switch_to_context(&context);
+
   os.memory.paging.kernel_context = context;
+  platform.thread.bsp_task.paging_context = &os.memory.paging.kernel_context;
+
+  context.apply();
 
   os.log("Doing vmm\n", .{});
 
@@ -281,7 +284,14 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     vga_log.register();
   }
 
+
+  os.log("Doing scheduler\n", .{});
+
+  os.thread.scheduler.init(&platform.thread.bsp_task);
+
   os.platform.smp.cpus[0].bootstrap_stacks();
+
+  os.log("Doing SMP\n", .{});
 
   if(info.smp) |smp| {
     os.vital(map_smp(smp), "mapping smp struct");

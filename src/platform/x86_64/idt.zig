@@ -11,11 +11,11 @@ const Idtr = packed struct {
   addr: u64,
 };
 
-var idt = [1]idt_entry{undefined} ** num_handlers;
+pub var idt = [1]IdtEntry{undefined} ** num_handlers;
 
 pub const InterruptHandler = fn func() callconv(.Naked) void;
 
-pub fn setup_idt() *[num_handlers]idt_entry {
+pub fn load_idt() void {
   const idtr = Idtr {
     .addr = @ptrToInt(&idt[0]),
     .limit = @sizeOf(@TypeOf(idt)) - 1,
@@ -26,14 +26,12 @@ pub fn setup_idt() *[num_handlers]idt_entry {
     :
     : [idtr_addr] "r" (&idtr)
   );
-
-  return idt[0..];
 }
 
-pub fn entry(handler: InterruptHandler, interrupt: bool, priv_level: u2) idt_entry {
+pub fn entry(handler: InterruptHandler, interrupt: bool, priv_level: u2, ist: u3) IdtEntry {
   return encode(
     @ptrToInt(handler), // addr
-    0, // ist
+    ist, // ist
     if (interrupt) 0xE else 0xF, // gate_type
     0, // storage
     priv_level, // priv_level
@@ -41,10 +39,11 @@ pub fn entry(handler: InterruptHandler, interrupt: bool, priv_level: u2) idt_ent
   );
 }
 
-const idt_entry = packed struct {
+pub const IdtEntry = packed struct {
   addr_low: u16,
   selector: u16,
-  ist: u8,
+  ist: u3,
+  space: u5 = 0,
   gate_type: u4,
   storage: u1,
   priv_level: u2,
@@ -54,8 +53,8 @@ const idt_entry = packed struct {
   zeroes: u32 = 0,
 };
 
-pub fn encode(addr: u64, ist: u8, gate_type: u4, storage: u1, priv_level: u2, present: u1) idt_entry {
-  return idt_entry {
+pub fn encode(addr: u64, ist: u3, gate_type: u4, storage: u1, priv_level: u2, present: u1) IdtEntry {
+   const result = IdtEntry {
     .addr_low = @truncate(u16, addr),
     .addr_mid = @truncate(u16, addr >> 16),
     .addr_high = @truncate(u32, addr >> 32),
@@ -66,8 +65,10 @@ pub fn encode(addr: u64, ist: u8, gate_type: u4, storage: u1, priv_level: u2, pr
     .priv_level = priv_level,
     .present = present,
   };
+  const intrepr = @ptrCast(*u64, &result).*;
+  os.log("")
 }
 
 comptime {
-  assert(@sizeOf(idt_entry) == 16);
+  assert(@sizeOf(IdtEntry) == 16);
 }

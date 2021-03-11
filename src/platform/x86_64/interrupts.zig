@@ -11,26 +11,33 @@ const pic = @import("pic.zig");
 const thread = @import("thread.zig");
 
 pub const num_handlers = 0x100;
-pub const handler_func = fn(*InterruptFrame)void;
+pub const InterruptHandler = fn(*InterruptFrame)void;
 pub const InterruptState = bool;
 
-var handlers = [_]handler_func {unhandled_interrupt} ** num_handlers;
+export var handlers: [256]InterruptHandler = [_]InterruptHandler {unhandled_interrupt} ** num_handlers;
+var itable: *[256]idt.IdtEntry = undefined;
+var raw_callbacks: [256](fn() callconv(.Naked) void) = undefined;
 
-pub fn add_handler(idx: u8, f: handler_func) void {
+/// Use ist=2 for scheduler calls and ist=1 for interrupts
+pub fn add_handler(idx: u8, f: InterruptHandler, interrupt: bool, priv_level: u2, ist: u3) void {
+  itable[idx] = idt.entry(raw_callbacks[idx], interrupt, priv_level, ist);
   handlers[idx] = f;
 }
 
 pub fn init_interrupts() !void {
   pic.disable();
-  var itable = idt.setup_idt();
+  itable = &idt.idt;
 
   inline for(range(num_handlers)) |intnum| {
-    itable[intnum] = idt.entry(make_handler(intnum), true, 0);
+    raw_callbacks[intnum] = make_handler(intnum);
+    add_handler(intnum, unhandled_interrupt, true, 0, 0);
   }
-  add_handler(0x0E, page_fault_handler);
-  add_handler(0x6B, os.thread.preemption.wait_yield);
-  add_handler(0x6C, os.thread.preemption.bootstrap);
-  add_handler(0xFF, spurious_handler);
+
+  add_handler(0x0E, page_fault_handler, true, 0, 1);
+  add_handler(0x6C, os.thread.preemption.bootstrap, true, 0, 0);
+  std.debug.assert(handlers[0x6c] == os.thread.preemption.bootstrap);
+  add_handler(0x6B, os.thread.preemption.wait_yield, true, 0, 2);
+  add_handler(0xFF, spurious_handler, true, 0, 1);
 }
 
 fn spurious_handler(frame: *InterruptFrame) void {

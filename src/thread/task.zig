@@ -45,7 +45,7 @@ pub const Task = struct {
     const mapping_size = self.stack;
     const nonbacked = os.memory.vmm.nonbacked();
     // Unmap stack pages
-    paging.unmap(.{ .virt = addr, .size = object.virtual_size(), .reclaim_pages = false });
+    os.memory.paging.unmap(.{ .virt = mapped, .size = mapping_size, .reclaim_pages = false });
     // Free nonbacked memory
     _ = nonbacked.resizeFn(nonbacked, @intToPtr([*]u8, virt)[0..total_size], 1, 0, 1, 0) catch @panic("task free stack");
   }

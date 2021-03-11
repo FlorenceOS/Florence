@@ -2,12 +2,15 @@ const os = @import("root").os;
 const std = @import("std");
 
 const interrupts = @import("interrupts.zig");
+const idt = @import("idt.zig");
 const gdt = @import("gdt.zig");
 const serial = @import("serial.zig");
 const ports = @import("ports.zig");
 const regs = @import("regs.zig");
 const apic = @import("apic.zig");
 const pci = os.platform.pci;
+
+const Tss = @import("tss.zig").Tss;
 
 pub const paging = @import("paging.zig");
 pub const pci_space = @import("pci_space.zig");
@@ -43,16 +46,25 @@ pub fn platform_init() !void {
 
 pub fn platform_early_init() void {
   os.platform.smp.prepare();
-  os.thread.scheduler.init(&thread.bsp_task);
   serial.init();
   try interrupts.init_interrupts();
   os.platform.smp.cpus[0].platform_data.gdt.load();
   os.memory.paging.init();
 }
 
+pub fn bsp_pre_scheduler_init() void {
+  const cpu = os.platform.thread.get_current_cpu();
+  thread.bsp_task.platform_data.tss = os.vital(os.memory.vmm.backed(.Eternal).create(Tss), "bsp pre sched init");
+  thread.bsp_task.platform_data.tss.* = .{};
+
+  thread.bsp_task.platform_data.tss.set_interrupt_stack(cpu.int_stack);
+  thread.bsp_task.platform_data.tss.set_scheduler_stack(cpu.sched_stack);
+  thread.bsp_task.platform_data.load_state();
+}
+
 pub fn ap_init() void {
   os.memory.paging.kernel_context.apply();
-  try interrupts.init_interrupts();
+  idt.load_idt();
 
   const cpu = os.platform.thread.get_current_cpu();
   cpu.platform_data.gdt.load();

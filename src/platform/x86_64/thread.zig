@@ -4,6 +4,7 @@ const std = @import("std");
 const gdt = @import("gdt.zig");
 const regs = @import("regs.zig");
 const interrupts = @import("interrupts.zig");
+const Tss = @import("tss.zig").Tss;
 
 pub const sched_stack_size = 0x10000;
 pub const int_stack_size = 0x10000;
@@ -15,10 +16,61 @@ pub var bsp_task: os.thread.Task = .{};
 pub const kernel_gs_base = regs.MSR(u64, 0xC0000102);
 
 pub const TaskData = struct {
+  tss: *Tss = undefined,
+  
+  pub fn load_state(self: *@This()) void {
+    const cpu = os.platform.thread.get_current_cpu();
+    cpu.platform_data.gdt.update_tss(self.tss);
+    os.log("TSS Loaded: 0x{x} 0x{x} 0x{x}\n", .{self.tss.rsp[0], self.tss.ist[0], self.tss.ist[1]});
+  }
 };
 
 pub const CoreData = struct {
   gdt: gdt.Gdt = .{},
+};
+
+pub const CoreDoorbell = struct {
+  addr: *usize = undefined,
+
+  pub fn init(self: *@This()) void {
+    const nonbacked = os.memory.vmm.nonbacked();
+
+    const virt = @ptrToInt(os.vital(nonbacked.allocFn(nonbacked, 4096, 1, 1, 0), "CoreDoorbell nonbacked").ptr);
+    os.vital(os.memory.paging.map(.{
+      .virt = virt,
+      .size = 4096,
+      .perm = os.memory.paging.rw(),
+      .memtype = os.platform.paging.MemoryType.MemoryWriteBack
+    }), "CoreDoorbell map");
+
+    self.addr = @intToPtr(*usize, virt);
+  }
+
+  pub fn ring(self: *@This()) void {
+    @atomicStore(usize, self.addr, 0, .Release);
+  }
+
+  pub fn start_monitoring(self: *@This()) void {
+    //asm volatile(
+    //  "monitor"
+    //  :
+    //  : [_]"{rax}"(@ptrToInt(self.addr)),
+    //    [_]"{ecx}"(@as(u32, 0)),
+    //    [_]"{edx}"(@as(u32, 0)),
+    //);
+  }
+
+  pub fn wait(self: *@This()) void {
+    //asm volatile(
+    //  \\sti
+    //  \\mwait
+    //  \\cli
+    //  :
+    //  : [_]"{eax}"(@as(u32, 0)),
+    //    [_]"{ecx}"(@as(u32, 0))
+    //);
+    asm volatile("sti; nop; pause; cli");
+  }
 };
 
 const ephemeral = os.memory.vmm.backed(.Ephemeral);
@@ -36,6 +88,8 @@ fn switch_task(frame: *interrupts.InterruptFrame) *os.thread.Task {
 }
 
 pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry) !void {
+  const cpu = os.platform.thread.get_current_cpu();
+
   new_task.registers.eflags = regs.eflags();
   new_task.registers.rdi = @ptrToInt(entry);
   new_task.registers.rsp = os.lib.libalign.align_down(usize, 16, @ptrToInt(entry));
@@ -46,6 +100,14 @@ pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry)
   new_task.registers.gs = gdt.selector.data64;
   new_task.registers.ds = gdt.selector.data64;
   new_task.registers.rip = @ptrToInt(entry.function);
+
+  const tss = try os.memory.vmm.backed(.Ephemeral).create(Tss);
+  tss.* = .{};
+
+  new_task.platform_data.tss = tss;
+  tss.set_interrupt_stack(cpu.int_stack);
+  tss.set_scheduler_stack(cpu.sched_stack);
+  tss.set_syscall_stack(new_task.stack);
 }
 
 pub fn yield() void {
