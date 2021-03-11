@@ -53,6 +53,7 @@ pub fn platform_early_init() void {
 }
 
 pub fn bsp_pre_scheduler_init() void {
+  idt.load_idt();
   const cpu = os.platform.thread.get_current_cpu();
   thread.bsp_task.platform_data.tss = os.vital(os.memory.vmm.backed(.Eternal).create(Tss), "bsp pre sched init");
   thread.bsp_task.platform_data.tss.* = .{};
