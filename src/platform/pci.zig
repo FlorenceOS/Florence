@@ -212,6 +212,10 @@ fn device_scan(bus: u8, device: u5) void {
 }
 
 fn bus_scan(bus: u8) void {
+  // We can't scan this bus
+  if(!@hasDecl(os.platform, "pci_space") and pci_mmio[bus] == null)
+    return;
+
   inline for(range(1 << 5)) |device| {
     device_scan(bus, device);
   }
