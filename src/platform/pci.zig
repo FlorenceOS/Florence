@@ -136,8 +136,8 @@ fn function_scan(addr: Addr) void {
       if (addr.vendor_id().read() == 0x1AF4 or addr.device_id().read() == 0x1050) {
         os.log("Virtio display controller\n", .{});
         if (os.drivers.vesa_log.get_info()) |vesa| {
-          const ephemeral = os.memory.vmm.backed(.Eternal);
-          const drv = ephemeral.create(virtio_gpu.Driver) catch {
+          const alloc = os.memory.vmm.backed(.Eternal);
+          const drv = alloc.create(virtio_gpu.Driver) catch {
             os.log("Virtio display controller: Allocation failure\n", .{});
             return;
           };
@@ -145,9 +145,9 @@ fn function_scan(addr: Addr) void {
             os.log("Virtio display controller: Init has failed!\n", .{});
             return;
           };
-          drv.modeset(vesa.phys, vesa.width, vesa.height);
-          drv.update_rect(.{.x = 0, .y = 0, .width = vesa.width, .height = vesa.height});
+          drv.modeset(os.drivers.vesa_log.framebuffer.?.bb_phys, vesa.width, vesa.height);
           os.drivers.vesa_log.set_updater(virtio_gpu.updater, @ptrToInt(drv));
+          os.log("Virtio display controller: Initialized\n", .{});
         }
       } else switch(addr.sub_class().read()) {
         else => { os.log("Unknown display controller!\n", .{}); },
