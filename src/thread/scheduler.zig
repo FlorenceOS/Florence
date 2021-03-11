@@ -98,6 +98,7 @@ pub fn exit_task() noreturn {
 
 /// Initialize scheduler
 pub fn init(task: *os.thread.Task) void {
+  os.platform.smp.cpus[0].bootstrap_stacks();
   os.platform.bsp_pre_scheduler_init();
   os.platform.set_current_task(task);
   os.platform.thread.get_current_cpu().executable_tasks.init();

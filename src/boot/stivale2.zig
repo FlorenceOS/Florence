@@ -284,12 +284,9 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     vga_log.register();
   }
 
-
   os.log("Doing scheduler\n", .{});
 
   os.thread.scheduler.init(&platform.thread.bsp_task);
-
-  os.platform.smp.cpus[0].bootstrap_stacks();
 
   os.log("Doing SMP\n", .{});
 
