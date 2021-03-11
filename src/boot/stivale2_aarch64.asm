@@ -24,10 +24,6 @@ smp:
 .section .text
 .global _start
 _start:
-  // LDR X5, =0x1C28000
-  // MOV W6, #0x21
-  // STR W6, [X5]
-
 .extern stivale2_main
   B     stivale2_main
 

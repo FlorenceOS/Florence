@@ -261,6 +261,16 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     }), "mapping UART");
   }
 
+  if(info.uart_status) |uart| {
+    os.log("Mapping UART with status\n", .{});
+    os.vital(paging.remap_phys_size(.{
+      .phys = uart.uart_addr,
+      .size = platform.paging.page_sizes[0],
+      .memtype = .DeviceUncacheable,
+      .context = &context,
+    }), "mapping UART with status");
+  }
+
   const phys_high = stivale.phys_high(info.memmap.?.get());
 
   os.memory.paging.switch_to_context(&context);
