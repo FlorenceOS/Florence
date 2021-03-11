@@ -22,17 +22,33 @@ pub fn set_current_cpu(ptr: *os.platform.smp.CoreData) void {
 }
 
 pub const TaskData = struct {
-  stack: ?*[task_stack_size]u8 = null,
+  pub fn load_state(self: *@This()) void { }
 };
-
-const task_stack_size = 1024 * 16;
 
 pub fn yield() void {
   asm volatile("SVC #'Y'");
 }
 
-pub fn init_task_call(new_task: *os.thread.Task, func: anytype, args: anytype) !void {
-  @panic("yield");
+pub fn set_interrupt_stack(int_stack: usize) void {
+  os.log("Setting the interrupt stack to 0x{X}\n", .{int_stack});
+
+  asm volatile(
+    \\ MSR SPSel, #1
+    \\ MOV SP, %[int_stack]
+    \\ MSR SPSel, #0
+    :
+    : [int_stack] "r" (int_stack)
+  );
+}
+
+pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry) !void {
+  const cpu = os.platform.thread.get_current_cpu();
+
+  new_task.registers.pc = @ptrToInt(entry.function);
+  new_task.registers.x0 = @ptrToInt(entry);
+  new_task.registers.sp = os.lib.libalign.align_down(usize, 16, @ptrToInt(entry));
+
+  set_interrupt_stack(cpu.int_stack);
 }
 
 pub fn self_exited() ?*os.thread.Task {
@@ -41,10 +57,5 @@ pub fn self_exited() ?*os.thread.Task {
   if(curr == &bsp_task)
     return null;
 
-  if(curr.platform_data.stack != null) {
-    // TODO: Figure out how to free the stack while returning using it??
-    // We can just leak it for now
-    //try vmm.free_single(curr.platform_data.stack.?);
-  }
   return curr;
 }
