@@ -235,9 +235,12 @@ comptime {
 
 extern const exception_vector_table: [0x800]u8;
 
+pub fn bsp_pre_scheduler_init() void {
+  install_vector_table();
+}
+
 pub fn platform_early_init() void {
   os.platform.smp.prepare();
-  install_vector_table();
   os.memory.paging.init();
 }
 
@@ -284,7 +287,7 @@ export fn interrupt64_handler(frame: *InterruptFrame) void {
       switch(@truncate(u16, iss)) {
         else => @panic("Unknown SVC"),
 
-        'Y' => @panic("yield_to_task"),
+        'Y' => os.thread.preemption.wait_yield(frame),
       }
     },
   }
