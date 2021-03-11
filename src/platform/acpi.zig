@@ -27,8 +27,9 @@ pub fn register_rsdp(rsdp_in: usize) void {
   rsdp_phys = rsdp_in;
 }
 
-fn locate_rsdp() !void {
-  return error.locate_rsdp;
+fn locate_rsdp() ?u64 {
+  // @TODO
+  return null;
 }
 
 fn parse_MCFG(sdt: []u8) void {
@@ -106,10 +107,7 @@ fn parse_root_sdt(comptime T: type, addr: usize) !void {
 
 pub fn init_acpi() !void {
   if(rsdp_phys == 0)
-    try locate_rsdp();
-
-  if(rsdp_phys == 0)
-    return error.NoRSDP;
+    rsdp_phys = locate_rsdp() orelse return;
 
   rsdp = try paging.remap_phys_struct(RSDP, .{.phys = rsdp_phys, .memtype = .MemoryWriteBack});
 
