@@ -39,13 +39,12 @@ pub const Task = struct {
   /// Free stack used by the task. Used in User Request Monitor on task termination
   pub fn free_stack(self: *@This()) void {
     const guard_size = os.platform.thread.stack_guard_size;
-    const total_size = guard_size + os.platform.thread.task_stack_size;
+    const map_size = os.platform.thread.task_stack_size;
+    const total_size = guard_size + map_size;
     const virt = self.stack - total_size;
-    const mapped = virt + guard_size;
-    const mapping_size = self.stack;
     const nonbacked = os.memory.vmm.nonbacked();
     // Unmap stack pages
-    os.memory.paging.unmap(.{ .virt = mapped, .size = mapping_size, .reclaim_pages = false });
+    os.memory.paging.unmap(.{ .virt = virt + guard_size, .size = map_size, .reclaim_pages = true });
     // Free nonbacked memory
     _ = nonbacked.resizeFn(nonbacked, @intToPtr([*]u8, virt)[0..total_size], 1, 0, 1, 0) catch @panic("task free stack");
   }
