@@ -12,6 +12,7 @@ const kmain    = os.kernel.kmain;
 const mmio_serial = os.drivers.mmio_serial;
 const vesa_log    = os.drivers.vesa_log;
 const vga_log     = os.drivers.vga_log;
+const page_size   = os.platform.paging.page_sizes[0];
 
 const MemmapEntry = stivale.MemmapEntry;
 
@@ -285,7 +286,19 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
   os.log("Doing framebuffer\n", .{});
 
   if(info.framebuffer) |fb| {
-    vesa_log.register_fb(fb.addr, fb.pitch, fb.width, fb.height, fb.bpp);
+    const fb_size = @as(usize, fb.pitch) * @as(usize, fb.height);
+    const fb_page_low = os.lib.libalign.align_down(usize, page_size, fb.addr);
+    const fb_page_high = os.lib.libalign.align_up(usize, page_size, fb.addr + fb_size);
+    var success = true;
+    paging.remap_phys_range(.{
+      .phys = fb_page_low,
+      .phys_end = fb_page_high,
+      .memtype = .DeviceWriteCombining,
+    }) catch |err| {
+      os.log("Stivale2: Couldn't map fb: {}\n", .{@errorName(err)});
+      success = false;
+    };
+    if (success) vesa_log.register_fb(vesa_log.lfb_updater, @ptrToInt(os.memory.pmm.access_phys(u8, fb.addr)), fb.pitch, fb.width, fb.height, fb.bpp);
   }
   else {
     vga_log.register();

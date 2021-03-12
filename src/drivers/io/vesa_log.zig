@@ -3,8 +3,6 @@ const std = @import("std");
 
 const range = os.lib.range.range;
 
-const page_size = os.platform.paging.page_sizes[0];
-
 const paging = os.memory.paging;
 const pmm    = os.memory.pmm;
 
@@ -117,9 +115,10 @@ const Framebuffer = struct {
   }
 
   fn update(self: *@This()) void {
+    @setRuntimeSafety(false);
     const yoff = self.yscroll * font.height;
     const used_h = self.height_in_chars() * font.height;
-    if (self.yscroll > 0) self.updater(self.backbuffer.ptr, 0, used_h - yoff, yoff - font.height, self.pitch, self.updater_ctx);
+    if (yoff > 0) self.updater(self.backbuffer.ptr, 0, used_h - yoff, yoff - font.height, self.pitch, self.updater_ctx);
     self.updater(self.backbuffer.ptr, yoff, 0, used_h - yoff, self.pitch, self.updater_ctx);
   }
 
@@ -137,7 +136,8 @@ const Framebuffer = struct {
   }
 };
 
-fn default_updater(bb: [*]u8, yoff_src: usize, yoff_dest: usize, ysize: usize, pitch: usize, ctx: usize) void {
+pub fn lfb_updater(bb: [*]u8, yoff_src: usize, yoff_dest: usize, ysize: usize, pitch: usize, ctx: usize) void {
+  @setRuntimeSafety(false);
   @memcpy(@intToPtr([*]u8, ctx + pitch * yoff_dest), bb + pitch * yoff_src, ysize * pitch);
 }
 
@@ -160,23 +160,14 @@ pub fn set_updater(u: Updater, ctx: usize) void {
   }
 }
 
-pub fn register_fb(fb_phys: usize, fb_pitch: u16, fb_width: u16, fb_height: u16, fb_bpp_in: u16) void {
+pub fn get_backbuffer_phy() usize {
+  return framebuffer.?.bb_phys;
+}
+
+pub fn register_fb(updater: Updater, updater_ctx: usize, fb_pitch: u16, fb_width: u16, fb_height: u16, fb_bpp_in: u16) void {
   std.debug.assert(fb_bpp_in == 24 or fb_bpp_in == 32);
-  // Bits are lies, I do bytes.
   const fb_bpp = fb_bpp_in / 8;
   const fb_size = @as(usize, fb_pitch) * @as(usize, fb_height);
-  const fb_page_low = os.lib.libalign.align_down(usize, page_size, fb_phys);
-  const fb_page_high = os.lib.libalign.align_up(usize, page_size, fb_phys + fb_size);
-  
-  paging.remap_phys_range(.{
-    .phys = fb_page_low,
-    .phys_end = fb_page_high,
-    .memtype = .DeviceWriteCombining,
-  }) catch |err| {
-    os.log("VESAlog: Couldn't map fb: {}\n", .{@errorName(err)});
-    return;
-  };
-  const addr = pmm.access_phys(u8, fb_phys);
 
   const bb_phys = os.memory.pmm.alloc_phys(fb_size) catch |err| {
     os.log("VESAlog: Could not allocate backbuffer: {}\n", .{@errorName(err)});
@@ -203,17 +194,15 @@ pub fn register_fb(fb_phys: usize, fb_pitch: u16, fb_width: u16, fb_height: u16,
 
   framebuffer = Framebuffer {
     .pitch = fb_pitch, .width = fb_width, .height = fb_height, .bpp = fb_bpp,
-    .updater = default_updater, .updater_ctx = @ptrToInt(addr),
+    .updater = updater, .updater_ctx = updater_ctx,
     .backbuffer = @intToPtr([*]u8, bb_virt)[0..fb_size], .bb_phys = bb_phys,
   };
 
   if(clear_screen) {
-    @memset(addr, bgcol, fb_size);
     @memset(framebuffer.?.backbuffer.ptr, bgcol, fb_size);
     os.log("VESAlog: Screen cleared.\n", .{});
   }
 
-  os.log("VESAlog: Registered fb @0x{X} with size 0x{X}\n", .{fb_phys, fb_size});
   os.log("VESAlog: width={}, height={}, pitch={}, bpp={}\n", .{fb_width, fb_height, fb_pitch, fb_bpp});
 }
 
