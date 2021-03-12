@@ -9,7 +9,7 @@ pub const DescIter = struct {
   pub fn begin(iter: *DescIter) void {
     var i = &iter.drv.queues[iter.i];
     iter.next = iter.drv.descr(iter.i);
-    i.avail.rings((i.avail.idx + i.pending) % i.size).* = iter.next;
+    i.avail.rings((i.avail.idx +% i.pending) % i.size).* = iter.next;
     i.pending += 1;
   }
   /// Put a descriptor to be part of the descriptor chain
@@ -73,14 +73,14 @@ pub const Driver = struct {
     var q = &drv.queues[i];
     while (q.last_in_used != q.used.idx) {
       var elem = q.used.rings(q.last_in_used % q.size);
-      q.last_in_used += 1;
+      q.last_in_used = q.last_in_used +% 1;
       cb(ctx, i, @truncate(u16, elem.id));
     }
   }
 
   /// Make the descriptors available to the device and notify it.
   pub fn start(drv: *Driver, i: u8) void {
-    drv.queues[i].avail.idx += drv.queues[i].pending;
+    drv.queues[i].avail.idx = drv.queues[i].avail.idx +% drv.queues[i].pending;
     drv.queues[i].pending = 0;
     drv.notify[i * drv.notify_mul] = drv.queues[i].avail.idx;
   }
