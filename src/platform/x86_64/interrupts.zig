@@ -266,6 +266,7 @@ export fn interrupt_common() callconv(.Naked) void {
 
 export fn interrupt_handler(frame: u64) void {
   const int_frame = @intToPtr(*InterruptFrame, frame);
+  int_frame.intnum &= 0xFF;
   if(int_frame.intnum < num_handlers) {
     handlers[int_frame.intnum](int_frame);
   }
