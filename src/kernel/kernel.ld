@@ -56,6 +56,8 @@ SECTIONS {
     *(.data*)
   }:data
 
+  . = ALIGN(16);
+
   .bss . : {
     *(.bss*)
   }

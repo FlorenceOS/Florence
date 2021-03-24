@@ -9,7 +9,7 @@ pub const DescIter = struct {
   pub fn begin(iter: *DescIter) void {
     var i = &iter.drv.queues[iter.i];
     iter.next = iter.drv.descr(iter.i);
-    i.avail.rings((i.avail.idx + i.pending) % i.size).* = iter.next;
+    i.avail.rings(i.wrap(i.avail.idx +% i.pending)).* = iter.next;
     i.pending += 1;
   }
   /// Put a descriptor to be part of the descriptor chain
@@ -72,15 +72,17 @@ pub const Driver = struct {
   pub fn process(drv: *Driver, i: u8, cb: anytype, ctx: anytype) void {
     var q = &drv.queues[i];
     while (q.last_in_used != q.used.idx) {
-      var elem = q.used.rings(q.last_in_used % q.size);
-      q.last_in_used += 1;
+      var elem = q.used.rings(q.wrap(q.last_in_used));
+      q.last_in_used = q.last_in_used +% 1;
       cb(ctx, i, @truncate(u16, elem.id));
     }
   }
 
   /// Make the descriptors available to the device and notify it.
   pub fn start(drv: *Driver, i: u8) void {
-    drv.queues[i].avail.idx += drv.queues[i].pending;
+    // The virtio spec requires me to send values modulo 2^16, and not modulo size
+    // This explains the ugly overflowing-adds
+    drv.queues[i].avail.idx = drv.queues[i].avail.idx +% drv.queues[i].pending;
     drv.queues[i].pending = 0;
     drv.notify[i * drv.notify_mul] = drv.queues[i].avail.idx;
   }
@@ -219,7 +221,7 @@ pub const VRING_DESC_F_INDIRECT: u32 = 4;
 
 const VirtqAvail = packed struct {
   flags: u16,
-  idx: Descriptor,
+  idx: Descriptor, // important: virtio requires this field to have the index without wraparound
   pub fn rings(self: *volatile VirtqAvail, desc: Descriptor) *volatile u16 {
     return @intToPtr(*volatile u16, @ptrToInt(self) + @sizeOf(VirtqAvail) + desc * 2);
   }
@@ -248,6 +250,12 @@ const VirtQueue = struct {
   last_in_used: u16, // index into used.rings()
   num_unused: u16,
   pending: u16,
+
+  // the size of a queue is guaranteed to be a power of two, so it's possible to save on a modulo
+  // and instead get the mask to AND
+  pub fn wrap(self: *@This(), val: u16) u16 {
+    return val & (self.size - 1);
+  }
 };
 
 const CommonCfg = packed struct {

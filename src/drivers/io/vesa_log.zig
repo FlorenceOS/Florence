@@ -3,8 +3,6 @@ const std = @import("std");
 
 const range = os.lib.range.range;
 
-const page_size = os.platform.paging.page_sizes[0];
-
 const paging = os.memory.paging;
 const pmm    = os.memory.pmm;
 
@@ -45,7 +43,6 @@ const fgcol = 0xbf;
 const clear_screen = true;
 
 const Framebuffer = struct {
-  addr: []u8,
   pitch: usize,
   width: u32,
   height: u32,
@@ -54,60 +51,39 @@ const Framebuffer = struct {
   pos_x: usize = 0,
   pos_y: usize = 0,
 
-  phys: usize,
+  yscroll: usize = 0,
+  scrolling: bool = false,
 
   updater: Updater,
   updater_ctx: usize,
 
   backbuffer: []u8,
+  bb_phys: usize,
 
-  fn width_in_chars(self: *@This()) usize {
-    return self.width / font.width;
-  }
+  fn width_in_chars(self: *@This()) usize { return self.width / font.width; }
+  fn height_in_chars(self: *@This()) usize { return self.height / font.height; }
 
-  fn height_in_chars(self: *@This()) usize {
-    return self.height / font.height;
-  }
-
-  fn offset(self: *@This(), comptime bpp: usize, x: usize, y: usize) usize {
-    return self.pitch * y + x * bpp;
-  }
-
-  fn px(self: *@This(), comptime bpp: usize, x: usize, y: usize) *[3]u8 {
-    const off = self.offset(bpp, x, y);
-    return self.addr[off .. off + 3][0 .. 3];
-  }
-
-  fn back_px(self: *@This(), comptime bpp: usize, x: usize, y: usize) *[3]u8 {
-    const off = self.offset(bpp, x, y);
-    return self.backbuffer[off .. off + 3][0 .. 3];
-  }
 
   fn blit_impl(self: *@This(), comptime bpp: usize, ch: u8) void {
     @setRuntimeSafety(false);
-    inline for(range(font.height)) |y| {
+    var y: u32 = 0; while (y < font.height) : (y += 1) {
       const chr_line = font.data[y + (@as(usize, ch) - font.base) * font.height * ((font.width + 7)/8)];
 
       const ypx = self.pos_y * font.height + y;
+      const xpx = self.pos_x * font.width;
+      const bg_pixels = self.backbuffer[(self.pitch * ypx + xpx * bpp)..];
 
       inline for(range(font.width)) |x| {
-        const xpx = self.pos_x * font.width + x;
-
-        const pixel = self.px(bpp, xpx, ypx);
-        const bg_pixel = self.back_px(bpp, xpx, ypx);
-
         const shift: u3 = font.width - 1 - x;
         const has_pixel_set = ((chr_line >> shift) & 1) == 1;
-
-        if(has_pixel_set) {
-          bg_pixel[0] = fgcol;
-          bg_pixel[1] = fgcol;
-          bg_pixel[2] = fgcol;
-        }
-        else {
-          bg_pixel[0] = bgcol;
-          bg_pixel[1] = bgcol;
-          bg_pixel[2] = bgcol;
+        if (has_pixel_set) {
+          bg_pixels[0 + x * bpp] = fgcol;
+          bg_pixels[1 + x * bpp] = fgcol;
+          bg_pixels[2 + x * bpp] = fgcol;
+        } else {
+          bg_pixels[0 + x * bpp] = bgcol;
+          bg_pixels[1 + x * bpp] = bgcol;
+          bg_pixels[2 + x * bpp] = bgcol;
         }
       }
     }
@@ -115,78 +91,64 @@ const Framebuffer = struct {
   }
 
   fn blit_char(self: *@This(), ch: u8) void {
-    if(self.bpp == 4) {
-      self.blit_impl(4, ch);
-      return;
+    switch (self.bpp) {
+      4 => self.blit_impl(4, ch),
+      3 => self.blit_impl(3, ch),
+      else => @panic("VESAlog: Unimplemented BPP")
     }
-    if(self.bpp == 3) {
-      self.blit_impl(3, ch);
-      return;
-    }
-    @panic("Unimplemented BPP");
-  }
-
-  fn scroll_fb(self: *@This()) void {
-    @setRuntimeSafety(false);
-    var y: usize = font.height;
-    while(y < (self.height/font.height) * font.height): (y += 1) {
-      const dst = self.backbuffer.ptr + self.pitch * (y - font.height);
-      const src = self.backbuffer.ptr + self.pitch * y;
-      @memcpy(dst, src, self.pitch);
-    }
-    @memset(self.backbuffer.ptr + self.pitch * (y - font.height), bgcol, self.pitch * font.height);
-    self.updater(0, 0, self.width, self.height, self.updater_ctx);
   }
 
   fn feed_line(self: *@This()) void {
     self.pos_x = 0;
     if(self.pos_y == self.height_in_chars() - 1) {
-      self.scroll_fb();
-    }
-    else {
+      self.pos_y = 0;
+      self.scrolling = true;
+    } else {
       self.pos_y += 1;
     }
+    if (self.scrolling) {
+      self.yscroll += 1;
+      if (self.yscroll == self.height_in_chars()) self.yscroll = 0;
+    }
+
+    @memset(self.backbuffer.ptr + self.pitch * font.height * self.pos_y, bgcol, self.pitch * font.height); // clean last line
   }
 
   fn update(self: *@This()) void {
-    var y = @truncate(u32, self.pos_y * font.height);
-    self.updater(0, y, self.width, @truncate(u32, font.height), self.updater_ctx);
+    @setRuntimeSafety(false);
+    const yoff = self.yscroll * font.height;
+    const used_h = self.height_in_chars() * font.height;
+    if (yoff > 0) self.updater(self.backbuffer.ptr, 0, used_h - yoff, yoff - font.height, self.pitch, self.updater_ctx);
+    self.updater(self.backbuffer.ptr, yoff, 0, used_h - yoff, self.pitch, self.updater_ctx);
   }
 
-  fn flush_backbuffer(self: *@This()) void {
-    @memcpy(self.addr.ptr, self.backbuffer.ptr, self.pitch * self.height);
-  }
 
   pub fn putch(self: *@This(), ch: u8) void {
-    if(ch == '\n') {
-      self.update();
+    if (ch == '\n') {
       self.feed_line();
-      self.flush_backbuffer();
+      self.update();
       return;
     }
 
-    if(self.pos_x == framebuffer.?.width_in_chars())
-      self.feed_line();
+    if (self.pos_x == framebuffer.?.width_in_chars()) self.feed_line();
 
-    if(!is_printable(ch)) {
-      self.blit_char('?');
-    }
-    else {
-      self.blit_char(ch);
-    }
+    self.blit_char(if (is_printable(ch)) ch else '?');
   }
 };
 
-fn default_updater(x: u32, y: u32, w: u32, h: u32, ctx: usize) void {} // Do nothing
+pub fn lfb_updater(bb: [*]u8, yoff_src: usize, yoff_dest: usize, ysize: usize, pitch: usize, ctx: usize) void {
+  @setRuntimeSafety(false);
+  @memcpy(@intToPtr([*]u8, ctx + pitch * yoff_dest), bb + pitch * yoff_src, ysize * pitch);
+}
 
-var framebuffer: ?Framebuffer = null;
+pub var framebuffer: ?Framebuffer = null;
 
-pub const Updater = fn(x: u32, y: u32, width: u32, height: u32, ctx: usize)void;
-pub const FBInfo = struct { phys: usize, width: u32, height: u32 }; 
+pub const Updater = fn(bb: [*]u8, yoff_src: usize, yoff_dest: usize, ysize: usize, pitch: usize, ctx: usize) void;
+pub const FBInfo = struct { width: u32, height: u32 }; 
 
 pub fn get_info() ?FBInfo {
   if (framebuffer) |fb| {
-    var i = .{ .phys = fb.phys, .width = fb.width, .height = fb.height };
+    var i = .{ .width = fb.width, .height = fb.height };
     return i;
   } else return null;
 }
@@ -198,53 +160,50 @@ pub fn set_updater(u: Updater, ctx: usize) void {
   }
 }
 
-pub fn register_fb(fb_phys: usize, fb_pitch: u16, fb_width: u16, fb_height: u16, fb_bpp_in: u16) void {
+pub fn get_backbuffer_phy() usize {
+  return framebuffer.?.bb_phys;
+}
+
+pub fn register_fb(updater: Updater, updater_ctx: usize, fb_pitch: u16, fb_width: u16, fb_height: u16, fb_bpp_in: u16) void {
   std.debug.assert(fb_bpp_in == 24 or fb_bpp_in == 32);
-  // Bits are lies, I do bytes.
   const fb_bpp = fb_bpp_in / 8;
   const fb_size = @as(usize, fb_pitch) * @as(usize, fb_height);
-  const fb_page_low = os.lib.libalign.align_down(usize, page_size, fb_phys);
-  const fb_page_high = os.lib.libalign.align_up(usize, page_size, fb_phys + fb_size);
 
-  // Allocate backbuffer
-  const backbuffer = os.memory.vmm.backed(.Eternal).alloc(u8, fb_size) catch |err| {
-    os.log("VESAlog: Couldn't map fb: {}\n", .{@errorName(err)});
+  const bb_phys = os.memory.pmm.alloc_phys(fb_size) catch |err| {
+    os.log("VESAlog: Could not allocate backbuffer: {}\n", .{@errorName(err)});
     return;
   };
 
-  paging.remap_phys_range(.{
-    .phys = fb_page_low,
-    .phys_end = fb_page_high,
-    .memtype = .DeviceWriteCombining,
+  var size: usize = 0;
+  for (os.platform.paging.page_sizes) |s| {
+    if (s >= fb_size) {
+      size = s;
+      break;
+    }
+  }
+
+  const bb_virt = os.memory.paging.kernel_context.phys_to_virt(bb_phys);
+  os.memory.paging.unmap(.{ .virt = bb_virt, .size = size, .reclaim_pages = false, .context = &os.memory.paging.kernel_context });
+  os.memory.paging.map_phys(.{
+    .virt = bb_virt, .phys = bb_phys, .size = size,
+    .perm = os.memory.paging.rw(), .memtype = .MemoryWriteBack, .context = &os.memory.paging.kernel_context,
   }) catch |err| {
-    os.log("VESAlog: Couldn't map fb: {}\n", .{@errorName(err)});
-    // Backbuffer is leaked =(
+    os.log("VESAlog: Could not map backbuffer: {}\n", .{@errorName(err)});
     return;
   };
 
   framebuffer = Framebuffer {
-    .addr = pmm.access_phys(u8, fb_phys)[0..fb_size],
-    .pitch = fb_pitch,
-    .width = fb_width,
-    .height = fb_height,
-    .bpp = fb_bpp,
-    .phys = fb_phys,
-    .updater = default_updater,
-    .updater_ctx = 0,
-    .backbuffer = backbuffer,
+    .pitch = fb_pitch, .width = fb_width, .height = fb_height, .bpp = fb_bpp,
+    .updater = updater, .updater_ctx = updater_ctx,
+    .backbuffer = @intToPtr([*]u8, bb_virt)[0..fb_size], .bb_phys = bb_phys,
   };
 
   if(clear_screen) {
-    @memset(framebuffer.?.addr.ptr, bgcol, fb_size);
     @memset(framebuffer.?.backbuffer.ptr, bgcol, fb_size);
     os.log("VESAlog: Screen cleared.\n", .{});
   }
 
-  os.log("VESAlog: Registered fb @0x{X} with size 0x{X}\n", .{fb_phys, fb_size});
-  os.log("VESAlog:  Width:  {}\n", .{fb_width});
-  os.log("VESAlog:  Height: {}\n", .{fb_height});
-  os.log("VESAlog:  Pitch:  {}\n", .{fb_pitch});
-  os.log("VESAlog:  BPP:    {}\n", .{fb_bpp});
+  os.log("VESAlog: width={}, height={}, pitch={}, bpp={}\n", .{fb_width, fb_height, fb_pitch, fb_bpp});
 }
 
 pub fn putch(ch: u8) void {

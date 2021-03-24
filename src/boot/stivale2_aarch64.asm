@@ -24,7 +24,6 @@ smp:
 .section .text
 .global _start
 _start:
-
 .extern stivale2_main
   B     stivale2_main
 
