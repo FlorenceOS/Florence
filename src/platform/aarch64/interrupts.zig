@@ -132,7 +132,6 @@ export fn interrupt_irq_stack() callconv(.Naked) void {
 /// The vector which switches to the per-CPU scheduler stack
 export fn interrupt_sched_stack() callconv(.Naked) void {
   asm volatile(
-    \\MSR DAIFSET, #0xF
     \\STP X0, X1, [SP, #-0x10]!
     \\MRS X0, TPIDR_EL1 // Get the current cpu struct
     \\LDR X0, [X0, %[sched_stack_offset]] // Get the CPU scheduler stack
@@ -152,7 +151,6 @@ export fn interrupt_sched_stack() callconv(.Naked) void {
 /// The vector which switches to the per-task syscall stack
 export fn interrupt_syscall_stack() callconv(.Naked) void {
   asm volatile(
-    \\MSR DAIFSET, #0xF
     \\STP X0, X1, [SP, #-0x10]!
     \\MRS X0, TPIDR_EL1 // Get the current cpu struct
     \\LDR X0, [X0, %[task_offset]] // Get the task
