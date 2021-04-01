@@ -6,7 +6,7 @@ const libalign = os.lib.libalign;
 /// Used as a helper for task creation in platform-specific code
 pub const NewTaskEntry = struct {
     /// Callback that should be executed in a new task
-    function: fn (*NewTaskEntry) void,
+    function: fn (*NewTaskEntry) noreturn,
 
     pub fn alloc(task: *os.thread.Task, func: anytype, args: anytype) *NewTaskEntry {
         comptime const Args = @TypeOf(args);
@@ -19,7 +19,7 @@ pub const NewTaskEntry = struct {
             args: Args,
 
             /// Implementation of invoke
-            fn invoke(entry: *NewTaskEntry) void {
+            fn invoke(entry: *NewTaskEntry) noreturn {
                 const self = @fieldParentPtr(@This(), "entry", entry);
                 @call(.{}, self.function, self.args) catch |err| {
                     os.log("Task has finished with error {s}\n", .{@errorName(err)});
