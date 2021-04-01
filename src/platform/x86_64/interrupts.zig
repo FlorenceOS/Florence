@@ -35,7 +35,6 @@ pub fn init_interrupts() !void {
 
   add_handler(0x0E, page_fault_handler, true, 0, 1);
   add_handler(0x6C, os.thread.preemption.bootstrap, true, 0, 0);
-  std.debug.assert(handlers[0x6c] == os.thread.preemption.bootstrap);
   add_handler(0x6B, os.thread.preemption.wait_yield, true, 0, 2);
   add_handler(0xFF, spurious_handler, true, 0, 1);
 }
