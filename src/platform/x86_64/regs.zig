@@ -75,6 +75,12 @@ pub fn fill_cpuid(res: anytype, leaf: u32) bool {
     , [ecx] "={ecx}" (ecx)
     : [leaf] "{eax}" (leaf)
   );
+
+  res.eax = eax;
+  res.ebx = ebx;
+  res.edx = edx;
+  res.ecx = ecx;
+
   return true;
 }
 
