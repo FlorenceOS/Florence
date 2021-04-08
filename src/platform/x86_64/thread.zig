@@ -40,7 +40,7 @@ pub const CoreDoorbell = struct {
       .virt = virt,
       .size = 4096,
       .perm = os.memory.paging.rw(),
-      .memtype = os.platform.paging.MemoryType.MemoryWriteBack
+      .memtype = .MemoryWriteBack
     }), "CoreDoorbell map");
 
     self.addr = @intToPtr(*usize, virt);
