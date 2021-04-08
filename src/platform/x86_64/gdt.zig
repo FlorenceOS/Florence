@@ -4,6 +4,9 @@ pub const selector = .{
   .selnul = @as(u16, 0x00),
   .code64 = @as(u16, 0x08),
   .data64 = @as(u16, 0x10),
+  .usercode64 = @as(u16, 0x18 | 3),
+  .userdata64 = @as(u16, 0x20 | 3),
+  .tss = @as(u16, 0x28)
 };
  
 pub const Gdt = packed struct {
@@ -36,7 +39,7 @@ pub const Gdt = packed struct {
     asm volatile(
       \\ltr %[ts_sel]
       :
-      : [ts_sel] "r" (@as(u16, 0x28))
+      : [ts_sel] "r" (@as(u16, selector.tss))
     );
   }
  
