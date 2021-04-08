@@ -102,16 +102,12 @@ export fn interrupt_common() callconv(.Naked) void {
     \\LDP X7,  X6,  [SP], 0x10
     \\LDP X5,  X4,  [SP], 0x10
     \\LDP X3,  X2,  [SP], 0x10
-    \\LDP X1,  X0,  [SP], 0x10
     \\
     \\// Restore old stack pointer
-    \\MSR SPSel, #1 // Use interrupt stack temporarily
-    \\STP X0, X1, [SP, #-0x10]!
-    \\MRS X0, SP_EL0
-    \\LDP X1, XZR, [X0] // Pop stack poiner
+    \\LDP X1, XZR, [SP, #0x10] // Load stack poiner
     \\MSR SP_EL0, X1 // Write old stack pointer to SP0
-    \\LDP X0, X1, [SP], 0x10
-    \\MSR SPSel, #0 // Use old stack
+    \\
+    \\LDP X1,  X0,  [SP], 0x20
     \\
     \\ERET
   );
