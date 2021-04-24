@@ -204,7 +204,7 @@ pub const InterruptFrame = packed struct {
   }
 };
 
-export fn interrupt_common() callconv(.Naked) void {
+export fn interrupt_common() linksection(".text.interrupt_common") callconv(.Naked) void {
   asm volatile(
     \\push %%rax
     \\push %%rbx
@@ -272,3 +272,80 @@ export fn interrupt_handler(frame: u64) void {
     handlers[int_frame.intnum](int_frame);
   }
 }
+
+// Turns out GAS is so terrible we have to write a small assembler ourselves.
+const swapgs = [_]u8{0x0F, 0x01, 0xF8};
+const sti = [_]u8{0xFB};
+const rex = [_]u8{0x41};
+
+fn pack_le(comptime T: type, comptime value: u32) [@sizeOf(T)]u8 {
+  var result: [@sizeOf(T)]u8 = undefined;
+  std.mem.writeIntLittle(T, &result, value);
+  return result;
+}
+
+fn mov_gs_offset_rsp(comptime offset: u32) [9]u8 {
+  return [_]u8{0x65, 0x48, 0x89, 0x24, 0x25} ++ pack_le(u32, offset);
+}
+
+fn mov_rsp_gs_offset(comptime offset: u32) [9]u8 {
+  return [_]u8{0x65, 0x48, 0x8B, 0x24, 0x25} ++ pack_le(u32, offset);
+}
+
+fn mov_rsp_rsp_offset(comptime offset: u32) [8]u8 {
+  return [_]u8{0x48, 0x8B, 0xA4, 0x24} ++ pack_le(u32, offset);
+}
+
+fn push_gs_offset(comptime offset: u32) [8]u8 {
+  return [_]u8{0x65, 0xFF, 0x34, 0x25} ++ pack_le(u32, offset);
+}
+
+fn pushi32(comptime value: i32) [5]u8 {
+  return [_]u8{0x68} ++ pack_le(i32, value);
+}
+
+fn pushi8(comptime value: i8) [2]u8 {
+  return [_]u8{0x6A} ++ pack_le(i8, value);
+}
+
+fn push_reg(comptime regnum: u3) [1]u8 {
+  return [_]u8{0x50 | @as(u8, regnum)};
+}
+
+// Assumes IA32_FMASK (0xC0000084) disables interrupts
+const rsp_stash_offset =
+  @byteOffsetOf(os.platform.smp.CoreData, "platform_data")
+  +
+  @byteOffsetOf(os.platform.thread.CoreData, "rsp_stash")
+;
+const task_offset = @byteOffsetOf(os.platform.smp.CoreData, "current_task");
+const kernel_stack_offset = @byteOffsetOf(os.thread.Task, "stack");
+
+pub fn syscall_handler_addr() u64 {
+  return @ptrToInt(&syscall_handler[0]);
+}
+
+export const syscall_handler linksection(".text.syscall_handler") = [0]u8{}
+  // First make sure we get a proper stack pointer while
+  // saving away all the userspace registers.
+  ++ swapgs                                  // swapgs
+  ++ mov_gs_offset_rsp(rsp_stash_offset)     // mov gs:[rsp_stash_offset], rsp
+  ++ mov_rsp_gs_offset(task_offset)          // mov rsp, gs:[task_offset]
+  ++ mov_rsp_rsp_offset(kernel_stack_offset) // mov rsp, [rsp + kernel_stack_offset]
+
+  // Now we have a kernel stack in rsp
+  // Set up an iret frame
+  ++ pushi8(gdt.selector.userdata64)         // push user_data_sel         // iret ss
+  ++ push_gs_offset(rsp_stash_offset)        // push gs:[rsp_stash_offset] // iret rsp
+  ++ rex ++ push_reg(11 - 8)                 // push r11                   // iret rflags
+  ++ pushi8(gdt.selector.usercode64)         // push user_code_sel         // iret cs
+  ++ push_reg(1)                             // push rcx                   // iret rip
+  ++ swapgs
+  ++ sti
+
+  // Now let's set up the rest of the interrupt frame
+  ++ pushi8(0)                               // push 0                     // error code
+  ++ pushi32(0x80)                           // push 0x80                  // interrupt vector
+
+  // Fall through to the main interrupt handler
+;

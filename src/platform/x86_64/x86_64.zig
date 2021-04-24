@@ -19,7 +19,28 @@ pub const PagingRoot = u64;
 pub const InterruptFrame = interrupts.InterruptFrame;
 pub const InterruptState = interrupts.InterruptState;
 
-pub const irq_eoi = apic.eoi; 
+pub const irq_eoi = apic.eoi;
+
+const allow_syscall_instr = true;
+
+fn setup_syscall_instr() void {
+  if(comptime !allow_syscall_instr)
+    return;
+
+  regs.IA32_LSTAR.write(interrupts.syscall_handler_addr());
+  // Clear everything but the res1 bit (bit 1)
+  regs.IA32_FMASK.write(~@as(u64, 1 << 1));
+
+  comptime {
+    if(gdt.selector.data64 != gdt.selector.code64 + 8)
+      @compileError("syscall instruction assumes this");
+  }
+
+  regs.IA32_STAR.write(@as(u64, gdt.selector.code64) << 32);
+
+  // Allow syscall instructions
+  regs.IA32_EFER.write(regs.IA32_EFER.read() | (1 << 0));
+}
 
 pub fn get_and_disable_interrupts() InterruptState {
   return regs.eflags() & 0x200 == 0x200;
@@ -54,6 +75,8 @@ pub fn platform_early_init() void {
 
 pub fn bsp_pre_scheduler_init() void {
   idt.load_idt();
+  setup_syscall_instr();
+
   const cpu = os.platform.thread.get_current_cpu();
   thread.bsp_task.platform_data.tss = os.vital(os.memory.vmm.backed(.Eternal).create(Tss), "bsp pre sched init");
   thread.bsp_task.platform_data.tss.* = .{};
@@ -66,6 +89,7 @@ pub fn bsp_pre_scheduler_init() void {
 pub fn ap_init() void {
   os.memory.paging.kernel_context.apply();
   idt.load_idt();
+  setup_syscall_instr();
 
   const cpu = os.platform.thread.get_current_cpu();
   cpu.platform_data.gdt.load();

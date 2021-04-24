@@ -17,7 +17,6 @@ const PatIndex = u3;
 const la64: u64 = 1 << 12;
 const cr3 = regs.ControlRegister(u64, "cr3");
 const cr4 = regs.ControlRegister(u64, "cr4");
-const ia32_efer = regs.MSR(u64, 0xC0000080);
 
 fn PATContext() type {
   const PATEncoding = u8;
@@ -139,7 +138,7 @@ pub const PagingContext = struct {
     if(self.pat) |pat|
       @call(.{.modifier = .always_inline}, PATContext().apply, .{&pat});
 
-    ia32_efer.write(ia32_efer.read() | (1 << 11)); // NXE
+    regs.IA32_EFER.write(regs.IA32_EFER.read() | (1 << 11)); // NXE
 
     // Set 5 level paging bit
     const old_cr4 = cr4.read();
