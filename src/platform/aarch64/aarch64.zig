@@ -50,6 +50,7 @@ pub fn platform_init() !void {
 
 pub fn ap_init() void {
   os.memory.paging.kernel_context.apply();
+  interrupts.install_vector_table();
 }
 
 pub fn debugputch(val: u8) void {
