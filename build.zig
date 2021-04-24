@@ -135,7 +135,6 @@ fn qemu_run_aarch64_sabaton(b: *Builder, board_name: []const u8, desc: []const u
         "-m", "4G",
         "-serial", "stdio",
         //"-S", "-s",
-        "-d", "int",
         "-smp", "4",
         "-device", "virtio-gpu-pci",
         "-device", "ramfb",
