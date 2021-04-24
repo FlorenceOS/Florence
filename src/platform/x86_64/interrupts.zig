@@ -146,13 +146,15 @@ pub fn make_handler(comptime intnum: u8) idt.InterruptHandler {
   return struct {
     fn func() callconv(.Naked) void {
       asm volatile(
-        if(comptime !has_error_code(intnum))
+        (if(comptime !has_error_code(intnum))
           \\push $0
+          \\
         else
-          ""
+          "")
         ++
         \\push %[intnum]
         \\jmp interrupt_common
+        \\
         :
         : [intnum] "i" (@as(u8, intnum))
       );
