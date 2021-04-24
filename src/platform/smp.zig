@@ -42,7 +42,7 @@ pub const CoreData = struct {
       .virt = virt + guard_size,
       .size = size,
       .perm = os.memory.paging.rw(),
-      .memtype = .MemoryWritethrough
+      .memtype = .MemoryWritethrough,
     }), "bootstrap stack map");
     return virt + total_size;
   }
