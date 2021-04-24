@@ -12,3 +12,4 @@ pub const hexdump     = lib.logger.hexdump;
 pub const hexdump_obj = lib.logger.hexdump_obj;
 pub const vital       = lib.vital.vital;
 pub const panic       = lib.panic.panic;
+pub const config      = @import("config.zig");

@@ -21,10 +21,8 @@ pub const InterruptState = interrupts.InterruptState;
 
 pub const irq_eoi = apic.eoi;
 
-const allow_syscall_instr = true;
-
 fn setup_syscall_instr() void {
-  if(comptime !allow_syscall_instr)
+  if(comptime !os.config.kernel.x86_64.allow_syscall_instr)
     return;
 
   regs.IA32_LSTAR.write(interrupts.syscall_handler_addr());
