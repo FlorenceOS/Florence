@@ -84,7 +84,7 @@ pub fn bsp_pre_scheduler_init() void {
   thread.bsp_task.platform_data.load_state();
 }
 
-pub fn ap_init() void {
+pub fn ap_init() noreturn {
   os.memory.paging.kernel_context.apply();
   idt.load_idt();
   setup_syscall_instr();
@@ -103,7 +103,7 @@ pub fn ap_init() void {
   unreachable;
 }
 
-fn ap_init_stage2() void {
+fn ap_init_stage2() noreturn {
   _ = @atomicRmw(usize, &os.platform.smp.cpus_left, .Sub, 1, .AcqRel);
   // Wait for tasks
   asm volatile("int $0x6C");

@@ -48,7 +48,7 @@ pub fn platform_init() !void {
   try os.platform.pci.init_pci();
 }
 
-pub fn ap_init() void {
+pub fn ap_init() noreturn {
   os.memory.paging.kernel_context.apply();
   interrupts.install_vector_table();
 
@@ -63,7 +63,7 @@ pub fn ap_init() void {
   unreachable;
 }
 
-fn ap_init_stage2() void {
+fn ap_init_stage2() noreturn {
   _ = @atomicRmw(usize, &os.platform.smp.cpus_left, .Sub, 1, .AcqRel);
   // Wait for tasks
   asm volatile("SVC #'B'");

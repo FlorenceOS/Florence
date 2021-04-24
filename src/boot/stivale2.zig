@@ -176,11 +176,8 @@ fn smp_entry(info_in: u64) callconv(.C) noreturn {
   const cpu = &os.platform.smp.cpus[core_id];
   os.platform.thread.set_current_cpu(cpu);
 
-  platform.ap_init();
   cpu.booted = true;
-
-  os.log("Core {} inited\n", .{core_id});
-  os.thread.scheduler.leave();
+  platform.ap_init();
 }
 
 fn map_smp(smp: os.platform.phys_ptr(*stivale2_smp)) !void {
