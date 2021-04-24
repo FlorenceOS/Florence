@@ -1,5 +1,5 @@
 /// virtio-gpu driver instance
-pub const Driver = struct {
+const Driver = struct {
   transport: virtio.Driver,
   inflight: u32 = 0,
   pitch: u32 = 0,
@@ -113,7 +113,26 @@ pub const Driver = struct {
   }
 };
 
-
+pub fn handle_controller(addr: pci.Addr) void {
+  const alloc = os.memory.vmm.backed(.Eternal);
+  const drv = alloc.create(Driver) catch {
+    os.log("Virtio display controller: Allocation failure\n", .{});
+    return;
+  };
+  drv.* = Driver.init(addr) catch {
+    os.log("Virtio display controller: Init has failed!\n", .{});
+    return;
+  };
+  if (os.drivers.vesa_log.get_info()) |vesa| {
+    drv.modeset(os.drivers.vesa_log.framebuffer.?.bb_phys, vesa.width, vesa.height);
+    os.drivers.vesa_log.set_updater(updater, @ptrToInt(drv));
+    os.log("Virtio display controller: Initialized with preexisting fb\n", .{});
+  } else {
+    os.drivers.vesa_log.register_fb(updater, @ptrToInt(drv), 800*4, 800, 600, 32);
+    drv.modeset(os.drivers.vesa_log.get_backbuffer_phy(), 800, 600);
+    os.log("Virtio display controller: Initialized\n", .{});
+  }
+}
 
 fn process(self: *Driver, i: u8, head: virtio.Descriptor) void {
   self.transport.freechain(i, head);
@@ -128,7 +147,7 @@ pub fn interrupt(frame: *os.platform.InterruptFrame, context: u64) void {
 }
 
 /// Global rectangle update, but with a global context
-pub fn updater(bb: [*]u8, yoff_src: usize, yoff_dest: usize, ysize: usize, pitch: usize, ctx: usize) void {
+fn updater(bb: [*]u8, yoff_src: usize, yoff_dest: usize, ysize: usize, pitch: usize, ctx: usize) void {
   var self = @intToPtr(*Driver, ctx);
   self.update_rect(self.pitch * yoff_src, .{ .x = 0, .y = @truncate(u32, yoff_dest), .width = self.width, .height = @truncate(u32, ysize) });
 }
