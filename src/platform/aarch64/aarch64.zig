@@ -51,6 +51,23 @@ pub fn platform_init() !void {
 pub fn ap_init() void {
   os.memory.paging.kernel_context.apply();
   interrupts.install_vector_table();
+
+  const cpu = os.platform.thread.get_current_cpu();
+
+  asm volatile(
+    \\BR %[dest]
+    :
+    : [stack] "{SP}" (cpu.sched_stack)
+    , [dest] "r" (ap_init_stage2)
+  );
+  unreachable;
+}
+
+fn ap_init_stage2() void {
+  _ = @atomicRmw(usize, &os.platform.smp.cpus_left, .Sub, 1, .AcqRel);
+  // Wait for tasks
+  asm volatile("SVC #'B'");
+  unreachable;
 }
 
 pub fn debugputch(val: u8) void {
