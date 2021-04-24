@@ -24,7 +24,7 @@ pub fn add_handler(idx: u8, f: InterruptHandler, interrupt: bool, priv_level: u2
   handlers[idx] = f;
 }
 
-pub fn init_interrupts() !void {
+pub fn init_interrupts() void {
   pic.disable();
   itable = &idt.idt;
 

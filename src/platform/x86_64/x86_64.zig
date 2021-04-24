@@ -68,7 +68,7 @@ pub fn platform_init() !void {
 pub fn platform_early_init() void {
   os.platform.smp.prepare();
   serial.init();
-  try interrupts.init_interrupts();
+  interrupts.init_interrupts();
   os.platform.smp.cpus[0].platform_data.gdt.load();
   os.memory.paging.init();
 }
