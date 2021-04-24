@@ -1,44 +1,41 @@
 const os = @import("root").os;
 
-// A simple spinlock
-// Can be used as an SMP synchronization primitive
+/// A simple spinlock
+/// Can be used as an SMP synchronization primitive
 pub const Spinlock = struct {
-  taken: bool = false,
+  serving: usize = 0,
+  allocated: usize = 0,
 
-  // Try grabbing lock and disabling interrupts atomically
-  pub fn try_lock(self: *@This()) ?os.platform.InterruptState {
-    const state = os.platform.get_and_disable_interrupts();
-    if(self.try_grab()) return state;
-    os.platform.set_interrupts(state);
-    return null;
-  }
-
-  // Grabs lock and disables interrupts atomically.
+  /// Grabs lock and disables interrupts atomically.
   pub fn lock(self: *@This()) os.platform.InterruptState {
-    while(true) {
-      if(self.try_lock()) |s| { return s; }
+    const ticket = @atomicRmw(usize, &self.allocated, .Add, 1, .AcqRel);
+    while (true) {
+      const state = os.platform.get_and_disable_interrupts();
+      if (@atomicLoad(usize, &self.serving, .Acquire) == ticket) {
+        return state;
+      }
+      os.platform.set_interrupts(state);
       os.platform.spin_hint();
     }
   }
 
-  pub fn try_grab(self: *@This()) bool {
-    return !@atomicRmw(bool, &self.taken, .Xchg, true, .AcqRel);
-  }
-
-  // Grab lock without disabling interrupts
+  /// Grab lock without disabling interrupts
   pub fn grab(self: *@This()) void {
-    while(!self.try_grab()) {
+    const ticket = @atomicRmw(usize, &self.allocated, .Add, 1, .AcqRel);
+    while (true) {
+      if (@atomicLoad(usize, &self.serving, .Acquire) == ticket) {
+        return;
+      }
       os.platform.spin_hint();
     }
   }
 
-  // Release lock without restoring interrupt state
+  /// Release lock without restoring interrupt state
   pub fn ungrab(self: *@This()) void {
-    @import("std").debug.assert(self.taken);
-    @atomicStore(bool, &self.taken, false, .Release);
+    _ =  @atomicRmw(usize, &self.serving, .Add, 1, .AcqRel);
   }
 
-  // Releases lock while atomically restoring interrupt state
+  /// Releases lock while atomically restoring interrupt state
   pub fn unlock(self: *@This(), s: os.platform.InterruptState) void {
     self.ungrab();
     os.platform.set_interrupts(s);

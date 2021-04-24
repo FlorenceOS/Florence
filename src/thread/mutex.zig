@@ -1,24 +1,34 @@
 const os = @import("root").os;
 const std = @import("std");
 
+/// Mutex is lock that should be used for synchronizing operations
+/// that may take too long and/or can't be run in interrupt disabled context
+/// (e.g. you need to use it if you allocate memory in locked section)
 pub const Mutex = struct {
+  /// Thread that holds the mutex
   held_by: ?*os.thread.Task = null,
-  queue: os.thread.QueueBase = .{},
+  /// Atomic queue of waiting tasks
+  queue: os.thread.TaskQueue = .{},
+  /// Spinlock used to prevent more than one thread from accessing mutex data
   spinlock: os.thread.Spinlock = .{},
 
+  /// Wrapper for mutex std API
   const Held = struct {
     mtx: *Mutex,
 
+    /// Release mutex
     pub fn release(self: *const @This()) void {
       self.mtx.unlock();
     }
   };
 
+  /// Acquire method to be used by zig std
   pub fn acquire(self: *@This()) Held {
     self.lock();
     return .{.mtx = self};
   }
 
+  /// Lock mutex. Don't call from interrupt context!
   pub fn lock(self: *@This()) void {
     const lock_state = self.spinlock.lock();
     if (self.held_by == null) {
@@ -26,37 +36,28 @@ pub const Mutex = struct {
       self.spinlock.unlock(lock_state);
       return;
     }
-    self.queue.add_back(os.platform.get_current_task());
+    self.queue.enqueue(os.platform.get_current_task());
     self.spinlock.ungrab();
     os.thread.scheduler.wait();
     os.platform.set_interrupts(lock_state);
   }
 
-  fn unlock_impl(self: *@This()) void {
-    @import("std").debug.assert(self.held_by_me());
-    self.held_by = null;
-  }
-
+  /// Unlock mutex.
   pub fn unlock(self: *@This()) void {
     const lock_state = self.spinlock.lock();
     std.debug.assert(self.held_by_me());
-    if (self.queue.remove_front()) |task| {
-      self.held_by = task;
+    if (self.queue.dequeue()) |task| {
+      @atomicStore(?*os.thread.Task, &self.held_by, task, .Release);
       os.thread.scheduler.wake(task);
     } else {
-      self.held_by = null;
+      @atomicStore(?*os.thread.Task, &self.held_by, null, .Release);
     }
     self.spinlock.unlock(lock_state);
   }
 
-  pub fn held(self: *const @This()) bool {
-    if(self.held_by) |h|
-      return true;
-    return false;
-  }
-
+  /// Check if mutex is held by current task
   pub fn held_by_me(self: *const @This()) bool {
-    return self.held_by == os.platform.get_current_task();
+    return @atomicLoad(?*os.thread.Task, &self.held_by, .Acquire) == os.platform.get_current_task();
   }
 
   pub fn init(self: *@This()) void {

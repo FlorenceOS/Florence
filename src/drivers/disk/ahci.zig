@@ -686,12 +686,12 @@ fn controller_task(abar: *volatile ABAR) !void {
         }
 
         switch (port.signature) {
-            0x00000101 => try scheduler.make_task(sata_port_task, .{ .ata, port }),
-            //0xEB140101 => try scheduler.make_task(sata_port_task, .{.atapi, port}),
+            0x00000101 => try scheduler.spawn_task(sata_port_task, .{ .ata, port }),
+            //0xEB140101 => try scheduler.spawn_task(sata_port_task, .{.atapi, port}),
             0xC33C0101, 0x96690101 => {
                 log("AHCI: Known TODO port signature: 0x{X}\n", .{port.signature});
-                //scheduler.make_task(sata_port_task, .{.semb,   port})
-                //scheduler.make_task(sata_port_task, .{.pm,     port})
+                //scheduler.spawn_task(sata_port_task, .{.semb,   port})
+                //scheduler.spawn_task(sata_port_task, .{.pm,     port})
             },
             else => {
                 log("AHCI: Unknown port signature: 0x{X}\n", .{port.signature});
@@ -734,7 +734,7 @@ pub fn register_controller(addr: pci.Addr) void {
         return;
     }
 
-    scheduler.make_task(controller_task, .{abar}) catch |err| {
+    scheduler.spawn_task(controller_task, .{abar}) catch |err| {
         log("AHCI: Failed to make controller task: {}\n", .{@errorName(err)});
     };
 }

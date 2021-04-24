@@ -1,5 +1,13 @@
 const std = @import("std");
 
+pub const IA32_EFER  = MSR(u64, 0xC0000080);
+pub const IA32_STAR  = MSR(u64, 0xC0000081);
+pub const IA32_LSTAR = MSR(u64, 0xC0000082);
+pub const IA32_FMASK = MSR(u64, 0xC0000084);
+
+pub const IA32_FS_BASE = MSR(u64, 0xC0000100);
+pub const IA32_GS_BASE = MSR(u64, 0xC0000101);
+
 fn read_msr(comptime T: type, msr_num: u32) T {
   std.debug.assert(T == u64);
 
@@ -51,7 +59,6 @@ pub fn ControlRegister(comptime T: type, comptime name: []const u8) type {
 pub fn eflags() u64 {
   return asm volatile(
     \\pushfq
-    \\cli
     \\pop %[flags]
     : [flags] "=r" (-> u64)
   );
@@ -76,6 +83,12 @@ pub fn fill_cpuid(res: anytype, leaf: u32) bool {
     , [ecx] "={ecx}" (ecx)
     : [leaf] "{eax}" (leaf)
   );
+
+  res.eax = eax;
+  res.ebx = ebx;
+  res.edx = edx;
+  res.ecx = ecx;
+
   return true;
 }
 

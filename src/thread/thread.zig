@@ -1,7 +1,11 @@
-pub const Mutex             = @import("mutex.zig").Mutex;
-pub const scheduler         = @import("scheduler.zig");
-pub const Spinlock          = @import("spinlock.zig").Spinlock;
-pub const Task              = @import("task.zig").Task;
-pub const QueueBase         = @import("task_queue.zig").QueueBase;
-pub const ReadyQueue        = @import("task_queue.zig").ReadyQueue;
-pub const NewTaskEntry      = @import("task_entry.zig").NewTaskEntry;
+/// Functions for task management
+pub const scheduler = @import("scheduler.zig");
+/// Functions for platform-specific layers to implement preemption
+pub const preemption = @import("preemption.zig");
+
+pub const Mutex = @import("mutex.zig").Mutex;
+pub const Spinlock = @import("spinlock.zig").Spinlock;
+pub const Task = @import("task.zig").Task;
+pub const TaskQueue = @import("task_queue.zig").TaskQueue;
+pub const ReadyQueue = @import("task_queue.zig").ReadyQueue;
+pub const NewTaskEntry = @import("task_entry.zig").NewTaskEntry;
