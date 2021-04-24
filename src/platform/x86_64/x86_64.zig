@@ -78,7 +78,7 @@ pub fn bsp_pre_scheduler_init() void {
   setup_syscall_instr();
 
   const cpu = os.platform.thread.get_current_cpu();
-  thread.bsp_task.platform_data.tss = os.vital(os.memory.vmm.backed(.Eternal).create(Tss), "bsp pre sched init");
+  thread.bsp_task.platform_data.tss = os.vital(os.memory.vmm.backed(.Eternal).create(Tss), "alloc bsp tss");
   thread.bsp_task.platform_data.tss.* = .{};
 
   thread.bsp_task.platform_data.tss.set_interrupt_stack(cpu.int_stack);
