@@ -27,7 +27,11 @@ pub fn timer(ticks: u32, div: u32, vec: u32) void {
 // ACPI information
 
 fn handle_processor(apic_id: u32) void {
-  os.log("APIC: Processor LAPIC ID {}\n", .{apic_id});
+  
+}
+
+fn handle_interrupt_source_override(bus: u8, source: u8, global_system_interrupt: u32, flags: u16) void {
+
 }
 
 pub fn handle_madt(madt: []u8) void {
@@ -38,14 +42,16 @@ pub fn handle_madt(madt: []u8) void {
     const kind = madt[offset + 0];
     const size = madt[offset + 1];
 
+    const data = madt[offset .. offset + size];
+
     if(offset + size >= madt.len)
       break;
 
     switch(kind) {
       0x00 => {
         std.debug.assert(size >= 8);
-        const apic_id = madt[offset + 3];
-        const flags = std.mem.readInt(u32, madt[offset + 4..][0..4], builtin.endian);
+        const apic_id = data[3];
+        const flags = std.mem.readIntNative(u32, data[4..8]);
         if(flags & 0x3 != 0)
           handle_processor(@as(u32, apic_id));
       },
@@ -55,7 +61,11 @@ pub fn handle_madt(madt: []u8) void {
       },
       0x02 => {
         std.debug.assert(size >= 10);
-        os.log("APIC: TODO: Interrupt Source Override\n", .{});
+        const bus = data[2];
+        const source = data[3];
+        const global_system_interrupt = std.mem.readIntNative(u32, data[4..8]);
+        const flags = std.mem.readIntNative(u16, data[8..10]);
+        handle_interrupt_source_override(bus, source, global_system_interrupt, flags);
       },
       0x03 => {
         std.debug.assert(size >= 8);
@@ -83,8 +93,8 @@ pub fn handle_madt(madt: []u8) void {
       },
       0x09 => {
         std.debug.assert(size >= 16);
-        const apic_id = std.mem.readInt(u32, madt[offset + 12..][0..4], builtin.endian);
-        const flags   = std.mem.readInt(u32, madt[offset + 8..][0..4], builtin.endian);
+        const flags   = std.mem.readIntNative(u32, data[8..12]);
+        const apic_id = std.mem.readIntNative(u32, data[12..16]);
         if(flags & 0x3 != 0)
           handle_processor(apic_id);
       },
