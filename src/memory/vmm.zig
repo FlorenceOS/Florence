@@ -20,7 +20,6 @@ pub fn nonbacked_sbrk(num_bytes: usize) ![]u8 {
   defer sbrk_mutex.unlock();
 
   const ret = sbrk_head;
-  os.log("VMM: sbrk(0x{X}) = 0x{X}\n", .{num_bytes, ret});
 
   sbrk_head += num_bytes;
 
