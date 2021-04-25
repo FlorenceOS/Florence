@@ -715,6 +715,7 @@ pub fn register_controller(addr: pci.Addr) void {
         .memtype = .DeviceUncacheable,
     }) catch |err| {
         log("AHCI: Failed to map ABAR: {}\n", .{@errorName(err)});
+        return;
     };
 
     const abar = pmm.access_phys_single_volatile(ABAR, abar_phys);
