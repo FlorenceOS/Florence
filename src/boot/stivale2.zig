@@ -171,20 +171,13 @@ const parsed_info = struct {
 
 fn smp_entry(info_in: u64) callconv(.C) noreturn {
   const smp_info = os.platform.phys_ptr(*stivale2_smp_info).from_int(info_in);
-  const core_id = smp_info.get().argument;
+  const core_id = smp_info.get_writeback().argument;
 
   const cpu = &os.platform.smp.cpus[core_id];
   os.platform.thread.set_current_cpu(cpu);
 
   cpu.booted = true;
   platform.ap_init();
-}
-
-fn map_smp(smp: os.platform.phys_ptr(*stivale2_smp)) !void {
-  var slc = os.platform.phys_slice(u8).init(smp.addr, @sizeOf(stivale2_smp));
-  try slc.remap(.MemoryWriteBack);
-  slc.len += smp.get().entries * @sizeOf(stivale2_smp_info);
-  try slc.remap(.MemoryWriteBack);
 }
 
 export fn stivale2_main(info_in: *stivale2_info) noreturn {
@@ -240,37 +233,17 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
   }
 
   for(info.memmap.?.get()) |*ent| {
-    stivale.add_memmap(ent);
-  }
-
-  var context = os.vital(paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
-
-  for(info.memmap.?.get()) |*ent| {
-    stivale.map_phys(ent, &context);
-  }
-
-  if(info.uart) |uart| {
-    os.log("Mapping UART\n", .{});
-    os.vital(paging.remap_phys_size(.{
-      .phys = uart.uart_addr,
-      .size = platform.paging.page_sizes[0],
-      .memtype = .DeviceUncacheable,
-      .context = &context,
-    }), "mapping UART");
-  }
-
-  if(info.uart_status) |uart| {
-    os.log("Mapping UART with status\n", .{});
-    os.vital(paging.remap_phys_size(.{
-      .phys = uart.uart_addr,
-      .size = platform.paging.page_sizes[0],
-      .memtype = .DeviceUncacheable,
-      .context = &context,
-    }), "mapping UART with status");
+    stivale.consume_physmem(ent);
   }
 
   const phys_high = stivale.phys_high(info.memmap.?.get());
 
+  var context = os.vital(paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
+
+  os.vital(os.memory.paging.map_physmem(.{
+    .context = &context,
+    .map_limit = phys_high,
+  }), "Mapping physmem");
 
   os.memory.paging.kernel_context = context;
   platform.thread.bsp_task.paging_context = &os.memory.paging.kernel_context;
@@ -279,26 +252,14 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
 
   os.log("Doing vmm\n", .{});
 
-  const heap_base = os.memory.paging.kernel_context.phys_to_virt(phys_high);
+  const heap_base = os.memory.paging.kernel_context.make_heap_base();
 
   os.vital(vmm.init(heap_base), "initializing vmm");
 
   os.log("Doing framebuffer\n", .{});
 
   if(info.framebuffer) |fb| {
-    const fb_size = @as(usize, fb.pitch) * @as(usize, fb.height);
-    const fb_page_low = os.lib.libalign.align_down(usize, page_size, fb.addr);
-    const fb_page_high = os.lib.libalign.align_up(usize, page_size, fb.addr + fb_size);
-    var success = true;
-    paging.remap_phys_range(.{
-      .phys = fb_page_low,
-      .phys_end = fb_page_high,
-      .memtype = .DeviceWriteCombining,
-    }) catch |err| {
-      os.log("Stivale2: Couldn't map fb: {}\n", .{@errorName(err)});
-      success = false;
-    };
-    if (success) vesa_log.register_fb(vesa_log.lfb_updater, @ptrToInt(os.memory.pmm.access_phys(u8, fb.addr)), fb.pitch, fb.width, fb.height, fb.bpp);
+    vesa_log.register_fb(vesa_log.lfb_updater, fb.addr, fb.pitch, fb.width, fb.height, fb.bpp);
   }
   else {
     vga_log.register();
@@ -311,14 +272,12 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
   os.log("Doing SMP\n", .{});
 
   if(info.smp) |smp| {
-    os.vital(map_smp(smp), "mapping smp struct");
-
-    const cpus = smp.get().get();
+    const cpus = smp.get_writeback().get();
 
     os.platform.smp.init(cpus.len);
 
     var bootstrap_stack_size =
-      os.memory.paging.kernel_context.page_size(0, os.memory.pmm.phys_to_virt(0));
+      os.memory.paging.kernel_context.page_size(0, os.memory.pmm.phys_to_uncached_virt(0));
 
     // Just a single page of stack isn't enough for debug mode :^(
     if(std.debug.runtime_safety) {
@@ -347,7 +306,7 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
       const stack = stacks + bootstrap_stack_size * i;
 
       cpu_info.argument = i;
-      cpu_info.target_stack = os.memory.pmm.phys_to_virt(stack + bootstrap_stack_size - 16);
+      cpu_info.target_stack = os.memory.pmm.phys_to_write_back_virt(stack + bootstrap_stack_size - 16);
       @atomicStore(u64, &cpu_info.goto_address, @ptrToInt(smp_entry), .Release);
     }
 

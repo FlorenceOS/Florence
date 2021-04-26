@@ -707,8 +707,6 @@ pub fn register_controller(addr: pci.Addr) void {
 
     const abar_phys = addr.barinfo(5).phy & 0xFFFFF000;
 
-    log("AHCI: Got abar phys: 0x{X}\n", .{abar_phys});
-
     paging.remap_phys_size(.{
         .phys = abar_phys,
         .size = abar_size,
@@ -719,11 +717,8 @@ pub fn register_controller(addr: pci.Addr) void {
     };
 
     const abar = pmm.access_phys_single_volatile(ABAR, abar_phys);
-    log("AHCI: ABAR is accessible at 0x{X}\n", .{@ptrToInt(abar)});
 
     const cap = abar.hba_capabilities;
-
-    log("AHCI: HBA capabilities: 0x{X}\n", .{cap});
 
     if ((cap & (1 << 31)) == 0) {
         log("AHCI: Controller is 32 bit only, ignoring.\n", .{});

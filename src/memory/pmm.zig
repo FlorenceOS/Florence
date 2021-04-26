@@ -62,8 +62,7 @@ fn alloc_impl(ind: usize) error{OutOfMemory}!usize {
   }
   else {
     const retval = free_roots[ind];
-
-    free_roots[ind] = access_phys(usize, retval)[0];
+    free_roots[ind] = os.platform.phys_ptr(*usize).from_int(retval).get_writeback().*;
     return retval;
   }
 }
@@ -82,7 +81,7 @@ pub fn alloc_phys(size: usize) !usize {
 fn free_impl(phys: usize, ind: usize) void {
   const last = free_roots[ind];
   free_roots[ind] = phys;
-  access_phys(usize, phys)[0] = last;
+  os.platform.phys_ptr(*usize).from_int(phys).get_writeback().* = last;
 }
 
 pub fn free_phys(phys: usize, size: usize) void {
@@ -99,24 +98,16 @@ pub fn free_phys(phys: usize, size: usize) void {
   unreachable;
 }
 
-pub fn phys_to_virt(phys: usize) usize {
-  return os.memory.paging.kernel_context.phys_to_virt(phys);
+pub fn phys_to_uncached_virt(phys: usize) usize {
+  return os.memory.paging.kernel_context.phys_to_uncached_virt(phys);
 }
 
-pub fn access_phys(comptime t: type, phys: usize) [*]t {
-  return @intToPtr([*]t, phys_to_virt(phys));
+pub fn phys_to_write_combining_virt(phys: usize) usize {
+  return os.memory.paging.kernel_context.phys_to_write_combining_virt(phys);
 }
 
-pub fn access_phys_volatile(comptime t: type, phys: usize) [*]volatile t {
-  return @ptrCast([*]volatile t, access_phys(t, phys));
-}
-
-pub fn access_phys_single(comptime t: type, phys: usize) *t {
-  return &access_phys(t, phys)[0];
-}
-
-pub fn access_phys_single_volatile(comptime t: type, phys: usize) *volatile t {
-  return @ptrCast(*volatile t, access_phys_single(t, phys));
+pub fn phys_to_write_back_virt(phys: usize) usize {
+  return os.memory.paging.kernel_context.phys_to_write_back_virt(phys);
 }
 
 pub fn init() void {

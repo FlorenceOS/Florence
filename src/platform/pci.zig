@@ -64,8 +64,10 @@ pub const Addr = struct {
   }
 
   pub fn read(self: Addr, comptime T: type, offset: regoff) T {
-    if(pci_mmio[self.bus] != null)
-      return std.mem.readIntLittle(T, mmio(self, offset)[0..@sizeOf(T)]);
+    if(pci_mmio[self.bus] != null) {
+      const buf = mmio(self, offset)[0..@sizeOf(T)].*;
+      return std.mem.readIntLittle(T, &buf);
+    }
     if(@hasDecl(os.platform, "pci_space"))
       return os.platform.pci_space.read(T, self, offset);
     @panic("No pci module!");
@@ -73,14 +75,15 @@ pub const Addr = struct {
 
   pub fn write(self: Addr, comptime T: type, offset: regoff, value: T) void {
     if(pci_mmio[self.bus] != null) {
-      std.mem.writeIntLittle(T, mmio(self, offset)[0..@sizeOf(T)], value);
+      var buf: [@sizeOf(T)]u8 = undefined;
+      std.mem.writeIntLittle(T, &buf, value);
+      mmio(self, offset)[0..@sizeOf(T)].* = buf;
       return;
     }
     if(@hasDecl(os.platform, "pci_space"))
         return os.platform.pci_space.write(T, self, offset, value);
     @panic("No pci module!");
   }
-
 
   pub fn format(self: Addr, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
     try writer.print("[{x:0>2}:{x:0>2}:{x:0>1}]", .{self.bus, self.device, self.function});
@@ -91,12 +94,9 @@ pub const Addr = struct {
 
 pub const regoff = u8;
 
-fn mmio(addr: Addr, offset: regoff) [*]u8 {
-  return @ptrCast([*]u8, pci_mmio[addr.bus].?) + (@as(u64, addr.device) << 15 | @as(u64, addr.function) << 12 | @as(u64, offset));
+fn mmio(addr: Addr, offset: regoff) [*]volatile u8 {
+  return @ptrCast([*]volatile u8, pci_mmio[addr.bus].?) + (@as(u64, addr.device) << 15 | @as(u64, addr.function) << 12 | @as(u64, offset));
 }
-
-const virtio_gpu = os.drivers.virtio_gpu;
-
 
 const BarInfo = struct {
   phy: u64,
@@ -213,12 +213,7 @@ pub fn init_pci() !void {
 }
 
 pub fn register_mmio(bus: u8, physaddr: u64) !void {
-  try paging.remap_phys_size(.{
-    .phys = physaddr,
-    .size = 1 << 20,
-    .memtype = .DeviceUncacheable,
-  });
-  pci_mmio[bus] = &os.memory.pmm.access_phys([1 << 20]u8, physaddr)[0];
+  pci_mmio[bus] = os.platform.phys_ptr([*]u8).from_int(physaddr).get_uncached()[0..1<<20];
 }
 
 var pci_mmio: [0x100]?*[1 << 20]u8 linksection(".bss") = undefined;

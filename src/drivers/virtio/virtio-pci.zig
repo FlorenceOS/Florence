@@ -126,21 +126,17 @@ pub const Driver = struct {
         const phy = a.barinfo(bar).phy + off;
         switch (cfg_typ) {
           VIRTIO_PCI_CAP_COMMON_CFG => {
-            map(phy, len);
-            drv.cfg = pmm.access_phys_single_volatile(CommonCfg, phy);
+            drv.cfg = os.platform.phys_ptr(*volatile CommonCfg).from_int(phy).get_uncached();
           },
           VIRTIO_PCI_CAP_NOTIFY_CFG => {
-            map(phy, len);
             drv.notify_mul = cap.read(u32, VIRTIO_PCI_NOTIFY_CAP_MULT) / 2; // VIRTIO_PCI_NOTIFY_CAP_MULT is a byte offset, each field is u16
-            drv.notify = pmm.access_phys_volatile(u16, phy);
+            drv.notify = os.platform.phys_ptr([*]volatile u16).from_int(phy).get_uncached();
           },
           VIRTIO_PCI_CAP_ISR_CFG => {
-            map(phy, len);
-            drv.isr = pmm.access_phys_single_volatile(u32, phy);
+            drv.isr = os.platform.phys_ptr(*volatile u32).from_int(phy).get_uncached();
           },
           VIRTIO_PCI_CAP_DEVICE_CFG => {
-            map(phy, len);
-            drv.dev = pmm.access_phys_volatile(u8, phy);
+            drv.dev = os.platform.phys_ptr([*]volatile u8).from_int(phy).get_uncached();
           },
           VIRTIO_PCI_CAP_PCI_CFG => {
           },
@@ -162,8 +158,7 @@ pub const Driver = struct {
     const used_siz: u32 = @sizeOf(VirtqUsed) + 2 + @sizeOf(VirtqUsedItem) * size;
     const total_siz = desc_siz + avail_siz + used_siz;
     const phys = os.memory.pmm.alloc_phys(size) catch unreachable;
-    paging.remap_phys_size(.{ .phys = phys, .size = size, .memtype = .DeviceUncacheable }) catch unreachable;
-    const virt = os.memory.pmm.access_phys_volatile(u8, phys);
+    const virt = os.platform.phys_ptr([*]volatile u8).from_int(phys).get_uncached();
     @memset(virt, 0x00, total_siz);
 
     drv.queues[i] = .{
@@ -277,15 +272,6 @@ const CommonCfg = packed struct {
   queue_avail: u64,
   queue_used: u64,
 };
-
-// map function helper
-fn map(phy: u64, len: u64) void {
-  os.vital(paging.remap_phys_size(.{
-    .phys = phy,
-    .size = len,
-    .memtype = .DeviceUncacheable
-  }), "mapping virtio-pci bars");
-}
 
 const VIRTIO_ACKNOWLEDGE: u8 = 1;
 const VIRTIO_DRIVER: u8 = 2;

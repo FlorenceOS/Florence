@@ -33,8 +33,8 @@ pub fn putch(ch: u8) void {
 
   if(mmio32_serial) |reg| {
     if(write_status) |s| {
-      while((s.status_ptr.get().* & s.status_mask) != s.status_value) { }
+      while((s.status_ptr.get_uncached().* & s.status_mask) != s.status_value) { }
     }
-    reg.get().* = @as(u32, ch);
+    reg.get_uncached().* = @as(u32, ch);
   }
 }

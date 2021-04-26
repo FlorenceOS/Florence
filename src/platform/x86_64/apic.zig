@@ -8,8 +8,7 @@ var lapic: *volatile [0x100]u32 = undefined;
 
 pub fn enable() void {
   const phy = IA32_APIC_BASE.read() & 0xFFFFF000; // ignore flags
-  os.memory.paging.remap_phys_size(.{ .phys = phy , .size = 0x400, .memtype = .DeviceUncacheable }) catch unreachable;
-  lapic = os.memory.pmm.access_phys_single_volatile([0x100]u32, phy);
+  lapic = os.platform.phys_ptr(*volatile [0x100]u32).from_int(phy).get_uncached();
   lapic[SPURIOUS] |= 0x1FF; // bit 8 = lapic enable, 0xFF = spurious vector
 }
 

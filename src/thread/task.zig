@@ -37,7 +37,7 @@ pub const Task = struct {
       .virt = virt + guard_size,
       .size = map_size,
       .perm = os.memory.paging.rw(),
-      .memtype = .MemoryWritethrough
+      .memtype = .MemoryWriteback,
     });
     self.stack = virt + total_size;
   }

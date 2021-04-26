@@ -63,19 +63,7 @@ fn page_fault_handler(frame: *InterruptFrame) void {
     os.platform.hang();
   };
 
-  os.log("Interrupts: Page fault while {} at 0x{x}\n",
-    .{
-      switch(page_fault_type) {
-        .Read => @as([]const u8, "reading"),
-        .Write => "writing",
-        .InstructionFetch => "fetching instruction",
-      },
-      page_fault_addr,
-    }
-  );
-
   platform.page_fault(page_fault_addr, (frame.ec & 1) != 0, page_fault_type, frame);
-  os.platform.hang();
 }
 
 fn unhandled_interrupt(frame: *InterruptFrame) void {
@@ -183,7 +171,7 @@ pub const InterruptFrame = packed struct {
   rsp: u64, 
   ss:  u64,
 
-  pub fn dump(self: *@This()) void {
+  pub fn dump(self: *const @This()) void {
     os.log("FRAME DUMP:\n", .{});
     os.log("RAX={x:0>16} RBX={x:0>16} RCX={x:0>16} RDX={x:0>16}\n", .{self.rax, self.rbx, self.rcx, self.rdx});
     os.log("RSI={x:0>16} RDI={x:0>16} RBP={x:0>16} RSP={x:0>16}\n", .{self.rsi, self.rdi, self.rbp, self.rsp});
@@ -192,7 +180,7 @@ pub const InterruptFrame = packed struct {
     os.log("RIP={x:0>16} int={x:0>16} ec ={x:0>16}\n",              .{self.rip, self.intnum, self.ec});
   }
 
-  pub fn trace_stack(self: *@This()) void {
+  pub fn trace_stack(self: *const @This()) void {
     os.lib.debug.dump_frame(self.rbp, self.rip);
   }
 };

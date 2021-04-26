@@ -57,20 +57,16 @@ fn signature_value(sdt: anytype) u32 {
   return std.mem.readInt(u32, sdt[0..4], builtin.endian);
 }
 
-fn map_sdt(addr: u64) !os.platform.phys_slice(u8) {
+fn get_sdt(addr: u64) []u8 {
   var result = os.platform.phys_slice(u8).init(addr, 8);
-
-  try result.remap(.MemoryWriteBack);
-  result.len = std.mem.readInt(u32, result.to_slice()[4..8], builtin.endian);
-  try result.remap(.MemoryWriteBack);
-
-  return result;
+  result.len = std.mem.readInt(u32, result.to_slice_writeback()[4..8], builtin.endian);
+  return result.to_slice_writeback();
 }
 
-fn parse_sdt(addr: usize) !void {
-  const sdt = try map_sdt(addr);
+fn parse_sdt(addr: usize) void {
+  const sdt = get_sdt(addr);
 
-  switch(signature_value(sdt.to_slice())) {
+  switch(signature_value(sdt)) {
     signature_value("FACP") => { }, // Ignore for now
     signature_value("SSDT") => { }, // Ignore for now
     signature_value("DMAR") => { }, // Ignore for now
@@ -82,26 +78,26 @@ fn parse_sdt(addr: usize) !void {
     signature_value("GTDT") => { }, // Ignore for now
     signature_value("APIC") => {
       switch(builtin.arch) {
-        .x86_64 => @import("x86_64/apic.zig").handle_madt(sdt.to_slice()),
+        .x86_64 => @import("x86_64/apic.zig").handle_madt(sdt),
         else => os.log("ACPI: MADT found on unsupported architecture!\n", .{}),
       }
     },
     signature_value("MCFG") => {
-      parse_MCFG(sdt.to_slice());
+      parse_MCFG(sdt);
     },
     else => {
-      os.log("ACPI: Unknown SDT: '{s}' with size {} bytes\n", .{sdt.to_slice()[0..4], sdt.len});
+      os.log("ACPI: Unknown SDT: '{s}' with size {} bytes\n", .{sdt[0..4], sdt.len});
     },
   }
 }
 
-fn parse_root_sdt(comptime T: type, addr: usize) !void {
-  const sdt = try map_sdt(addr);
+fn parse_root_sdt(comptime T: type, addr: usize) void {
+  const sdt = get_sdt(addr);
 
   var offset: u64 = 36;
 
   while(offset + @sizeOf(T) <= sdt.len): (offset += @sizeOf(T)) {
-    try parse_sdt(std.mem.readInt(T, sdt.to_slice()[offset..][0..@sizeOf(T)], builtin.endian));
+    parse_sdt(std.mem.readInt(T, sdt[offset..][0..@sizeOf(T)], builtin.endian));
   }
 }
 
@@ -109,13 +105,13 @@ pub fn init_acpi() !void {
   if(rsdp_phys == 0)
     rsdp_phys = locate_rsdp() orelse return;
 
-  rsdp = try paging.remap_phys_struct(RSDP, .{.phys = rsdp_phys, .memtype = .MemoryWriteBack});
+  rsdp = os.platform.phys_ptr(*RSDP).from_int(rsdp_phys).get_writeback();
 
   os.log("ACPI: Revision: {}\n", .{rsdp.revision});
 
   switch(rsdp.revision) {
-    0 => try parse_root_sdt(u32, rsdp.rsdt_addr),
-    2 => try parse_root_sdt(u64, rsdp.xsdt_addr),
+    0 => parse_root_sdt(u32, rsdp.rsdt_addr),
+    2 => parse_root_sdt(u64, rsdp.xsdt_addr),
     else => return error.UnknownACPIRevision,
   }
 }

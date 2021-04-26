@@ -138,7 +138,8 @@ const Framebuffer = struct {
 
 pub fn lfb_updater(bb: [*]u8, yoff_src: usize, yoff_dest: usize, ysize: usize, pitch: usize, ctx: usize) void {
   @setRuntimeSafety(false);
-  @memcpy(@intToPtr([*]u8, ctx + pitch * yoff_dest), bb + pitch * yoff_src, ysize * pitch);
+  const virt = pmm.phys_to_write_combining_virt(ctx);
+  @memcpy(@intToPtr([*]u8, virt + pitch * yoff_dest), bb + pitch * yoff_src, ysize * pitch);
 }
 
 pub var framebuffer: ?Framebuffer = null;
@@ -174,23 +175,7 @@ pub fn register_fb(updater: Updater, updater_ctx: usize, fb_pitch: u16, fb_width
     return;
   };
 
-  var size: usize = 0;
-  for (os.platform.paging.page_sizes) |s| {
-    if (s >= fb_size) {
-      size = s;
-      break;
-    }
-  }
-
-  const bb_virt = os.memory.paging.kernel_context.phys_to_virt(bb_phys);
-  os.memory.paging.unmap(.{ .virt = bb_virt, .size = size, .reclaim_pages = false, .context = &os.memory.paging.kernel_context });
-  os.memory.paging.map_phys(.{
-    .virt = bb_virt, .phys = bb_phys, .size = size,
-    .perm = os.memory.paging.rw(), .memtype = .MemoryWriteBack, .context = &os.memory.paging.kernel_context,
-  }) catch |err| {
-    os.log("VESAlog: Could not map backbuffer: {}\n", .{@errorName(err)});
-    return;
-  };
+  const bb_virt = os.memory.paging.kernel_context.phys_to_write_back_virt(bb_phys);
 
   framebuffer = Framebuffer {
     .pitch = fb_pitch, .width = fb_width, .height = fb_height, .bpp = fb_bpp,
