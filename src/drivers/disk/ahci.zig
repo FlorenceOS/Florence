@@ -51,7 +51,7 @@ const Port = packed struct {
 
     pub fn command_headers(self: *const volatile @This()) *volatile [32]CommandTableHeader {
         const addr = read_u64(&self.command_list_base);
-        return &pmm.access_phys_single_volatile(CommandList, addr).command_headers;
+        return &os.platform.phys_ptr(*volatile CommandList).from_int(addr).get_uncached().command_headers;
     }
 
     pub fn start_command_engine(self: *volatile @This()) void {
@@ -124,7 +124,7 @@ const Port = packed struct {
         const prd_ptr = self.prd(slot, 0);
         const buf_addr = read_u64(&prd_ptr.data_base_addr);
         const buf_size = @as(usize, prd_ptr.sizem1) + 1;
-        return pmm.access_phys(u8, buf_addr)[0..buf_size];
+        return os.platform.phys_slice(u8).init(buf_addr, buf_size).to_slice_writeback();
     }
 
     pub fn read_single_sector(self: *volatile @This(), slot: u5) void {
@@ -265,7 +265,7 @@ const CommandTableHeader = packed struct {
 
     pub fn table(self: *volatile @This()) *volatile CommandTable {
         const addr = read_u64(&self.command_table_addr);
-        return pmm.access_phys_single_volatile(CommandTable, addr);
+        return os.platform.phys_ptr(*volatile CommandTable).from_int(addr).get_uncached();
     }
 };
 
@@ -394,12 +394,7 @@ const PortState = struct {
 
         const commands_phys = try pmm.alloc_phys(port_io_size);
         const fis_phys = commands_phys + @sizeOf(CommandList);
-        try paging.remap_phys_size(.{
-            .phys = commands_phys,
-            .size = port_io_size,
-            .memtype = .DeviceUncacheable,
-        });
-        @memset(pmm.access_phys_volatile(u8, commands_phys), 0, port_io_size);
+        @memset(os.platform.phys_ptr([*]u8).from_int(commands_phys).get_uncached(), 0, port_io_size);
         write_u64(&self.mmio.command_list_base, commands_phys);
         write_u64(&self.mmio.fis_base, fis_phys);
     }
@@ -411,12 +406,7 @@ const PortState = struct {
             if (reamining_table_size < @sizeOf(CommandTable)) {
                 reamining_table_size = page_size;
                 current_table_addr = try pmm.alloc_phys(page_size);
-                try paging.remap_phys_size(.{
-                    .phys = current_table_addr,
-                    .size = page_size,
-                    .memtype = .DeviceUncacheable,
-                });
-                @memset(pmm.access_phys_volatile(u8, current_table_addr), 0, page_size);
+                @memset(os.platform.phys_ptr([*]u8).from_int(current_table_addr).get_uncached(), 0, page_size);
             }
 
             write_u64(&header.command_table_addr, current_table_addr);
@@ -428,12 +418,7 @@ const PortState = struct {
 
             // First PRD is just a small preallocated single page buffer
             const buf = try pmm.alloc_phys(page_size);
-            try paging.remap_phys_size(.{
-                .phys = buf,
-                .size = page_size,
-                .memtype = .DeviceUncacheable,
-            });
-            @memset(pmm.access_phys_volatile(u8, buf), 0, page_size);
+            @memset(os.platform.phys_ptr([*]u8).from_int(buf).get_uncached(), 0, page_size);
             write_u64(&header.table().prds[0].data_base_addr, buf);
             header.table().prds[0].sizem1 = page_size - 1;
         }
@@ -705,18 +690,7 @@ pub fn register_controller(addr: pci.Addr) void {
     // Busty master bit
     addr.command().write(addr.command().read() | 0x6);
 
-    const abar_phys = addr.barinfo(5).phy & 0xFFFFF000;
-
-    paging.remap_phys_size(.{
-        .phys = abar_phys,
-        .size = abar_size,
-        .memtype = .DeviceUncacheable,
-    }) catch |err| {
-        log("AHCI: Failed to map ABAR: {}\n", .{@errorName(err)});
-        return;
-    };
-
-    const abar = pmm.access_phys_single_volatile(ABAR, abar_phys);
+    const abar = os.platform.phys_ptr(*volatile ABAR).from_int(addr.barinfo(5).phy & 0xFFFFF000).get_uncached();
 
     const cap = abar.hba_capabilities;
 
