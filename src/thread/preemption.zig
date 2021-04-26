@@ -34,12 +34,10 @@ pub fn wait_yield(frame: *os.platform.InterruptFrame) void {
 
 /// Wait for the task on bootstrap
 pub fn bootstrap(frame: *os.platform.InterruptFrame) void {
-    os.log("Started bootstrap\n", .{});
     const cpu = os.platform.thread.get_current_cpu();
     const task = cpu.executable_tasks.dequeue();
     frame.* = task.registers;
     task.paging_context.apply();
     os.platform.set_current_task(task);
     task.platform_data.load_state();
-    os.log("Finished bootstrap\n", .{});
 }
