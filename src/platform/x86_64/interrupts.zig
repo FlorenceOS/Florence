@@ -24,6 +24,16 @@ pub fn add_handler(idx: u8, f: InterruptHandler, interrupt: bool, priv_level: u2
   handlers[idx] = f;
 }
 
+pub const spurious_vector: u8 = 0x30;
+pub const boostrap_vector: u8 = 0x31;
+pub const wait_yield_vector: u8 = 0x32;
+
+var last_vector: u8 = wait_yield_vector;
+
+pub fn allocate_vector() u8 {
+  return @atomicRmw(u8, &last_vector, .Add, 1, .AcqRel) + 1;
+}
+
 pub fn init_interrupts() void {
   pic.disable();
   itable = &idt.idt;
@@ -33,10 +43,10 @@ pub fn init_interrupts() void {
     add_handler(intnum, unhandled_interrupt, true, 0, 0);
   }
 
-  add_handler(0x0E, page_fault_handler, true, 0, 1);
-  add_handler(0x6C, os.thread.preemption.bootstrap, true, 0, 0);
-  add_handler(0x6B, os.thread.preemption.wait_yield, true, 0, 2);
-  add_handler(0xFF, spurious_handler, true, 0, 1);
+  add_handler(0x0E,              page_fault_handler, true, 3, 1);
+  add_handler(boostrap_vector,   os.thread.preemption.bootstrap, true, 0, 0);
+  add_handler(wait_yield_vector, os.thread.preemption.wait_yield, true, 0, 2);
+  add_handler(spurious_vector,   spurious_handler, true, 0, 1);
 }
 
 fn spurious_handler(frame: *InterruptFrame) void {

@@ -112,7 +112,12 @@ pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry)
 }
 
 pub fn yield() void {
-  asm volatile("int $0x6B");
+  asm volatile(
+    \\int %[wait_yield_vector]
+    \\
+    :
+    : [wait_yield_vector] "i" (interrupts.wait_yield_vector)
+  );
 }
 
 pub fn set_current_cpu(cpu_ptr: *os.platform.smp.CoreData) void {

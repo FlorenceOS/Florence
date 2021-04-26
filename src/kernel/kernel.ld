@@ -16,8 +16,6 @@ SECTIONS {
 
   __kernel_text_begin = .;
   .text . : {
-    *(.text.syscall_handler)
-    *(.text.interrupt_common)
     *(.text*)
   }:text
   . = ALIGN(64K);

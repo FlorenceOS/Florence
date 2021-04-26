@@ -60,6 +60,16 @@ pub fn platform_init() !void {
   try os.platform.acpi.init_acpi();
   apic.enable();
   set_interrupts(true);
+  if(comptime(os.config.kernel.x86_64.enable_ps2_keyboard)) {
+    const ps2 = @import("ps2.zig");
+    ps2.interrupt_vector = interrupts.allocate_vector();
+    os.log("PS2: vector 0x{X}\n", .{ps2.interrupt_vector});
+
+    interrupts.add_handler(ps2.interrupt_vector, ps2.handler, true, 3, 1);
+
+    ps2.interrupt_gsi = apic.route_irq(0, 0x01, ps2.interrupt_vector);
+    os.log("PS2: gsi 0x{X}\n", .{ps2.interrupt_gsi});
+  }
   try os.platform.pci.init_pci();
 }
 
@@ -106,7 +116,12 @@ pub fn ap_init() noreturn {
 fn ap_init_stage2() noreturn {
   _ = @atomicRmw(usize, &os.platform.smp.cpus_left, .Sub, 1, .AcqRel);
   // Wait for tasks
-  asm volatile("int $0x6C");
+  asm volatile(
+    \\int %[boostrap_vector]
+    \\
+    :
+    : [boostrap_vector] "i" (interrupts.boostrap_vector)
+  );
   unreachable;
 }
 
