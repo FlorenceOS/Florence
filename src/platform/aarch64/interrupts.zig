@@ -60,6 +60,23 @@ pub const InterruptFrame = struct {
   x0: u64,
   sp: u64,
   _: u64,
+
+  pub fn dump(self: *const @This()) void {
+    os.log("FRAME DUMP:\n", .{});
+    os.log("X0 ={x:0>16} X1 ={x:0>16} X2 ={x:0>16} X3 ={x:0>16}\n", .{self.x0,  self.x1,  self.x2,  self.x3});
+    os.log("X4 ={x:0>16} X5 ={x:0>16} X6 ={x:0>16} X7 ={x:0>16}\n", .{self.x4,  self.x5,  self.x6,  self.x7});
+    os.log("X8 ={x:0>16} X9 ={x:0>16} X10={x:0>16} X11={x:0>16}\n", .{self.x8,  self.x9,  self.x10, self.x11});
+    os.log("X12={x:0>16} X13={x:0>16} X14={x:0>16} X15={x:0>16}\n", .{self.x12, self.x13, self.x14, self.x15});
+    os.log("X16={x:0>16} X17={x:0>16} X18={x:0>16} X19={x:0>16}\n", .{self.x16, self.x17, self.x18, self.x19});
+    os.log("X20={x:0>16} X21={x:0>16} X22={x:0>16} X23={x:0>16}\n", .{self.x20, self.x21, self.x22, self.x23});
+    os.log("X24={x:0>16} X25={x:0>16} X26={x:0>16} X27={x:0>16}\n", .{self.x24, self.x25, self.x26, self.x27});
+    os.log("X28={x:0>16} X29={x:0>16} X30={x:0>16} X31={x:0>16}\n", .{self.x28, self.x29, self.x30, self.x31});
+    os.log("PC ={x:0>16} SP ={x:0>16} SPSR={x:0>16}\n",             .{self.pc,  self.sp,  self.spsr});
+  }
+
+  pub fn trace_stack(self: *const @This()) void {
+    os.lib.debug.dump_frame(self.x29, self.pc);
+  }
 };
 
 export fn interrupt_common() callconv(.Naked) void {
@@ -103,12 +120,19 @@ export fn interrupt_common() callconv(.Naked) void {
     \\LDP X5,  X4,  [SP], 0x10
     \\LDP X3,  X2,  [SP], 0x10
     \\
+    \\// Critical section
+    \\MSR DAIFSET, #0xF
+    \\
+    \\// Make the current SP the interrupt stack
+    \\MSR SPSel, 1
+    \\MRS X0, SP_EL0
+    \\MOV SP, X0
+    \\
     \\// Restore old stack pointer
     \\LDP X1, XZR, [SP, #0x10] // Load stack poiner
     \\MSR SP_EL0, X1 // Write old stack pointer to SP0
-    \\
     \\LDP X1,  X0,  [SP], 0x20
-    \\
+    \\MSR SPSel, 0
     \\ERET
   );
   unreachable;
@@ -209,7 +233,6 @@ comptime {
 extern const exception_vector_table: [0x800]u8;
 
 pub fn install_vector_table() void {
-  os.log("Installing exception vector table at 0x{X}\n", .{@ptrToInt(&exception_vector_table[0])});
   asm volatile(
     \\MSR VBAR_EL1, %[evt]
     :
@@ -231,7 +254,17 @@ export fn interrupt_handler(frame: *InterruptFrame) void {
   switch(ec) {
     else => @panic("Unknown EC!"),
     0b00000000 => @panic("Unknown reason in EC!"),
-    0b00100101 => @panic("Data abort without change in exception level"),
+    0b00100101 => {
+      const far = asm volatile("MRS %[esr], FAR_EL1" : [esr] "=r" (-> u64));
+      const wnr = (iss >> 6) & 1;
+      const dfsc = iss & 0x3f;
+
+      // Assume present == !translation fault
+      const present = (dfsc & 0b111100) != 0b000100;
+
+      // addr: usize, present: bool, access: PageFaultAccess, frame: anytype
+      os.platform.page_fault(far, present, if(wnr == 1) .Write else .Read, frame);
+    },
     0b00100001 => @panic("Instruction fault without change in exception level"),
     0b00010101 => {
       // SVC instruction execution in AArch64 state
