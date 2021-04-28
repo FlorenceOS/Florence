@@ -24,11 +24,11 @@ pub fn add_handler(idx: u8, f: InterruptHandler, interrupt: bool, priv_level: u2
   handlers[idx] = f;
 }
 
-pub const spurious_vector: u8 = 0x30;
-pub const boostrap_vector: u8 = 0x31;
-pub const wait_yield_vector: u8 = 0x32;
+pub const boostrap_vector: u8 = 0x30;
+pub const wait_yield_vector: u8 = 0x31;
+pub const spurious_vector: u8 = 0x3F;
 
-var last_vector: u8 = wait_yield_vector;
+var last_vector: u8 = spurious_vector;
 
 pub fn allocate_vector() u8 {
   return @atomicRmw(u8, &last_vector, .Add, 1, .AcqRel) + 1;
@@ -195,7 +195,7 @@ pub const InterruptFrame = packed struct {
   }
 };
 
-export fn interrupt_common() linksection(".text.interrupt_common") callconv(.Naked) void {
+export fn interrupt_common() callconv(.Naked) void {
   asm volatile(
     \\push %%rax
     \\push %%rbx

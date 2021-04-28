@@ -10,7 +10,7 @@ var lapic: *volatile [0x100]u32 = undefined;
 pub fn enable() void {
   const phy = IA32_APIC_BASE.read() & 0xFFFFF000; // ignore flags
   lapic = os.platform.phys_ptr(*volatile [0x100]u32).from_int(phy).get_uncached();
-  lapic[SPURIOUS] |= 0x1 | interrupts.spurious_vector; // bit 8 = lapic enable, bit 7-0 = spurious vector
+  lapic[SPURIOUS] |= @as(u32, 0x100) | interrupts.spurious_vector; // bit 8 = lapic enable, bit 7-0 = spurious vector
 }
 
 pub fn eoi() void {
@@ -52,13 +52,14 @@ pub fn route_gsi(lapic_id: u32, vector: u8, gsi: u32, flags: u16) void {
 }
 
 fn route_gsi_ioapic(ioapic_id: u8, lapic_id: u32, vector: u8, gsi: u32, flags: u16) void {
-  const value = @as(u64, flags & 0b1010) << 12
-    | @as(u64, vector)
-    | @as(u64, lapic_id) << 56
+  const value = 0
+    | (@as(u64, vector) << 0)
+    | (@as(u64, flags & 0b1010) << 12)
+    | (@as(u64, lapic_id) << 56)
   ;
 
   const ioapic = ioapics[ioapic_id].?;
-  const gsi_offset = (gsi - ioapic.gsi_base) * 2 + 16;
+  const gsi_offset = (gsi - ioapic.gsi_base) * 2 + 0x10;
 
   ioapic.write(gsi_offset + 0, @truncate(u32, value));
   ioapic.write(gsi_offset + 1, @truncate(u32, value >> 32));
