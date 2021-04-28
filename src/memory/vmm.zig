@@ -90,7 +90,15 @@ export fn laihost_malloc(sz: usize) ?*c_void {
   return @ptrCast(*c_void, mem.ptr);
 }
 
-export fn laihost_realloc(ptr: *c_void, newsize: usize, oldsize: usize) ?*c_void {
+export fn laihost_realloc(ptr: ?*c_void, newsize: usize, oldsize: usize) ?*c_void {
+  std.debug.assert((ptr == null) == (oldsize == 0));
+  if(oldsize == 0) {
+    return laihost_malloc(newsize);
+  }
+  if(newsize == 0) {
+    laihost_free(ptr, oldsize);
+    return os.lib.lai.NULL;
+  }
   const ret = laihost_malloc(newsize);
   @memcpy(@ptrCast([*]u8, ret), @ptrCast([*]const u8, ptr), oldsize);
   laihost_free(ptr, oldsize);
