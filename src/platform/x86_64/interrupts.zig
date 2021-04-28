@@ -228,9 +228,9 @@ export fn interrupt_common() callconv(.Naked) void {
     \\mov %%ax, %%gs
     \\call interrupt_handler
     \\pop %%rax
-    \\mov %%es, %%rax
+    \\mov %%rax, %%es
     \\pop %%rax
-    \\mov %%ds, %%rax
+    \\mov %%rax, %%ds
     \\pop %%fs
     \\pop %%gs
     \\pop %%r15
