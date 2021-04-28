@@ -23,19 +23,22 @@ pub var interrupt_vector: u8 = undefined;
 pub var interrupt_gsi: u32 = undefined;
 
 fn parse_event(t: EventType, ext: Extendedness, scancode: u8) void {
-  os.log("Event: {} {} Scancode: 0x{X}\n", .{@tagName(ext), @tagName(t), scancode});
+  os.log("Event: {s} {s} Scancode: 0x{X}\n", .{@tagName(ext), @tagName(t), scancode});
+}
+
+fn has_byte() bool {
+  return (ports.inb(0x64) & 1) != 0;
 }
 
 fn wait_byte() u8 {
-  while((ports.inb(0x64) & 1) == 0)
-    os.platform.spin_hint();
+  while(!has_byte()) { }
   return ports.inb(0x60);
 }
 
 pub fn handler(_: *os.platform.InterruptFrame) void {
   var ext: Extendedness = .NotExtended;
   var t: EventType = .Press;
-  
+
   var scancode = wait_byte();
 
   if(scancode == 0xE0) {
@@ -43,9 +46,9 @@ pub fn handler(_: *os.platform.InterruptFrame) void {
     scancode = wait_byte();
   }
 
-  if(scancode == 0xF0) {
+  if((scancode & 0x80) != 0) {
     t = .Release;
-    scancode = wait_byte();
+    scancode &= 0x7F;
   }
 
   parse_event(t, ext, scancode);
