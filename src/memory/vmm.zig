@@ -83,3 +83,21 @@ pub fn backed(
 pub fn nonbacked() *std.mem.Allocator {
   return &nonbacked_range.allocator;
 }
+
+export fn laihost_malloc(sz: usize) ?*c_void {
+  if(sz == 0) return os.lib.lai.NULL;
+  const mem = os.memory.vmm.backed(.Ephemeral).alloc(u8, sz) catch return os.lib.lai.NULL;
+  return @ptrCast(*c_void, mem.ptr);
+}
+
+export fn laihost_realloc(ptr: *c_void, newsize: usize, oldsize: usize) ?*c_void {
+  const ret = laihost_malloc(newsize);
+  @memcpy(@ptrCast([*]u8, ret), @ptrCast([*]const u8, ptr), oldsize);
+  laihost_free(ptr, oldsize);
+  return ret;
+}
+
+export fn laihost_free(ptr: ?*c_void, oldsize: usize) void {
+  if(ptr == null) return;
+  os.memory.vmm.backed(.Ephemeral).free(@ptrCast([*]u8, ptr)[0..oldsize]);
+}

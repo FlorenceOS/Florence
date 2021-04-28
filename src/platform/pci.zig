@@ -181,6 +181,38 @@ fn function_scan(addr: Addr) void {
   }
 }
 
+fn laihost_addr(seg: u16, bus: u8, slot: u8, fun: u8) Addr {
+  return .{
+    .bus = bus,
+    .device = @intCast(u5, slot),
+    .function = @intCast(u3, fun),
+  };
+}
+
+export fn laihost_pci_writeb(seg: u16, bus: u8, slot: u8, fun: u8, offset: u16, value: u8) void {
+  laihost_addr(seg, bus, slot, fun).write(u8, @intCast(u8, offset), value);
+}
+
+export fn laihost_pci_readb(seg: u16, bus: u8, slot: u8, fun: u8, offset: u16) u8 {
+  return laihost_addr(seg, bus, slot, fun).read(u8, @intCast(u8, offset));
+}
+
+export fn laihost_pci_writew(seg: u16, bus: u8, slot: u8, fun: u8, offset: u16, value: u16) void {
+  laihost_addr(seg, bus, slot, fun).write(u16, @intCast(u8, offset), value);
+}
+
+export fn laihost_pci_readw(seg: u16, bus: u8, slot: u8, fun: u8, offset: u16) u16 {
+  return laihost_addr(seg, bus, slot, fun).read(u16, @intCast(u8, offset));
+}
+
+export fn laihost_pci_writed(seg: u16, bus: u8, slot: u8, fun: u8, offset: u16, value: u32) void {
+  laihost_addr(seg, bus, slot, fun).write(u32, @intCast(u8, offset), value);
+}
+
+export fn laihost_pci_readd(seg: u16, bus: u8, slot: u8, fun: u8, offset: u16) u32 {
+  return laihost_addr(seg, bus, slot, fun).read(u32, @intCast(u8, offset));
+}
+
 fn device_scan(bus: u8, device: u5) void {
   const nullfunc: Addr = .{ .bus = bus, .device = device, .function = 0 };
 

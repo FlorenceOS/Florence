@@ -105,6 +105,29 @@ fn build_kernel(b: *Builder, arch: builtin.Arch, name: []const u8) *std.build.Li
     kernel.addAssemblyFile(b.fmt("src/boot/{s}_{s}.asm", .{ name, @tagName(arch) }));
     kernel.setLinkerScriptPath("src/kernel/kernel.ld");
 
+    const laipath = "src/extern/lai/";
+    kernel.addIncludeDir(laipath ++ "include/");
+    const laiflags = &[_][]const u8{"-std=c99"};
+    kernel.addCSourceFile(laipath ++ "core/error.c", laiflags);
+    kernel.addCSourceFile(laipath ++ "core/eval.c", laiflags);
+    kernel.addCSourceFile(laipath ++ "core/exec-operand.c", laiflags);
+    kernel.addCSourceFile(laipath ++ "core/exec.c", laiflags);
+    kernel.addCSourceFile(laipath ++ "core/libc.c", laiflags);
+    kernel.addCSourceFile(laipath ++ "core/ns.c", laiflags);
+    kernel.addCSourceFile(laipath ++ "core/object.c", laiflags);
+    kernel.addCSourceFile(laipath ++ "core/opregion.c", laiflags); 
+    kernel.addCSourceFile(laipath ++ "core/os_methods.c", laiflags);
+    kernel.addCSourceFile(laipath ++ "core/variable.c", laiflags);
+    kernel.addCSourceFile(laipath ++ "core/vsnprintf.c", laiflags);
+    kernel.addCSourceFile(laipath ++ "drivers/ec.c", laiflags);
+    kernel.addCSourceFile(laipath ++ "drivers/timer.c", laiflags);
+    if(arch == .x86_64)
+        kernel.addCSourceFile(laipath ++ "helpers/pc-bios.c", laiflags);
+    kernel.addCSourceFile(laipath ++ "helpers/pci.c", laiflags);
+    kernel.addCSourceFile(laipath ++ "helpers/pm.c", laiflags);
+    kernel.addCSourceFile(laipath ++ "helpers/resource.c", laiflags);
+    kernel.addCSourceFile(laipath ++ "helpers/sci.c", laiflags);
+
     //kernel.step.dependOn(&build_dyld(b, arch).step);
 
     return kernel;
