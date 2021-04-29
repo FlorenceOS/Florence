@@ -26,6 +26,7 @@ pub fn add_handler(idx: u8, f: InterruptHandler, interrupt: bool, priv_level: u2
 
 pub const boostrap_vector: u8 = 0x30;
 pub const wait_yield_vector: u8 = 0x31;
+pub const syscall_vector: u8 = 0x32;
 pub const spurious_vector: u8 = 0x3F;
 
 var last_vector: u8 = spurious_vector;
@@ -307,10 +308,10 @@ const task_offset = @byteOffsetOf(os.platform.smp.CoreData, "current_task");
 const kernel_stack_offset = @byteOffsetOf(os.thread.Task, "stack");
 
 pub fn syscall_handler_addr() u64 {
-  return @ptrToInt(&syscall_handler[0]);
+  return @ptrToInt(syscall_handler);
 }
 
-export const syscall_handler linksection(".text.syscall_handler") = [0]u8{}
+const syscall_handler_bytes = [0]u8{}
   // First make sure we get a proper stack pointer while
   // saving away all the userspace registers.
   ++ swapgs                                  // swapgs
@@ -330,7 +331,43 @@ export const syscall_handler linksection(".text.syscall_handler") = [0]u8{}
 
   // Now let's set up the rest of the interrupt frame
   ++ pushi8(0)                               // push 0                     // error code
-  ++ pushi32(0x80)                           // push 0x80                  // interrupt vector
-
-  // Fall through to the main interrupt handler
+  ++ pushi32(syscall_vector)                 // push 0x80                  // interrupt vector
 ;
+
+fn hex_chr(comptime value: u4) u8 {
+  return "0123456789ABCDEF"[value];
+}
+
+fn hex_str(comptime value: u8) [2]u8 {
+  var buf: [2]u8 = undefined;
+  buf[0] = hex_chr(@truncate(u4, value >> 4));
+  buf[1] = hex_chr(@truncate(u4, value));
+  return buf;
+}
+
+const encoded_byte_len = 11;
+fn encode_byte(comptime value: u8) [encoded_byte_len]u8 {
+  return [_]u8{'.', 'b', 'y', 't', 'e', ' ', '0', 'x'} ++ hex_str(value) ++ [_]u8{'\n'};
+}
+
+fn generate_syscall_handler_inline_asm(comptime _: usize) [encoded_byte_len * syscall_handler_bytes.len]u8 {
+  var result: [encoded_byte_len * syscall_handler_bytes.len]u8 = undefined;
+  var off: usize = 0;
+  while(off < syscall_handler_bytes.len) : (off += 1) {
+    var bytes = encode_byte(syscall_handler_bytes[off]);
+    const dest = result[off * encoded_byte_len..][0..encoded_byte_len];
+    std.mem.copy(u8, dest, bytes[0..]);
+  }
+  return result;
+}
+
+export fn syscall_handler() callconv(.Naked) void {
+  @setEvalBranchQuota(999999);
+  asm volatile(
+    generate_syscall_handler_inline_asm(0) ++
+    \\jmp interrupt_common
+    :
+    : [dsel] "i" (gdt.selector.data64)
+  );
+  unreachable;
+}
