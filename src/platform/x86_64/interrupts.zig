@@ -307,10 +307,6 @@ const rsp_stash_offset =
 const task_offset = @byteOffsetOf(os.platform.smp.CoreData, "current_task");
 const kernel_stack_offset = @byteOffsetOf(os.thread.Task, "stack");
 
-pub fn syscall_handler_addr() u64 {
-  return @ptrToInt(syscall_handler);
-}
-
 const syscall_handler_bytes = [0]u8{}
   // First make sure we get a proper stack pointer while
   // saving away all the userspace registers.
@@ -345,27 +341,17 @@ fn hex_str(comptime value: u8) [2]u8 {
   return buf;
 }
 
-const encoded_byte_len = 11;
-fn encode_byte(comptime value: u8) [encoded_byte_len]u8 {
-  return [_]u8{'.', 'b', 'y', 't', 'e', ' ', '0', 'x'} ++ hex_str(value) ++ [_]u8{'\n'};
-}
+pub fn syscall_handler() callconv(.Naked) void {
+  // https://github.com/ziglang/zig/issues/8644
+  comptime var syscall_handler_asm: []const u8 = &[_]u8{};
+  inline for(syscall_handler_bytes) |b|
+    syscall_handler_asm = syscall_handler_asm
+      ++ [_]u8{'.', 'b', 'y', 't', 'e', ' ', '0', 'x'} ++ hex_str(b) ++ [_]u8{'\n'};
 
-fn generate_syscall_handler_inline_asm(comptime _: usize) [encoded_byte_len * syscall_handler_bytes.len]u8 {
-  var result: [encoded_byte_len * syscall_handler_bytes.len]u8 = undefined;
-  var off: usize = 0;
-  while(off < syscall_handler_bytes.len) : (off += 1) {
-    var bytes = encode_byte(syscall_handler_bytes[off]);
-    const dest = result[off * encoded_byte_len..][0..encoded_byte_len];
-    std.mem.copy(u8, dest, bytes[0..]);
-  }
-  return result;
-}
-
-export fn syscall_handler() callconv(.Naked) void {
-  @setEvalBranchQuota(999999);
   asm volatile(
-    generate_syscall_handler_inline_asm(0) ++
+    syscall_handler_asm ++
     \\jmp interrupt_common
+    \\
     :
     : [dsel] "i" (gdt.selector.data64)
   );

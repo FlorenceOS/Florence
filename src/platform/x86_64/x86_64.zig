@@ -25,7 +25,7 @@ fn setup_syscall_instr() void {
   if(comptime !os.config.kernel.x86_64.allow_syscall_instr)
     return;
 
-  regs.IA32_LSTAR.write(interrupts.syscall_handler_addr());
+  regs.IA32_LSTAR.write(@ptrToInt(interrupts.syscall_handler));
   // Clear everything but the res1 bit (bit 1)
   regs.IA32_FMASK.write(~@as(u64, 1 << 1));
 
