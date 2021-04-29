@@ -102,7 +102,7 @@ fn build_kernel(b: *Builder, arch: builtin.Arch, name: []const u8) *std.build.Li
     const main_file = b.fmt("src/boot/{s}.zig", .{name});
 
     const kernel = make_exec(b, arch, .kernel, kernel_filename, main_file);
-    kernel.addAssemblyFile(b.fmt("src/boot/{s}_{s}.asm", .{ name, @tagName(arch) }));
+    kernel.addAssemblyFile(b.fmt("src/boot/{s}_{s}.S", .{ name, @tagName(arch) }));
     kernel.setLinkerScriptPath("src/kernel/kernel.ld");
 
     const laipath = "src/extern/lai/";
