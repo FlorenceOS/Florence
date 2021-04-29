@@ -54,7 +54,7 @@ const stivale2_commandline = packed struct {
   commandline: [*:0]u8,
 
   pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
-    try writer.print("Commandline: {}", .{self.commandline});
+    try writer.print("Commandline: {s}", .{self.commandline});
   }
 };
 
@@ -191,7 +191,7 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
   while(tag != null): (tag = tag.?.next) {
     switch(tag.?.identifier) {
       0x2187f79e8612de07 => info.memmap      = @ptrCast(*stivale2_memmap, tag),
-      0xe5e76a1b4597a781 => os.log("{}\n", .{@ptrCast(*stivale2_commandline, tag)}),
+      0xe5e76a1b4597a781 => os.log("{s}\n",  .{@ptrCast(*stivale2_commandline, tag)}),
       0x506461d2950408fa => info.framebuffer = @ptrCast(*stivale2_framebuffer, tag).*,
       0x9e1786930a375e78 => info.rsdp        = @ptrCast(*stivale2_rsdp, tag).rsdp,
       0x34d1d96339647025 => info.smp         = os.platform.phys_ptr(*stivale2_smp).from_int(@ptrToInt(tag)),
@@ -217,8 +217,8 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
   os.memory.pmm.init();
 
   os.log(
-    \\Bootloader: {}
-    \\Bootloader version: {}
+    \\Bootloader: {s}
+    \\Bootloader version: {s}
     \\{}
     , .{info_in.bootloader_brand, info_in.bootloader_version, info}
   );

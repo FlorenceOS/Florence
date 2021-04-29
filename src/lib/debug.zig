@@ -37,7 +37,7 @@ fn init_debug_info() void {
         //debug_info.debug_ranges = slice_section(&__debug_ranges_start, &__debug_ranges_end);
         os.log("Opening debug info\n", .{});
         std.dwarf.openDwarfDebugInfo(&debug_info, debug_allocator) catch |err| {
-            os.log("Unable to open debug info: {}\n", .{@errorName(err)});
+            os.log("Unable to open debug info: {s}\n", .{@errorName(err)});
             return;
         };
         os.log("Opened debug info\n", .{});
@@ -73,12 +73,12 @@ fn slice_section(start: *u8, end: *u8) []const u8 {
 
 fn print_addr(ip: usize) void {
     var compile_unit = debug_info.findCompileUnit(ip) catch |err| {
-        os.log("Couldn't find the compile unit at {x}: {}\n", .{ ip, @errorName(err) });
+        os.log("Couldn't find the compile unit at {x}: {s}\n", .{ ip, @errorName(err) });
         return;
     };
 
     var line_info = debug_info.getLineNumberInfo(compile_unit.*, ip) catch |err| {
-        os.log("Couldn't find the line info at {x}: {}\n", .{ ip, @errorName(err) });
+        os.log("Couldn't find the line info at {x}: {s}\n", .{ ip, @errorName(err) });
         return;
     };
 

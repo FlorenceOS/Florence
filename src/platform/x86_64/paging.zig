@@ -170,7 +170,7 @@ pub const PagingContext = struct {
     curr.level5paging = is_5levelpaging();
 
     // Check CPUID to determine if enabled or not
-    curr.gigapage_allowed = if(id) |i| ((i.edx >> 26) & 1) == 1 else false;
+    curr.gigapage_allowed = false;// if(id) |i| ((i.edx >> 26) & 1) == 1 else false;
   }
 
   pub fn make_default() !@This() {
@@ -187,7 +187,7 @@ pub const PagingContext = struct {
       .pat = PATContext().make_default(),
       .cr3_val = pt,
       .level5paging = curr.level5paging,
-      .gigapage_allowed = curr.gigapage_allowed,
+      .gigapage_allowed = false,//curr.gigapage_allowed,
       .wb_virt_base = curr_base,
       .wc_virt_base = curr_base + max_phys,
       .uc_virt_base = curr_base + max_phys * 2,
@@ -196,7 +196,7 @@ pub const PagingContext = struct {
   }
 
   pub fn can_map_at_level(self: *const @This(), level: LevelType) bool {
-    return level < @as(LevelType, 3) + @boolToInt(self.gigapage_allowed);
+    return level < @as(LevelType, 2) + @boolToInt(self.gigapage_allowed);
   }
 
   pub fn check_phys(self: *const @This(), phys: u64) void {

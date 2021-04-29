@@ -171,7 +171,7 @@ pub fn register_fb(updater: Updater, updater_ctx: usize, fb_pitch: u16, fb_width
   const fb_size = @as(usize, fb_pitch) * @as(usize, fb_height);
 
   const bb_phys = os.memory.pmm.alloc_phys(fb_size) catch |err| {
-    os.log("VESAlog: Could not allocate backbuffer: {}\n", .{@errorName(err)});
+    os.log("VESAlog: Could not allocate backbuffer: {s}\n", .{@errorName(err)});
     return;
   };
 

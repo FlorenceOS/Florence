@@ -616,7 +616,7 @@ fn sata_port_task(port_type: sata_port_type, port: *volatile Port) !void {
         else => return,
     }
 
-    log("AHCI: {} task started for port at 0x{X}\n", .{ @tagName(port_type), @ptrToInt(port) });
+    log("AHCI: {s} task started for port at 0x{X}\n", .{ @tagName(port_type), @ptrToInt(port) });
 
     var port_state = try PortState.init(port);
 
@@ -705,6 +705,6 @@ pub fn register_controller(addr: pci.Addr) void {
     }
 
     scheduler.spawn_task(controller_task, .{abar}) catch |err| {
-        log("AHCI: Failed to make controller task: {}\n", .{@errorName(err)});
+        log("AHCI: Failed to make controller task: {s}\n", .{@errorName(err)});
     };
 }
