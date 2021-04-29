@@ -52,12 +52,10 @@ pub fn init_interrupts() void {
 fn spurious_handler(frame: *InterruptFrame) void {
 }
 
-fn type_page_fault(error_code: usize) !platform.PageFaultAccess {
-  if(error_code & 0x8 != 0)
-    return error.ReservedWrite;
-  if(error_code & 0x10 != 0)
+fn type_page_fault(error_code: usize) platform.PageFaultAccess {
+  if((error_code & 0x10) != 0)
     return .InstructionFetch;
-  if(error_code & 0x2 != 0)
+  if((error_code & 0x2) != 0)
     return .Write;
   return .Read;
 }
@@ -67,11 +65,7 @@ fn page_fault_handler(frame: *InterruptFrame) void {
     "mov %%cr2, %[addr]"
     :[addr] "=r" (-> usize)
   );
-  const page_fault_type = type_page_fault(frame.ec) catch |err| {
-    os.log("Interrupts: Page fault at addr 0x{x}, but we couldn't determine what type. (error code was 0x{x}).\nCaught error {}.\n", .{page_fault_addr, frame.ec, @errorName(err)});
-    frame.dump();
-    os.platform.hang();
-  };
+  const page_fault_type = type_page_fault(frame.ec);
 
   platform.page_fault(page_fault_addr, (frame.ec & 1) != 0, page_fault_type, frame);
 }
