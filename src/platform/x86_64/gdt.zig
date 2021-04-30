@@ -16,7 +16,7 @@ pub const Gdt = packed struct {
   };
  
   descriptors: [7]u64 = [7]u64 {
-    0x000F00000000FFFF, // Null
+    0x0000000000000000, // Null
     0x00A09A0000000000, // 64 bit code
     0x0000920000000000, // 64 bit data
  
