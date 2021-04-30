@@ -151,8 +151,6 @@ pub fn make_handler(comptime intnum: u8) idt.InterruptHandler {
 pub const InterruptFrame = packed struct {
   es: u64,
   ds: u64,
-  fs: u64,
-  gs: u64,
   r15: u64,
   r14: u64,
   r13: u64,
@@ -207,10 +205,6 @@ export fn interrupt_common() callconv(.Naked) void {
     \\push %%r13
     \\push %%r14
     \\push %%r15
-    \\mov %%gs, %%rax
-    \\push %%rax
-    \\mov %%fs, %%rax
-    \\push %%rax
     \\mov %%ds, %%rax
     \\push %%rax
     \\mov %%es, %%rax
@@ -219,15 +213,11 @@ export fn interrupt_common() callconv(.Naked) void {
     \\mov %[dsel], %%ax
     \\mov %%ax, %%es
     \\mov %%ax, %%ds
-    \\mov %%ax, %%fs
-    \\mov %%ax, %%gs
     \\call interrupt_handler
     \\pop %%rax
     \\mov %%rax, %%es
     \\pop %%rax
     \\mov %%rax, %%ds
-    \\pop %%fs
-    \\pop %%gs
     \\pop %%r15
     \\pop %%r14
     \\pop %%r13

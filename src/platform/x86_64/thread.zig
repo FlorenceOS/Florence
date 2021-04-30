@@ -96,9 +96,7 @@ pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry)
   new_task.registers.rsp = os.lib.libalign.align_down(usize, 16, @ptrToInt(entry));
   new_task.registers.cs = gdt.selector.code64;
   new_task.registers.ss = gdt.selector.data64;
-  new_task.registers.fs = gdt.selector.data64;
   new_task.registers.es = gdt.selector.data64;
-  new_task.registers.gs = gdt.selector.data64;
   new_task.registers.ds = gdt.selector.data64;
   new_task.registers.rip = @ptrToInt(entry.function);
 
