@@ -342,8 +342,6 @@ pub fn syscall_handler() callconv(.Naked) void {
     syscall_handler_asm ++
     \\jmp interrupt_common
     \\
-    :
-    : [dsel] "i" (gdt.selector.data64)
   );
   unreachable;
 }
