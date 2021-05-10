@@ -27,7 +27,7 @@ fn setup_syscall_instr() void {
 
   regs.IA32_LSTAR.write(@ptrToInt(interrupts.syscall_handler));
   // Clear everything but the res1 bit (bit 1)
-  regs.IA32_FMASK.write(~@as(u64, 1 << 1));
+  regs.IA32_FMASK.write(@truncate(u22, ~@as(u64, 1 << 1)));
 
   comptime {
     if(gdt.selector.data64 != gdt.selector.code64 + 8)
