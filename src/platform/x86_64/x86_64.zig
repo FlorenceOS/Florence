@@ -83,6 +83,9 @@ pub fn platform_early_init() void {
 
 pub fn bsp_pre_scheduler_init() void {
   idt.load_idt();
+
+  apic.enable();
+
   setup_syscall_instr();
 
   const cpu = os.platform.thread.get_current_cpu();
