@@ -28,6 +28,7 @@ pub const TaskData = struct {
 pub const CoreData = struct {
   gdt: gdt.Gdt = .{},
   rsp_stash: u64 = undefined, // Stash for rsp after syscall instruction
+  lapic: ?os.platform.phys_ptr(*volatile [0x100]u32) = undefined,
 };
 
 pub const CoreDoorbell = struct {
