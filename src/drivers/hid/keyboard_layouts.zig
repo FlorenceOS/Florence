@@ -44,6 +44,7 @@ fn default_key_lookup(key: Location) error{unknownKey}!Input {
 
     .Tab => .Tab,
     .CapsLock => .CapsLock,
+    .Enter => .Enter,
 
     .NumLock => .NumLock,
     .NumpadDivision => .NumpadDivision,
