@@ -37,8 +37,8 @@ pub const Location = enum {
   NumLock, NumpadDivision, NumpadMultiplication,
   Numpad7, Numpad8, Numpad9, NumpadSubtraction,
   Numpad4, Numpad5, Numpad6, NumpadAddition,
-  Numpad1, Numpad2, Numpad3, Numpad0, NumpadPoint,
-  NumpadEnter,
+  Numpad1, Numpad2, Numpad3,
+  Numpad0, NumpadPoint, NumpadEnter,
 
   // Multimedia keys
   MediaStop, MediaRewind, MediaPausePlay, MediaForward, MediaMute,
@@ -91,8 +91,8 @@ pub const Input = enum {
   NumLock, NumpadDivision, NumpadMultiplication,
   Numpad7, Numpad8, Numpad9, NumpadSubtraction,
   Numpad4, Numpad5, Numpad6, NumpadAddition,
-  Numpad1, Numpad2, Numpad3, Numpad0, NumpadPoint,
-  NumpadEnter,
+  Numpad1, Numpad2, Numpad3,
+  Numpad0, NumpadPoint, NumpadEnter,
 
   // Multimedia keys
   MediaStop, MediaRewind, MediaPausePlay, MediaForward, MediaMute,

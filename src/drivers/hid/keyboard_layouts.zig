@@ -63,9 +63,9 @@ fn default_key_lookup(key: Location) error{unknownKey}!Input {
     .Numpad1 => .Numpad1,
     .Numpad2 => .Numpad2,
     .Numpad3 => .Numpad3,
+    
     .Numpad0 => .Numpad0,
     .NumpadPoint => .NumpadPoint,
-
     .NumpadEnter => .NumpadEnter,
 
 
