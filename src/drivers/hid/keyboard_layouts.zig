@@ -203,6 +203,7 @@ fn en_US_QWERTY(state: *const keyboard.KeyboardState, key: Location) !Input {
   const shift = state.is_shift_pressed();
 
   switch(key) {
+    .LeftOf1    => { if(shift) return Input.Tilde;           return Input.Backtick; },
     .NumberKey1 => { if(shift) return Input.ExclamationMark; return Input.@"1"; },
     .NumberKey2 => { if(shift) return Input.At;              return Input.@"2"; },
     .NumberKey3 => { if(shift) return Input.Hash;            return Input.@"3"; },
