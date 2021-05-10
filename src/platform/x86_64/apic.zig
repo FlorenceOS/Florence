@@ -108,17 +108,6 @@ fn map_irq_to_gsi(irq: u8) Override {
   return source_overrides[irq] orelse Override{.gsi = @as(u32, irq), .flags = 0, .ioapic_id = gsi_to_ioapic(irq), };
 }
 
-fn handle_interrupt_source_override(ioapic_id: u8, irq: u8, gsi: u32, flags: u16) void {
-  // We can probably filter away overrides where irq == gsi and flags == 0
-  // Until we have a reason to do so, let's not.
-  source_overrides[irq] = .{
-    .gsi = gsi,
-    .flags = flags,
-    .ioapic_id = ioapic_id,
-  };
-  os.log("Interrupt source override {}: {}\n", .{irq, source_overrides[irq]});
-}
-
 const IOAPIC = struct {
   phys: usize,
   gsi_base: u32,
@@ -156,10 +145,6 @@ fn gsi_to_ioapic(gsi: u32) u8 {
 
 var ioapics = [1]?IOAPIC{null} ** os.config.kernel.x86_64.max_ioapics;
 
-fn handle_ioapic(ioapic_id: u8, ioapic_addr: usize, gsi_base: u32) void {
-  ioapics[ioapic_id] = .{ .phys = ioapic_addr, .gsi_base = gsi_base, };
-}
-
 pub fn handle_madt(madt: []u8) void {
   os.log("APIC: Got MADT (size={x})\n", .{madt.len});
 
@@ -175,26 +160,27 @@ pub fn handle_madt(madt: []u8) void {
 
     switch(kind) {
       0x00 => {
-        std.debug.assert(size >= 8);
         const apic_id = data[3];
         const flags = std.mem.readIntNative(u32, data[4..8]);
         if(flags & 0x3 != 0)
           handle_processor(@as(u32, apic_id));
       },
       0x01 => {
-        std.debug.assert(size >= 12);
         const ioapic_id = data[2];
-        const addr = std.mem.readIntNative(u32, data[4..8]);
-        const gsi_base = std.mem.readIntNative(u32, data[8..12]);
-        handle_ioapic(ioapic_id, addr, gsi_base);
+        ioapics[ioapic_id] = .{
+          .phys = std.mem.readIntNative(u32, data[4..8]),
+          .gsi_base = std.mem.readIntNative(u32, data[8..12]),
+        };
       },
       0x02 => {
-        std.debug.assert(size >= 10);
-        const ioapic_id = data[2];
+        // We can probably filter away overrides where irq == gsi and flags == 0
+        // Until we have a reason to do so, let's not.
         const irq = data[3];
-        const gsi = std.mem.readIntNative(u32, data[4..8]);
-        const flags = std.mem.readIntNative(u16, data[8..10]);
-        handle_interrupt_source_override(ioapic_id, irq, gsi, flags);
+        source_overrides[irq] = .{
+          .gsi = std.mem.readIntNative(u32, data[4..8]),
+          .flags = std.mem.readIntNative(u16, data[8..10]),
+          .ioapic_id = data[2],
+        };
       },
       0x03 => {
         std.debug.assert(size >= 8);
@@ -221,7 +207,6 @@ pub fn handle_madt(madt: []u8) void {
         os.log("APIC: TODO: Platform interrupt sources\n", .{});
       },
       0x09 => {
-        std.debug.assert(size >= 16);
         const flags   = std.mem.readIntNative(u32, data[8..12]);
         const apic_id = std.mem.readIntNative(u32, data[12..16]);
         if(flags & 0x3 != 0)
