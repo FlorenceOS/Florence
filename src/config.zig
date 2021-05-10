@@ -16,3 +16,8 @@ pub const kernel = .{
     .enable_ps2_keyboard = true,
   },
 };
+
+pub const user = .{
+  // The default keyboard layout
+  .keyboard_layout = .en_US_QWERTY,
+};
