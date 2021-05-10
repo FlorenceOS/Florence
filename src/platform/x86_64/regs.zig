@@ -11,18 +11,32 @@ pub const IA32_GS_BASE = MSR(u64, 0xC0000101);
 fn read_msr(comptime T: type, msr_num: u32) T {
   std.debug.assert(T == u64);
 
-  var low: u32 = undefined;
-  var high: u32 = undefined;
-  asm volatile("rdmsr" : [_]"={eax}"(low), [_]"={edx}"(high) : [_]"{ecx}"(msr_num));
-  return (@as(u64, high) << 32) | @as(u64, low);
+  switch(T) {
+    u64 => {
+      var low: u32 = undefined;
+      var high: u32 = undefined;
+      asm volatile("rdmsr" : [_]"={eax}"(low), [_]"={edx}"(high) : [_]"{ecx}"(msr_num));
+      return (@as(u64, high) << 32) | @as(u64, low);
+    },
+    u32 => {
+      return asm volatile("rdmsr" : [_]"={eax}"(->u32) : [_]"{ecx}"(msr_num));
+    },
+    else => @compileError("read_msr not implemented for type"),
+  }
 }
 
 fn write_msr(comptime T: type, msr_num: u32, val: T) void {
-  std.debug.assert(T == u64);
-
-  const low = @truncate(u32, val);
-  const high = @truncate(u32, val >> 32);
-  asm volatile("wrmsr" :: [_]"{eax}"(low), [_]"{edx}"(high), [_]"{ecx}"(msr_num));
+  switch(T) {
+    u64 => {
+      const low = @truncate(u32, val);
+      const high = @truncate(u32, val >> 32);
+      asm volatile("wrmsr" :: [_]"{eax}"(low), [_]"{edx}"(high), [_]"{ecx}"(msr_num));
+    },
+    u32 => {
+      asm volatile("wrmsr" :: [_]"{eax}"(val), [_]"{ecx}"(msr_num));
+    },
+    else => @compileError("write_msr not implemented for type"),
+  }
 }
 
 pub fn MSR(comptime T: type, comptime msr_num: u32) type {
