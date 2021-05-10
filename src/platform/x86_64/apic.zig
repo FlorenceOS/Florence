@@ -1,26 +1,65 @@
 const os = @import("root").os;
+const regs = @import("regs.zig");
 const std = @import("std");
 const builtin = @import("builtin");
 const interrupts = @import("interrupts.zig");
 
 // LAPIC
 
-var lapic: *volatile [0x100]u32 = undefined;
+fn lapic_ptr() ?*volatile[0x100]u32 {
+  if(os.platform.thread.get_current_cpu().platform_data.lapic) |ptr| {
+    return ptr.get_writeback();
+  }
+  return null;
+}
+
+fn x2apic_msr(comptime register: u10) comptime_int {
+  return @as(u32, 0x800) + @truncate(u8, register >> 2);
+}
+
+fn write_x2apic(comptime register: u10, value: u32) void {
+  regs.MSR(u32, x2apic_msr(register)).write(value);
+}
+
+fn read_x2apic(comptime register: u10) u32 {
+  return regs.MSR(u32, x2apic_msr(register)).read();
+}
 
 pub fn enable() void {
-  const phy = IA32_APIC_BASE.read() & 0xFFFFF000; // ignore flags
-  lapic = os.platform.phys_ptr(*volatile [0x100]u32).from_int(phy).get_uncached();
-  lapic[SPURIOUS] |= @as(u32, 0x100) | interrupts.spurious_vector; // bit 8 = lapic enable, bit 7-0 = spurious vector
+  const spur_reg = @as(u32, 0x100) | interrupts.spurious_vector; // bit 8 = lapic enable, bit 7-0 = spurious vector;
+
+  const raw = IA32_APIC_BASE.read();
+
+  if(raw & 0x400 != 0) {
+    // X2APIC
+    os.platform.thread.get_current_cpu().platform_data.lapic = null;
+    write_x2apic(SPURIOUS, spur_reg);
+    return;
+  }
+
+  const phy = raw & 0xFFFFF000; // ignore flags
+
+  os.platform.thread.get_current_cpu().platform_data.lapic = os.platform.phys_ptr(*volatile [0x100]u32).from_int(phy);
+
+  lapic_ptr().?[SPURIOUS] = spur_reg;
 }
 
 pub fn eoi() void {
-  lapic[EOI] = 0;
+  if(lapic_ptr()) |lapic| {
+    lapic[EOI] = 0;
+  } else {
+    write_x2apic(EOI, 0);
+  }
 }
 
 pub fn timer(ticks: u32, div: u32, vec: u32) void {
-  lapic[LVT_TIMER] = vec | TIMER_MODE_PERIODIC;
-  lapic[TIMER_DIV] = div;
-  lapic[TIMER_INITCNT] = ticks;
+  if(lapic_ptr()) |lapic| {
+    lapic[LVT_TIMER] = vec | TIMER_MODE_PERIODIC;
+    lapic[TIMER_DIV] = div;
+    lapic[TIMER_INITCNT] = ticks;
+  } else {
+    @panic("X2APIC timer NYI");
+  }
 }
 
 
