@@ -44,6 +44,9 @@ pub const Note = struct {
         /// all endpoints are lost. The intent is to allow server
         /// to cleanup all the structures that were used for the endpoint
         EndpointUnreachable,
+        /// Sent to the driver whenever owned InterruptObject
+        /// raises interrupt
+        InterruptRaised,
 
         /// Get peer type from the note type (whether this note is directed
         /// to producer or consumer)
@@ -51,6 +54,7 @@ pub const Note = struct {
             return switch (self) {
                 .RequestPending, .TasksAvailable, .ConsumerLeft, .EndpointUnreachable => .Producer,
                 .RequestAccepted, .RequestDenied, .ResultsAvailable, .ProducerLeft => .Consumer,
+                .InterruptRaised => @panic("to_peer_type called on a wrong message type"),
             };
         }
     };
@@ -67,13 +71,17 @@ pub const Note = struct {
         /// For the .EndpointUnreachable, this field stores the reference to the endpoint,
         /// all references to which are already lost
         endpoint: *Endpoint,
+        /// For the .interruptRaised, this field stores the reference to the InterruptObject
+        /// that has raised the interrupt
+        interrupt: *kepler.interrupts.InterruptObject,
     },
 
-    /// Drop reference from the note. This function ensures that
-    /// node is only dropped once
+    /// Drop reference from the note.
     pub fn drop(self: *@This()) void {
         if (self.typ == .EndpointUnreachable) {
             self.owner_ref.endpoint.drop();
+        } else if (self.typ == .InterruptRaised) {
+            self.owner_ref.interrupt.drop();
         } else {
             self.owner_ref.stream.drop();
         }
@@ -111,6 +119,13 @@ pub const Note = struct {
             .TasksAvailable, .ResultsAvailable, .ConsumerLeft, .ProducerLeft => {
                 const peer = self.typ.to_peer_type();
                 if (!self.owner_ref.stream.assert_status(peer, .Connected)) {
+                    return false;
+                }
+            },
+            // For .InterruptRaised, check if new interrupts are still being
+            // waited for
+            .InterruptRaised => {
+                if (!self.owner_ref.interrupt.is_active()) {
                     return false;
                 }
             },
@@ -169,7 +184,7 @@ pub const NoteQueue = struct {
     }
 
     /// Send note to the queue
-    fn send(self: *@This(), note: *Note) !void {
+    pub fn send(self: *@This(), note: *Note) !void {
         // Check queue state for the first time
         if (@atomicLoad(State, &self.state, .Acquire) != .Up) {
             return error.ThreadUnreachable;
@@ -198,7 +213,7 @@ pub const NoteQueue = struct {
         }
         return null;
     }
-    
+
     /// Wait for new notes
     pub fn wait(self: *@This()) void {
         self.event.wait();

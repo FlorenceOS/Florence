@@ -16,6 +16,8 @@ pub const ObjectType = enum {
     /// LockedHandle is the object that stores one integer only
     /// owner can access. See LockedHandle description in this file. Shareable
     LockedHandle,
+    /// InterruptObject is the object that owns interrupt source of any kind.
+    InterruptObject,
     /// Used to indicate that this reference cell is empty
     None,
 };
@@ -48,6 +50,8 @@ pub const ObjectRef = union(ObjectType) {
         /// address of the mapping
         mapped_to: ?usize,
     },
+    /// Interrupt object
+    InterruptObject: *kepler.interrupts.InterruptObject,
     /// Locked handle reference
     LockedHandle: *LockedHandle,
     /// None means that there is no reference to any object
@@ -70,6 +74,7 @@ pub const ObjectRef = union(ObjectType) {
                 }
             },
             .LockedHandle => |locked_handle| locked_handle.drop(),
+            .InterruptObject => |interrupt_object| interrupt_object.shutdown(),
             .None => {},
         }
     }
@@ -83,7 +88,7 @@ pub const ObjectRef = union(ObjectType) {
     /// Borrow shareable reference. Increments refcount
     pub fn pack_shareable(self: *const @This()) !SharedObjectRef {
         switch (self.*) {
-            .Stream => return error.ObjectNotShareable,
+            .Stream, .InterruptObject => return error.ObjectNotShareable,
             .Endpoint => |endpoint| return SharedObjectRef{ .Endpoint = endpoint.ref.borrow() },
             .MemoryObject => |memory_obj| return SharedObjectRef{ .MemoryObject = memory_obj.ref.borrow() },
             .LockedHandle => |locked_handle| return SharedObjectRef{ .LockedHandle = locked_handle.borrow() },

@@ -5,7 +5,10 @@ const kepler = os.kepler;
 fn rdtsc() u64 {
     var eax: u32 = undefined;
     var edx: u32 = undefined;
-    asm volatile("rdtsc": [_]"={eax}"(eax), [_]"={edx}"(edx));
+    asm volatile ("rdtsc"
+        : [_] "={eax}" (eax),
+          [_] "={edx}" (edx)
+    );
     return @as(u64, eax) + (@as(u64, edx) << 32);
 }
 
@@ -48,7 +51,7 @@ fn server_task(allocator: *std.mem.Allocator, server_noteq: *kepler.ipc.NoteQueu
         try conn.notify(.Consumer);
         server_send_rdtsc += rdtsc() - send_starting_time;
     }
-    os.log("Server task exits stress test! Send: {} clk. Recieve: {} clk\n", .{server_send_rdtsc / tries, server_recv_rdtsc / tries});
+    os.log("Server task exits stress test! Send: {} clk. Recieve: {} clk\n", .{ server_send_rdtsc / tries, server_recv_rdtsc / tries });
 
     // Terminate connection from the server
     conn.abandon(.Producer);
@@ -63,7 +66,7 @@ fn client_task(allocator: *std.mem.Allocator, client_noteq: *kepler.ipc.NoteQueu
         .obj_mailbox_size = 16,
     };
     const conn = try kepler.ipc.Stream.create(allocator, client_noteq, endpoint, conn_params);
-    os.log("Created connection!\n", .{}); 
+    os.log("Created connection!\n", .{});
 
     // Client note queue should get the .Accept note
     client_noteq.wait();
@@ -102,7 +105,7 @@ fn client_task(allocator: *std.mem.Allocator, client_noteq: *kepler.ipc.NoteQueu
         // Allow server to resend its note
         conn.unblock(.Producer);
     }
-    os.log("Client task exits stress test! Send: {} clk. Recieve: {} clk\n", .{client_send_rdtsc / tries, client_recv_rdtsc / tries});
+    os.log("Client task exits stress test! Send: {} clk. Recieve: {} clk\n", .{ client_send_rdtsc / tries, client_recv_rdtsc / tries });
 
     // Client should get ping of death message
     client_noteq.wait();
@@ -133,7 +136,7 @@ fn notifications(allocator: *std.mem.Allocator) !void {
     os.log("Created server endpoint!\n", .{});
 
     // Run client task separately
-    try os.thread.scheduler.make_task(client_task, .{allocator, client_noteq, endpoint});
+    try os.thread.scheduler.make_task(client_task, .{ allocator, client_noteq, endpoint });
 
     // Launch server task inline
     try server_task(allocator, server_noteq);
@@ -270,6 +273,23 @@ fn locked_handle_table(allocator: *std.mem.Allocator) !void {
     std.testing.expect(disposer.called == 2);
 }
 
+fn interrupt_test(allocator: *std.mem.Allocator) !void {
+    os.log("\nInterrupt test...\n", .{});
+    // Create a notification queue
+    const noteq = try kepler.ipc.NoteQueue.create(allocator);
+    // Create interrupt object
+    var object: kepler.interrupts.InterruptObject = undefined;
+    const dummy_callback =  struct {fn dummy(_: *kepler.interrupts.InterruptObject) void {}}.dummy;
+    object.init(noteq, dummy_callback, dummy_callback);
+    // Raise interrupt
+    object.raise();
+    // Check that we got a notification
+    const note = noteq.try_recv() orelse unreachable;
+    std.debug.assert(note.typ == .InterruptRaised);
+    note.drop();
+    object.shutdown();
+}
+
 pub fn run_tests() !void {
     var buffer: [4096]u8 = undefined;
     var fixed_buffer = std.heap.FixedBufferAllocator.init(&buffer);
@@ -280,6 +300,7 @@ pub fn run_tests() !void {
     try object_passing(allocator);
     try locked_handles(allocator);
     try locked_handle_table(allocator);
+    try interrupt_test(allocator);
 
     os.log("\nAll tests passing!\n", .{});
 }
