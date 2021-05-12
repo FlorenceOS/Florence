@@ -13,6 +13,7 @@ pub const tar = @import("tar.zig");
 pub const vital = @import("vital.zig");
 pub const rbtree = @import("rbtree.zig");
 pub const atmcqueue = @import("atomic_queue.zig");
+pub const handle_table = @import("handle_table.zig");
 
 pub const lai = @cImport({
   @cInclude("lai/core.h");
@@ -28,5 +29,5 @@ pub const lai = @cImport({
 });
 
 pub fn get_index(ptr: anytype, slice: []@TypeOf(ptr.*)) usize {
-  return (@ptrToInt(ptr) - @ptrToInt(slice.ptr))/@sizeOf(@TypeOf(ptr.*));
+    return (@ptrToInt(ptr) - @ptrToInt(slice.ptr)) / @sizeOf(@TypeOf(ptr.*));
 }

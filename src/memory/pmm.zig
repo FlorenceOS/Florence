@@ -27,7 +27,7 @@ pub fn consume(phys: usize, size: usize) void {
   outer: while(sz != 0) {
     inline for(reverse_sizes) |psz, ri| {
       const i = page_sizes.len - ri - 1;
-      if(sz >= psz and lalign.is_aligned(u64, psz, pp)) {
+      if(sz >= psz and lalign.is_aligned(usize, psz, pp)) {
         free_impl(pp, i);
         sz -= psz;
         pp += psz;

@@ -54,7 +54,7 @@ const Lifetime = enum {
 var range = RangeAlloc{.materialize_bytes = sbrk};
 
 /// Range allocator for nonbacked memory
-var nonbacked_range = RangeAlloc{.materialize_bytes = nonbacked_sbrk};
+pub var nonbacked_range = RangeAlloc{.materialize_bytes = nonbacked_sbrk};
 
 var ephemeral_alloc =
   std.heap.GeneralPurposeAllocator(.{
