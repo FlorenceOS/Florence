@@ -51,7 +51,7 @@ const Port = packed struct {
 
     pub fn command_headers(self: *const volatile @This()) *volatile [32]CommandTableHeader {
         const addr = read_u64(&self.command_list_base);
-        return &pmm.access_phys_single_volatile(CommandList, addr).command_headers;
+        return &os.platform.phys_ptr(*volatile CommandList).from_int(addr).get_uncached().command_headers;
     }
 
     pub fn start_command_engine(self: *volatile @This()) void {
@@ -124,7 +124,7 @@ const Port = packed struct {
         const prd_ptr = self.prd(slot, 0);
         const buf_addr = read_u64(&prd_ptr.data_base_addr);
         const buf_size = @as(usize, prd_ptr.sizem1) + 1;
-        return pmm.access_phys(u8, buf_addr)[0..buf_size];
+        return os.platform.phys_slice(u8).init(buf_addr, buf_size).to_slice_writeback();
     }
 
     pub fn read_single_sector(self: *volatile @This(), slot: u5) void {
@@ -265,7 +265,7 @@ const CommandTableHeader = packed struct {
 
     pub fn table(self: *volatile @This()) *volatile CommandTable {
         const addr = read_u64(&self.command_table_addr);
-        return pmm.access_phys_single_volatile(CommandTable, addr);
+        return os.platform.phys_ptr(*volatile CommandTable).from_int(addr).get_uncached();
     }
 };
 
@@ -394,12 +394,7 @@ const PortState = struct {
 
         const commands_phys = try pmm.alloc_phys(port_io_size);
         const fis_phys = commands_phys + @sizeOf(CommandList);
-        try paging.remap_phys_size(.{
-            .phys = commands_phys,
-            .size = port_io_size,
-            .memtype = .DeviceUncacheable,
-        });
-        @memset(pmm.access_phys_volatile(u8, commands_phys), 0, port_io_size);
+        @memset(os.platform.phys_ptr([*]u8).from_int(commands_phys).get_uncached(), 0, port_io_size);
         write_u64(&self.mmio.command_list_base, commands_phys);
         write_u64(&self.mmio.fis_base, fis_phys);
     }
@@ -411,12 +406,7 @@ const PortState = struct {
             if (reamining_table_size < @sizeOf(CommandTable)) {
                 reamining_table_size = page_size;
                 current_table_addr = try pmm.alloc_phys(page_size);
-                try paging.remap_phys_size(.{
-                    .phys = current_table_addr,
-                    .size = page_size,
-                    .memtype = .DeviceUncacheable,
-                });
-                @memset(pmm.access_phys_volatile(u8, current_table_addr), 0, page_size);
+                @memset(os.platform.phys_ptr([*]u8).from_int(current_table_addr).get_uncached(), 0, page_size);
             }
 
             write_u64(&header.command_table_addr, current_table_addr);
@@ -428,12 +418,7 @@ const PortState = struct {
 
             // First PRD is just a small preallocated single page buffer
             const buf = try pmm.alloc_phys(page_size);
-            try paging.remap_phys_size(.{
-                .phys = buf,
-                .size = page_size,
-                .memtype = .DeviceUncacheable,
-            });
-            @memset(pmm.access_phys_volatile(u8, buf), 0, page_size);
+            @memset(os.platform.phys_ptr([*]u8).from_int(buf).get_uncached(), 0, page_size);
             write_u64(&header.table().prds[0].data_base_addr, buf);
             header.table().prds[0].sizem1 = page_size - 1;
         }
@@ -631,7 +616,7 @@ fn sata_port_task(port_type: sata_port_type, port: *volatile Port) !void {
         else => return,
     }
 
-    log("AHCI: {} task started for port at 0x{X}\n", .{ @tagName(port_type), @ptrToInt(port) });
+    log("AHCI: {s} task started for port at 0x{X}\n", .{ @tagName(port_type), @ptrToInt(port) });
 
     var port_state = try PortState.init(port);
 
@@ -686,12 +671,12 @@ fn controller_task(abar: *volatile ABAR) !void {
         }
 
         switch (port.signature) {
-            0x00000101 => try scheduler.make_task(sata_port_task, .{ .ata, port }),
-            //0xEB140101 => try scheduler.make_task(sata_port_task, .{.atapi, port}),
+            0x00000101 => try scheduler.spawn_task(sata_port_task, .{ .ata, port }),
+            //0xEB140101 => try scheduler.spawn_task(sata_port_task, .{.atapi, port}),
             0xC33C0101, 0x96690101 => {
                 log("AHCI: Known TODO port signature: 0x{X}\n", .{port.signature});
-                //scheduler.make_task(sata_port_task, .{.semb,   port})
-                //scheduler.make_task(sata_port_task, .{.pm,     port})
+                //scheduler.spawn_task(sata_port_task, .{.semb,   port})
+                //scheduler.spawn_task(sata_port_task, .{.pm,     port})
             },
             else => {
                 log("AHCI: Unknown port signature: 0x{X}\n", .{port.signature});
@@ -705,24 +690,9 @@ pub fn register_controller(addr: pci.Addr) void {
     // Busty master bit
     addr.command().write(addr.command().read() | 0x6);
 
-    const abar_phys = addr.barinfo(5).phy & 0xFFFFF000;
-
-    log("AHCI: Got abar phys: 0x{X}\n", .{abar_phys});
-
-    paging.remap_phys_size(.{
-        .phys = abar_phys,
-        .size = abar_size,
-        .memtype = .DeviceUncacheable,
-    }) catch |err| {
-        log("AHCI: Failed to map ABAR: {}\n", .{@errorName(err)});
-    };
-
-    const abar = pmm.access_phys_single_volatile(ABAR, abar_phys);
-    log("AHCI: ABAR is accessible at 0x{X}\n", .{@ptrToInt(abar)});
+    const abar = os.platform.phys_ptr(*volatile ABAR).from_int(addr.barinfo(5).phy & 0xFFFFF000).get_uncached();
 
     const cap = abar.hba_capabilities;
-
-    log("AHCI: HBA capabilities: 0x{X}\n", .{cap});
 
     if ((cap & (1 << 31)) == 0) {
         log("AHCI: Controller is 32 bit only, ignoring.\n", .{});
@@ -734,7 +704,7 @@ pub fn register_controller(addr: pci.Addr) void {
         return;
     }
 
-    scheduler.make_task(controller_task, .{abar}) catch |err| {
-        log("AHCI: Failed to make controller task: {}\n", .{@errorName(err)});
+    scheduler.spawn_task(controller_task, .{abar}) catch |err| {
+        log("AHCI: Failed to make controller task: {s}\n", .{@errorName(err)});
     };
 }

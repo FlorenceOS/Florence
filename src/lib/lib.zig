@@ -15,6 +15,19 @@ pub const rbtree = @import("rbtree.zig");
 pub const atmcqueue = @import("atomic_queue.zig");
 pub const handle_table = @import("handle_table.zig");
 
+pub const lai = @cImport({
+  @cInclude("lai/core.h");
+  @cInclude("lai/error.h");
+  @cInclude("lai/host.h");
+  @cInclude("lai/drivers/ec.h");
+  @cInclude("lai/drivers/timer.h");
+  @cInclude("lai/helpers/pc-bios.h");
+  @cInclude("lai/helpers/pci.h");
+  @cInclude("lai/helpers/pm.h");
+  @cInclude("lai/helpers/resource.h");
+  @cInclude("lai/helpers/sci.h");
+});
+
 pub fn get_index(ptr: anytype, slice: []@TypeOf(ptr.*)) usize {
     return (@ptrToInt(ptr) - @ptrToInt(slice.ptr)) / @sizeOf(@TypeOf(ptr.*));
 }

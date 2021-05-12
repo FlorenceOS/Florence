@@ -1,8 +1,10 @@
 /// virtio-gpu driver instance
-pub const Driver = struct {
+const Driver = struct {
   transport: virtio.Driver,
   inflight: u32 = 0,
   pitch: u32 = 0,
+  width: u32 = 0,
+  height: u32 = 0,
 
   // Initialize the virtio transport, but don't change modes
   pub fn init(pciaddr: pci.Addr) !Driver {
@@ -14,6 +16,8 @@ pub const Driver = struct {
   // Do a modeswitch to the described mode
   pub fn modeset(self: *Driver, addr: u64, width: u32, height: u32) void {
     self.pitch = width * 4;
+    self.width = width;
+    self.height = height;
     var iter = self.transport.iter(0);
     {
       var msg: ResourceCreate2D = .{
@@ -61,16 +65,19 @@ pub const Driver = struct {
 
     self.transport.start(0);
     self.wait();
+
+    self.update_rect(0, .{.x = 0, .y = 0, .width = width, .height = height});
   }
 
   /// Update *only* the rectangle
-  pub fn update_rect(self: *Driver, rect: Rect) void {
+  pub fn update_rect(self: *Driver, offset: u64, rect: Rect) void {
+
     var iter = self.transport.iter(0);
     {
       var msg: TransferHost2D = .{
         .hdr = .{ .cmdtype = VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D, .flags = 0, .fenceid = 0, .ctxid = 0 },
         .resid = 1,
-        .offset = rect.y * self.pitch + rect.x * 4,
+        .offset = offset,
         .rect = rect,
       };
       var resp: ConfHdr = undefined;
@@ -106,7 +113,26 @@ pub const Driver = struct {
   }
 };
 
-
+pub fn handle_controller(addr: pci.Addr) void {
+  const alloc = os.memory.vmm.backed(.Eternal);
+  const drv = alloc.create(Driver) catch {
+    os.log("Virtio display controller: Allocation failure\n", .{});
+    return;
+  };
+  drv.* = Driver.init(addr) catch {
+    os.log("Virtio display controller: Init has failed!\n", .{});
+    return;
+  };
+  if (os.drivers.vesa_log.get_info()) |vesa| {
+    drv.modeset(os.drivers.vesa_log.framebuffer.?.bb_phys, vesa.width, vesa.height);
+    os.drivers.vesa_log.set_updater(updater, @ptrToInt(drv));
+    os.log("Virtio display controller: Initialized with preexisting fb\n", .{});
+  } else {
+    os.drivers.vesa_log.register_fb(updater, @ptrToInt(drv), 800*4, 800, 600, 32);
+    drv.modeset(os.drivers.vesa_log.get_backbuffer_phy(), 800, 600);
+    os.log("Virtio display controller: Initialized\n", .{});
+  }
+}
 
 fn process(self: *Driver, i: u8, head: virtio.Descriptor) void {
   self.transport.freechain(i, head);
@@ -121,9 +147,9 @@ pub fn interrupt(frame: *os.platform.InterruptFrame, context: u64) void {
 }
 
 /// Global rectangle update, but with a global context
-pub fn updater(x: u32, y: u32, w: u32, h: u32, ctx: u64) void {
+fn updater(bb: [*]u8, yoff_src: usize, yoff_dest: usize, ysize: usize, pitch: usize, ctx: usize) void {
   var self = @intToPtr(*Driver, ctx);
-  self.update_rect(.{ .x = x, .y = y, .width = w, .height = h });
+  self.update_rect(self.pitch * yoff_src, .{ .x = 0, .y = @truncate(u32, yoff_dest), .width = self.width, .height = @truncate(u32, ysize) });
 }
 
 const virtio = @import("virtio-pci.zig");

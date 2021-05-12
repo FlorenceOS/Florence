@@ -20,7 +20,6 @@ pub fn nonbacked_sbrk(num_bytes: usize) ![]u8 {
   defer sbrk_mutex.unlock();
 
   const ret = sbrk_head;
-  os.log("VMM: sbrk(0x{X}) = 0x{X}\n", .{num_bytes, ret});
 
   sbrk_head += num_bytes;
 
@@ -83,4 +82,30 @@ pub fn backed(
 /// before mapping the memory to some physical memory.
 pub fn nonbacked() *std.mem.Allocator {
   return &nonbacked_range.allocator;
+}
+
+export fn laihost_malloc(sz: usize) ?*c_void {
+  if(sz == 0) return os.lib.lai.NULL;
+  const mem = os.memory.vmm.backed(.Ephemeral).alloc(u8, sz) catch return os.lib.lai.NULL;
+  return @ptrCast(*c_void, mem.ptr);
+}
+
+export fn laihost_realloc(ptr: ?*c_void, newsize: usize, oldsize: usize) ?*c_void {
+  std.debug.assert((ptr == null) == (oldsize == 0));
+  if(oldsize == 0) {
+    return laihost_malloc(newsize);
+  }
+  if(newsize == 0) {
+    laihost_free(ptr, oldsize);
+    return os.lib.lai.NULL;
+  }
+  const ret = laihost_malloc(newsize);
+  @memcpy(@ptrCast([*]u8, ret), @ptrCast([*]const u8, ptr), oldsize);
+  laihost_free(ptr, oldsize);
+  return ret;
+}
+
+export fn laihost_free(ptr: ?*c_void, oldsize: usize) void {
+  if(ptr == null) return;
+  os.memory.vmm.backed(.Ephemeral).free(@ptrCast([*]u8, ptr)[0..oldsize]);
 }

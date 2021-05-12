@@ -63,3 +63,11 @@ pub fn inl(port: u16) u32 {
     : [port]   "N{dx}" (port)
   );
 }
+
+export fn laihost_outb(port: u16, value: u8) void { outb(port, value); }
+export fn laihost_outw(port: u16, value: u16) void { outw(port, value); }
+export fn laihost_outd(port: u16, value: u32) void { outl(port, value); }
+
+export fn laihost_inb(port: u16) u8 { return inb(port); }
+export fn laihost_inw(port: u16) u16 { return inw(port); }
+export fn laihost_ind(port: u16) u32 { return inl(port); }

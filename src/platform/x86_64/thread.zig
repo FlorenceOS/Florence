@@ -4,10 +4,120 @@ const std = @import("std");
 const gdt = @import("gdt.zig");
 const regs = @import("regs.zig");
 const interrupts = @import("interrupts.zig");
+const Tss = @import("tss.zig").Tss;
+
+pub const sched_stack_size = 0x10000;
+pub const int_stack_size = 0x10000;
+pub const task_stack_size = 0x10000;
+pub const stack_guard_size = 0x1000;
 
 pub var bsp_task: os.thread.Task = .{};
 
 pub const kernel_gs_base = regs.MSR(u64, 0xC0000102);
+
+pub const TaskData = struct {
+  tss: *Tss = undefined,
+  
+  pub fn load_state(self: *@This()) void {
+    const cpu = os.platform.thread.get_current_cpu();
+    cpu.platform_data.gdt.update_tss(self.tss);
+    os.log("TSS Loaded: 0x{x} 0x{x} 0x{x}\n", .{self.tss.rsp[0], self.tss.ist[0], self.tss.ist[1]});
+  }
+};
+
+pub const CoreData = struct {
+  gdt: gdt.Gdt = .{},
+  rsp_stash: u64 = undefined, // Stash for rsp after syscall instruction
+  lapic: ?os.platform.phys_ptr(*volatile [0x100]u32) = undefined,
+};
+
+pub const CoreDoorbell = struct {
+  addr: *usize = undefined,
+
+  pub fn init(self: *@This()) void {
+    const nonbacked = os.memory.vmm.nonbacked();
+
+    const virt = @ptrToInt(os.vital(nonbacked.allocFn(nonbacked, 4096, 1, 1, 0), "CoreDoorbell nonbacked").ptr);
+    os.vital(os.memory.paging.map(.{
+      .virt = virt,
+      .size = 4096,
+      .perm = os.memory.paging.rw(),
+      .memtype = .MemoryWriteBack
+    }), "CoreDoorbell map");
+
+    self.addr = @intToPtr(*usize, virt);
+  }
+
+  pub fn ring(self: *@This()) void {
+    @atomicStore(usize, self.addr, 0, .Release);
+  }
+
+  pub fn start_monitoring(self: *@This()) void {
+    //asm volatile(
+    //  "monitor"
+    //  :
+    //  : [_]"{rax}"(@ptrToInt(self.addr)),
+    //    [_]"{ecx}"(@as(u32, 0)),
+    //    [_]"{edx}"(@as(u32, 0)),
+    //);
+  }
+
+  pub fn wait(self: *@This()) void {
+    //asm volatile(
+    //  \\sti
+    //  \\mwait
+    //  \\cli
+    //  :
+    //  : [_]"{eax}"(@as(u32, 0)),
+    //    [_]"{ecx}"(@as(u32, 0))
+    //);
+    asm volatile("sti; nop; pause; cli");
+  }
+};
+
+const ephemeral = os.memory.vmm.backed(.Ephemeral);
+
+fn switch_task(frame: *interrupts.InterruptFrame) *os.thread.Task {
+  var next_task: *os.thread.Task = undefined;
+  while (true) {
+    next_task = os.platform.thread.get_current_cpu().executable_tasks.dequeue() orelse continue;
+    break;
+  }
+
+  os.platform.set_current_task(next_task);
+  frame.* = next_task.registers;
+  return next_task;
+}
+
+pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry) !void {
+  const cpu = os.platform.thread.get_current_cpu();
+
+  new_task.registers.eflags = regs.eflags();
+  new_task.registers.rdi = @ptrToInt(entry);
+  new_task.registers.rsp = os.lib.libalign.align_down(usize, 16, @ptrToInt(entry));
+  new_task.registers.cs = gdt.selector.code64;
+  new_task.registers.ss = gdt.selector.data64;
+  new_task.registers.es = gdt.selector.data64;
+  new_task.registers.ds = gdt.selector.data64;
+  new_task.registers.rip = @ptrToInt(entry.function);
+
+  const tss = try os.memory.vmm.backed(.Ephemeral).create(Tss);
+  tss.* = .{};
+
+  new_task.platform_data.tss = tss;
+  tss.set_interrupt_stack(cpu.int_stack);
+  tss.set_scheduler_stack(cpu.sched_stack);
+  tss.set_syscall_stack(new_task.stack);
+}
+
+pub fn yield() void {
+  asm volatile(
+    \\int %[wait_yield_vector]
+    \\
+    :
+    : [wait_yield_vector] "i" (interrupts.wait_yield_vector)
+  );
+}
 
 pub fn set_current_cpu(cpu_ptr: *os.platform.smp.CoreData) void {
   kernel_gs_base.write(@ptrToInt(cpu_ptr));
@@ -23,81 +133,5 @@ pub fn self_exited() ?*os.thread.Task {
   if(curr == &bsp_task)
     return null;
 
-  if(curr.platform_data.stack != null) {
-    // TODO: Add URM
-  }
   return curr;
-}
-
-pub const TaskData = struct {
-  stack: ?*[task_stack_size]u8 = null,
-};
-
-pub const CoreData = struct {
-  gdt: gdt.Gdt = .{},
-};
-
-const task_stack_size = 1024 * 16;
-
-const ephemeral = os.memory.vmm.backed(.Ephemeral);
-
-pub fn new_task_call(new_task: *os.thread.Task, func: anytype, args: anytype) !void {
-  const Args = @TypeOf(args);
-  var had_error: u64 = undefined;
-  var result: u64 = undefined;
- 
-  const cpu = &os.platform.smp.cpus[new_task.allocated_core_id];
- 
-  new_task.platform_data.stack = try ephemeral.create([task_stack_size]u8);
-  errdefer ephemeral.destroy(new_task.platform_data.stack.?);
- 
-  const stack_bottom = @ptrToInt(new_task.platform_data.stack);
-  var stack_top = stack_bottom + task_stack_size;
-  const entry = os.thread.NewTaskEntry.alloc_on_stack(func, args, stack_top, stack_bottom);
-  stack_top = os.lib.libalign.align_down(usize, 16, @ptrToInt(entry));
-
-  new_task.registers.eflags = regs.eflags();
-  new_task.registers.rdi = @ptrToInt(entry);
-  new_task.registers.rsp = stack_top;
-  new_task.registers.cs = gdt.selector.code64;
-  new_task.registers.ss = gdt.selector.data64;
-  new_task.registers.fs = gdt.selector.data64;
-  new_task.registers.es = gdt.selector.data64;
-  new_task.registers.gs = gdt.selector.data64;
-  new_task.registers.ds = gdt.selector.data64;
-  new_task.registers.rip = @ptrToInt(entry.function);
- 
-  os.platform.smp.cpus[new_task.allocated_core_id].executable_tasks.enqueue(new_task);
-}
-
-pub fn yield() void {
-  asm volatile("int $0x6B");
-}
-
-pub fn yield_handler(frame: *interrupts.InterruptFrame) void {
-  const current_task = os.platform.get_current_task();
-  const curent_context = current_task.paging_context;
-  current_task.registers = frame.*;
-
-  const next_task = switch_task(frame);
-  if (current_task.paging_context != next_task.paging_context) {
-    next_task.paging_context.apply();
-  }
-}
-
-fn switch_task(frame: *interrupts.InterruptFrame) *os.thread.Task {
-  var next_task: *os.thread.Task = undefined;
-  while (true) {
-    next_task = os.platform.thread.get_current_cpu().executable_tasks.dequeue() orelse continue;
-    break;
-  }
-
-  os.platform.set_current_task(next_task);
-  frame.* = next_task.registers;
-  return next_task;
-}
-
-pub fn await_handler(frame: *interrupts.InterruptFrame) void {
-  const next_task = switch_task(frame);
-  next_task.paging_context.apply();
 }

@@ -17,7 +17,7 @@ pub const MemmapEntry = packed struct {
   }
 };
 
-pub fn add_memmap(ent: *const MemmapEntry) void {
+pub fn consume_physmem(ent: *const MemmapEntry) void {
   if(ent.type != 1)
     return;
 
@@ -46,7 +46,6 @@ pub fn map_phys(ent: *const MemmapEntry, context: *platform.paging.PagingContext
     .context = context,
     .phys = new_ent.base,
     .size = new_ent.length,
-    .memtype = .MemoryWriteBack,
   }), "mapping physical stivale mem");
 }
 
@@ -57,26 +56,21 @@ pub fn phys_high(map: []const MemmapEntry) usize {
   return ent.base + ent.length;
 }
 
-pub fn map_bootloader_data(context: *platform.paging.PagingContext) void {
-  os.vital(paging.map_phys_range(0, 0x100000, paging.rw(), context), "mapping stivale bootloader data");
-}
-
 pub fn detect_phys_base() void {
-  switch(std.builtin.arch) {
-    .aarch64 => {
-      os.memory.paging.kernel_context.set_phys_base(0xFFFF800000000000);
-    },
-    .x86_64 => {
-      if(os.platform.paging.is_5levelpaging()) {
-        os.log("5 level paging detected!\n", .{});
-        os.memory.paging.kernel_context.set_phys_base(0xFF00000000000000);
-      }
-      else {
-        os.memory.paging.kernel_context.set_phys_base(0xFFFF800000000000);
-      }
-    },
-    else => {
-      @panic("Phys base for platform unknown!");
-    },
-  }
+  const base: usize = switch(std.builtin.arch) {
+    .aarch64 => 0xFFFF800000000000,
+    .x86_64 =>
+      if(os.platform.paging.is_5levelpaging())
+        @as(usize, 0xFF00000000000000)
+      else
+        0xFFFF800000000000,
+    else => @panic("Phys base for platform unknown!"),
+  };
+
+  const context = &os.memory.paging.kernel_context;
+
+  context.wb_virt_base = base;
+  context.wc_virt_base = base;
+  context.uc_virt_base = base;
+  context.max_phys = 0x7F0000000000;
 }

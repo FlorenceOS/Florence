@@ -316,7 +316,12 @@ pub const RangeAlloc = struct {
     }
 
     fn make_range(self: *@This(), minBytes: usize) !*Range {
-        const size = std.math.max(min_materialize_size, minBytes);
+        const page_size = os.memory.paging.kernel_context.page_size(0, os.memory.pmm.phys_to_write_back_virt(0));
+        const size = os.lib.libalign.align_up(
+            usize,
+            page_size,
+            std.math.max(min_materialize_size, minBytes),
+        );
         const result: Range = .{
             .base = @ptrToInt((try self.materialize_bytes(size)).ptr),
             .size = size,

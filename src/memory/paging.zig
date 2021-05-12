@@ -10,6 +10,7 @@ const range_reverse = os.lib.range.range_reverse;
 
 const pmm = os.memory.pmm;
 
+const Context = *platform.paging.PagingContext;
 pub var kernel_context: os.platform.paging.PagingContext = undefined;
 
 pub fn init() void {
@@ -21,7 +22,7 @@ pub fn map(args: struct {
   size: usize,
   perm: Perms,
   memtype: platform.paging.MemoryType,
-  context: *platform.paging.PagingContext = &kernel_context,
+  context: Context = &kernel_context,
 }) !void {
   var argc = args;
   return map_impl_with_rollback(.{
@@ -40,7 +41,7 @@ pub fn map_phys(args: struct {
   size: usize,
   perm: Perms,
   memtype: platform.paging.MemoryType,
-  context: *platform.paging.PagingContext = &kernel_context,
+  context: Context = &kernel_context,
 }) !void {
   var argc = args;
   return map_impl_with_rollback(.{
@@ -57,7 +58,7 @@ pub fn unmap(args: struct {
   virt: usize,
   size: usize,
   reclaim_pages: bool,
-  context: *platform.paging.PagingContext = &kernel_context,
+  context: Context = &kernel_context,
 }) void {
   var argc = args;
   unmap_loop(&argc.virt, &argc.size, argc.reclaim_pages, argc.context);
@@ -125,7 +126,7 @@ pub fn get_current_paging_root() platform.paging_root {
   return platform.current_paging_root();
 }
 
-pub fn set_context(new_context: *platform.paging.PagingContext) !void {
+pub fn set_context(new_context: Context) !void {
   new_context.apply();
   kernel_context = new_context.*;
 }
@@ -148,7 +149,7 @@ pub fn bootstrap_kernel_paging() !platform.paging.PagingContext {
   return new_context;
 }
 
-fn map_kernel_section(new_paging_context: *platform.paging.PagingContext, start: *u8, end: *u8, perm: Perms) !void {
+fn map_kernel_section(new_paging_context: Context, start: *u8, end: *u8, perm: Perms) !void {
   const virt = @ptrToInt(start);
   const phys = os.vital(translate_virt(.{.virt = virt}), "Translating kaddr");  
   const region_size = @ptrToInt(end) - virt;
@@ -163,90 +164,36 @@ fn map_kernel_section(new_paging_context: *platform.paging.PagingContext, start:
   }), "Mapping kernel section");
 }
 
-// Will probably be replaced by phys_slice(T[]).map()
-/// Deprecated
-pub fn add_physical_mapping(args: struct {
-  context: *platform.paging.PagingContext,
-  phys: usize,
-  size: usize,
-  memtype: platform.paging.MemoryType,
+pub fn map_physmem(args: struct {
+  context: Context,
+  map_limit: usize,
 }) !void {
+  // Map once with each memory type
   try map_phys(.{
-    .virt = args.context.phys_to_virt(args.phys),
-    .phys = args.phys,
-    .size = args.size,
+    .virt = args.context.phys_to_write_back_virt(0),
+    .phys = 0,
+    .size = args.map_limit,
     .perm = rw(),
     .context = args.context,
-    .memtype = args.memtype,
+    .memtype = .MemoryWriteBack,
   });
-}
 
-// Will probably be replaced by phys_slice(T[]).map()
-/// Deprecated
-pub fn remap_phys_range(args: struct {
-  phys: usize,
-  phys_end: usize,
-  memtype: platform.paging.MemoryType,
-  context: *platform.paging.PagingContext = &kernel_context,
-}) !void {
-  var beg = args.phys;
-  var virt = args.context.phys_to_virt(beg);
-  const psz = args.context.page_size(0, virt);
-  while(beg < args.phys_end): (beg += psz) {
-    virt = args.context.phys_to_virt(beg);
-
-    unmap(.{
-      .virt = virt,
-      .size = psz,
-      .reclaim_pages = false,
-      .context = args.context,
-    });
-
-    try map_phys(.{
-      .virt = virt,
-      .phys = beg,
-      .size = psz,
-      .perm = rw(),
-      .memtype = args.memtype,
-      .context = args.context,
-    });
-  }
-}
-
-// Will probably be replaced by phys_ptr(T).map()
-/// Deprecated
-pub fn remap_phys_struct(comptime T: type, args: struct{
-  phys: usize,
-  memtype: platform.paging.MemoryType,
-  context: *platform.paging.PagingContext = &kernel_context,
-}) !*T {
-  const struct_size = @sizeOf(T);
-  try remap_phys_size(.{
-    .phys = args.phys,
-    .size = struct_size,
-    .memtype = args.memtype,
+  try map_phys(.{
+    .virt = args.context.phys_to_write_combining_virt(0),
+    .phys = 0,
+    .size = args.map_limit,
+    .perm = rw(),
     .context = args.context,
+    .memtype = .DeviceWriteCombining,
   });
-  return &pmm.access_phys(T, args.phys)[0];
-}
 
-// Will probably be replaced by phys_slice(T[]).map()
-/// Deprecated
-pub fn remap_phys_size(args: struct {
-  phys: usize,
-  size: usize,
-  memtype: platform.paging.MemoryType,
-  context: *platform.paging.PagingContext = &kernel_context,
-}) !void {
-  const psz = args.context.page_size(0, args.context.phys_to_virt(args.phys));
-  const page_addr_low = libalign.align_down(usize, psz, args.phys);
-  const page_addr_high = libalign.align_up(usize, psz, args.phys + args.size);
-
-  try remap_phys_range(.{
-    .phys = page_addr_low,
-    .phys_end = page_addr_high,
+  try map_phys(.{
+    .virt = args.context.phys_to_uncached_virt(0),
+    .phys = 0,
+    .size = args.map_limit,
+    .perm = rw(),
     .context = args.context,
-    .memtype = args.memtype,
+    .memtype = .DeviceUncacheable,
   });
 }
 
@@ -258,7 +205,7 @@ fn map_impl_with_rollback(args: struct {
   size: *usize,
   perm: Perms,
   memtype: platform.paging.MemoryType,
-  context: *platform.paging.PagingContext,
+  context: Context,
 }) !void {
   const start_virt = args.virt.*;
 
@@ -287,7 +234,7 @@ fn map_impl_with_rollback(args: struct {
     return error.IncompleteMapping;
 }
 
-fn is_aligned(virt: usize, phys: ?*usize, level: anytype, context: *platform.paging.PagingContext) bool {
+fn is_aligned(virt: usize, phys: ?*usize, level: anytype, context: Context) bool {
   if(!libalign.is_aligned(usize, context.page_size(level, virt), virt))
     return false;
 
@@ -311,7 +258,7 @@ fn map_impl(
   table: anytype,
   perm: Perms,
   memtype: platform.paging.MemoryType,
-  context: *platform.paging.PagingContext,
+  context: Context,
 ) MapError!void {
   var curr = table;
 
@@ -360,7 +307,7 @@ fn map_impl(
 fn translate_virt_impl(
   virt: usize,
   table: anytype,
-  context: *platform.paging.PagingContext,
+  context: Context,
 ) error{NotPresent}!usize {
   const child = table.decode_child(&table.skip_to(virt)[0]);
   const dom = table.child_domain(virt);
@@ -374,7 +321,7 @@ fn translate_virt_impl(
 
 pub fn translate_virt(args: struct {
   virt: usize,
-  context: *platform.paging.PagingContext = &kernel_context,
+  context: Context = &kernel_context,
 }) !usize {
   const root = args.context.root_table(args.virt);
   return translate_virt_impl(args.virt, root, args.context);
@@ -384,7 +331,7 @@ fn unmap_loop(
   virt: *usize,
   size: *usize,
   reclaim_pages: bool,
-  context: *platform.paging.PagingContext,
+  context: Context,
 ) void {
   const root = context.root_table(virt.*);
   while(size.* != 0)
@@ -396,7 +343,7 @@ fn unmap_iter(
   size: *usize,
   reclaim_pages: bool,
   table: anytype,
-  context: *platform.paging.PagingContext,
+  context: Context,
 ) void {
   for(table.skip_to(virt.*)) |*child| {
     const dom = table.child_domain(virt.*);
@@ -467,7 +414,7 @@ fn print_impl(root: *page_table, comptime level: usize) void {
   }
 }
 
-pub fn switch_to_context(context: *platform.paging.PagingContext) void {
+pub fn switch_to_context(context: Context) void {
   const state = os.platform.get_and_disable_interrupts();
   context.apply();
   os.platform.get_current_task().paging_context = context;

@@ -9,7 +9,7 @@ pub const DescIter = struct {
   pub fn begin(iter: *DescIter) void {
     var i = &iter.drv.queues[iter.i];
     iter.next = iter.drv.descr(iter.i);
-    i.avail.rings((i.avail.idx + i.pending) % i.size).* = iter.next;
+    i.avail.rings(i.wrap(i.avail.idx +% i.pending)).* = iter.next;
     i.pending += 1;
   }
   /// Put a descriptor to be part of the descriptor chain
@@ -72,15 +72,17 @@ pub const Driver = struct {
   pub fn process(drv: *Driver, i: u8, cb: anytype, ctx: anytype) void {
     var q = &drv.queues[i];
     while (q.last_in_used != q.used.idx) {
-      var elem = q.used.rings(q.last_in_used % q.size);
-      q.last_in_used += 1;
+      var elem = q.used.rings(q.wrap(q.last_in_used));
+      q.last_in_used = q.last_in_used +% 1;
       cb(ctx, i, @truncate(u16, elem.id));
     }
   }
 
   /// Make the descriptors available to the device and notify it.
   pub fn start(drv: *Driver, i: u8) void {
-    drv.queues[i].avail.idx += drv.queues[i].pending;
+    // The virtio spec requires me to send values modulo 2^16, and not modulo size
+    // This explains the ugly overflowing-adds
+    drv.queues[i].avail.idx = drv.queues[i].avail.idx +% drv.queues[i].pending;
     drv.queues[i].pending = 0;
     drv.notify[i * drv.notify_mul] = drv.queues[i].avail.idx;
   }
@@ -124,21 +126,17 @@ pub const Driver = struct {
         const phy = a.barinfo(bar).phy + off;
         switch (cfg_typ) {
           VIRTIO_PCI_CAP_COMMON_CFG => {
-            map(phy, len);
-            drv.cfg = pmm.access_phys_single_volatile(CommonCfg, phy);
+            drv.cfg = os.platform.phys_ptr(*volatile CommonCfg).from_int(phy).get_uncached();
           },
           VIRTIO_PCI_CAP_NOTIFY_CFG => {
-            map(phy, len);
             drv.notify_mul = cap.read(u32, VIRTIO_PCI_NOTIFY_CAP_MULT) / 2; // VIRTIO_PCI_NOTIFY_CAP_MULT is a byte offset, each field is u16
-            drv.notify = pmm.access_phys_volatile(u16, phy);
+            drv.notify = os.platform.phys_ptr([*]volatile u16).from_int(phy).get_uncached();
           },
           VIRTIO_PCI_CAP_ISR_CFG => {
-            map(phy, len);
-            drv.isr = pmm.access_phys_single_volatile(u32, phy);
+            drv.isr = os.platform.phys_ptr(*volatile u32).from_int(phy).get_uncached();
           },
           VIRTIO_PCI_CAP_DEVICE_CFG => {
-            map(phy, len);
-            drv.dev = pmm.access_phys_volatile(u8, phy);
+            drv.dev = os.platform.phys_ptr([*]volatile u8).from_int(phy).get_uncached();
           },
           VIRTIO_PCI_CAP_PCI_CFG => {
           },
@@ -160,8 +158,7 @@ pub const Driver = struct {
     const used_siz: u32 = @sizeOf(VirtqUsed) + 2 + @sizeOf(VirtqUsedItem) * size;
     const total_siz = desc_siz + avail_siz + used_siz;
     const phys = os.memory.pmm.alloc_phys(size) catch unreachable;
-    paging.remap_phys_size(.{ .phys = phys, .size = size, .memtype = .DeviceUncacheable }) catch unreachable;
-    const virt = os.memory.pmm.access_phys_volatile(u8, phys);
+    const virt = os.platform.phys_ptr([*]volatile u8).from_int(phys).get_uncached();
     @memset(virt, 0x00, total_siz);
 
     drv.queues[i] = .{
@@ -219,7 +216,7 @@ pub const VRING_DESC_F_INDIRECT: u32 = 4;
 
 const VirtqAvail = packed struct {
   flags: u16,
-  idx: Descriptor,
+  idx: Descriptor, // important: virtio requires this field to have the index without wraparound
   pub fn rings(self: *volatile VirtqAvail, desc: Descriptor) *volatile u16 {
     return @intToPtr(*volatile u16, @ptrToInt(self) + @sizeOf(VirtqAvail) + desc * 2);
   }
@@ -248,6 +245,12 @@ const VirtQueue = struct {
   last_in_used: u16, // index into used.rings()
   num_unused: u16,
   pending: u16,
+
+  // the size of a queue is guaranteed to be a power of two, so it's possible to save on a modulo
+  // and instead get the mask to AND
+  pub fn wrap(self: *@This(), val: u16) u16 {
+    return val & (self.size - 1);
+  }
 };
 
 const CommonCfg = packed struct {
@@ -269,15 +272,6 @@ const CommonCfg = packed struct {
   queue_avail: u64,
   queue_used: u64,
 };
-
-// map function helper
-fn map(phy: u64, len: u64) void {
-  os.vital(paging.remap_phys_size(.{
-    .phys = phy,
-    .size = len,
-    .memtype = .DeviceUncacheable
-  }), "mapping virtio-pci bars");
-}
 
 const VIRTIO_ACKNOWLEDGE: u8 = 1;
 const VIRTIO_DRIVER: u8 = 2;

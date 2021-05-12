@@ -11,33 +11,52 @@ const pic = @import("pic.zig");
 const thread = @import("thread.zig");
 
 pub const num_handlers = 0x100;
-pub const handler_func = fn(*InterruptFrame)void;
+pub const InterruptHandler = fn(*InterruptFrame)void;
 pub const InterruptState = bool;
 
-var handlers = [_]handler_func {unhandled_interrupt} ** num_handlers;
+export var handlers: [256]InterruptHandler = [_]InterruptHandler {unhandled_interrupt} ** num_handlers;
+var itable: *[256]idt.IdtEntry = undefined;
+var raw_callbacks: [256](fn() callconv(.Naked) void) = undefined;
 
-pub fn add_handler(idx: u8, f: handler_func) void {
+/// Use ist=2 for scheduler calls and ist=1 for interrupts
+pub fn add_handler(idx: u8, f: InterruptHandler, interrupt: bool, priv_level: u2, ist: u3) void {
+  itable[idx] = idt.entry(raw_callbacks[idx], interrupt, priv_level, ist);
   handlers[idx] = f;
 }
 
-pub fn init_interrupts() !void {
-  pic.disable();
-  var itable = idt.setup_idt();
+pub const boostrap_vector: u8 = 0x30;
+pub const wait_yield_vector: u8 = 0x31;
+pub const syscall_vector: u8 = 0x32;
+pub const spurious_vector: u8 = 0x3F;
 
-  inline for(range(num_handlers)) |intnum| {
-    itable[intnum] = idt.entry(make_handler(intnum), true, 0);
-  }
-  add_handler(0x0E, page_fault_handler);
-  add_handler(0x6B, thread.yield_handler);
-  add_handler(0x6C, thread.await_handler);
+var last_vector: u8 = spurious_vector;
+
+pub fn allocate_vector() u8 {
+  return @atomicRmw(u8, &last_vector, .Add, 1, .AcqRel) + 1;
 }
 
-fn type_page_fault(error_code: usize) !platform.PageFaultAccess {
-  if(error_code & 0x8 != 0)
-    return error.ReservedWrite;
-  if(error_code & 0x10 != 0)
+pub fn init_interrupts() void {
+  pic.disable();
+  itable = &idt.idt;
+
+  inline for(range(num_handlers)) |intnum| {
+    raw_callbacks[intnum] = make_handler(intnum);
+    add_handler(intnum, unhandled_interrupt, true, 0, 0);
+  }
+
+  add_handler(0x0E,              page_fault_handler, true, 3, 1);
+  add_handler(boostrap_vector,   os.thread.preemption.bootstrap, true, 0, 0);
+  add_handler(wait_yield_vector, os.thread.preemption.wait_yield, true, 0, 2);
+  add_handler(spurious_vector,   spurious_handler, true, 0, 1);
+}
+
+fn spurious_handler(frame: *InterruptFrame) void {
+}
+
+fn type_page_fault(error_code: usize) platform.PageFaultAccess {
+  if((error_code & 0x10) != 0)
     return .InstructionFetch;
-  if(error_code & 0x2 != 0)
+  if((error_code & 0x2) != 0)
     return .Write;
   return .Read;
 }
@@ -47,25 +66,9 @@ fn page_fault_handler(frame: *InterruptFrame) void {
     "mov %%cr2, %[addr]"
     :[addr] "=r" (-> usize)
   );
-  const page_fault_type = type_page_fault(frame.ec) catch |err| {
-    os.log("Interrupts: Page fault at addr 0x{x}, but we couldn't determine what type. (error code was 0x{x}).\nCaught error {}.\n", .{page_fault_addr, frame.ec, @errorName(err)});
-    frame.dump();
-    os.platform.hang();
-  };
-
-  os.log("Interrupts: Page fault while {} at 0x{x}\n",
-    .{
-      switch(page_fault_type) {
-        .Read => @as([]const u8, "reading"),
-        .Write => "writing",
-        .InstructionFetch => "fetching instruction",
-      },
-      page_fault_addr,
-    }
-  );
+  const page_fault_type = type_page_fault(frame.ec);
 
   platform.page_fault(page_fault_addr, (frame.ec & 1) != 0, page_fault_type, frame);
-  os.platform.hang();
 }
 
 fn unhandled_interrupt(frame: *InterruptFrame) void {
@@ -132,19 +135,14 @@ fn has_error_code(intnum: u64) bool {
   };
 }
 
-pub fn make_handler(comptime intnum: u64) idt.InterruptHandler {
+pub fn make_handler(comptime intnum: u8) idt.InterruptHandler {
   return struct {
     fn func() callconv(.Naked) void {
-      if(comptime !has_error_code(intnum)) {
-        asm volatile(
-          \\push $0
-        );
-      }
+      const ec = if(comptime(!has_error_code(intnum))) "push $0\n" else "";
       asm volatile(
-        \\push %[intnum]
-        \\jmp interrupt_common
+        ec ++ "push %[intnum]\njmp interrupt_common\n"
         :
-        : [intnum] "N{dx}" (@as(u8, intnum))
+        : [intnum] "i" (@as(u8, intnum))
       );
     }
   }.func;
@@ -153,8 +151,6 @@ pub fn make_handler(comptime intnum: u64) idt.InterruptHandler {
 pub const InterruptFrame = packed struct {
   es: u64,
   ds: u64,
-  fs: u64,
-  gs: u64,
   r15: u64,
   r14: u64,
   r13: u64,
@@ -178,7 +174,7 @@ pub const InterruptFrame = packed struct {
   rsp: u64, 
   ss:  u64,
 
-  pub fn dump(self: *@This()) void {
+  pub fn dump(self: *const @This()) void {
     os.log("FRAME DUMP:\n", .{});
     os.log("RAX={x:0>16} RBX={x:0>16} RCX={x:0>16} RDX={x:0>16}\n", .{self.rax, self.rbx, self.rcx, self.rdx});
     os.log("RSI={x:0>16} RDI={x:0>16} RBP={x:0>16} RSP={x:0>16}\n", .{self.rsi, self.rdi, self.rbp, self.rsp});
@@ -187,7 +183,7 @@ pub const InterruptFrame = packed struct {
     os.log("RIP={x:0>16} int={x:0>16} ec ={x:0>16}\n",              .{self.rip, self.intnum, self.ec});
   }
 
-  pub fn trace_stack(self: *@This()) void {
+  pub fn trace_stack(self: *const @This()) void {
     os.lib.debug.dump_frame(self.rbp, self.rip);
   }
 };
@@ -209,10 +205,6 @@ export fn interrupt_common() callconv(.Naked) void {
     \\push %%r13
     \\push %%r14
     \\push %%r15
-    \\mov %%gs, %%rax
-    \\push %%rax
-    \\mov %%fs, %%rax
-    \\push %%rax
     \\mov %%ds, %%rax
     \\push %%rax
     \\mov %%es, %%rax
@@ -221,15 +213,11 @@ export fn interrupt_common() callconv(.Naked) void {
     \\mov %[dsel], %%ax
     \\mov %%ax, %%es
     \\mov %%ax, %%ds
-    \\mov %%ax, %%fs
-    \\mov %%ax, %%gs
     \\call interrupt_handler
     \\pop %%rax
-    \\mov %%es, %%rax
+    \\mov %%rax, %%es
     \\pop %%rax
-    \\mov %%ds, %%rax
-    \\pop %%fs
-    \\pop %%gs
+    \\mov %%rax, %%ds
     \\pop %%r15
     \\pop %%r14
     \\pop %%r13
@@ -255,7 +243,106 @@ export fn interrupt_common() callconv(.Naked) void {
 
 export fn interrupt_handler(frame: u64) void {
   const int_frame = @intToPtr(*InterruptFrame, frame);
+  int_frame.intnum &= 0xFF;
   if(int_frame.intnum < num_handlers) {
     handlers[int_frame.intnum](int_frame);
   }
+  @import("apic.zig").eoi();
+}
+
+// Turns out GAS is so terrible we have to write a small assembler ourselves.
+const swapgs = [_]u8{0x0F, 0x01, 0xF8};
+const sti = [_]u8{0xFB};
+const rex = [_]u8{0x41};
+
+fn pack_le(comptime T: type, comptime value: u32) [@sizeOf(T)]u8 {
+  var result: [@sizeOf(T)]u8 = undefined;
+  std.mem.writeIntLittle(T, &result, value);
+  return result;
+}
+
+fn mov_gs_offset_rsp(comptime offset: u32) [9]u8 {
+  return [_]u8{0x65, 0x48, 0x89, 0x24, 0x25} ++ pack_le(u32, offset);
+}
+
+fn mov_rsp_gs_offset(comptime offset: u32) [9]u8 {
+  return [_]u8{0x65, 0x48, 0x8B, 0x24, 0x25} ++ pack_le(u32, offset);
+}
+
+fn mov_rsp_rsp_offset(comptime offset: u32) [8]u8 {
+  return [_]u8{0x48, 0x8B, 0xA4, 0x24} ++ pack_le(u32, offset);
+}
+
+fn push_gs_offset(comptime offset: u32) [8]u8 {
+  return [_]u8{0x65, 0xFF, 0x34, 0x25} ++ pack_le(u32, offset);
+}
+
+fn pushi32(comptime value: i32) [5]u8 {
+  return [_]u8{0x68} ++ pack_le(i32, value);
+}
+
+fn pushi8(comptime value: i8) [2]u8 {
+  return [_]u8{0x6A} ++ pack_le(i8, value);
+}
+
+fn push_reg(comptime regnum: u3) [1]u8 {
+  return [_]u8{0x50 | @as(u8, regnum)};
+}
+
+// Assumes IA32_FMASK (0xC0000084) disables interrupts
+const rsp_stash_offset =
+  @byteOffsetOf(os.platform.smp.CoreData, "platform_data")
+  +
+  @byteOffsetOf(os.platform.thread.CoreData, "rsp_stash")
+;
+const task_offset = @byteOffsetOf(os.platform.smp.CoreData, "current_task");
+const kernel_stack_offset = @byteOffsetOf(os.thread.Task, "stack");
+
+const syscall_handler_bytes = [0]u8{}
+  // First make sure we get a proper stack pointer while
+  // saving away all the userspace registers.
+  ++ swapgs                                  // swapgs
+  ++ mov_gs_offset_rsp(rsp_stash_offset)     // mov gs:[rsp_stash_offset], rsp
+  ++ mov_rsp_gs_offset(task_offset)          // mov rsp, gs:[task_offset]
+  ++ mov_rsp_rsp_offset(kernel_stack_offset) // mov rsp, [rsp + kernel_stack_offset]
+
+  // Now we have a kernel stack in rsp
+  // Set up an iret frame
+  ++ pushi8(gdt.selector.userdata64)         // push user_data_sel         // iret ss
+  ++ push_gs_offset(rsp_stash_offset)        // push gs:[rsp_stash_offset] // iret rsp
+  ++ rex ++ push_reg(11 - 8)                 // push r11                   // iret rflags
+  ++ pushi8(gdt.selector.usercode64)         // push user_code_sel         // iret cs
+  ++ push_reg(1)                             // push rcx                   // iret rip
+  ++ swapgs
+  ++ sti
+
+  // Now let's set up the rest of the interrupt frame
+  ++ pushi8(0)                               // push 0                     // error code
+  ++ pushi32(syscall_vector)                 // push 0x80                  // interrupt vector
+;
+
+fn hex_chr(comptime value: u4) u8 {
+  return "0123456789ABCDEF"[value];
+}
+
+fn hex_str(comptime value: u8) [2]u8 {
+  var buf: [2]u8 = undefined;
+  buf[0] = hex_chr(@truncate(u4, value >> 4));
+  buf[1] = hex_chr(@truncate(u4, value));
+  return buf;
+}
+
+pub fn syscall_handler() callconv(.Naked) void {
+  // https://github.com/ziglang/zig/issues/8644
+  comptime var syscall_handler_asm: []const u8 = &[_]u8{};
+  inline for(syscall_handler_bytes) |b|
+    syscall_handler_asm = syscall_handler_asm
+      ++ [_]u8{'.', 'b', 'y', 't', 'e', ' ', '0', 'x'} ++ hex_str(b) ++ [_]u8{'\n'};
+
+  asm volatile(
+    syscall_handler_asm ++
+    \\jmp interrupt_common
+    \\
+  );
+  unreachable;
 }

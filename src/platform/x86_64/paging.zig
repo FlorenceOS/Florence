@@ -1,4 +1,5 @@
 const os = @import("root").os;
+const std = @import("std");
 const regs = @import("regs.zig");
 const paging = @import("../paging.zig");
 
@@ -17,7 +18,6 @@ const PatIndex = u3;
 const la64: u64 = 1 << 12;
 const cr3 = regs.ControlRegister(u64, "cr3");
 const cr4 = regs.ControlRegister(u64, "cr4");
-const ia32_efer = regs.MSR(u64, 0xC0000080);
 
 fn PATContext() type {
   const PATEncoding = u8;
@@ -119,7 +119,8 @@ fn level_size(level: LevelType) u64 {
 
 pub fn make_page_table() !u64 {
   const pt = try os.memory.pmm.alloc_phys(0x1000);
-  @memset(os.memory.pmm.access_phys(u8, pt), 0x00, 0x1000);
+  const pt_bytes = os.platform.phys_slice(u8).init(pt, 0x1000);
+  @memset(pt_bytes.to_slice_writeback().ptr, 0x00, 0x1000);
   return pt;
 }
 
@@ -132,14 +133,18 @@ pub const PagingContext = struct {
   cr3_val: u64,
   level5paging: bool,
   gigapage_allowed: bool,
-  physical_base: u64,
+
+  wb_virt_base: u64 = undefined,
+  wc_virt_base: u64 = undefined,
+  uc_virt_base: u64 = undefined,
+  max_phys: u64 = undefined,
 
   pub fn apply(self: *@This()) void {
     // First apply the PAT, shouldn't cause any errors
     if(self.pat) |pat|
       @call(.{.modifier = .always_inline}, PATContext().apply, .{&pat});
 
-    ia32_efer.write(ia32_efer.read() | (1 << 11)); // NXE
+    regs.IA32_EFER.write(regs.IA32_EFER.read() | (1 << 11)); // NXE
 
     // Set 5 level paging bit
     const old_cr4 = cr4.read();
@@ -165,36 +170,59 @@ pub const PagingContext = struct {
     curr.level5paging = is_5levelpaging();
 
     // Check CPUID to determine if enabled or not
-    curr.gigapage_allowed = if(id) |i| ((i.edx >> 26) & 1) == 1 else false;
+    curr.gigapage_allowed = false;// if(id) |i| ((i.edx >> 26) & 1) == 1 else false;
   }
 
   pub fn make_default() !@This() {
     const curr = &os.memory.paging.kernel_context;
 
-    // Check if we can upgrade
-    const enable_5level = curr.level5paging or false;
-
     const pt = try make_page_table();
+
+    // 32TB ought to be enough for anyone...
+    const max_phys = 0x200000000000;
+
+    const curr_base = os.memory.paging.kernel_context.wb_virt_base;
 
     return @This(){
       .pat = PATContext().make_default(),
       .cr3_val = pt,
-      .level5paging = enable_5level,
-      .physical_base = curr.physical_base,
-      .gigapage_allowed = curr.gigapage_allowed,
+      .level5paging = curr.level5paging,
+      .gigapage_allowed = false,//curr.gigapage_allowed,
+      .wb_virt_base = curr_base,
+      .wc_virt_base = curr_base + max_phys,
+      .uc_virt_base = curr_base + max_phys * 2,
+      .max_phys = max_phys,
     };
   }
 
   pub fn can_map_at_level(self: *const @This(), level: LevelType) bool {
-    return level < @as(LevelType, 3) + @boolToInt(self.gigapage_allowed);
+    return level < @as(LevelType, 2) + @boolToInt(self.gigapage_allowed);
   }
 
-  pub fn set_phys_base(self: *@This(), phys_base: u64) void {
-    self.physical_base = phys_base;
+  pub fn check_phys(self: *const @This(), phys: u64) void {
+    if(comptime(std.debug.runtime_safety)) {
+      if(phys > self.max_phys) @panic("Physical address out of range");
+    }
   }
 
-  pub fn phys_to_virt(self: *const @This(), phys: u64) u64 {
-    return self.physical_base + phys;
+  pub fn phys_to_write_back_virt(self: *const @This(), phys: u64) u64 {
+    self.check_phys(phys);
+    return self.wb_virt_base + phys;
+  }
+
+  pub fn phys_to_write_combining_virt(self: *const @This(), phys: u64) u64 {
+    self.check_phys(phys);
+    return self.wc_virt_base + phys;
+  }
+
+  pub fn phys_to_uncached_virt(self: *const @This(), phys: u64) u64 {
+    self.check_phys(phys);
+    return self.uc_virt_base + phys;
+  }
+
+  pub fn make_heap_base(self: *const @This()) u64 {
+    // Just after last physical memory mapping
+    return self.uc_virt_base + self.max_phys;
   }
 
   pub fn root_table(self: *@This(), virt: u64) TablePTE {
@@ -431,7 +459,7 @@ const MappingPTE = struct {
   pub fn mapped_bytes(self: *const @This()) os.platform.PhysBytes {
     return .{
       .ptr = self.phys,
-      .len = self.context.page_size(self.level, self.context.phys_to_virt(self.phys)),
+      .len = self.context.page_size(self.level, self.context.phys_to_write_back_virt(self.phys)),
     };
   }
 
@@ -450,7 +478,7 @@ const TablePTE = struct {
   underlying: ?*TableEncoding,
 
   pub fn get_child_tables(self: *const @This()) []EncodedPTE {
-    return os.memory.pmm.access_phys(EncodedPTE, self.phys)[0..512];
+    return os.platform.phys_slice(EncodedPTE).init(self.phys, 512).to_slice_writeback();
   }
 
   pub fn skip_to(self: *const @This(), virt: u64) []EncodedPTE {

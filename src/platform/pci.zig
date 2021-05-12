@@ -64,8 +64,10 @@ pub const Addr = struct {
   }
 
   pub fn read(self: Addr, comptime T: type, offset: regoff) T {
-    if(pci_mmio[self.bus] != null)
-      return std.mem.readIntLittle(T, mmio(self, offset)[0..@sizeOf(T)]);
+    if(pci_mmio[self.bus] != null) {
+      const buf = mmio(self, offset)[0..@sizeOf(T)].*;
+      return std.mem.readIntLittle(T, &buf);
+    }
     if(@hasDecl(os.platform, "pci_space"))
       return os.platform.pci_space.read(T, self, offset);
     @panic("No pci module!");
@@ -73,14 +75,15 @@ pub const Addr = struct {
 
   pub fn write(self: Addr, comptime T: type, offset: regoff, value: T) void {
     if(pci_mmio[self.bus] != null) {
-      std.mem.writeIntLittle(T, mmio(self, offset)[0..@sizeOf(T)], value);
+      var buf: [@sizeOf(T)]u8 = undefined;
+      std.mem.writeIntLittle(T, &buf, value);
+      mmio(self, offset)[0..@sizeOf(T)].* = buf;
       return;
     }
     if(@hasDecl(os.platform, "pci_space"))
         return os.platform.pci_space.write(T, self, offset, value);
     @panic("No pci module!");
   }
-
 
   pub fn format(self: Addr, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
     try writer.print("[{x:0>2}:{x:0>2}:{x:0>1}]", .{self.bus, self.device, self.function});
@@ -91,12 +94,9 @@ pub const Addr = struct {
 
 pub const regoff = u8;
 
-fn mmio(addr: Addr, offset: regoff) [*]u8 {
-  return @ptrCast([*]u8, pci_mmio[addr.bus].?) + (@as(u64, addr.device) << 15 | @as(u64, addr.function) << 12 | @as(u64, offset));
+fn mmio(addr: Addr, offset: regoff) [*]volatile u8 {
+  return @ptrCast([*]volatile u8, pci_mmio[addr.bus].?) + (@as(u64, addr.device) << 15 | @as(u64, addr.function) << 12 | @as(u64, offset));
 }
-
-const virtio_gpu = os.drivers.virtio_gpu;
-
 
 const BarInfo = struct {
   phy: u64,
@@ -135,20 +135,7 @@ fn function_scan(addr: Addr) void {
     0x03 => {
       if (addr.vendor_id().read() == 0x1AF4 or addr.device_id().read() == 0x1050) {
         os.log("Virtio display controller\n", .{});
-        if (os.drivers.vesa_log.get_info()) |vesa| {
-          const ephemeral = os.memory.vmm.backed(.Eternal);
-          const drv = ephemeral.create(virtio_gpu.Driver) catch {
-            os.log("Virtio display controller: Allocation failure\n", .{});
-            return;
-          };
-          drv.* = virtio_gpu.Driver.init(addr) catch {
-            os.log("Virtio display controller: Init has failed!\n", .{});
-            return;
-          };
-          drv.modeset(vesa.phys, vesa.width, vesa.height);
-          drv.update_rect(.{.x = 0, .y = 0, .width = vesa.width, .height = vesa.height});
-          os.drivers.vesa_log.set_updater(virtio_gpu.updater, @ptrToInt(drv));
-        }
+        os.drivers.virtio_gpu.handle_controller(addr);
       } else switch(addr.sub_class().read()) {
         else => { os.log("Unknown display controller!\n", .{}); },
         0x00 => { os.log("VGA compatible controller\n", .{}); },
@@ -194,6 +181,38 @@ fn function_scan(addr: Addr) void {
   }
 }
 
+fn laihost_addr(seg: u16, bus: u8, slot: u8, fun: u8) Addr {
+  return .{
+    .bus = bus,
+    .device = @intCast(u5, slot),
+    .function = @intCast(u3, fun),
+  };
+}
+
+export fn laihost_pci_writeb(seg: u16, bus: u8, slot: u8, fun: u8, offset: u16, value: u8) void {
+  laihost_addr(seg, bus, slot, fun).write(u8, @intCast(u8, offset), value);
+}
+
+export fn laihost_pci_readb(seg: u16, bus: u8, slot: u8, fun: u8, offset: u16) u8 {
+  return laihost_addr(seg, bus, slot, fun).read(u8, @intCast(u8, offset));
+}
+
+export fn laihost_pci_writew(seg: u16, bus: u8, slot: u8, fun: u8, offset: u16, value: u16) void {
+  laihost_addr(seg, bus, slot, fun).write(u16, @intCast(u8, offset), value);
+}
+
+export fn laihost_pci_readw(seg: u16, bus: u8, slot: u8, fun: u8, offset: u16) u16 {
+  return laihost_addr(seg, bus, slot, fun).read(u16, @intCast(u8, offset));
+}
+
+export fn laihost_pci_writed(seg: u16, bus: u8, slot: u8, fun: u8, offset: u16, value: u32) void {
+  laihost_addr(seg, bus, slot, fun).write(u32, @intCast(u8, offset), value);
+}
+
+export fn laihost_pci_readd(seg: u16, bus: u8, slot: u8, fun: u8, offset: u16) u32 {
+  return laihost_addr(seg, bus, slot, fun).read(u32, @intCast(u8, offset));
+}
+
 fn device_scan(bus: u8, device: u5) void {
   const nullfunc: Addr = .{ .bus = bus, .device = device, .function = 0 };
 
@@ -212,6 +231,10 @@ fn device_scan(bus: u8, device: u5) void {
 }
 
 fn bus_scan(bus: u8) void {
+  // We can't scan this bus
+  if(!@hasDecl(os.platform, "pci_space") and pci_mmio[bus] == null)
+    return;
+
   inline for(range(1 << 5)) |device| {
     device_scan(bus, device);
   }
@@ -222,12 +245,7 @@ pub fn init_pci() !void {
 }
 
 pub fn register_mmio(bus: u8, physaddr: u64) !void {
-  try paging.remap_phys_size(.{
-    .phys = physaddr,
-    .size = 1 << 20,
-    .memtype = .DeviceUncacheable,
-  });
-  pci_mmio[bus] = &os.memory.pmm.access_phys([1 << 20]u8, physaddr)[0];
+  pci_mmio[bus] = os.platform.phys_ptr([*]u8).from_int(physaddr).get_uncached()[0..1<<20];
 }
 
 var pci_mmio: [0x100]?*[1 << 20]u8 linksection(".bss") = undefined;
