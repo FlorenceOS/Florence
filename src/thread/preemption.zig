@@ -5,8 +5,10 @@ fn yield_to(frame: *os.platform.InterruptFrame, task: *os.thread.Task) void {
     const cpu = os.platform.thread.get_current_cpu();
     const current_task = os.platform.get_current_task();
 
+    os.log("Frame rip: 0x{X}\n", .{frame.rip});
     current_task.registers = frame.*;
     frame.* = task.registers;
+    os.log("Frame rip: 0x{X}\n", .{frame.rip});
     os.platform.set_current_task(task);
     if (current_task.paging_context != task.paging_context) {
         task.paging_context.apply();

@@ -13,8 +13,11 @@ const pmm = os.memory.pmm;
 const Context = *platform.paging.PagingContext;
 pub var kernel_context: os.platform.paging.PagingContext = undefined;
 
+var pt_mutex = os.thread.Spinlock{};
+
 pub fn init() void {
   os.platform.paging.PagingContext.read_current();
+  //pt_mutex.init();
 }
 
 pub fn map(args: struct {
@@ -227,6 +230,9 @@ fn map_impl_with_rollback(args: struct {
     }
   }
 
+  const l = pt_mutex.lock();
+  defer pt_mutex.unlock(l);
+
   const root = args.context.root_table(args.virt.*);
   try map_impl(args.virt, args.phys, args.size, root, args.perm, args.memtype, args.context);
 
@@ -333,6 +339,9 @@ fn unmap_loop(
   reclaim_pages: bool,
   context: Context,
 ) void {
+  const l = pt_mutex.lock();
+  defer pt_mutex.unlock(l);
+
   const root = context.root_table(virt.*);
   while(size.* != 0)
     unmap_iter(virt, size, reclaim_pages, root, context);

@@ -8,7 +8,7 @@ const lalign   = os.lib.libalign;
 const page_sizes = platform.paging.page_sizes;
 var free_roots   = [_]usize{0} ** page_sizes.len;
 
-var pmm_mutex    = os.thread.Mutex{};
+var pmm_mutex    = os.thread.Spinlock{};
 
 const reverse_sizes = {
   var result: [page_sizes.len]usize = undefined;
@@ -18,8 +18,8 @@ const reverse_sizes = {
 };
 
 pub fn consume(phys: usize, size: usize) void {
-  pmm_mutex.lock();
-  defer pmm_mutex.unlock();
+  const l = pmm_mutex.lock();
+  defer pmm_mutex.unlock(l);
 
   var sz = size;
   var pp = phys;
@@ -70,8 +70,8 @@ fn alloc_impl(ind: usize) error{OutOfMemory}!usize {
 pub fn alloc_phys(size: usize) !usize {
   inline for(page_sizes) |psz, i| {
     if(size <= psz) {
-      pmm_mutex.lock();
-      defer pmm_mutex.unlock();
+      const l = pmm_mutex.lock();
+      defer pmm_mutex.unlock(l);
       return alloc_impl(i);
     }
   }
@@ -85,8 +85,8 @@ fn free_impl(phys: usize, ind: usize) void {
 }
 
 pub fn free_phys(phys: usize, size: usize) void {
-  pmm_mutex.lock();
-  defer pmm_mutex.unlock();
+  const l = pmm_mutex.lock();
+  defer pmm_mutex.unlock(l);
 
   inline for(reverse_sizes) |psz, ri| {
     const i = page_sizes.len - ri - 1;
@@ -111,5 +111,5 @@ pub fn phys_to_write_back_virt(phys: usize) usize {
 }
 
 pub fn init() void {
-  pmm_mutex.init();
+  //pmm_mutex.init();
 }

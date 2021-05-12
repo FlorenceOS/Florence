@@ -247,6 +247,13 @@ export fn interrupt_handler(frame: u64) void {
   if(int_frame.intnum < num_handlers) {
     handlers[int_frame.intnum](int_frame);
   }
+
+  if(int_frame.rip < 0x1000) {
+    os.log("AAAAA I'M LOG AS FUCK BOIII\n", .{});
+    int_frame.dump();
+    @panic("No, fucker!");
+  }
+
   @import("apic.zig").eoi();
 }
 

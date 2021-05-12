@@ -2,26 +2,18 @@ const std = @import("std");
 const os = @import("root").os;
 
 const paging     = os.memory.paging;
-const RangeAlloc = os.lib.range_alloc.RangeAlloc;
+const RangeAlloc = os.lib.debug_alloc.DebugAlloc;
 const Mutex      = os.thread.Mutex;
 
 var sbrk_head: usize = undefined;
 
 pub fn init(phys_high: usize) !void {
   os.log("Initializing vmm with base 0x{X}\n", .{phys_high});
-  sbrk_mutex.init();
   sbrk_head = phys_high;
 }
 
-var sbrk_mutex = Mutex{};
-
 pub fn nonbacked_sbrk(num_bytes: usize) ![]u8 {
-  sbrk_mutex.lock();
-  defer sbrk_mutex.unlock();
-
-  const ret = sbrk_head;
-
-  sbrk_head += num_bytes;
+  const ret = @atomicRmw(usize, &sbrk_head, .Add, num_bytes, .AcqRel);
 
   return @intToPtr([*]u8, ret)[0..num_bytes];
 }
@@ -51,10 +43,16 @@ const Lifetime = enum {
 };
 
 /// Range allocator for backed memory
-var range = RangeAlloc{.materialize_bytes = sbrk};
+var range = RangeAlloc{
+  .backed = true,
+  //.materialize_bytes = sbrk
+};
 
 /// Range allocator for nonbacked memory
-pub var nonbacked_range = RangeAlloc{.materialize_bytes = nonbacked_sbrk};
+pub var nonbacked_range = RangeAlloc{
+  .backed = false,
+  //.materialize_bytes = nonbacked_sbrk
+};
 
 var ephemeral_alloc =
   std.heap.GeneralPurposeAllocator(.{

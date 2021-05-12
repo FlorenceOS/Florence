@@ -2,6 +2,7 @@ pub const bitfields = @import("bitfields.zig");
 pub const bitset = @import("bitset.zig");
 pub const buddy = @import("buddy.zig");
 pub const debug = @import("debug.zig");
+pub const debug_alloc = @import("debug_alloc.zig");
 pub const libalign = @import("libalign.zig");
 pub const logger = @import("logger.zig");
 pub const packed_int = @import("packed_int.zig").packed_int;
