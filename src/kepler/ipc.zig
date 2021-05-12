@@ -64,7 +64,7 @@ pub const Note = struct {
     /// Type of the notification
     typ: Type,
     /// Borrowed reference to the owner
-    owner_ref: union(Type) {
+    owner_ref: union {
         /// For all the note types except for .EndpointUnreachable, this
         /// field stores reference to the stream object over which message was sent
         stream: *Stream,
