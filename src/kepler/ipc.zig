@@ -64,7 +64,7 @@ pub const Note = struct {
     /// Type of the notification
     typ: Type,
     /// Borrowed reference to the owner
-    owner_ref: union {
+    owner_ref: union(Type) {
         /// For all the note types except for .EndpointUnreachable, this
         /// field stores reference to the stream object over which message was sent
         stream: *Stream,
@@ -364,6 +364,7 @@ pub const Stream = struct {
     };
 
     /// Peer connection status
+    /// https://github.com/ziglang/zig/issues/7976
     pub const PeerStatus = enum(usize) {
         /// Peer connection is still pending
         Pending,

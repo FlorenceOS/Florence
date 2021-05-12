@@ -150,3 +150,13 @@ pub fn debugputch(ch: u8) void {
   serial.port(3).write(ch);
   serial.port(4).write(ch);
 }
+
+pub fn clock() usize {
+    var eax: u32 = undefined;
+    var edx: u32 = undefined;
+    asm volatile ("rdtsc"
+        : [_] "={eax}" (eax),
+          [_] "={edx}" (edx),
+    );
+    return @as(usize, eax) + (@as(usize, edx) << 32);
+}

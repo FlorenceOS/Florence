@@ -2,16 +2,6 @@ const std = @import("std");
 const os = @import("root").os;
 const kepler = os.kepler;
 
-fn rdtsc() u64 {
-    var eax: u32 = undefined;
-    var edx: u32 = undefined;
-    asm volatile ("rdtsc"
-        : [_] "={eax}" (eax),
-          [_] "={edx}" (edx)
-    );
-    return @as(u64, eax) + (@as(u64, edx) << 32);
-}
-
 const tries = 1_000_000;
 
 fn server_task(allocator: *std.mem.Allocator, server_noteq: *kepler.ipc.NoteQueue) !void {
@@ -35,9 +25,9 @@ fn server_task(allocator: *std.mem.Allocator, server_noteq: *kepler.ipc.NoteQueu
         // Server should get .Submit note
         server_noteq.wait();
 
-        const recv_starting_time = rdtsc();
+        const recv_starting_time = os.platform.clock();
         const submit_note = server_noteq.try_recv() orelse unreachable;
-        server_recv_rdtsc += rdtsc() - recv_starting_time;
+        server_recv_rdtsc += os.platform.clock() - recv_starting_time;
 
         std.debug.assert(submit_note.typ == .TasksAvailable);
         std.debug.assert(submit_note.owner_ref.stream == conn);
@@ -47,9 +37,9 @@ fn server_task(allocator: *std.mem.Allocator, server_noteq: *kepler.ipc.NoteQueu
         conn.unblock(.Consumer);
 
         // Notify consumer about completed tasks
-        const send_starting_time = rdtsc();
+        const send_starting_time = os.platform.clock();
         try conn.notify(.Consumer);
-        server_send_rdtsc += rdtsc() - send_starting_time;
+        server_send_rdtsc += os.platform.clock() - send_starting_time;
     }
     os.log("Server task exits stress test! Send: {} clk. Recieve: {} clk\n", .{ server_send_rdtsc / tries, server_recv_rdtsc / tries });
 
@@ -87,16 +77,16 @@ fn client_task(allocator: *std.mem.Allocator, client_noteq: *kepler.ipc.NoteQueu
     os.log("Client task enters stress test!\n", .{});
     while (i < tries) : (i += 1) {
         // Let's notify server about more tasks
-        const send_starting_time = rdtsc();
+        const send_starting_time = os.platform.clock();
         try conn.notify(.Producer);
-        client_send_rdtsc += rdtsc() - send_starting_time;
+        client_send_rdtsc += os.platform.clock() - send_starting_time;
 
         // Client should get .Complete note
         client_noteq.wait();
 
-        const recv_starting_time = rdtsc();
+        const recv_starting_time = os.platform.clock();
         const complete_note = client_noteq.try_recv() orelse unreachable;
-        client_recv_rdtsc += rdtsc() - recv_starting_time;
+        client_recv_rdtsc += os.platform.clock() - recv_starting_time;
 
         std.debug.assert(complete_note.typ == .ResultsAvailable);
         std.debug.assert(complete_note.owner_ref.stream == conn);
@@ -136,7 +126,7 @@ fn notifications(allocator: *std.mem.Allocator) !void {
     os.log("Created server endpoint!\n", .{});
 
     // Run client task separately
-    try os.thread.scheduler.make_task(client_task, .{ allocator, client_noteq, endpoint });
+    try os.thread.scheduler.spawn_task(client_task, .{ allocator, client_noteq, endpoint });
 
     // Launch server task inline
     try server_task(allocator, server_noteq);
