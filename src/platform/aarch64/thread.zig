@@ -22,7 +22,10 @@ pub fn set_current_cpu(ptr: *os.platform.smp.CoreData) void {
 }
 
 pub const TaskData = struct {
-  pub fn load_state(self: *@This()) void { }
+  pub fn load_state(self: *@This()) void {
+    const cpu = os.platform.thread.get_current_cpu();
+    set_interrupt_stack(cpu.int_stack);
+  }
 };
 
 pub fn yield() void {
@@ -48,8 +51,6 @@ pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry)
   new_task.registers.x0 = @ptrToInt(entry);
   new_task.registers.sp = os.lib.libalign.align_down(usize, 16, @ptrToInt(entry));
   new_task.registers.spsr = 0b0100; // EL1t / EL1 with SP0
-
-  set_interrupt_stack(cpu.int_stack);
 }
 
 pub fn self_exited() ?*os.thread.Task {

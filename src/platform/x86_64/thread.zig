@@ -20,6 +20,10 @@ pub const TaskData = struct {
   
   pub fn load_state(self: *@This()) void {
     const cpu = os.platform.thread.get_current_cpu();
+
+    self.tss.set_interrupt_stack(cpu.int_stack);
+    self.tss.set_scheduler_stack(cpu.sched_stack);
+
     cpu.platform_data.gdt.update_tss(self.tss);
     os.log("TSS Loaded: 0x{x} 0x{x} 0x{x}\n", .{self.tss.rsp[0], self.tss.ist[0], self.tss.ist[1]});
   }
@@ -105,8 +109,6 @@ pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry)
   tss.* = .{};
 
   new_task.platform_data.tss = tss;
-  tss.set_interrupt_stack(cpu.int_stack);
-  tss.set_scheduler_stack(cpu.sched_stack);
   tss.set_syscall_stack(new_task.stack);
 }
 
