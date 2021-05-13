@@ -79,7 +79,6 @@ pub fn hang() noreturn {
   _ = get_and_disable_interrupts();
   while(true) {
     await_interrupt();
-    unreachable;
   }
 }
 
