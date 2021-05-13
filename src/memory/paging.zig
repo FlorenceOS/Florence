@@ -137,6 +137,8 @@ extern var __kernel_data_begin: u8;
 extern var __kernel_data_end: u8;
 extern var __kernel_rodata_begin: u8;
 extern var __kernel_rodata_end: u8;
+extern var __bootstrap_stack_bottom: u8;
+extern var __bootstrap_stack_top: u8;
 
 pub fn bootstrap_kernel_paging() !platform.paging.PagingContext {
   // Setup some paging
@@ -145,6 +147,7 @@ pub fn bootstrap_kernel_paging() !platform.paging.PagingContext {
   try map_kernel_section(&new_context, &__kernel_text_begin, &__kernel_text_end, rx());
   try map_kernel_section(&new_context, &__kernel_data_begin, &__kernel_data_end, rw());
   try map_kernel_section(&new_context, &__kernel_rodata_begin, &__kernel_rodata_end, ro());
+  try map_kernel_section(&new_context, &__bootstrap_stack_bottom, &__bootstrap_stack_top, rw());
 
   return new_context;
 }

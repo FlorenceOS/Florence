@@ -3,6 +3,7 @@ ENTRY(_start)
 PHDRS {
   none   PT_NULL FLAGS(0);
   text   PT_LOAD FLAGS((1 << 2) | (1 << 0) /* Readable | Executable */);
+  stk    PT_LOAD FLAGS((1 << 2) | (1 << 1) /* Readable | Writeable  */);
   data   PT_LOAD FLAGS((1 << 2) | (1 << 1) /* Readable | Writeable  */);
   rodata PT_LOAD FLAGS((1 << 2)            /* Readable */);
 }
@@ -20,6 +21,16 @@ SECTIONS {
   }:text
   . = ALIGN(64K);
   __kernel_text_end = .;
+
+  . += 64K;
+  .stk . : {
+    __bootstrap_stack_bottom = .;
+    . += 128K;
+    __bootstrap_stack_top = .;
+  }:stk
+  . = ALIGN(64K);
+
+  . += 64K;
 
   __kernel_rodata_begin = .;
   .rodata . : {
