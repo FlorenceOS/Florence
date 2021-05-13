@@ -35,4 +35,4 @@ _start:
   mov rbp, rsp
   
 .extern stivale2_main
-  jmp   stivale2_main
+  call  stivale2_main
