@@ -74,8 +74,10 @@ fn kb_wait_byte() u8 {
   return ports.inb(0x60);
 }
 
-pub fn kb_handler(_: *os.platform.InterruptFrame) void {
+fn handle_keyboard_interrupt() void {
   var ext: Extendedness = .NotExtended;
+
+  if(!kb_has_byte()) return;
 
   var scancode = kb_wait_byte();
 
@@ -89,8 +91,15 @@ pub fn kb_handler(_: *os.platform.InterruptFrame) void {
   eoi();
 }
 
-pub fn kb_init() void {
+pub fn kb_handler(_: *os.platform.InterruptFrame) void {
+  handle_keyboard_interrupt();
+}
 
+pub fn kb_init() void {
+  const i = os.platform.get_and_disable_interrupts();
+  defer os.platform.set_interrupts(i);
+
+  handle_keyboard_interrupt();
 }
 
 fn key_location(ext: Extendedness, scancode: u8) !kb.keys.Location {
