@@ -4,6 +4,7 @@ const os = @import("root").os;
 const apic = @import("apic.zig");
 const ports = @import("ports.zig");
 const kb = os.drivers.hid.keyboard;
+const eoi = @import("apic.zig").eoi;
 
 const Extendedness = enum {
   Extended,
@@ -84,6 +85,8 @@ pub fn handler(_: *os.platform.InterruptFrame) void {
   }
 
   parse_scancode(ext, scancode);
+
+  eoi();
 }
 
 fn key_location(ext: Extendedness, scancode: u8) !kb.keys.Location {

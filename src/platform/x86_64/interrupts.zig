@@ -247,7 +247,6 @@ export fn interrupt_handler(frame: u64) void {
   if(int_frame.intnum < num_handlers) {
     handlers[int_frame.intnum](int_frame);
   }
-  @import("apic.zig").eoi();
 }
 
 // Turns out GAS is so terrible we have to write a small assembler ourselves.
