@@ -81,18 +81,6 @@ pub const CoreDoorbell = struct {
 
 const ephemeral = os.memory.vmm.backed(.Ephemeral);
 
-fn switch_task(frame: *interrupts.InterruptFrame) *os.thread.Task {
-  var next_task: *os.thread.Task = undefined;
-  while (true) {
-    next_task = os.platform.thread.get_current_cpu().executable_tasks.dequeue() orelse continue;
-    break;
-  }
-
-  os.platform.set_current_task(next_task);
-  frame.* = next_task.registers;
-  return next_task;
-}
-
 pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry) !void {
   const cpu = os.platform.thread.get_current_cpu();
 
