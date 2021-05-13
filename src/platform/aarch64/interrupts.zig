@@ -279,3 +279,17 @@ export fn interrupt_handler(frame: *InterruptFrame) void {
     },
   }
 }
+
+pub fn set_interrupt_stack(int_stack: usize) void {
+  const current_stack = asm volatile("MRS %[res], SPSel" : [res]"=r"(->u64));
+
+  if(current_stack != 0) @panic("Cannot set interrupt stack while using it!");
+
+  asm volatile(
+    \\ MSR SPSel, #1
+    \\ MOV SP, %[int_stack]
+    \\ MSR SPSel, #0
+    :
+    : [int_stack] "r" (int_stack)
+  );
+}

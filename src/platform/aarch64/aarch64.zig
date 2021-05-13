@@ -54,6 +54,8 @@ pub fn ap_init() noreturn {
 
   const cpu = os.platform.thread.get_current_cpu();
 
+  interrupts.set_interrupt_stack(cpu.int_stack);
+
   asm volatile(
     \\BR %[dest]
     :
@@ -80,7 +82,7 @@ pub fn debugputch(val: u8) void {
 
 pub fn bsp_pre_scheduler_init() void {
   const cpu = os.platform.thread.get_current_cpu();
-  thread.set_interrupt_stack(cpu.int_stack);
+  interrupts.set_interrupt_stack(cpu.int_stack);
   interrupts.install_vector_table();
 }
 

@@ -24,24 +24,11 @@ pub fn set_current_cpu(ptr: *os.platform.smp.CoreData) void {
 pub const TaskData = struct {
   pub fn load_state(self: *@This()) void {
     const cpu = os.platform.thread.get_current_cpu();
-    set_interrupt_stack(cpu.int_stack);
   }
 };
 
 pub fn yield() void {
   asm volatile("SVC #'Y'");
-}
-
-pub fn set_interrupt_stack(int_stack: usize) void {
-  os.log("Setting the interrupt stack to 0x{X}\n", .{int_stack});
-
-  asm volatile(
-    \\ MSR SPSel, #1
-    \\ MOV SP, %[int_stack]
-    \\ MSR SPSel, #0
-    :
-    : [int_stack] "r" (int_stack)
-  );
 }
 
 pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry) !void {
