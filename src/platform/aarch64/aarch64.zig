@@ -70,6 +70,10 @@ fn ap_init_stage2() noreturn {
   unreachable;
 }
 
+pub fn clock() usize {
+  return asm volatile("MRS %[out], CNTPCT_EL0" : [out] "=r" (-> usize));
+}
+
 pub fn debugputch(val: u8) void {
 
 }
