@@ -1,7 +1,7 @@
 const ports = @import("ports.zig");
 
 fn wait() void {
-  asm volatile("outb %%al, $0x80" : : [_]"{al}"(@as(u8, 0)) : "memory");
+  ports.outb(0x80, undefined);
 }
 
 pub fn disable() void {
