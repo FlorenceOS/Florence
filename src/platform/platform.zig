@@ -62,10 +62,11 @@ pub fn page_fault(addr: usize, present: bool, access: PageFaultAccess, frame: an
     }
   }
 
-  os.log("Platform: Unhandled page fault on {s} at 0x{x}, present: {}\n",
+  os.log("Platform: Unhandled page fault on {s} at 0x{x} on CPU {}, present: {}\n",
     .{
       @tagName(access),
       addr,
+      thread.get_current_cpu().id(),
       present,
     }
   );
