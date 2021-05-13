@@ -1,8 +1,10 @@
 .intel_syntax noprefix
 
+.extern __bootstrap_stack_top
+
 .section .stivale2hdr, "a"
 .8byte _start
-.8byte stack_top
+.8byte __bootstrap_stack_top
 .8byte 0
 .8byte framebuffer
 
@@ -29,15 +31,8 @@ lv5paging:
 .section .text
 .global _start
 _start:
-  lea rsp, stack_top
+  lea rsp, __bootstrap_stack_top
   mov rbp, rsp
   
 .extern stivale2_main
   jmp   stivale2_main
-
-.section .bss
-.balign 16
-stack_bottom:
-.zero 4096 * 16 - 16
-stack_top:
-.zero 16
