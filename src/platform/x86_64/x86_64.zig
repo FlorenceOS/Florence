@@ -60,7 +60,8 @@ pub fn platform_init() !void {
   try os.platform.acpi.init_acpi();
   apic.enable();
   set_interrupts(true);
-  if(comptime(os.config.kernel.x86_64.enable_ps2_keyboard)) {
+
+  if(comptime(os.config.kernel.x86_64.ps2.enable_keyboard)) {
     const ps2 = @import("ps2.zig");
     ps2.interrupt_vector = interrupts.allocate_vector();
     os.log("PS2: vector 0x{X}\n", .{ps2.interrupt_vector});

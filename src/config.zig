@@ -9,11 +9,13 @@ pub const kernel = .{
     // The maximum number of IOAPICs to use
     .max_ioapics = 5,
 
-    // Enable ps2 keyboard devices
+    // Enable ps2 devices
     // Your system managment mode may emulate a ps2 keyboard
     // when you connect a usb keyboard. If you disable this,
     // that won't work.
-    .enable_ps2_keyboard = true,
+    .ps2 = .{
+      .enable_keyboard = true,
+    },
   },
 };
 
