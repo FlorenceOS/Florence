@@ -27,7 +27,6 @@ pub fn yield_or_not(frame: *os.platform.InterruptFrame) void {
 /// Wait for queue to become non-empty and yield to the next task
 /// Use for yield
 pub fn wait_yield(frame: *os.platform.InterruptFrame) void {
-    os.log("WAIT YIELD!\n", .{});
     const cpu = os.platform.thread.get_current_cpu();
     yield_to(frame, cpu.executable_tasks.dequeue());
 }

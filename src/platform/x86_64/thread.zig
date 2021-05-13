@@ -25,7 +25,6 @@ pub const TaskData = struct {
     self.tss.set_scheduler_stack(cpu.sched_stack);
 
     cpu.platform_data.gdt.update_tss(self.tss);
-    os.log("TSS Loaded: 0x{x} 0x{x} 0x{x}\n", .{self.tss.rsp[0], self.tss.ist[0], self.tss.ist[1]});
   }
 };
 
