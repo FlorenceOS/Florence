@@ -2,7 +2,7 @@
 
 .section .stivale2hdr, "a"
 .8byte _start
-.8byte stack_top
+.8byte __bootstrap_stack_top
 .8byte 0
 .8byte framebuffer
 
@@ -26,13 +26,6 @@ smp:
 _start:
 .extern stivale2_main
   B     stivale2_main
-
-.section .bss.stack, "a"
-.balign 16
-stack_bottom:
-.zero 4096 * 16 - 16
-stack_top:
-.zero 16
 
 .section .rodata
 stivale_flags_value:
