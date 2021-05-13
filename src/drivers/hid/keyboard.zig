@@ -47,7 +47,7 @@ pub const KeyboardState = struct {
     switch(t) {
       .Press => {
         //os.log("Press event: {s}\n", .{@tagName(location)});
-        os.log("Input event: {s}\n", .{@tagName(input)});
+        //os.log("Input event: {s}\n", .{@tagName(input)});
         self.is_pressed.set(@enumToInt(location), true);
       },
       .Release => {
