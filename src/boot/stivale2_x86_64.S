@@ -32,6 +32,10 @@ lv5paging:
 .global _start
 _start:
   lea rsp, __bootstrap_stack_top
+
+  push 0
+  push 0
+
   mov rbp, rsp
   
 .extern stivale2_main
