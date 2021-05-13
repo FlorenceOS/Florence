@@ -49,32 +49,32 @@ pub const Gdt = packed struct {
       .base = @ptrToInt(self),
     };
  
-  // Load the GDT
-  asm volatile(
-    \\  lgdt %[p]
-    :
-    : [p] "*p" (&gdt_ptr)
-  );
- 
-  // Use the data selectors
-  asm volatile(
-    \\  mov %[dsel], %%ds
-    \\  mov %[dsel], %%fs
-    \\  mov %[dsel], %%gs
-    \\  mov %[dsel], %%es
-    \\  mov %[dsel], %%ss
-    :
-    : [dsel] "rm" (@as(u16, selector.data64))
-  );
- 
-  // Use the code selector
-  asm volatile(
-    \\ push %[csel]
-    \\ push $1f
-    \\ .byte 0x48, 0xCB // Far return
-    \\ 1:
-    :
-    : [csel] "i" (@as(u16, selector.code64))
-  );
+    // Load the GDT
+    asm volatile(
+      \\  lgdt %[p]
+      :
+      : [p] "*p" (&gdt_ptr)
+    );
+   
+    // Use the data selectors
+    asm volatile(
+      \\  mov %[dsel], %%ds
+      \\  mov %[dsel], %%fs
+      \\  mov %[dsel], %%gs
+      \\  mov %[dsel], %%es
+      \\  mov %[dsel], %%ss
+      :
+      : [dsel] "rm" (@as(u16, selector.data64))
+    );
+   
+    // Use the code selector
+    asm volatile(
+      \\ push %[csel]
+      \\ push $1f
+      \\ .byte 0x48, 0xCB // Far return
+      \\ 1:
+      :
+      : [csel] "i" (@as(u16, selector.code64))
+    );
   }
 };
