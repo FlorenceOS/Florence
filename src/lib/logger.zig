@@ -28,13 +28,13 @@ var lock_owner: ?*os.platform.smp.CoreData = null;
 
 pub fn log(comptime format: []const u8, args: anytype) void {
     const current_cpu = os.platform.thread.get_current_cpu();
-    const require_locking = current_cpu != lock_owner;
+    const require_locking = @atomicLoad(?*os.platform.smp.CoreData, &lock_owner, .Acquire) != current_cpu;
 
     const a = if(require_locking) log_lock.lock() else undefined;
     defer if(require_locking) log_lock.unlock(a);
 
-    if(require_locking) lock_owner = current_cpu;
-    defer if(require_locking) { lock_owner = null; };
+    if(require_locking) @atomicStore(?*os.platform.smp.CoreData, &lock_owner, current_cpu, .Release);
+    defer if(require_locking) {  @atomicStore(?*os.platform.smp.CoreData, &lock_owner, null, .Release); };
 
     return log_nolock(format, args);
 }
