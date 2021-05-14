@@ -240,6 +240,12 @@ pub fn install_vector_table() void {
   );
 }
 
+fn do_stack_call(frame: *InterruptFrame) void {
+  const fun = @intToPtr(fn (*os.platform.InterruptFrame, usize) void, frame.x0);
+  const ctx: usize = frame.x1;
+  fun(frame, ctx);
+}
+
 export fn interrupt_handler(frame: *InterruptFrame) void {
   const esr = asm volatile("MRS %[esr], ESR_EL1" : [esr] "=r" (-> u64));
 
@@ -274,11 +280,7 @@ export fn interrupt_handler(frame: *InterruptFrame) void {
         else => @panic("Unknown SVC"),
 
         'B' => os.thread.preemption.bootstrap(frame),
-        'Y' => {
-            const fun = @intToPtr(fn (*os.platform.InterruptFrame, usize) void, frame.x0);
-            const ctx: usize = frame.x1;
-            fun(frame, ctx);
-        }
+        'S' => do_stack_call(frame),
       }
     },
   }

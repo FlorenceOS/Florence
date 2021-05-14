@@ -29,7 +29,7 @@ pub const TaskData = struct {
 
 pub fn sched_call_impl(fun: usize, ctx: usize) void {
   asm volatile(
-    \\SVC #'Y'
+    \\SVC #'S'
     :
     : [_]"{X0}"(fun),
       [_]"{X1}"(ctx),

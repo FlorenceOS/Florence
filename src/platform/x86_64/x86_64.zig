@@ -63,14 +63,16 @@ pub fn platform_init() !void {
 
   if(comptime(os.config.kernel.x86_64.ps2.enable_keyboard)) {
     const ps2 = @import("ps2.zig");
-    ps2.interrupt_vector = interrupts.allocate_vector();
-    os.log("PS2: vector 0x{X}\n", .{ps2.interrupt_vector});
+    ps2.kb_interrupt_vector = interrupts.allocate_vector();
+    os.log("PS2 keyboard: vector 0x{X}\n", .{ps2.kb_interrupt_vector});
 
-    interrupts.add_handler(ps2.interrupt_vector, ps2.handler, true, 3, 1);
+    interrupts.add_handler(ps2.kb_interrupt_vector, ps2.kb_handler, true, 3, 1);
 
-    ps2.interrupt_gsi = apic.route_irq(0, 0x01, ps2.interrupt_vector);
-    os.log("PS2: gsi 0x{X}\n", .{ps2.interrupt_gsi});
+    ps2.kb_interrupt_gsi = apic.route_irq(0, 1, ps2.kb_interrupt_vector);
+    os.log("PS2 keyboard: gsi 0x{X}\n", .{ps2.kb_interrupt_gsi});
+    ps2.kb_init();
   }
+
   try os.platform.pci.init_pci();
 }
 

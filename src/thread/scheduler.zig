@@ -12,7 +12,13 @@ var balancer_lock = os.thread.Spinlock{};
 /// NOTE: Should be called in interrupt disabled context if its
 /// not the last time task runs
 pub fn wait() void {
-    os.platform.sched_call(os.thread.preemption.wait_yield, undefined);
+    const wait_callback = struct {
+        fn wait_callback(frame: *os.platform.InterruptFrame, _: usize) void {
+            os.thread.preemption.store_current_state(frame);
+            os.thread.preemption.await_task_and_yield(frame);
+        }
+    }.wait_callback;
+    os.platform.sched_call(wait_callback, undefined);
 }
 
 /// Terminate current task to never run it again
