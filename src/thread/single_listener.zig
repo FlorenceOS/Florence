@@ -54,7 +54,7 @@ pub const SingleListener = struct {
                 os.thread.preemption.store_current_state(frame);
                 //os.log("Current state preserved!\n", .{});
                 // Enable wakeup. After this point, task can be enqueued any minute
-                @atomicStore(bool, &listener.wakeup_allowed, true, .Release);
+                @atomicStore(bool, &listener.wakeup_allowed, true, .SeqCst);
                 // Check if there are any events
                 if (listener.diff() != 0) {
                     // If there are some events, we race with trigger()
