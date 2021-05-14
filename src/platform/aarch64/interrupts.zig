@@ -274,7 +274,11 @@ export fn interrupt_handler(frame: *InterruptFrame) void {
         else => @panic("Unknown SVC"),
 
         'B' => os.thread.preemption.bootstrap(frame),
-        'Y' => os.thread.preemption.wait_yield(frame),
+        'Y' => {
+            const fun = @intToPtr(fn (*os.platform.InterruptFrame, usize) void, frame.x0);
+            const ctx: usize = frame.x1;
+            fun(frame, ctx);
+        }
       }
     },
   }

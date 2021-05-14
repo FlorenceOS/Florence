@@ -25,8 +25,9 @@ pub fn yield_or_not(frame: *os.platform.InterruptFrame) void {
 }
 
 /// Wait for queue to become non-empty and yield to the next task
-/// Use for yield
-pub fn wait_yield(frame: *os.platform.InterruptFrame) void {
+/// Use for yield. Empty usize argument is needed so that
+/// this function could be passed to os.platform.sched_call
+pub fn wait_yield(frame: *os.platform.InterruptFrame, _: usize) void {
     const cpu = os.platform.thread.get_current_cpu();
     yield_to(frame, cpu.executable_tasks.dequeue());
 }

@@ -99,13 +99,20 @@ pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry)
   tss.set_syscall_stack(new_task.stack);
 }
 
-pub fn yield() void {
+pub fn sched_call_impl(fun: usize, ctx: usize) void {
   asm volatile(
-    \\int %[wait_yield_vector]
-    \\
+    \\int %[sched_call_vector]
     :
-    : [wait_yield_vector] "i" (interrupts.wait_yield_vector)
+    : [sched_call_vector] "i" (interrupts.sched_call_vector),
+      [_]"{rdi}"(fun),
+      [_]"{rsi}"(ctx),
   );
+}
+
+pub fn sched_call_impl_handler(frame: *os.platform.InterruptFrame) void {
+  const fun: fn (*os.platform.InterruptFrame, usize) void = @intToPtr(fn (*os.platform.InterruptFrame, usize) void, frame.rdi);
+  const ctx: usize = frame.rsi;
+  fun(frame, ctx);
 }
 
 pub fn set_current_cpu(cpu_ptr: *os.platform.smp.CoreData) void {
