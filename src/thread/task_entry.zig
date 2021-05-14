@@ -18,10 +18,15 @@ pub const NewTaskEntry = struct {
             function: Func,
             args: Args,
 
+            /// Error guard
+            fn calL_with_error_guard(self: *@This()) !void {
+                return @call(.{}, self.function, self.args);
+            }
+
             /// Implementation of invoke
             fn invoke(entry: *NewTaskEntry) noreturn {
                 const self = @fieldParentPtr(@This(), "entry", entry);
-                @call(.{}, self.function, self.args) catch |err| {
+                self.calL_with_error_guard() catch |err| {
                     os.log("Task has finished with error {s}\n", .{@errorName(err)});
                 };
                 os.thread.scheduler.exit_task();
