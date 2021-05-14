@@ -11,8 +11,8 @@ const Extendedness = enum {
   NotExtended,
 };
 
-pub var interrupt_vector: u8 = undefined;
-pub var interrupt_gsi: u32 = undefined;
+pub var kb_interrupt_vector: u8 = undefined;
+pub var kb_interrupt_gsi: u32 = undefined;
 
 const scancode_extended = 0xE0;
 
@@ -21,14 +21,14 @@ fn parse_scancode(ext: Extendedness, scancode: u8) void {
     .Extended => {
       switch(scancode) {
         0x2A => { // Print screen press
-          std.debug.assert(wait_byte() == scancode_extended);
-          std.debug.assert(wait_byte() == 0x37);
+          std.debug.assert(kb_wait_byte() == scancode_extended);
+          std.debug.assert(kb_wait_byte() == 0x37);
           state.event(.Press, .PrintScreen);
           return;
         },
         0xB7 => { // Print screen release
-          std.debug.assert(wait_byte() == scancode_extended);
-          std.debug.assert(wait_byte() == 0xAA);
+          std.debug.assert(kb_wait_byte() == scancode_extended);
+          std.debug.assert(kb_wait_byte() == 0xAA);
           state.event(.Release, .PrintScreen);
           return;
         },
@@ -38,11 +38,11 @@ fn parse_scancode(ext: Extendedness, scancode: u8) void {
     .NotExtended => {
       switch(scancode) {
         0xE1 => {
-          std.debug.assert(wait_byte() == 0x1D);
-          std.debug.assert(wait_byte() == 0x45);
-          std.debug.assert(wait_byte() == 0xE1);
-          std.debug.assert(wait_byte() == 0x9D);
-          std.debug.assert(wait_byte() == 0xC5);
+          std.debug.assert(kb_wait_byte() == 0x1D);
+          std.debug.assert(kb_wait_byte() == 0x45);
+          std.debug.assert(kb_wait_byte() == 0xE1);
+          std.debug.assert(kb_wait_byte() == 0x9D);
+          std.debug.assert(kb_wait_byte() == 0xC5);
           state.event(.Press, .PauseBreak);
           // There is no event for releasing this key,
           // so we just gotta pretend it's released instantly
@@ -65,28 +65,43 @@ fn parse_scancode(ext: Extendedness, scancode: u8) void {
 
 var state: kb.KeyboardState = .{};
 
-fn has_byte() bool {
+fn kb_has_byte() bool {
   return (ports.inb(0x64) & 1) != 0;
 }
 
-fn wait_byte() u8 {
-  while(!has_byte()) { }
+fn kb_wait_byte() u8 {
+  while(!kb_has_byte()) { }
   return ports.inb(0x60);
 }
 
-pub fn handler(_: *os.platform.InterruptFrame) void {
+fn handle_keyboard_interrupt() void {
   var ext: Extendedness = .NotExtended;
 
-  var scancode = wait_byte();
+  var scancode = kb_wait_byte();
 
   if(scancode == scancode_extended) {
     ext = .Extended;
-    scancode = wait_byte();
+    scancode = kb_wait_byte();
   }
 
   parse_scancode(ext, scancode);
 
   eoi();
+}
+
+pub fn kb_handler(_: *os.platform.InterruptFrame) void {
+  while(kb_has_byte()) {
+    handle_keyboard_interrupt();
+  }
+}
+
+pub fn kb_init() void {
+  const i = os.platform.get_and_disable_interrupts();
+  defer os.platform.set_interrupts(i);
+
+  if(kb_has_byte()) {
+    handle_keyboard_interrupt();
+  }
 }
 
 fn key_location(ext: Extendedness, scancode: u8) !kb.keys.Location {
