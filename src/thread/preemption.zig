@@ -35,13 +35,3 @@ pub fn yield_or_not(frame: *os.platform.InterruptFrame) void {
         load_state(frame, task);
     }
 }
-
-/// Wait for the task on bootstrap
-pub fn bootstrap(frame: *os.platform.InterruptFrame) void {
-    const cpu = os.platform.thread.get_current_cpu();
-    const task = cpu.executable_tasks.dequeue();
-    frame.* = task.registers;
-    task.paging_context.apply();
-    os.platform.set_current_task(task);
-    task.platform_data.load_state();
-}

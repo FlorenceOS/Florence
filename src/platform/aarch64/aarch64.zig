@@ -56,20 +56,7 @@ pub fn ap_init() noreturn {
 
   interrupts.set_interrupt_stack(cpu.int_stack);
 
-  asm volatile(
-    \\BR %[dest]
-    :
-    : [stack] "{SP}" (cpu.sched_stack)
-    , [dest] "r" (ap_init_stage2)
-  );
-  unreachable;
-}
-
-fn ap_init_stage2() noreturn {
-  _ = @atomicRmw(usize, &os.platform.smp.cpus_left, .Sub, 1, .AcqRel);
-  // Wait for tasks
-  asm volatile("SVC #'B'");
-  unreachable;
+  cpu.bootstrap_tasking();
 }
 
 pub fn clock() usize {

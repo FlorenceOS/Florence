@@ -77,10 +77,16 @@ pub fn platform_init() !void {
 }
 
 pub fn platform_early_init() void {
+  // Set SMP metadata for the first CPU
   os.platform.smp.prepare();
+  // Init serial
   serial.init();
+  // Load IDT
   interrupts.init_interrupts();
-  os.platform.smp.cpus[0].platform_data.gdt.load();
+  const cpu = &os.platform.smp.cpus[0];
+  // Init BSP GDT
+  cpu.platform_data.gdt.load();
+  // Init paging
   os.memory.paging.init();
 }
 
@@ -91,13 +97,19 @@ pub fn bsp_pre_scheduler_init() void {
 
   setup_syscall_instr();
 
-  const cpu = os.platform.thread.get_current_cpu();
+  const cpu = &os.platform.smp.cpus[0];
+  
+  // Init BSP TSS
+  cpu.platform_data.shared_tss = .{};
+  cpu.platform_data.shared_tss.set_interrupt_stack(cpu.int_stack);
+  cpu.platform_data.shared_tss.set_scheduler_stack(cpu.sched_stack);
+  // Init BSP task TSS
   thread.bsp_task.platform_data.tss = os.vital(os.memory.vmm.backed(.Eternal).create(Tss), "alloc bsp tss");
   thread.bsp_task.platform_data.tss.* = .{};
-
   thread.bsp_task.platform_data.tss.set_interrupt_stack(cpu.int_stack);
   thread.bsp_task.platform_data.tss.set_scheduler_stack(cpu.sched_stack);
-  thread.bsp_task.platform_data.load_state();
+  // Load BSP TSS
+  cpu.platform_data.gdt.update_tss(&cpu.platform_data.shared_tss);
 }
 
 pub fn ap_init() noreturn {
@@ -106,29 +118,15 @@ pub fn ap_init() noreturn {
   setup_syscall_instr();
 
   const cpu = os.platform.thread.get_current_cpu();
+
   cpu.platform_data.gdt.load();
 
-  asm volatile(
-    \\mov %[stack], %%rsp
-    \\jmp *%[dest]
-    :
-    : [stack] "rm" (cpu.sched_stack)
-    , [_] "{rdi}" (cpu)
-    , [dest] "r" (ap_init_stage2)
-  );
-  unreachable;
-}
+  cpu.platform_data.shared_tss = .{};
+  cpu.platform_data.shared_tss.set_interrupt_stack(cpu.int_stack);
+  cpu.platform_data.shared_tss.set_scheduler_stack(cpu.sched_stack);
+  cpu.platform_data.gdt.update_tss(&cpu.platform_data.shared_tss);
 
-fn ap_init_stage2() noreturn {
-  _ = @atomicRmw(usize, &os.platform.smp.cpus_left, .Sub, 1, .AcqRel);
-  // Wait for tasks
-  asm volatile(
-    \\int %[boostrap_vector]
-    \\
-    :
-    : [boostrap_vector] "i" (interrupts.boostrap_vector)
-  );
-  unreachable;
+  cpu.bootstrap_tasking();
 }
 
 pub fn spin_hint() void {

@@ -24,7 +24,6 @@ pub fn add_handler(idx: u8, f: InterruptHandler, interrupt: bool, priv_level: u2
   handlers[idx] = f;
 }
 
-pub const boostrap_vector: u8 = 0x30;
 pub const sched_call_vector: u8 = 0x31;
 pub const syscall_vector: u8 = 0x32;
 pub const spurious_vector: u8 = 0x3F;
@@ -45,7 +44,6 @@ pub fn init_interrupts() void {
   }
 
   add_handler(0x0E,              page_fault_handler, true, 3, 1);
-  add_handler(boostrap_vector,   os.thread.preemption.bootstrap, true, 0, 0);
   add_handler(sched_call_vector, os.platform.thread.sched_call_impl_handler, true, 0, 2);
   add_handler(spurious_vector,   spurious_handler, true, 0, 1);
 }

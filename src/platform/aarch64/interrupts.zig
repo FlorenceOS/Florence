@@ -279,7 +279,6 @@ export fn interrupt_handler(frame: *InterruptFrame) void {
       switch(@truncate(u16, iss)) {
         else => @panic("Unknown SVC"),
 
-        'B' => os.thread.preemption.bootstrap(frame),
         'S' => do_stack_call(frame),
       }
     },
