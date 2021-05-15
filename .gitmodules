@@ -10,3 +10,6 @@
 [submodule "src/extern/lai"]
 	path = src/extern/lai
 	url = https://github.com/managarm/lai.git
+[submodule "src/copernicus/Copernicus"]
+	path = src/copernicus/Copernicus
+	url = https://github.com/FlorenceOS/Copernicus
