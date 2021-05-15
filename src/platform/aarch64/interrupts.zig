@@ -241,8 +241,8 @@ pub fn install_vector_table() void {
 }
 
 fn do_stack_call(frame: *InterruptFrame) void {
-  const fun = @intToPtr(fn (*os.platform.InterruptFrame, usize) void, frame.x0);
-  const ctx: usize = frame.x1;
+  const fun = @intToPtr(fn (*os.platform.InterruptFrame, usize) void, frame.x8);
+  const ctx: usize = frame.x9;
   fun(frame, ctx);
 }
 
