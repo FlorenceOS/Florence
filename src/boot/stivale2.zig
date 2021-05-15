@@ -238,7 +238,17 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     stivale.consume_physmem(ent);
   }
 
-  const phys_high = stivale.phys_high(info.memmap.?.get());
+  var phys_high = stivale.phys_high(info.memmap.?.get());
+  // Eagerly map UART too, as it's initialized before exc handlers
+  if(info.uart) |uart| {
+    phys_high = std.math.max(phys_high, uart.uart_addr);
+  }
+  if(info.uart_status) |uart| {
+    phys_high = std.math.max(phys_high, uart.uart_addr);
+    phys_high = std.math.max(phys_high, uart.uart_status);
+  }
+  phys_high += page_size - 1;
+  phys_high &= ~(page_size - 1);
 
   var context = os.vital(paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
 
