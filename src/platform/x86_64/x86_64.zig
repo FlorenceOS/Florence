@@ -79,14 +79,15 @@ pub fn platform_init() !void {
 pub fn platform_early_init() void {
   // Set SMP metadata for the first CPU
   os.platform.smp.prepare();
-  // Init serial
+
   serial.init();
+
   // Load IDT
   interrupts.init_interrupts();
-  const cpu = &os.platform.smp.cpus[0];
+
   // Init BSP GDT
-  cpu.platform_data.gdt.load();
-  // Init paging
+  os.platform.smp.cpus[0].platform_data.gdt.load();
+
   os.memory.paging.init();
 }
 
@@ -112,7 +113,7 @@ pub fn bsp_pre_scheduler_init() void {
   cpu.platform_data.gdt.update_tss(&cpu.platform_data.shared_tss);
 }
 
-pub fn ap_init() noreturn {
+pub fn ap_init() void {
   os.memory.paging.kernel_context.apply();
   idt.load_idt();
   setup_syscall_instr();
@@ -125,8 +126,6 @@ pub fn ap_init() noreturn {
   cpu.platform_data.shared_tss.set_interrupt_stack(cpu.int_stack);
   cpu.platform_data.shared_tss.set_scheduler_stack(cpu.sched_stack);
   cpu.platform_data.gdt.update_tss(&cpu.platform_data.shared_tss);
-
-  cpu.bootstrap_tasking();
 }
 
 pub fn spin_hint() void {

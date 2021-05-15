@@ -48,15 +48,13 @@ pub fn platform_init() !void {
   try os.platform.pci.init_pci();
 }
 
-pub fn ap_init() noreturn {
+pub fn ap_init() void {
   os.memory.paging.kernel_context.apply();
   interrupts.install_vector_table();
 
   const cpu = os.platform.thread.get_current_cpu();
 
   interrupts.set_interrupt_stack(cpu.int_stack);
-
-  cpu.bootstrap_tasking();
 }
 
 pub fn clock() usize {

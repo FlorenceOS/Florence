@@ -178,6 +178,8 @@ fn smp_entry(info_in: u64) callconv(.C) noreturn {
 
   cpu.booted = true;
   platform.ap_init();
+
+  cpu.bootstrap_tasking();
 }
 
 export fn stivale2_main(info_in: *stivale2_info) noreturn {
