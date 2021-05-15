@@ -27,8 +27,13 @@ pub const TaskData = struct {
   }
 };
 
-pub fn yield() void {
-  asm volatile("SVC #'Y'");
+pub fn sched_call_impl(fun: usize, ctx: usize) void {
+  asm volatile(
+    \\SVC #'S'
+    :
+    : [_]"{X8}"(fun),
+      [_]"{X9}"(ctx),
+  );
 }
 
 pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry) !void {

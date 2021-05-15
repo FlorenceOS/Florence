@@ -153,3 +153,10 @@ pub const PhysBytes = struct {
   ptr: usize,
   len: usize,
 };
+
+/// Helper for calling functions on scheduler stack
+pub fn sched_call(fun: fn (*os.platform.InterruptFrame, usize) void, ctx: usize) void {
+    const state = os.platform.get_and_disable_interrupts();
+    os.platform.thread.sched_call_impl(@ptrToInt(fun), ctx);
+    os.platform.set_interrupts(state);
+}

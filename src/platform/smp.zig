@@ -47,9 +47,29 @@ pub const CoreData = struct {
     return virt + total_size;
   }
 
+  // Called from BSP to bootstrap stacks for AP
   pub fn bootstrap_stacks(self: *@This()) void {
     self.int_stack = CoreData.bootstrap_stack(os.platform.thread.int_stack_size);
     self.sched_stack = CoreData.bootstrap_stack(os.platform.thread.sched_stack_size);
+  }
+
+  // Called from AP when AP is ready to get tasks to run
+  pub fn bootstrap_tasking(self: *@This()) noreturn {
+    const bootstrap_handler = struct {
+      // Wait for the first task and run it
+      pub fn bootstrap(frame: *os.platform.InterruptFrame, _: usize) void {
+          _ = @atomicRmw(usize, &os.platform.smp.cpus_left, .Sub, 1, .AcqRel);
+          const cpu = os.platform.thread.get_current_cpu();
+          const task = cpu.executable_tasks.dequeue();
+          frame.* = task.registers;
+          task.paging_context.apply();
+          os.platform.set_current_task(task);
+          task.platform_data.load_state();
+      }
+    }.bootstrap;
+    // Call bootstrap callback on a scheduler stack
+    os.platform.sched_call(bootstrap_handler, undefined);
+    unreachable;
   }
 };
 
