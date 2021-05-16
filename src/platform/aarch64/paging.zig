@@ -249,7 +249,6 @@ pub const PagingContext = struct {
       // First, make sure we're not
       // doing this on a page boundary
       \\  .balign 0x20
-      \\apply_paging:
       \\  MSR TCR_EL1,   %[tcr]
       \\  MSR SCTLR_EL1, %[sctlr]
       \\  MSR TTBR0_EL1, %[ttbr0]
