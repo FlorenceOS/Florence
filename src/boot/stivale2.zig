@@ -288,8 +288,7 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
 
     os.platform.smp.init(cpus.len);
 
-    var bootstrap_stack_size =
-      os.memory.paging.kernel_context.page_size(0, os.memory.pmm.phys_to_uncached_virt(0));
+    var bootstrap_stack_size = os.memory.paging.kernel_context.page_size(0);
 
     // Just a single page of stack isn't enough for debug mode :^(
     if(std.debug.runtime_safety) {

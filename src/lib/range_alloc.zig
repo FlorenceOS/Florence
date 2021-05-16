@@ -316,7 +316,7 @@ pub const RangeAlloc = struct {
     }
 
     fn make_range(self: *@This(), minBytes: usize) !*Range {
-        const page_size = os.memory.paging.kernel_context.page_size(0, os.memory.pmm.phys_to_write_back_virt(0));
+        const page_size = os.memory.paging.kernel_context.page_size(0);
         const size = os.lib.libalign.align_up(
             usize,
             page_size,

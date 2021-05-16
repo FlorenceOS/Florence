@@ -379,8 +379,8 @@ pub const PagingContext = struct {
 
   pub fn domain(self: *const @This(), level: LevelType, virtaddr: u64) os.platform.virt_slice {
     return .{
-      .ptr = virtaddr & ~(self.page_size(level, virtaddr) - 1),
-      .len = self.page_size(level, virtaddr),
+      .ptr = virtaddr & ~(self.page_size(level) - 1),
+      .len = self.page_size(level),
     };
   }
 
@@ -393,7 +393,7 @@ pub const PagingContext = struct {
     );
   }
 
-  pub fn page_size(_: *const @This(), level: LevelType, virtaddr: u64) u64 {
+  pub fn page_size(_: *const @This(), level: LevelType) u64 {
     return level_size(level);
   }
 };
@@ -459,7 +459,7 @@ const MappingPTE = struct {
   pub fn mapped_bytes(self: *const @This()) os.platform.PhysBytes {
     return .{
       .ptr = self.phys,
-      .len = self.context.page_size(self.level, self.context.phys_to_write_back_virt(self.phys)),
+      .len = self.context.page_size(self.level),
     };
   }
 
@@ -530,7 +530,7 @@ const TablePTE = struct {
     perms: os.memory.paging.Perms,
     memtype: MemoryType,
   ) !MappingPTE {
-    const page_size = self.context.page_size(self.level() - 1, undefined);
+    const page_size = self.context.page_size(self.level() - 1);
     const pmem = phys orelse try os.memory.pmm.alloc_phys(page_size);
     errdefer if(phys == null) os.memory.pmm.free_phys(pmem, page_size);
 

@@ -211,8 +211,7 @@ pub const PagingContext = struct {
   mair: MAIRContext(),
   br0: u64,
   br1: u64,
-  upper: PageSizeContext,
-  lower: PageSizeContext,
+  pszc: PageSizeContext,
 
   wb_virt_base: u64 = undefined,
   wc_virt_base: u64 = undefined,
@@ -230,8 +229,8 @@ pub const PagingContext = struct {
     const sctlr: u64 = 0x100D;
 
     const tcr: u64 = 0
-      | self.lower.offset_bits()       // T0SZ
-      | self.upper.offset_bits() << 16 // T1SZ
+      | self.pszc.offset_bits()       // T0SZ
+      | self.pszc.offset_bits() << 16 // T1SZ
       | (1 << 8)   // TTBR0 Inner WB RW-Allocate
       | (1 << 10)  // TTBR0 Outer WB RW-Allocate
       | (1 << 24)  // TTBR1 Inner WB RW-Allocate
@@ -239,8 +238,8 @@ pub const PagingContext = struct {
       | (2 << 12)  // TTBR0 Inner shareable
       | (2 << 28)  // TTBR1 Inner shareable
       | (aa64mmfr0 << 32) // intermediate address size
-      | (self.lower.granule(.Lower) << 14) // TTBR0 granule
-      | (self.upper.granule(.Upper) << 30) // TTBR1 granule
+      | (self.pszc.granule(.Lower) << 14) // TTBR0 granule
+      | (self.pszc.granule(.Upper) << 30) // TTBR1 granule
       | (1 << 56) // Fault on TTBR1 access from EL0
       | (0 << 55) // Don't fault on TTBR0 access from EL0
     ;
@@ -274,8 +273,14 @@ pub const PagingContext = struct {
     curr.mair = MAIRContext().get_active();
     curr.br0 = ttbr0.read();
     curr.br1 = ttbr1.read();
-    curr.upper = PageSizeContext.get_active(.Upper, tcr);
-    curr.lower = PageSizeContext.get_active(.Lower, tcr);
+
+    const upper = PageSizeContext.get_active(.Upper, tcr);
+    const lower = PageSizeContext.get_active(.Lower, tcr);
+
+    if(lower.basebits() != upper.basebits())
+      @panic("Cannot use different page sizes in upper/lower half!");
+
+    curr.pszc = lower;
   }
 
   pub fn make_default() !@This() {
@@ -291,8 +296,7 @@ pub const PagingContext = struct {
       .mair = MAIRContext().make_default(),
       .br0 = try make_page_table(psz),
       .br1 = try make_page_table(psz),
-      .upper = pszc,
-      .lower = pszc,
+      .pszc = pszc,
       .wb_virt_base = curr_base,
       .wc_virt_base = curr_base + max_phys,
       .uc_virt_base = curr_base + max_phys * 2,
@@ -338,7 +342,7 @@ pub const PagingContext = struct {
       .context = self,
       .perms = os.memory.paging.rwx(),
       .underlying = null,
-      .pszc = if(h == .Lower) self.lower else self.upper,
+      .pszc = self.pszc,
     };
   }
 
@@ -430,30 +434,22 @@ pub const PagingContext = struct {
 
   pub fn domain(self: *const @This(), level: level_type, virtaddr: u64) os.platform.virt_slice {
     return .{
-      .ptr = virtaddr & ~(self.page_size(level, virtaddr) - 1),
-      .len = self.page_size(level, virtaddr),
+      .ptr = virtaddr & ~(self.page_size(level) - 1),
+      .len = self.page_size(level),
     };
   }
 
   pub fn invalidate(self: *const @This(), virt: u64) void {
-    const h = half(virt);
-    const basebits = if(h == .Lower) self.lower.basebits() else self.upper.basebits();
     asm volatile(
       \\TLBI VAE1, %[virt]
       :
-      : [virt] "r" (virt >> basebits)
+      : [virt] "r" (virt >> self.pszc.basebits())
       : "memory"
     );
   }
 
-  pub fn page_size(self: *const @This(), level: level_type, virtaddr: u64) u64 {
-    return self.half_page_size(level, half(virtaddr));
-  }
-
-  pub fn half_page_size(self: *const @This(), level: level_type, h: Half) u64 {
-    if(h == .Lower)
-      return self.lower.page_size(level);
-    return self.upper.page_size(level);
+  pub fn page_size(self: *const @This(), level: level_type) u64 {
+    return self.pszc.page_size(level);
   }
 };
 
@@ -517,7 +513,7 @@ const MappingPTE = struct {
   pub fn mapped_bytes(self: *const @This()) os.platform.PhysBytes {
     return .{
       .ptr = self.phys,
-      .len = self.context.page_size(self.level, self.context.phys_to_write_back_virt(self.phys)),
+      .len = self.context.page_size(self.level),
     };
   }
 
