@@ -5,8 +5,18 @@ const assert   = std.debug.assert;
 const platform = os.platform;
 const lalign   = os.lib.libalign;
 
-const page_sizes = platform.paging.page_sizes;
-var free_roots   = [_]usize{0} ** page_sizes.len;
+const pmm_sizes = {
+  comptime var shift = 12;
+  comptime var sizes: []const usize = &[0]usize{};
+
+  while(shift < @bitSizeOf(usize) - 3) : (shift += 1) {
+    sizes = sizes ++ [1]usize{1 << shift};
+  }
+
+  return sizes;
+};
+
+var free_roots   = [_]usize{0} ** pmm_sizes.len;
 
 var pmm_mutex    = os.thread.Mutex{};
 
