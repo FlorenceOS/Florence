@@ -36,7 +36,7 @@ pub fn consume(phys: usize, size: usize) void {
     var pp = phys;
 
     outer: while (sz != 0) {
-        inline for (reverse_sizes) |psz, ri| {
+        for (reverse_sizes) |psz, ri| {
             const i = page_sizes.len - ri - 1;
             if (sz >= psz and lalign.is_aligned(usize, psz, pp)) {
                 free_impl(pp, i);
@@ -78,7 +78,7 @@ fn alloc_impl(ind: usize) error{OutOfMemory}!usize {
 }
 
 pub fn alloc_phys(size: usize) !usize {
-    inline for (page_sizes) |psz, i| {
+    for (page_sizes) |psz, i| {
         if (size <= psz) {
             pmm_mutex.lock();
             defer pmm_mutex.unlock();
@@ -98,7 +98,7 @@ pub fn free_phys(phys: usize, size: usize) void {
     pmm_mutex.lock();
     defer pmm_mutex.unlock();
 
-    inline for (reverse_sizes) |psz, ri| {
+    for (reverse_sizes) |psz, ri| {
         const i = page_sizes.len - ri - 1;
 
         if (size <= psz and lalign.is_aligned(usize, psz, phys)) {
