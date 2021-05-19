@@ -139,25 +139,74 @@ fn notifications(allocator: *std.mem.Allocator) !void {
 
 fn memory_objects(allocator: *std.mem.Allocator) !void {
     os.log("\nMemory objects test...\n", .{});
-
-    const test_obj = try kepler.memory.MemoryObject.create(allocator, 0x10000);
+    // Get page size
+    const page_size = kepler.memory.get_smallest_page_size();
+    // Create plain memory object
+    const test_obj = try kepler.memory.MemoryObjectRef.create_plain(
+        allocator,
+        page_size * 10,
+        page_size,
+        kepler.memory.MemoryPerms.rw(),
+    );
     os.log("Created memory object of size 0x10000!\n", .{});
-    const base = try kepler.memory.kernel_mapper.map(test_obj, os.memory.paging.rw(), .MemoryWriteBack);
+    // Allocate space in non-paged pool
+    const fake_arr = try os.memory.vmm.nonbacked_range.allocator.allocFn(
+        &os.memory.vmm.nonbacked_range.allocator,
+        0x10000,
+        1,
+        1,
+        0,
+    );
+    const base = @ptrToInt(fake_arr.ptr);
+    // Try to map memory object
+    try test_obj.map_in(.{
+        .context = &os.memory.paging.kernel_context,
+        .base = base,
+        .offset = 0,
+        .size = page_size * 10,
+        .perms = kepler.memory.MemoryPerms.rw(),
+        .user = false,
+        .memtype = .MemoryWriteBack,
+    });
     os.log("Mapped memory object!\n", .{});
     const arr = @intToPtr([*]u8, base);
     arr[0] = 0x69;
-    kepler.memory.kernel_mapper.unmap(test_obj, base);
+    test_obj.unmap_from(.{
+        .context = &os.memory.paging.kernel_context,
+        .base = base,
+        .size = page_size * 10,
+    });
     os.log("Unmapped memory object!\n", .{});
-
-    const base2 = try kepler.memory.kernel_mapper.map(test_obj, os.memory.paging.ro(), .MemoryWriteBack);
+    // Map memory object again
+    try test_obj.map_in(.{
+        .context = &os.memory.paging.kernel_context,
+        .base = base,
+        .offset = 0,
+        .size = page_size * 10,
+        .perms = kepler.memory.MemoryPerms.rw(),
+        .user = false,
+        .memtype = .MemoryWriteBack,
+    });
     os.log("Mapped memory object again!\n", .{});
-    const arr2 = @intToPtr([*]u8, base2);
-    kepler_assert(arr2[0] == 0x69, "Value passed in shared memory was not preserved");
-    kepler.memory.kernel_mapper.unmap(test_obj, base2);
+    kepler_assert(arr[0] == 0x69, "Value passed in shared memory was not preserved");
+    test_obj.unmap_from(.{
+        .context = &os.memory.paging.kernel_context,
+        .base = base,
+        .size = page_size * 10,
+    });
     os.log("Unmapped memory object again!\n", .{});
 
     test_obj.drop();
     os.log("Dropped memory object!\n", .{});
+
+    _ = os.memory.vmm.nonbacked_range.allocator.resizeFn(
+        &os.memory.vmm.nonbacked_range.allocator,
+        fake_arr,
+        1,
+        0,
+        1,
+        0,
+    ) catch @panic("Unmap failed");
 }
 
 fn object_passing(allocator: *std.mem.Allocator) !void {
@@ -166,10 +215,17 @@ fn object_passing(allocator: *std.mem.Allocator) !void {
     var mailbox = try kepler.objects.ObjectRefMailbox.init(allocator, 2);
     os.log("Created object reference mailbox!\n", .{});
 
+    // Get smallest page size
+    const page_size = kepler.memory.get_smallest_page_size();
     // Create a dummy object to pass around
-    const dummy = try kepler.memory.MemoryObject.create(allocator, 0x1000);
+    const test_obj = try kepler.memory.MemoryObjectRef.create_plain(
+        allocator,
+        page_size * 10,
+        page_size,
+        kepler.memory.MemoryPerms.rwx(),
+    );
     os.log("Created dummy object!\n", .{});
-    const dummy_ref = kepler.objects.ObjectRef{ .MemoryObject = .{ .ref = dummy.borrow(), .mapped_to = null } };
+    const dummy_ref = kepler.objects.ObjectRef{ .MemoryObject = test_obj };
 
     // Test send from consumer and recieve from producer
     if (mailbox.write_from_consumer(3, dummy_ref)) {
@@ -197,8 +253,8 @@ fn object_passing(allocator: *std.mem.Allocator) !void {
     os.log("Read with wrong permissions passed!\n", .{});
 
     const recieved_dummy_ref = try mailbox.read_from_producer(0);
-    kepler_assert(recieved_dummy_ref.MemoryObject.ref == dummy_ref.MemoryObject.ref, "The reference to the object passed is corrupted");
-    recieved_dummy_ref.drop(&kepler.memory.kernel_mapper);
+    kepler_assert(recieved_dummy_ref.MemoryObject.val == dummy_ref.MemoryObject.val, "The reference to the object passed is corrupted");
+    recieved_dummy_ref.drop();
     os.log("Read passed!\n", .{});
 
     // Test grant from consumer, send from producer, and reciever from consumer
@@ -214,11 +270,11 @@ fn object_passing(allocator: *std.mem.Allocator) !void {
     try mailbox.write_from_producer(0, dummy_ref);
 
     const new_recieved_dummy_ref = try mailbox.read_from_consumer(0);
-    kepler_assert(new_recieved_dummy_ref.MemoryObject.ref == dummy_ref.MemoryObject.ref, "The reference to the object passed is corrupted");
-    new_recieved_dummy_ref.drop(&kepler.memory.kernel_mapper);
+    kepler_assert(new_recieved_dummy_ref.MemoryObject.val == dummy_ref.MemoryObject.val, "The reference to the object passed is corrupted");
+    new_recieved_dummy_ref.drop();
     os.log("Read passed!\n", .{});
 
-    dummy_ref.drop(&kepler.memory.kernel_mapper);
+    dummy_ref.drop();
     mailbox.drop();
 }
 
@@ -277,7 +333,9 @@ fn interrupt_test(allocator: *std.mem.Allocator) !void {
     const noteq = try kepler.ipc.NoteQueue.create(allocator);
     // Create interrupt object
     var object: kepler.interrupts.InterruptObject = undefined;
-    const dummy_callback =  struct {fn dummy(_: *kepler.interrupts.InterruptObject) void {}}.dummy;
+    const dummy_callback = struct {
+        fn dummy(_: *kepler.interrupts.InterruptObject) void {}
+    }.dummy;
     object.init(noteq, dummy_callback, dummy_callback);
     // Raise interrupt
     object.raise();
