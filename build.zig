@@ -87,7 +87,8 @@ fn make_exec(b: *Builder, arch: builtin.Arch, ctx: Context, filename: []const u8
     add_libs(exec);
     exec.setBuildMode(.ReleaseSafe);
     exec.strip = false;
-    exec.want_lto = false;
+    if(@hasField(@TypeOf(exec.*), "want_lto"))
+        exec.want_lto = false;
     exec.setMainPkgPath("src/");
     exec.setOutputDir(b.cache_root);
 
