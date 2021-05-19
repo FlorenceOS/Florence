@@ -21,9 +21,9 @@ var free_roots = [_]usize{0} ** pmm_sizes.len;
 var pmm_mutex = os.thread.Mutex{};
 
 const reverse_sizes = {
-    var result: [page_sizes.len]usize = undefined;
-    for (page_sizes) |psz, i| {
-        result[page_sizes.len - i - 1] = psz;
+    var result: [pmm_sizes.len]usize = undefined;
+    for (pmm_sizes) |psz, i| {
+        result[pmm_sizes.len - i - 1] = psz;
     }
     return result;
 };
@@ -37,7 +37,7 @@ pub fn consume(phys: usize, size: usize) void {
 
     outer: while (sz != 0) {
         for (reverse_sizes) |psz, ri| {
-            const i = page_sizes.len - ri - 1;
+            const i = pmm_sizes.len - ri - 1;
             if (sz >= psz and lalign.is_aligned(usize, psz, pp)) {
                 free_impl(pp, i);
                 sz -= psz;
@@ -55,13 +55,13 @@ pub fn good_size(size: usize) usize {
 
 fn alloc_impl(ind: usize) error{OutOfMemory}!usize {
     if (free_roots[ind] == 0) {
-        if (ind + 1 >= page_sizes.len)
+        if (ind + 1 >= pmm_sizes.len)
             return error.OutOfMemory;
 
         var next = try alloc_impl(ind + 1);
-        var next_size = page_sizes[ind + 1];
+        var next_size = pmm_sizes[ind + 1];
 
-        const current_size = page_sizes[ind];
+        const current_size = pmm_sizes[ind];
 
         while (next_size > current_size) {
             free_impl(next, ind);
@@ -78,7 +78,7 @@ fn alloc_impl(ind: usize) error{OutOfMemory}!usize {
 }
 
 pub fn alloc_phys(size: usize) !usize {
-    for (page_sizes) |psz, i| {
+    for (pmm_sizes) |psz, i| {
         if (size <= psz) {
             pmm_mutex.lock();
             defer pmm_mutex.unlock();
@@ -99,7 +99,7 @@ pub fn free_phys(phys: usize, size: usize) void {
     defer pmm_mutex.unlock();
 
     for (reverse_sizes) |psz, ri| {
-        const i = page_sizes.len - ri - 1;
+        const i = pmm_sizes.len - ri - 1;
 
         if (size <= psz and lalign.is_aligned(usize, psz, phys)) {
             return free_impl(phys, i);
