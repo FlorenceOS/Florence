@@ -14,6 +14,7 @@ pub const vital = @import("vital.zig");
 pub const rbtree = @import("rbtree.zig");
 pub const atmcqueue = @import("atomic_queue.zig");
 pub const handle_table = @import("handle_table.zig");
+pub const refcounted = @import("refcounted.zig");
 
 pub const lai = @cImport({
   @cInclude("lai/core.h");
