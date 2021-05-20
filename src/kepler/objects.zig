@@ -43,13 +43,7 @@ pub const ObjectRef = union(ObjectType) {
         is_owning: bool,
     },
     /// Memory object reference data
-    MemoryObject: struct {
-        /// Reference to the memory object itself
-        ref: *kepler.memory.MemoryObject,
-        /// null if memory object was not mapped
-        /// address of the mapping
-        mapped_to: ?usize,
-    },
+    MemoryObject: kepler.memory.MemoryObjectRef,
     /// Interrupt object
     InterruptObject: *kepler.interrupts.InterruptObject,
     /// Locked handle reference
@@ -58,7 +52,7 @@ pub const ObjectRef = union(ObjectType) {
     None: void,
 
     /// Drop reference. mapper is the Mapper used by the arena (for .MemoryObject objects)
-    pub fn drop(self: *const @This(), mapper: *kepler.memory.Mapper) void {
+    pub fn drop(self: *const @This()) void {
         switch (self.*) {
             .Stream => |stream| stream.ref.abandon(stream.peer),
             .Endpoint => |endpoint| {
@@ -68,11 +62,7 @@ pub const ObjectRef = union(ObjectType) {
                     endpoint.ref.drop();
                 }
             },
-            .MemoryObject => |memory_object| {
-                if (memory_object.mapped_to) |offset| {
-                    mapper.unmap(memory_object.ref, offset);
-                }
-            },
+            .MemoryObject => |memory_object_ref| memory_object_ref.drop(),
             .LockedHandle => |locked_handle| locked_handle.drop(),
             .InterruptObject => |interrupt_object| interrupt_object.shutdown(),
             .None => {},
@@ -90,7 +80,7 @@ pub const ObjectRef = union(ObjectType) {
         switch (self.*) {
             .Stream, .InterruptObject => return error.ObjectNotShareable,
             .Endpoint => |endpoint| return SharedObjectRef{ .Endpoint = endpoint.ref.borrow() },
-            .MemoryObject => |memory_obj| return SharedObjectRef{ .MemoryObject = memory_obj.ref.borrow() },
+            .MemoryObject => |memory_obj_ref| return SharedObjectRef{ .MemoryObject = memory_obj_ref.borrow() },
             .LockedHandle => |locked_handle| return SharedObjectRef{ .LockedHandle = locked_handle.borrow() },
             .None => return SharedObjectRef.None,
         }
@@ -100,7 +90,7 @@ pub const ObjectRef = union(ObjectType) {
     pub fn unpack_shareable(ref: SharedObjectRef) @This() {
         switch (ref) {
             .Endpoint => |endpoint| return @This(){ .Endpoint = .{ .ref = endpoint, .is_owning = false } },
-            .MemoryObject => |memory_obj| return @This(){ .MemoryObject = .{ .ref = memory_obj, .mapped_to = null } },
+            .MemoryObject => |memory_obj_ref| return @This(){ .MemoryObject = memory_obj_ref },
             .LockedHandle => |locked_handle| return @This(){ .LockedHandle = locked_handle },
             .None => return @This().None,
         }
@@ -126,7 +116,7 @@ pub const SharedObjectRef = union(SharedObjectType) {
     /// Shareable reference to the endpoint
     Endpoint: *kepler.ipc.Endpoint,
     /// Shareable reference to the memory objects
-    MemoryObject: *kepler.memory.MemoryObject,
+    MemoryObject: kepler.memory.MemoryObjectRef,
     /// Shareable reference to the locked handle
     LockedHandle: *LockedHandle,
     /// Idk, just none :^)
@@ -137,7 +127,7 @@ pub const SharedObjectRef = union(SharedObjectType) {
         switch (self.*) {
             .Endpoint => |endpoint| endpoint.drop(),
             .LockedHandle => |locked_handle| locked_handle.drop(),
-            .MemoryObject => |memory_obj| memory_obj.drop(),
+            .MemoryObject => |memory_obj_ref| memory_obj_ref.drop(),
             .None => {},
         }
     }

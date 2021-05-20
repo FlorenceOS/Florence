@@ -405,7 +405,7 @@ pub const Stream = struct {
     /// Endpoint stream is attached to
     endpoint: *Endpoint,
     /// Memory objects for buffers
-    memory_objs: [2]*kepler.memory.MemoryObject,
+    memory_objs: [2]kepler.memory.MemoryObjectRef,
     /// Mailbox object for passing references
     mailbox: kepler.objects.ObjectRefMailbox,
     /// Info for userspace
@@ -413,13 +413,29 @@ pub const Stream = struct {
 
     /// Create stream object
     /// All stored resources are borrowed
-    pub fn create(allocator: *std.mem.Allocator, consumer_queue: *NoteQueue, endpoint: *Endpoint, info: UserspaceInfo) !*@This() {
+    pub fn create(
+        allocator: *std.mem.Allocator,
+        consumer_queue: *NoteQueue,
+        endpoint: *Endpoint,
+        info: UserspaceInfo,
+    ) !*@This() {
         // Allocate all structures as requested by the stream
+        const page_size = kepler.memory.get_smallest_page_size();
         // Producer RW buffer
-        const producer_rw_object = try kepler.memory.MemoryObject.create(allocator, info.producer_rw_buf_size);
+        const producer_rw_object = try kepler.memory.MemoryObjectRef.create_plain(
+            allocator,
+            page_size,
+            info.producer_rw_buf_size,
+            kepler.memory.MemoryPerms.rw(),
+        );
         errdefer producer_rw_object.drop();
         // Consumer RW buffer
-        const consumer_rw_object = try kepler.memory.MemoryObject.create(allocator, info.consumer_rw_buf_size);
+        const consumer_rw_object = try kepler.memory.MemoryObjectRef.create_plain(
+            allocator,
+            page_size,
+            info.consumer_rw_buf_size,
+            kepler.memory.MemoryPerms.rw(),
+        );
         errdefer consumer_rw_object.drop();
         // Mailbox
         const mailbox = try kepler.objects.ObjectRefMailbox.init(allocator, info.obj_mailbox_size);
