@@ -41,20 +41,25 @@ pub const Note = struct {
         /// to notify the client that server has abandoned the stream
         ProducerLeft,
         /// Sent to the server's notification queue to indicate that
-        /// all endpoints are lost. The intent is to allow server
+        /// all references to the endpoint are lost. The purpose is to allow server
         /// to cleanup all the structures that were used for the endpoint
         EndpointUnreachable,
+        /// Sent to the server's notification queue to indicate that
+        /// all references to the locked handle are lost. The purpose is to allow server
+        /// to cleanup all the structures that were associated with locked handle
+        LockedHandleUnreachable,
         /// Sent to the driver whenever owned InterruptObject
         /// raises interrupt
         InterruptRaised,
-
         /// Get peer type from the note type (whether this note is directed
         /// to producer or consumer)
         pub fn to_peer_type(self: @This()) Stream.Peer {
             return switch (self) {
-                .RequestPending, .TasksAvailable, .ConsumerLeft, .EndpointUnreachable => .Producer,
+                .RequestPending, .TasksAvailable, .ConsumerLeft => .Producer,
                 .RequestAccepted, .RequestDenied, .ResultsAvailable, .ProducerLeft => .Consumer,
-                .InterruptRaised => @panic("to_peer_type called on a wrong message type"),
+                .InterruptRaised, .EndpointUnreachable, .LockedHandleUnreachable => {
+                    @panic("to_peer_type called on a wrong message type");
+                },
             };
         }
     };
@@ -65,12 +70,15 @@ pub const Note = struct {
     typ: Type,
     /// Borrowed reference to the owner
     owner_ref: union {
-        /// For all the note types except for .EndpointUnreachable, this
+        /// For all the note types except listed below, this
         /// field stores reference to the stream object over which message was sent
         stream: *Stream,
         /// For the .EndpointUnreachable, this field stores the reference to the endpoint,
-        /// all references to which are already lost
+        /// all references to which are lost
         endpoint: *Endpoint,
+        /// For the .LockedHandleUnreachable, this field stores the reference to the locked handle
+        /// all references to which are lost
+        locked_handle: *kepler.objects.LockedHandle,
         /// For the .interruptRaised, this field stores the reference to the InterruptObject
         /// that has raised the interrupt
         interrupt: *kepler.interrupts.InterruptObject,
@@ -78,12 +86,11 @@ pub const Note = struct {
 
     /// Drop reference from the note.
     pub fn drop(self: *@This()) void {
-        if (self.typ == .EndpointUnreachable) {
-            self.owner_ref.endpoint.drop();
-        } else if (self.typ == .InterruptRaised) {
-            self.owner_ref.interrupt.drop();
-        } else {
-            self.owner_ref.stream.drop();
+        switch (self.typ) {
+            .EndpointUnreachable => self.owner_ref.endpoint.drop(),
+            .InterruptRaised => self.owner_ref.interrupt.drop(),
+            .LockedHandleUnreachable => self.owner_ref.locked_handle.drop(),
+            else => self.owner_ref.stream.drop(),
         }
     }
 
@@ -107,6 +114,9 @@ pub const Note = struct {
                     return false;
                 }
             },
+            // We are always interested in locked handle notifications since we want to dispose
+            // resources
+            .LockedHandleUnreachable => {},
             // For .RequestDenied and .RequestAccepted types, we need to check that
             // we still have pending stream object unclosed
             .RequestDenied, .RequestAccepted => {
