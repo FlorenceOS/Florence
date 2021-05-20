@@ -34,7 +34,10 @@ fn server_task(allocator: *std.mem.Allocator, server_noteq: *kepler.ipc.NoteQueu
         server_recv_rdtsc += os.platform.clock() - recv_starting_time;
 
         kepler_assert(submit_note.typ == .TasksAvailable, "Not .TasksAvailable node was recieved");
-        kepler_assert(submit_note.owner_ref.stream == conn, "Owning stream ref is incorrect in server task");
+        kepler_assert(
+            submit_note.owner_ref.stream == conn,
+            "Owning stream ref is incorrect in server task",
+        );
 
         // Allow client to resent its note
         submit_note.drop();
@@ -45,14 +48,23 @@ fn server_task(allocator: *std.mem.Allocator, server_noteq: *kepler.ipc.NoteQueu
         try conn.notify(.Consumer);
         server_send_rdtsc += os.platform.clock() - send_starting_time;
     }
-    os.log("Server task exits stress test! Send: {} clk. Recieve: {} clk\n", .{ server_send_rdtsc / tries, server_recv_rdtsc / tries });
+    os.log(
+        "Server task exits stress test! Send: {} clk. Recieve: {} clk\n",
+        .{ server_send_rdtsc / tries, server_recv_rdtsc / tries },
+    );
 
     // Terminate connection from the server
     conn.abandon(.Producer);
     os.log("Connection terminated from the server side!\n", .{});
+    // Terminate notification queue
+    server_noteq.terminate();
 }
 
-fn client_task(allocator: *std.mem.Allocator, client_noteq: *kepler.ipc.NoteQueue, endpoint: *kepler.ipc.Endpoint) !void {
+fn client_task(
+    allocator: *std.mem.Allocator,
+    client_noteq: *kepler.ipc.NoteQueue,
+    endpoint: *kepler.ipc.Endpoint,
+) !void {
     // Stream connection object
     const conn_params = kepler.ipc.Stream.UserspaceInfo{
         .consumer_rw_buf_size = 1024,
@@ -66,7 +78,10 @@ fn client_task(allocator: *std.mem.Allocator, client_noteq: *kepler.ipc.NoteQueu
     client_noteq.wait();
     const accept_note = client_noteq.try_recv() orelse unreachable;
     kepler_assert(accept_note.typ == .RequestAccepted, "Not .RequestAccepted node was recieved");
-    kepler_assert(accept_note.owner_ref.stream == conn, "Owner stream reference is incorrect in client task on RequestAccepted event");
+    kepler_assert(
+        accept_note.owner_ref.stream == conn,
+        "Owner stream reference is incorrect in client task on RequestAccepted event",
+    );
     accept_note.drop();
     os.log(".Accept note recieved!\n", .{});
 
@@ -92,26 +107,44 @@ fn client_task(allocator: *std.mem.Allocator, client_noteq: *kepler.ipc.NoteQueu
         const complete_note = client_noteq.try_recv() orelse unreachable;
         client_recv_rdtsc += os.platform.clock() - recv_starting_time;
 
-        kepler_assert(complete_note.typ == .ResultsAvailable, "Not .ResultsAvailable note was recieved");
-        kepler_assert(complete_note.owner_ref.stream == conn, "Incorrect owning stream ref in client task");
+        kepler_assert(
+            complete_note.typ == .ResultsAvailable,
+            "Not .ResultsAvailable note was recieved",
+        );
+        kepler_assert(
+            complete_note.owner_ref.stream == conn,
+            "Incorrect owning stream ref in client task",
+        );
         complete_note.drop();
 
         // Allow server to resend its note
         conn.unblock(.Producer);
     }
-    os.log("Client task exits stress test! Send: {} clk. Recieve: {} clk\n", .{ client_send_rdtsc / tries, client_recv_rdtsc / tries });
+    os.log(
+        "Client task exits stress test! Send: {} clk. Recieve: {} clk\n",
+        .{ client_send_rdtsc / tries, client_recv_rdtsc / tries },
+    );
 
     // Client should get ping of death message
     client_noteq.wait();
     const server_death_note = client_noteq.try_recv() orelse unreachable;
-    kepler_assert(server_death_note.owner_ref.stream == conn, "Incorrect owning stream ref on ping of death");
-    kepler_assert(server_death_note.typ == .ProducerLeft, "Note type on ping of death is not .ProducerLeft");
+    kepler_assert(
+        server_death_note.owner_ref.stream == conn,
+        "Incorrect owning stream ref on ping of death",
+    );
+    kepler_assert(
+        server_death_note.typ == .ProducerLeft,
+        "Note type on ping of death is not .ProducerLeft",
+    );
     os.log("Ping of death recieved!\n", .{});
     server_death_note.drop();
 
     // Close connection on the client's side as well
     conn.abandon(.Consumer);
     os.log("Connection terminated from the client side!\n", .{});
+
+    // Terminate notification queue
+    client_noteq.terminate();
 
     // Exit client task
     os.thread.scheduler.exit_task();
@@ -231,7 +264,10 @@ fn object_passing(allocator: *std.mem.Allocator) !void {
     if (mailbox.write_from_consumer(3, dummy_ref)) {
         @panic("Mailbox should have returned out of bounds error");
     } else |err| {
-        kepler_assert(err == error.OutOfBounds, "Error returned from mailbox is not out of bounds error");
+        kepler_assert(
+            err == error.OutOfBounds,
+            "Error returned from mailbox is not out of bounds error",
+        );
     }
     os.log("Out of bounds write passed!\n", .{});
 
@@ -241,19 +277,28 @@ fn object_passing(allocator: *std.mem.Allocator) !void {
     if (mailbox.write_from_consumer(0, dummy_ref)) {
         @panic("Mailbox should not have permitted write to the same cell");
     } else |err| {
-        kepler_assert(err == error.NotEnoughPermissions, "Error returned from mailbox is not NotEnoughPermissions");
+        kepler_assert(
+            err == error.NotEnoughPermissions,
+            "Error returned from mailbox is not NotEnoughPermissions",
+        );
     }
     os.log("Wrong send to the same cell passed!\n", .{});
 
     if (mailbox.read_from_producer(1)) |_| {
         @panic("Read with wrong permissions should not be permitted");
     } else |err| {
-        kepler_assert(err == error.NotEnoughPermissions, "Error returned from mailbox is not NotEnoughPermissions");
+        kepler_assert(
+            err == error.NotEnoughPermissions,
+            "Error returned from mailbox is not NotEnoughPermissions",
+        );
     }
     os.log("Read with wrong permissions passed!\n", .{});
 
     const recieved_dummy_ref = try mailbox.read_from_producer(0);
-    kepler_assert(recieved_dummy_ref.MemoryObject.val == dummy_ref.MemoryObject.val, "The reference to the object passed is corrupted");
+    kepler_assert(
+        recieved_dummy_ref.MemoryObject.val == dummy_ref.MemoryObject.val,
+        "The reference to the object passed is corrupted",
+    );
     recieved_dummy_ref.drop();
     os.log("Read passed!\n", .{});
 
@@ -263,14 +308,20 @@ fn object_passing(allocator: *std.mem.Allocator) !void {
     if (mailbox.write_from_producer(1, dummy_ref)) {
         @panic("Write permission violation was not detected");
     } else |err| {
-        kepler_assert(err == error.NotEnoughPermissions, "Error returned from mailbox is not NotEnoughPermissions");
+        kepler_assert(
+            err == error.NotEnoughPermissions,
+            "Error returned from mailbox is not NotEnoughPermissions",
+        );
     }
     os.log("Write with wrong permissions passed!\n", .{});
 
     try mailbox.write_from_producer(0, dummy_ref);
 
     const new_recieved_dummy_ref = try mailbox.read_from_consumer(0);
-    kepler_assert(new_recieved_dummy_ref.MemoryObject.val == dummy_ref.MemoryObject.val, "The reference to the object passed is corrupted");
+    kepler_assert(
+        new_recieved_dummy_ref.MemoryObject.val == dummy_ref.MemoryObject.val,
+        "The reference to the object passed is corrupted",
+    );
     new_recieved_dummy_ref.drop();
     os.log("Read passed!\n", .{});
 
@@ -280,13 +331,29 @@ fn object_passing(allocator: *std.mem.Allocator) !void {
 
 fn locked_handles(allocator: *std.mem.Allocator) !void {
     os.log("\nLocked handles test...\n", .{});
-    const handle = try kepler.objects.LockedHandle.create(allocator, 69, 420);
+    // Create test notification queue
+    const noteq = try kepler.ipc.NoteQueue.create(allocator);
+    os.log("Notification queue created...\n", .{});
+    const handle = try kepler.objects.LockedHandle.create(allocator, 69, 420, noteq);
+    // Try to peek with various password values
     kepler_assert((try handle.peek(420)) == 69, "Failed to open locked handle");
     if (handle.peek(412)) |_| {
         @panic("Authentification failure was not caught");
     } else |err| {
-        kepler_assert(err == error.AuthenticationFailed, "Wrong error was returned from handle.peek");
+        kepler_assert(
+            err == error.AuthenticationFailed,
+            "Wrong error was returned from handle.peek",
+        );
     }
+    os.log("Peek tests passed...\n", .{});
+    // Try to drop locked handle
+    handle.drop();
+    // Assert correct notification type
+    const death_note = noteq.try_recv() orelse unreachable;
+    kepler_assert(death_note.typ == .LockedHandleUnreachable, "Wrong notification type");
+    os.log("Death ping recieved...\n", .{});
+    noteq.terminate();
+    os.log("Queue shutdown successful...\n", .{});
     os.log("Locked handles test passed...\n", .{});
 }
 
@@ -316,7 +383,10 @@ fn locked_handle_table(allocator: *std.mem.Allocator) !void {
             return .{ .called = 0 };
         }
 
-        pub fn dispose(self: *@This(), loc: os.lib.handle_table.LockedHandleTable(u64).Location) void {
+        pub fn dispose(
+            self: *@This(),
+            loc: os.lib.handle_table.LockedHandleTable(u64).Location,
+        ) void {
             self.called += 1;
         }
     };
