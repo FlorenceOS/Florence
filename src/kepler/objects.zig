@@ -254,15 +254,26 @@ pub const LockedHandle = struct {
     /// Password. TODO: Set to arena ID or something
     password: usize,
     /// Allocator used to allocate the object
-    /// TODO: Consider storing allocator somewhere else, storing it here may
-    /// be too wasteful. For now I just add it to pad it to 32 bytes :^)
     allocator: *std.mem.Allocator,
+    /// Death notification note
+    death_note: kepler.ipc.Note,
+    /// Pointer to the notification queue
+    queue: *kepler.ipc.NoteQueue,
+    /// True if death note was sent
+    death_note_sent: bool,
 
-    pub fn create(allocator: *std.mem.Allocator, handle: usize, password: usize) !*LockedHandle {
+    pub fn create(
+        allocator: *std.mem.Allocator,
+        handle: usize,
+        password: usize,
+        queue: *kepler.ipc.NoteQueue,
+    ) !*LockedHandle {
         const instance = try allocator.create(@This());
         instance.ref_count = 1;
         instance.password = password;
         instance.handle = handle;
+        instance.queue = queue.borrow();
+        instance.death_note_sent = false;
         return instance;
     }
 
@@ -272,10 +283,18 @@ pub const LockedHandle = struct {
     }
 
     pub fn drop(self: *@This()) void {
+        if (self.death_note_sent) {
+            self.allocator.destroy(self);
+        }
         if (@atomicRmw(usize, &self.ref_count, .Sub, 1, .AcqRel) > 1) {
             return;
         }
-        self.allocator.destroy(self);
+        self.death_note.typ = .LockedHandleUnreachable;
+        self.death_note.owner_ref = .{ .locked_handle = self.borrow() };
+        // If send failed, we can just ignore the failure
+        // drop() called in send() will see that message was already sent
+        // and will terminate
+        self.queue.send(&self.death_note) catch {};
     }
 
     pub fn peek(self: *const @This(), password: usize) !usize {
