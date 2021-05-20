@@ -96,7 +96,7 @@ pub fn init(num_cores: usize) void {
 
     c.panicked = false;
     c.tasks_count = 0;
-    c.executable_tasks.init();
+    c.executable_tasks.init(c);
     c.bootstrap_stacks();
     c.platform_data = .{};
   }

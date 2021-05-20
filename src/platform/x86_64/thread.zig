@@ -4,6 +4,7 @@ const std = @import("std");
 const gdt = @import("gdt.zig");
 const regs = @import("regs.zig");
 const interrupts = @import("interrupts.zig");
+const apic = @import("apic.zig");
 const Tss = @import("tss.zig").Tss;
 
 pub const sched_stack_size = 0x10000;
@@ -37,46 +38,21 @@ pub const CoreData = struct {
 };
 
 pub const CoreDoorbell = struct {
-  addr: *usize = undefined,
+  cpu: *os.platform.smp.CoreData,
 
-  pub fn init(self: *@This()) void {
-    const nonbacked = os.memory.vmm.nonbacked();
-
-    const virt = @ptrToInt(os.vital(nonbacked.allocFn(nonbacked, 4096, 1, 1, 0), "CoreDoorbell nonbacked").ptr);
-    os.vital(os.memory.paging.map(.{
-      .virt = virt,
-      .size = 4096,
-      .perm = os.memory.paging.rw(),
-      .memtype = .MemoryWriteBack
-    }), "CoreDoorbell map");
-
-    self.addr = @intToPtr(*usize, virt);
+  pub fn init(self: *@This(), cpu: *os.platform.smp.CoreData) void {
+    self.cpu = cpu;
   }
 
   pub fn ring(self: *@This()) void {
-    @atomicStore(usize, self.addr, 0, .Release);
+    apic.ipi(@truncate(u8, self.cpu.acpi_id), interrupts.ring_vector);
   }
 
   pub fn start_monitoring(self: *@This()) void {
-    //asm volatile(
-    //  "monitor"
-    //  :
-    //  : [_]"{rax}"(@ptrToInt(self.addr)),
-    //    [_]"{ecx}"(@as(u32, 0)),
-    //    [_]"{edx}"(@as(u32, 0)),
-    //);
   }
 
   pub fn wait(self: *@This()) void {
-    //asm volatile(
-    //  \\sti
-    //  \\mwait
-    //  \\cli
-    //  :
-    //  : [_]"{eax}"(@as(u32, 0)),
-    //    [_]"{ecx}"(@as(u32, 0))
-    //);
-    asm volatile("sti; nop; pause; cli");
+    asm volatile("sti; hlt; cli");
   }
 };
 

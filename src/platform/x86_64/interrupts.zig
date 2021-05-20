@@ -8,6 +8,7 @@ const scheduler = os.thread.scheduler;
 const idt = @import("idt.zig");
 const gdt = @import("gdt.zig");
 const pic = @import("pic.zig");
+const apic = @import("apic.zig");
 const thread = @import("thread.zig");
 
 pub const num_handlers = 0x100;
@@ -26,6 +27,7 @@ pub fn add_handler(idx: u8, f: InterruptHandler, interrupt: bool, priv_level: u2
 
 pub const sched_call_vector: u8 = 0x31;
 pub const syscall_vector: u8 = 0x32;
+pub const ring_vector: u8 = 0x33;
 pub const spurious_vector: u8 = 0x3F;
 
 var last_vector: u8 = spurious_vector;
@@ -44,11 +46,16 @@ pub fn init_interrupts() void {
   }
 
   add_handler(0x0E,              page_fault_handler, true, 3, 1);
+  add_handler(ring_vector,       ring_handler, true, 0, 1);
   add_handler(sched_call_vector, os.platform.thread.sched_call_impl_handler, true, 0, 2);
   add_handler(spurious_vector,   spurious_handler, true, 0, 1);
 }
 
-fn spurious_handler(frame: *InterruptFrame) void {
+fn spurious_handler(_: *InterruptFrame) void {
+}
+
+fn ring_handler(_: *InterruptFrame) void {
+  apic.eoi();
 }
 
 fn type_page_fault(error_code: usize) platform.PageFaultAccess {

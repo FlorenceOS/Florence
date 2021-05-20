@@ -94,9 +94,9 @@ pub const ReadyQueue = struct {
   }
 
   /// Initialize atomic queue used to store tasks
-  pub fn init(self: *@This()) void {
+  pub fn init(self: *@This(), cpu: *os.platform.smp.CoreData) void {
     if (use_doorbell) {
-      self.doorbell.init();
+      self.doorbell.init(cpu);
     }
     self.queue.init();
   }

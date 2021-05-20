@@ -17,12 +17,12 @@ fn x2apic_msr(comptime register: u10) comptime_int {
   return @as(u32, 0x800) + @truncate(u8, register >> 2);
 }
 
-fn write_x2apic(comptime register: u10, value: u32) void {
-  regs.MSR(u32, x2apic_msr(register)).write(value);
+fn write_x2apic(comptime T: type, comptime register: u10, value: T) void {
+  regs.MSR(T, x2apic_msr(register)).write(value);
 }
 
-fn read_x2apic(comptime register: u10) u32 {
-  return regs.MSR(u32, x2apic_msr(register)).read();
+fn read_x2apic(comptime T: type, comptime register: u10) T {
+  return regs.MSR(T, x2apic_msr(register)).read();
 }
 
 pub fn enable() void {
@@ -33,7 +33,7 @@ pub fn enable() void {
   if(raw & 0x400 != 0) {
     // X2APIC
     os.platform.thread.get_current_cpu().platform_data.lapic = null;
-    write_x2apic(SPURIOUS, spur_reg);
+    write_x2apic(u32, SPURIOUS, spur_reg);
     return;
   }
 
@@ -48,7 +48,7 @@ pub fn eoi() void {
   if(lapic_ptr()) |lapic| {
     lapic[EOI] = 0;
   } else {
-    write_x2apic(EOI, 0);
+    write_x2apic(u32, EOI, 0);
   }
 }
 
@@ -62,9 +62,16 @@ pub fn timer(ticks: u32, div: u32, vec: u32) void {
   }
 }
 
+pub fn ipi(apic_id: u32, vector: u8) void {
+  if(lapic_ptr()) |lapic| {
+    lapic[ICR_HIGH] = @as(u32, apic_id) << 24;
+    lapic[ICR_LOW] = @as(u32, vector);
+  } else {
+    write_x2apic(u64, ICR_LOW, (@as(u64, apic_id) << 56) | (@as(u64, vector)));
+  }
+}
 
 // ACPI information
-
 fn handle_processor(apic_id: u32) void {
   
 }
@@ -226,7 +233,8 @@ pub fn handle_madt(madt: []u8) void {
 }
 
 const IA32_APIC_BASE = @import("regs.zig").MSR(u64, 0x0000001B);
-const LVT_TIMER = 0x320 / 4;
+const ICR_LOW = 0x300 / 4;
+const ICR_HIGH = 0x310 / 4;
 const TIMER_MODE_PERIODIC = 1 << 17;
 const TIMER_DIV = 0x3E0 / 4;
 const TIMER_INITCNT = 0x380 / 4;
