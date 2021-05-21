@@ -39,8 +39,14 @@ pub const SingleListener = struct {
     /// Wait for events without actually acknowledging them
     pub fn wait(self: *@This()) void {
         // If there are events already, we can return immediatelly
-        if (self.diff() != 0) {
-            return;
+        // Poll a few times to avoid doing costly wait operations
+        const poll_num = 1024;
+        var i: usize = 0;
+        while (i < poll_num) : (i += 1) {
+            if (self.diff() != 0) {
+                return;
+            }
+            os.platform.spin_hint();
         }
         // Get pointer to the current task
         const task = os.platform.get_current_task();
