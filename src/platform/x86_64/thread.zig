@@ -35,6 +35,7 @@ pub const CoreData = struct {
   shared_tss_loaded: bool = true,
   rsp_stash: u64 = undefined, // Stash for rsp after syscall instruction
   lapic: ?os.platform.phys_ptr(*volatile [0x100]u32) = undefined,
+  lapic_id: u32 = 0,
 };
 
 pub const CoreDoorbell = struct {
@@ -45,7 +46,11 @@ pub const CoreDoorbell = struct {
   }
 
   pub fn ring(self: *@This()) void {
-    apic.ipi(@truncate(u8, self.cpu.acpi_id), interrupts.ring_vector);
+    const current_cpu = os.platform.thread.get_current_cpu();
+    if (current_cpu.platform_data.lapic_id == self.cpu.platform_data.lapic_id) {
+      return;
+    }
+    apic.ipi(self.cpu.platform_data.lapic_id, interrupts.ring_vector);
   }
 
   pub fn start_monitoring(self: *@This()) void {

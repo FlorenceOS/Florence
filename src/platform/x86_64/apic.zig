@@ -26,22 +26,27 @@ fn read_x2apic(comptime T: type, comptime register: u10) T {
 }
 
 pub fn enable() void {
-  const spur_reg = @as(u32, 0x100) | interrupts.spurious_vector; // bit 8 = lapic enable, bit 7-0 = spurious vector;
+  const spur_reg = @as(u32, 0x100) | interrupts.spurious_vector;
+  const cpu = os.platform.thread.get_current_cpu();
 
   const raw = IA32_APIC_BASE.read();
-
   if(raw & 0x400 != 0) {
     // X2APIC
-    os.platform.thread.get_current_cpu().platform_data.lapic = null;
+    cpu.platform_data.lapic = null;
     write_x2apic(u32, SPURIOUS, spur_reg);
+    cpu.platform_data.lapic_id = read_x2apic(u32, LAPIC_ID);
     return;
   }
 
   const phy = raw & 0xFFFFF000; // ignore flags
 
-  os.platform.thread.get_current_cpu().platform_data.lapic = os.platform.phys_ptr(*volatile [0x100]u32).from_int(phy);
+  const lapic = os.platform.phys_ptr(*volatile [0x100]u32).from_int(phy);
+  cpu.platform_data.lapic = lapic;
 
-  lapic_ptr().?[SPURIOUS] = spur_reg;
+  const lapic_wb = lapic.get_writeback();
+
+  lapic_wb[SPURIOUS] = spur_reg;
+  cpu.platform_data.lapic_id = lapic_wb[LAPIC_ID];
 }
 
 pub fn eoi() void {
@@ -64,10 +69,10 @@ pub fn timer(ticks: u32, div: u32, vec: u32) void {
 
 pub fn ipi(apic_id: u32, vector: u8) void {
   if(lapic_ptr()) |lapic| {
-    lapic[ICR_HIGH] = @as(u32, apic_id) << 24;
+    lapic[ICR_HIGH] = apic_id;
     lapic[ICR_LOW] = @as(u32, vector);
   } else {
-    write_x2apic(u64, ICR_LOW, (@as(u64, apic_id) << 56) | (@as(u64, vector)));
+    write_x2apic(u64, ICR_LOW, (@as(u64, apic_id) << 32) | (@as(u64, vector)));
   }
 }
 
@@ -233,6 +238,7 @@ pub fn handle_madt(madt: []u8) void {
 }
 
 const IA32_APIC_BASE = @import("regs.zig").MSR(u64, 0x0000001B);
+const LAPIC_ID = 0x20 / 4;
 const ICR_LOW = 0x300 / 4;
 const ICR_HIGH = 0x310 / 4;
 const TIMER_MODE_PERIODIC = 1 << 17;

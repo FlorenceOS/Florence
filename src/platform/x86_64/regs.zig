@@ -1,4 +1,5 @@
 const std = @import("std");
+const os = @import("root").os;
 
 pub const IA32_EFER  = MSR(u64, 0xC0000080);
 pub const IA32_STAR  = MSR(u64, 0xC0000081);
@@ -9,8 +10,6 @@ pub const IA32_FS_BASE = MSR(u64, 0xC0000100);
 pub const IA32_GS_BASE = MSR(u64, 0xC0000101);
 
 fn read_msr(comptime T: type, msr_num: u32) T {
-  std.debug.assert(T == u64);
-
   switch(T) {
     u64 => {
       var low: u32 = undefined;

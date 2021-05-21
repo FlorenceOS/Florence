@@ -58,7 +58,6 @@ pub fn set_interrupts(s: InterruptState) void {
 
 pub fn platform_init() !void {
   try os.platform.acpi.init_acpi();
-  apic.enable();
   set_interrupts(true);
 
   if(comptime(os.config.kernel.x86_64.ps2.enable_keyboard)) {
@@ -126,6 +125,8 @@ pub fn ap_init() void {
   cpu.platform_data.shared_tss.set_interrupt_stack(cpu.int_stack);
   cpu.platform_data.shared_tss.set_scheduler_stack(cpu.sched_stack);
   cpu.platform_data.gdt.update_tss(&cpu.platform_data.shared_tss);
+
+  apic.enable();
 }
 
 pub fn spin_hint() void {
