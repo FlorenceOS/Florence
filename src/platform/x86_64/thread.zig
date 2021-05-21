@@ -40,9 +40,11 @@ pub const CoreData = struct {
 
 pub const CoreDoorbell = struct {
   cpu: *os.platform.smp.CoreData,
+  wakeable: bool,
 
   pub fn init(self: *@This(), cpu: *os.platform.smp.CoreData) void {
     self.cpu = cpu;
+    self.wakeable = false;
   }
 
   pub fn ring(self: *@This()) void {
@@ -50,14 +52,18 @@ pub const CoreDoorbell = struct {
     if (current_cpu.platform_data.lapic_id == self.cpu.platform_data.lapic_id) {
       return;
     }
-    apic.ipi(self.cpu.platform_data.lapic_id, interrupts.ring_vector);
+    if (@atomicLoad(bool, &self.wakeable, .Acquire)) {
+      apic.ipi(self.cpu.platform_data.lapic_id, interrupts.ring_vector);
+    }
   }
 
   pub fn start_monitoring(self: *@This()) void {
+    @atomicStore(bool, &self.wakeable, true, .Release);
   }
 
   pub fn wait(self: *@This()) void {
     asm volatile("sti; hlt; cli");
+    @atomicStore(bool, &self.wakeable, false, .Release);
   }
 };
 
