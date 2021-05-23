@@ -128,14 +128,16 @@ pub fn is_5levelpaging() bool {
   return cr4.read() & la64 != 0;
 }
 
+var gigapage_allowed: bool = false;
+
 pub fn init() void {
+  gigapage_allowed = if(regs.cpuid(0x80000001)) |i| ((i.edx >> 26) & 1) == 1 else false;
 }
 
 pub const PagingContext = struct {
   pat: ?PATContext(),
   cr3_val: u64,
   level5paging: bool,
-  gigapage_allowed: bool,
 
   wb_virt_base: u64 = undefined,
   wc_virt_base: u64 = undefined,
@@ -162,8 +164,6 @@ pub const PagingContext = struct {
   }
 
   pub fn read_current() void {
-    const id = regs.cpuid(0x80000001);
-
     const curr = &os.memory.paging.kernel_context;
 
     curr.pat = PATContext().get_active();
@@ -171,9 +171,6 @@ pub const PagingContext = struct {
 
     // Test if 5 level paging currently is enabled
     curr.level5paging = is_5levelpaging();
-
-    // Check CPUID to determine if enabled or not
-    curr.gigapage_allowed = false;// if(id) |i| ((i.edx >> 26) & 1) == 1 else false;
   }
 
   pub fn make_default() !@This() {
@@ -190,7 +187,6 @@ pub const PagingContext = struct {
       .pat = PATContext().make_default(),
       .cr3_val = pt,
       .level5paging = curr.level5paging,
-      .gigapage_allowed = false,//curr.gigapage_allowed,
       .wb_virt_base = curr_base,
       .wc_virt_base = curr_base + max_phys,
       .uc_virt_base = curr_base + max_phys * 2,
@@ -199,7 +195,7 @@ pub const PagingContext = struct {
   }
 
   pub fn can_map_at_level(self: *const @This(), level: LevelType) bool {
-    return level < @as(LevelType, 2) + @boolToInt(self.gigapage_allowed);
+    return level < @as(LevelType, 2) + @boolToInt(gigapage_allowed);
   }
 
   pub fn check_phys(self: *const @This(), phys: u64) void {
