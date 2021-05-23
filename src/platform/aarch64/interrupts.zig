@@ -114,9 +114,9 @@ comptime {
     \\STP X0,  X1, [SP, #-0x10]!
     \\MOV X0,  SP
     \\BL interrupt_handler
-    \\LDP X0,  X1, [SP], 0x10
+    \\LDP X0,  X1,  [SP], 0x10
+    \\MSR SPSR_EL1, X0
     \\MSR ELR_EL1, X1
-    \\MSR SPSR_EL1, X1
     \\LDP X31, X30, [SP], 0x10
     \\LDP X29, X28, [SP], 0x10
     \\LDP X27, X26, [SP], 0x10
