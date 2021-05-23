@@ -128,6 +128,9 @@ pub fn is_5levelpaging() bool {
   return cr4.read() & la64 != 0;
 }
 
+pub fn init() void {
+}
+
 pub const PagingContext = struct {
   pat: ?PATContext(),
   cr3_val: u64,

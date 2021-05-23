@@ -56,7 +56,9 @@ pub fn phys_high(map: []const MemmapEntry) usize {
   return ent.base + ent.length;
 }
 
-pub fn detect_phys_base() void {
+pub fn init_paging() void {
+  os.platform.paging.init();
+
   const base: usize = switch(std.builtin.arch) {
     .aarch64 => 0xFFFF800000000000,
     .x86_64 =>

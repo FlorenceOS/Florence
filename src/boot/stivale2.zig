@@ -204,7 +204,7 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     }
   }
 
-  stivale.detect_phys_base();
+  stivale.init_paging();
 
   if(info.uart) |uart| {
     mmio_serial.register_mmio32_serial(uart.uart_addr);
