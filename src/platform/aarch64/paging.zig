@@ -207,6 +207,9 @@ pub fn make_page_table(page_size: usize) !u64 {
   return pt;
 }
 
+pub fn init() void {
+}
+
 pub const PagingContext = struct {
   mair: MAIRContext(),
   br0: u64,
