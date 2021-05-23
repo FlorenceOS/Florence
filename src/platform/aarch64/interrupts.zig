@@ -56,10 +56,10 @@ pub const InterruptFrame = struct {
   x4: u64,
   x3: u64,
   x2: u64,
-  x1: u64,
-  x0: u64,
   sp: u64,
   _: u64,
+  x1: u64,
+  x0: u64,
 
   pub fn dump(self: *const @This()) void {
     os.log("FRAME DUMP:\n", .{});
@@ -79,8 +79,21 @@ pub const InterruptFrame = struct {
   }
 };
 
-export fn interrupt_common() callconv(.Naked) void {
-  asm volatile(
+comptime {
+  asm(
+    \\handle_interrupt_on_stack:
+    \\MRS X1, SP_EL0
+    \\STP X1, XZR, [X0, #-0x20]
+    \\
+    \\MSR SP_EL0, X0 // Use this stack
+    \\
+    \\LDP X1, X0, [SP], 0x10
+    \\MSR SPSel, #0 // Switch stacks
+    \\STP X1, X0, [SP, #-0x10]!
+    \\
+    \\SUB SP, SP, #0x10
+    \\
+    \\interrupt_common:
     \\STP X3,  X2,  [SP, #-0x10]!
     \\STP X5,  X4,  [SP, #-0x10]!
     \\STP X7,  X6,  [SP, #-0x10]!
@@ -101,7 +114,7 @@ export fn interrupt_common() callconv(.Naked) void {
     \\STP X0,  X1, [SP, #-0x10]!
     \\MOV X0,  SP
     \\BL interrupt_handler
-    \\LDP X0, X1, [SP], 0x10
+    \\LDP X0,  X1, [SP], 0x10
     \\MSR ELR_EL1, X1
     \\MSR SPSR_EL1, X1
     \\LDP X31, X30, [SP], 0x10
@@ -120,30 +133,41 @@ export fn interrupt_common() callconv(.Naked) void {
     \\LDP X5,  X4,  [SP], 0x10
     \\LDP X3,  X2,  [SP], 0x10
     \\
-    \\// Critical section
-    \\MSR DAIFSET, #0xF
+    \\LDP X1,  XZR, [SP], 0x10
+    \\MRS X0, SPSel
+    \\CBNZ X0, .int_stack_ret
+    \\ // Return from non-interrupt stack
     \\
-    \\// Make the current SP the interrupt stack
-    \\MSR SPSel, 1
-    \\MRS X0, SP_EL0
-    \\MOV SP, X0
+    \\MSR SPSel, #1
+    \\STP X1,  XZR, [SP, #-0x20]
+    \\MSR SPSel, #0
+    \\LDP X1,  X0,  [SP], 0x10
+    \\MSR SPSel, #1
+    \\STP X1,  X0,  [SP, #-0x10]
+    \\LDP X1,  XZR, [SP, #-0x20]
+    \\MSR SP_EL0, X1
+    \\LDP X1,  X0,  [SP, #-0x10]
+    \\MSR SPSel, #0
+    \\ERET
     \\
-    \\// Restore old stack pointer
-    \\LDP X1, XZR, [SP, #0x10] // Load stack poiner
-    \\MSR SP_EL0, X1 // Write old stack pointer to SP0
-    \\LDP X1,  X0,  [SP], 0x20
-    \\MSR SPSel, 0
+    \\.int_stack_ret:
+    \\ // Return from int stack
+    \\
+    \\MSR SP_EL0, X1
+    \\LDP X1,  X0,  [SP], 0x10
+    \\MSR SPSel, #0
     \\ERET
   );
-  unreachable;
 }
 
 /// The vector which uses the already selected interrupt stack
 export fn interrupt_irq_stack() callconv(.Naked) void {
   asm volatile(
-    \\STP X1, X0, [SP, #-0x20]!
+    \\STP X1, X0, [SP, #-0x10]!
+    \\
     \\MRS X1, SP_EL0
-    \\STP X1, XZR, [SP, #0x10] // Store old stack pointer
+    \\STP X1, XZR, [SP, #-0x10]!
+    \\
     \\B interrupt_common
   );
   unreachable;
@@ -153,15 +177,11 @@ export fn interrupt_irq_stack() callconv(.Naked) void {
 export fn interrupt_sched_stack() callconv(.Naked) void {
   asm volatile(
     \\STP X0, X1, [SP, #-0x10]!
+    \\
     \\MRS X0, TPIDR_EL1 // Get the current cpu struct
     \\LDR X0, [X0, %[sched_stack_offset]] // Get the CPU scheduler stack
-    \\MRS X1, SP_EL0
-    \\STP X1, XZR, [X0, #-0x10]! // Push SP0 onto the scheduler stack
-    \\MSR SP_EL0, X0 // Use our new, shiny call stack
-    \\LDP X0, X1, [SP], 0x10
-    \\MSR SPSel, #0 // Switch to it
-    \\STP X1, X0, [SP, #-0x10]!
-    \\B interrupt_common
+    \\
+    \\B handle_interrupt_on_stack
     :
     : [sched_stack_offset] "i" (@as(usize, @byteOffsetOf(os.platform.smp.CoreData, "sched_stack")))
   );
@@ -172,16 +192,12 @@ export fn interrupt_sched_stack() callconv(.Naked) void {
 export fn interrupt_syscall_stack() callconv(.Naked) void {
   asm volatile(
     \\STP X0, X1, [SP, #-0x10]!
+    \\
     \\MRS X0, TPIDR_EL1 // Get the current cpu struct
     \\LDR X0, [X0, %[task_offset]] // Get the task
     \\LDR X0, [X0, %[syscall_stack_offset]]
-    \\MRS X1, SP_EL0
-    \\STP X1, XZR, [X0, #-0x10]! // Push SP0 onto the syscall stack
-    \\MSR SP_EL0, X0 // Use our new, shiny syscall stack
-    \\LDP X0, X1, [SP], 0x10
-    \\MSR SPSel, #0 // Switch to it
-    \\STP X1, X0, [SP, #-0x10]!
-    \\B interrupt_common
+    \\
+    \\B handle_interrupt_on_stack
     :
     : [task_offset] "i" (@as(usize, @byteOffsetOf(os.platform.smp.CoreData, "current_task")))
     , [syscall_stack_offset] "i" (@as(usize, @byteOffsetOf(os.thread.Task, "stack")))
@@ -241,8 +257,8 @@ pub fn install_vector_table() void {
 }
 
 fn do_stack_call(frame: *InterruptFrame) void {
-  const fun = @intToPtr(fn (*os.platform.InterruptFrame, usize) void, frame.x8);
-  const ctx: usize = frame.x9;
+  const fun = @intToPtr(fn (*os.platform.InterruptFrame, usize) void, frame.x2);
+  const ctx: usize = frame.x1;
   fun(frame, ctx);
 }
 
@@ -258,8 +274,14 @@ export fn interrupt_handler(frame: *InterruptFrame) void {
   }
 
   switch(ec) {
-    else => @panic("Unknown EC!"),
-    0b00000000 => @panic("Unknown reason in EC!"),
+    else => {
+      frame.dump();
+      @panic("Unknown EC!");
+    },
+    0b00000000 => {
+      frame.dump();
+      @panic("Unknown reason in EC!");
+    },
     0b00100101 => {
       const far = asm volatile("MRS %[esr], FAR_EL1" : [esr] "=r" (-> u64));
       const wnr = (iss >> 6) & 1;
@@ -271,7 +293,11 @@ export fn interrupt_handler(frame: *InterruptFrame) void {
       // addr: usize, present: bool, access: PageFaultAccess, frame: anytype
       os.platform.page_fault(far, present, if(wnr == 1) .Write else .Read, frame);
     },
-    0b00100001 => @panic("Instruction fault without change in exception level"),
+    0b00100001 => {
+      // This could be an instruction fetch page fault if it's a prefetch abort
+      frame.dump();
+      @panic("Instruction fault without change in exception level");
+    },
     0b00010101 => {
       // SVC instruction execution in AArch64 state
       // Figure out which call this is

@@ -31,8 +31,8 @@ pub fn sched_call_impl(fun: usize, ctx: usize) void {
   asm volatile(
     \\SVC #'S'
     :
-    : [_]"{X8}"(fun),
-      [_]"{X9}"(ctx),
+    : [_]"{X2}"(fun),
+      [_]"{X1}"(ctx),
   );
 }
 
