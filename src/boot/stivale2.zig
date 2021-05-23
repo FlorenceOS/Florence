@@ -290,15 +290,10 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
 
     os.platform.smp.init(cpus.len);
 
-    var bootstrap_stack_size = page_size;
-
-    // Just a single page of stack isn't enough for debug mode :^(
-    if(std.debug.runtime_safety) {
-      bootstrap_stack_size *= 4;
-    }
+    const ap_init_stack_size = os.platform.thread.ap_init_stack_size;
 
     // Allocate stacks for all CPUs
-    var bootstrap_stack_pool_sz = bootstrap_stack_size * cpus.len;
+    var bootstrap_stack_pool_sz = ap_init_stack_size * cpus.len;
     var stacks = os.vital(os.memory.pmm.alloc_phys(bootstrap_stack_pool_sz), "allocating ap stacks");
 
     // Setup counter used for waiting
@@ -316,10 +311,10 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
       cpu.booted = false;
 
       // Boot it!
-      const stack = stacks + bootstrap_stack_size * i;
+      const stack = stacks + ap_init_stack_size * i;
 
       cpu_info.argument = i;
-      cpu_info.target_stack = os.memory.pmm.phys_to_write_back_virt(stack + bootstrap_stack_size - 16);
+      cpu_info.target_stack = os.memory.pmm.phys_to_write_back_virt(stack + ap_init_stack_size - 16);
       @atomicStore(u64, &cpu_info.goto_address, @ptrToInt(smp_entry), .Release);
     }
 

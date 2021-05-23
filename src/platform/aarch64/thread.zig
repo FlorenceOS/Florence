@@ -12,6 +12,7 @@ pub const sched_stack_size = 0x10000;
 pub const int_stack_size = 0x10000;
 pub const task_stack_size = 0x10000;
 pub const stack_guard_size = 0x1000;
+pub const ap_init_stack_size = 0x4000;
 
 pub fn get_current_cpu() *os.platform.smp.CoreData {
   return TPIDR_EL1.read();
