@@ -3,19 +3,30 @@ const paging_common = @import("../paging.zig");
 
 const std = @import("std");
 
-pub const page_sizes =
-  [_]u64 {
-    0x1000, // 4K << 0
-    0x4000, // 16K << 0
-    0x10000, // 32K << 0
-    0x200000, // 4K << 9
-    0x2000000, // 16K << 11
-    0x10000000, // 32K << 12
-    0x40000000, // 4K << 18
-    0x1000000000, // 16K << 22
-    0x8000000000, // 4K << 27
-    0x10000000000, // 32K << 24
-  };
+pub var page_sizes: []const usize = undefined;
+
+const pages_4K = [_]usize{
+  0x1000, // 4K << 0
+  0x200000, // 4K << 9
+  0x40000000, // 4K << 18
+  0x8000000000, // 4K << 27
+  0x1000000000000, // 4K << 36
+};
+
+const pages_16K = [_]usize{
+  0x4000, // 16K << 0
+  0x2000000, // 16K << 11
+  0x1000000000, // 16K << 22
+  0x800000000000, // 16K << 33
+  0x400000000000000, // 16K << 44
+};
+
+const pages_64K = [_]usize{
+  0x10000, // 64K << 0
+  0x20000000, // 64K << 13
+  0x40000000000, // 64K << 26
+  0x80000000000000, // 64K << 39
+};
 
 const mair_index = u3;
 
@@ -200,21 +211,42 @@ const ttbr0 = os.platform.msr(ttbr_value, "TTBR0_EL1");
 const ttbr1 = os.platform.msr(ttbr_value, "TTBR1_EL1");
 const level_type = u3;
 
-pub fn make_page_table(page_size: usize) !u64 {
-  const pt = try os.memory.pmm.alloc_phys(page_size);
-  const pt_bytes = os.platform.phys_slice(u8).init(pt, page_size);
-  @memset(pt_bytes.to_slice_writeback().ptr, 0x00, page_size);
+pub fn make_page_table() !u64 {
+  const pt = try os.memory.pmm.alloc_phys(page_sizes[0]);
+  const pt_bytes = os.platform.phys_slice(u8).init(pt, page_sizes[0]);
+  @memset(pt_bytes.to_slice_writeback().ptr, 0x00, page_sizes[0]);
   return pt;
 }
 
+var pszc: PageSizeContext = undefined;
+
 pub fn init() void {
+  pszc = PageSizeContext.make_default();
+  switch(pszc.page_size(0)) {
+    0x1000 => {
+      page_sizes = pages_4K[0..];
+    },
+
+    0x4000 => {
+      page_sizes = pages_16K[0..];
+    },
+
+    0x10000 => {
+      page_sizes = pages_64K[0..];
+    },
+
+    else => unreachable,
+  }
+}
+
+pub fn page_size(level: u6) usize {
+  return pszc.page_size(level);
 }
 
 pub const PagingContext = struct {
   mair: MAIRContext(),
   br0: u64,
   br1: u64,
-  pszc: PageSizeContext,
 
   wb_virt_base: u64 = undefined,
   wc_virt_base: u64 = undefined,
@@ -232,8 +264,8 @@ pub const PagingContext = struct {
     const sctlr: u64 = 0x100D;
 
     const tcr: u64 = 0
-      | self.pszc.offset_bits()       // T0SZ
-      | self.pszc.offset_bits() << 16 // T1SZ
+      | pszc.offset_bits()       // T0SZ
+      | pszc.offset_bits() << 16 // T1SZ
       | (1 << 8)   // TTBR0 Inner WB RW-Allocate
       | (1 << 10)  // TTBR0 Outer WB RW-Allocate
       | (1 << 24)  // TTBR1 Inner WB RW-Allocate
@@ -241,8 +273,8 @@ pub const PagingContext = struct {
       | (2 << 12)  // TTBR0 Inner shareable
       | (2 << 28)  // TTBR1 Inner shareable
       | (aa64mmfr0 << 32) // intermediate address size
-      | (self.pszc.granule(.Lower) << 14) // TTBR0 granule
-      | (self.pszc.granule(.Upper) << 30) // TTBR1 granule
+      | (pszc.granule(.Lower) << 14) // TTBR0 granule
+      | (pszc.granule(.Upper) << 30) // TTBR1 granule
       | (1 << 56) // Fault on TTBR1 access from EL0
       | (0 << 55) // Don't fault on TTBR0 access from EL0
     ;
@@ -282,14 +314,9 @@ pub const PagingContext = struct {
 
     if(lower.basebits() != upper.basebits())
       @panic("Cannot use different page sizes in upper/lower half!");
-
-    curr.pszc = lower;
   }
 
   pub fn make_default() !@This() {
-    const pszc = PageSizeContext.make_default();
-    const psz = pszc.page_size(0);
-
     // 32TB ought to be enough for anyone...
     const max_phys = 0x200000000000;
 
@@ -297,9 +324,8 @@ pub const PagingContext = struct {
 
     return @This(){
       .mair = MAIRContext().make_default(),
-      .br0 = try make_page_table(psz),
-      .br1 = try make_page_table(psz),
-      .pszc = pszc,
+      .br0 = try make_page_table(),
+      .br1 = try make_page_table(),
       .wb_virt_base = curr_base,
       .wc_virt_base = curr_base + max_phys,
       .uc_virt_base = curr_base + max_phys * 2,
@@ -308,7 +334,7 @@ pub const PagingContext = struct {
   }
 
   pub fn can_map_at_level(self: *const @This(), level: level_type) bool {
-    return level < @as(level_type, 2);
+    return page_sizes[level] < 0x1000000000;
   }
 
   pub fn check_phys(self: *const @This(), phys: u64) void {
@@ -345,21 +371,20 @@ pub const PagingContext = struct {
       .context = self,
       .perms = os.memory.paging.rwx(),
       .underlying = null,
-      .pszc = self.pszc,
     };
   }
 
-  fn decode(self: *@This(), enc: *EncodedPTE, level: level_type, pszc: PageSizeContext) PTE {
+  fn decode(self: *@This(), enc: *EncodedPTE, level: level_type) PTE {
     var pte = PTEEncoding{.raw = enc.*};
 
     if(!pte.present.read())
       return .Empty;
     if(pte.walk.read() and level != 0)
-      return .{.Table = self.decode_table(enc, level, pszc)};
-    return .{.Mapping = self.decode_mapping(enc, level, pszc)};
+      return .{.Table = self.decode_table(enc, level)};
+    return .{.Mapping = self.decode_mapping(enc, level)};
   }
 
-  fn decode_mapping(self: *@This(), enc: *EncodedPTE, level: level_type, pszc: PageSizeContext) MappingPTE {
+  fn decode_mapping(self: *@This(), enc: *EncodedPTE, level: level_type) MappingPTE {
     const map = MappingEncoding{.raw = enc.*};
 
     const memtype: MemoryType = self.mair.memory_type_at_index(map.attr_index.read());
@@ -375,11 +400,10 @@ pub const PagingContext = struct {
         .executable = !map.no_execute.read(),
         .userspace = !map.no_user.read(),
       },
-      .pszc = pszc,
     };
   }
 
-  fn decode_table(self: *@This(), enc: *EncodedPTE, level: level_type, pszc: PageSizeContext) TablePTE {
+  fn decode_table(self: *@This(), enc: *EncodedPTE, level: level_type) TablePTE {
     const tbl = TableEncoding{.raw = enc.*};
 
     return .{
@@ -392,7 +416,6 @@ pub const PagingContext = struct {
         .executable = !tbl.no_execute.read(),
         .userspace = !tbl.no_user.read(),
       },
-      .pszc = pszc,
     };
   }
 
@@ -437,8 +460,8 @@ pub const PagingContext = struct {
 
   pub fn domain(self: *const @This(), level: level_type, virtaddr: u64) os.platform.virt_slice {
     return .{
-      .ptr = virtaddr & ~(self.page_size(level) - 1),
-      .len = self.page_size(level),
+      .ptr = virtaddr & ~(page_sizes[level] - 1),
+      .len = page_sizes[level],
     };
   }
 
@@ -446,13 +469,9 @@ pub const PagingContext = struct {
     asm volatile(
       \\TLBI VAE1, %[virt]
       :
-      : [virt] "r" (virt >> self.pszc.basebits())
+      : [virt] "r" (virt >> pszc.basebits())
       : "memory"
     );
-  }
-
-  pub fn page_size(self: *const @This(), level: level_type) u64 {
-    return self.pszc.page_size(level);
   }
 };
 
@@ -511,12 +530,11 @@ const MappingPTE = struct {
   context: *PagingContext,
   perms: os.memory.paging.Perms,
   underlying: *MappingEncoding,
-  pszc: PageSizeContext,
 
   pub fn mapped_bytes(self: *const @This()) os.platform.PhysBytes {
     return .{
       .ptr = self.phys,
-      .len = self.context.page_size(self.level),
+      .len = page_sizes[self.level],
     };
   }
 
@@ -533,7 +551,6 @@ const TablePTE = struct {
   context: *PagingContext,
   perms: os.memory.paging.Perms,
   underlying: ?*TableEncoding,
-  pszc: PageSizeContext,
 
   pub fn get_child_tables(self: *const @This()) []EncodedPTE {
     return os.platform.phys_slice(EncodedPTE).init(self.phys, 512).to_slice_writeback();
@@ -548,7 +565,7 @@ const TablePTE = struct {
   }
 
   pub fn decode_child(self: *const @This(), pte: *EncodedPTE) PTE {
-    return self.context.decode(pte, self.curr_level - 1, self.pszc);
+    return self.context.decode(pte, self.curr_level - 1);
   }
 
   pub fn level(self: *const @This()) level_type {
@@ -565,9 +582,8 @@ const TablePTE = struct {
   }
 
   pub fn make_child_table(self: *const @This(), enc: *u64, perms: os.memory.paging.Perms) !TablePTE {
-    const psz = self.pszc.page_size(0);
-    const pmem = try make_page_table(psz);
-    errdefer os.memory.pmm.free_phys(pmem, psz);
+    const pmem = try make_page_table();
+    errdefer os.memory.pmm.free_phys(pmem, page_sizes[0]);
 
     var result: TablePTE = .{
       .phys = pmem,
@@ -575,7 +591,6 @@ const TablePTE = struct {
       .curr_level = self.curr_level - 1,
       .perms = perms,
       .underlying = @ptrCast(*TableEncoding, enc),
-      .pszc = self.pszc,
     };
 
     enc.* = try self.context.encode_table(result);
@@ -590,9 +605,9 @@ const TablePTE = struct {
     perms: os.memory.paging.Perms,
     memtype: MemoryType,
   ) !MappingPTE {
-    const page_size = self.pszc.page_size(self.level() - 1);
-    const pmem = phys orelse try os.memory.pmm.alloc_phys(page_size);
-    errdefer if(phys == null) os.memory.pmm.free_phys(pmem, page_size);
+    const psz = page_sizes[self.level() - 1];
+    const pmem = phys orelse try os.memory.pmm.alloc_phys(psz);
+    errdefer if(phys == null) os.memory.pmm.free_phys(pmem, psz);
 
     var result: MappingPTE = .{
       .level = self.level() - 1,
@@ -601,7 +616,6 @@ const TablePTE = struct {
       .perms = perms,
       .underlying = @ptrCast(*MappingEncoding, enc),
       .phys = pmem,
-      .pszc = self.pszc,
     };
 
     enc.* = try self.context.encode_mapping(result);

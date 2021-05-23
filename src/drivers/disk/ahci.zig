@@ -9,7 +9,6 @@ const pci = os.platform.pci;
 const paging = os.memory.paging;
 const pmm = os.memory.pmm;
 const scheduler = os.thread.scheduler;
-const page_size = os.platform.paging.page_sizes[0];
 
 const abar_size = 0x1100;
 const port_control_registers_size = 0x80;
@@ -400,6 +399,7 @@ const PortState = struct {
     }
 
     fn setup_prdts(self: *@This()) !void {
+        const page_size = os.platform.paging.page_sizes[0];
         var current_table_addr: usize = undefined;
         var reamining_table_size: usize = 0;
         for (self.mmio.command_headers()) |*header| {
@@ -420,7 +420,7 @@ const PortState = struct {
             const buf = try pmm.alloc_phys(page_size);
             @memset(os.platform.phys_ptr([*]u8).from_int(buf).get_uncached(), 0, page_size);
             write_u64(&header.table().prds[0].data_base_addr, buf);
-            header.table().prds[0].sizem1 = page_size - 1;
+            header.table().prds[0].sizem1 = @intCast(u22, page_size - 1);
         }
     }
 

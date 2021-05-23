@@ -12,7 +12,6 @@ const kmain    = os.kernel.kmain;
 const mmio_serial = os.drivers.mmio_serial;
 const vesa_log    = os.drivers.vesa_log;
 const vga_log     = os.drivers.vga_log;
-const page_size   = os.platform.paging.page_sizes[0];
 
 const MemmapEntry = stivale.MemmapEntry;
 
@@ -247,6 +246,9 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     phys_high = std.math.max(phys_high, uart.uart_addr + 4);
     phys_high = std.math.max(phys_high, uart.uart_status + 4);
   }
+
+  const page_size = os.platform.paging.page_sizes[0];
+
   phys_high += page_size - 1;
   phys_high &= ~(page_size - 1);
 
@@ -288,7 +290,7 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
 
     os.platform.smp.init(cpus.len);
 
-    var bootstrap_stack_size = os.memory.paging.kernel_context.page_size(0);
+    var bootstrap_stack_size = page_size;
 
     // Just a single page of stack isn't enough for debug mode :^(
     if(std.debug.runtime_safety) {
