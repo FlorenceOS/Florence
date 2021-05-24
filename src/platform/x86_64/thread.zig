@@ -4,6 +4,7 @@ const std = @import("std");
 const gdt = @import("gdt.zig");
 const regs = @import("regs.zig");
 const interrupts = @import("interrupts.zig");
+const apic = @import("apic.zig");
 const Tss = @import("tss.zig").Tss;
 
 pub const sched_stack_size = 0x10000;
@@ -35,49 +36,27 @@ pub const CoreData = struct {
   shared_tss_loaded: bool = true,
   rsp_stash: u64 = undefined, // Stash for rsp after syscall instruction
   lapic: ?os.platform.phys_ptr(*volatile [0x100]u32) = undefined,
-};
-
-pub const CoreDoorbell = struct {
-  addr: *usize = undefined,
-
-  pub fn init(self: *@This()) void {
-    const nonbacked = os.memory.vmm.nonbacked();
-
-    const virt = @ptrToInt(os.vital(nonbacked.allocFn(nonbacked, 4096, 1, 1, 0), "CoreDoorbell nonbacked").ptr);
-    os.vital(os.memory.paging.map(.{
-      .virt = virt,
-      .size = 4096,
-      .perm = os.memory.paging.rw(),
-      .memtype = .MemoryWriteBack
-    }), "CoreDoorbell map");
-
-    self.addr = @intToPtr(*usize, virt);
-  }
+  lapic_id: u32 = 0,
+  mwait_supported: bool = false,
+  wakeable: bool = false,
 
   pub fn ring(self: *@This()) void {
-    @atomicStore(usize, self.addr, 0, .Release);
+    const current_cpu = os.platform.thread.get_current_cpu();
+    if (current_cpu.platform_data.lapic_id == self.lapic_id) {
+      return;
+    }
+    if (@atomicLoad(bool, &self.wakeable, .Acquire)) {
+      apic.ipi(self.lapic_id, interrupts.ring_vector);
+    }
   }
 
   pub fn start_monitoring(self: *@This()) void {
-    //asm volatile(
-    //  "monitor"
-    //  :
-    //  : [_]"{rax}"(@ptrToInt(self.addr)),
-    //    [_]"{ecx}"(@as(u32, 0)),
-    //    [_]"{edx}"(@as(u32, 0)),
-    //);
+    @atomicStore(bool, &self.wakeable, true, .Release);
   }
 
   pub fn wait(self: *@This()) void {
-    //asm volatile(
-    //  \\sti
-    //  \\mwait
-    //  \\cli
-    //  :
-    //  : [_]"{eax}"(@as(u32, 0)),
-    //    [_]"{ecx}"(@as(u32, 0))
-    //);
-    asm volatile("sti; nop; pause; cli");
+    asm volatile("sti; hlt; cli");
+    @atomicStore(bool, &self.wakeable, false, .Release);
   }
 };
 
