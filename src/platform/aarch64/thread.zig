@@ -5,7 +5,15 @@ pub var bsp_task: os.thread.Task = .{};
 const TPIDR_EL1 = os.platform.msr(*os.platform.smp.CoreData, "TPIDR_EL1");
 
 pub const CoreData = struct {
+  pub fn start_monitoring(self: *@This()) void {
+  }
 
+  pub fn wait(self: *@This()) void {
+    os.platform.spin_hint();
+  }
+
+  pub fn ring(self: *@This()) void {
+  }
 };
 
 pub const sched_stack_size = 0x10000;

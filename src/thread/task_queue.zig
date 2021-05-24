@@ -8,14 +8,6 @@ pub const TaskQueue = struct {
   last_ack: usize = 0,
   last_triggered: usize = 0,
 
-  /// Spin until new events are available
-  /// Used only if Doorbell is not implemented for the given arch
-  fn wait(self: *@This()) void {
-    while (self.last_ack == @atomicLoad(usize, &self.last_triggered, .Acquire)) {
-      os.platform.spin_hint();
-    }
-  }
-
   /// Remove task that is queue head from the queue. Returns null if queue is "empty"
   pub fn dequeue(self: *@This()) ?*os.thread.Task {
     const state = os.platform.get_and_disable_interrupts();
@@ -46,25 +38,20 @@ pub const TaskQueue = struct {
   }
 };
 
-/// True if CoreDoorbell is implemented
-const use_doorbell = @hasDecl(os.platform.thread, "CoreDoorbell");
-
 /// ReadyQueue is a data structure that implements core ready task queue logic
-/// With the help of os.platform.thread.CoreDoorbell to notify about newer tasks
-/// os.platform.thread.CoreDoorbell should define:
-/// 1) start_monitoring: Initialize monitor to get ring events. If events occurs after  this function call,
-/// it should be captured. Corresponds to MONITOR on x86
-/// 2) wait: Wait for events. If one was recieved after call to start_monitoring, return immediatelly
+/// os.platform.thread.CoreData should define:
+/// 1) start_monitoring: Initialize monitor to get ring events. If events occurs after this function 
+/// call, it should be captured. Corresponds to MONITOR on x86
+/// 2) wait: Wait for events. If one was recieved after call to start_monitoring, return
+/// immediatelly
 pub const ReadyQueue = struct {
   queue: TaskQueue = .{},
-  doorbell: if (use_doorbell) os.platform.thread.CoreDoorbell else void = .{},
+  cpu: *os.platform.smp.CoreData = undefined,
 
   /// Enqueue task to run
   pub fn enqueue(self: *@This(), task: *os.thread.Task) void {
     self.queue.enqueue(task);
-    if (use_doorbell) {
-      self.doorbell.ring();
-    }
+    self.cpu.platform_data.ring();
   }
 
   /// Dequeue task. Waits for one to become available
@@ -72,19 +59,13 @@ pub const ReadyQueue = struct {
   pub fn dequeue(self: *@This()) *os.thread.Task {
     while (true) {
       // Begin waiting for ring events
-      if (use_doorbell) {
-        self.doorbell.start_monitoring();
-      }
+      self.cpu.platform_data.start_monitoring();
       // If task already there, just return
       if (self.queue.dequeue()) |task| {
         return task;
       }
       // Wait for events
-      if (use_doorbell) {
-        self.doorbell.wait();
-      } else {
-        self.queue.wait();
-      }
+      self.cpu.platform_data.wait();
     }
   }
   
@@ -95,9 +76,7 @@ pub const ReadyQueue = struct {
 
   /// Initialize atomic queue used to store tasks
   pub fn init(self: *@This(), cpu: *os.platform.smp.CoreData) void {
-    if (use_doorbell) {
-      self.doorbell.init(cpu);
-    }
     self.queue.init();
+    self.cpu = cpu;
   }
 };

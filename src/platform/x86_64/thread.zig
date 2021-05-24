@@ -37,24 +37,16 @@ pub const CoreData = struct {
   rsp_stash: u64 = undefined, // Stash for rsp after syscall instruction
   lapic: ?os.platform.phys_ptr(*volatile [0x100]u32) = undefined,
   lapic_id: u32 = 0,
-};
-
-pub const CoreDoorbell = struct {
-  cpu: *os.platform.smp.CoreData,
-  wakeable: bool,
-
-  pub fn init(self: *@This(), cpu: *os.platform.smp.CoreData) void {
-    self.cpu = cpu;
-    self.wakeable = false;
-  }
+  mwait_supported: bool = false,
+  wakeable: bool = false,
 
   pub fn ring(self: *@This()) void {
     const current_cpu = os.platform.thread.get_current_cpu();
-    if (current_cpu.platform_data.lapic_id == self.cpu.platform_data.lapic_id) {
+    if (current_cpu.platform_data.lapic_id == self.lapic_id) {
       return;
     }
     if (@atomicLoad(bool, &self.wakeable, .Acquire)) {
-      apic.ipi(self.cpu.platform_data.lapic_id, interrupts.ring_vector);
+      apic.ipi(self.lapic_id, interrupts.ring_vector);
     }
   }
 
