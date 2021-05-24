@@ -2,7 +2,7 @@ const std = @import("std");
 const os = @import("root").os;
 const kepler = os.kepler;
 
-const tries = 1_000_000;
+const tries = 100_000;
 
 fn kepler_assert(condition: bool, comptime panic_msg: []const u8) void {
     if (!condition) @panic("kepler tests failed: " ++ panic_msg);
