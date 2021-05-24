@@ -102,8 +102,8 @@ pub const Driver = struct {
     return first_un;
   }
 
-  /// Negotiate feature bitmask with device
-  fn feature(drv: *Driver, i: u32, req: u32, opt: u32) !void {
+  /// Negotiate feature bitmask with device, ZIG BUG, bad codegen without .Inline, no issue open
+  fn feature(drv: *Driver, i: u32, req: u32, opt: u32) callconv(.Inline) !void {
     drv.cfg.device_feature_select = i;
     const f = drv.cfg.device_feature & (req | opt);
     if ((f & req) != req) return error.FeatureNotAvailable;
