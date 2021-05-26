@@ -28,9 +28,10 @@ pub fn add_handler(idx: u8, f: InterruptHandler, interrupt: bool, priv_level: u2
 pub const sched_call_vector: u8 = 0x31;
 pub const syscall_vector: u8 = 0x32;
 pub const ring_vector: u8 = 0x33;
-pub const spurious_vector: u8 = 0x3F;
 
-var last_vector: u8 = spurious_vector;
+var last_vector: u8 = ring_vector;
+
+pub const spurious_vector: u8 = 0xFF;
 
 pub fn allocate_vector() u8 {
   return @atomicRmw(u8, &last_vector, .Add, 1, .AcqRel) + 1;
