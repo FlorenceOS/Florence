@@ -14,3 +14,6 @@ pub const hexdump_obj = lib.logger.hexdump_obj;
 pub const vital       = lib.vital.vital;
 pub const panic       = lib.panic.panic;
 pub const config      = @import("config.zig");
+
+pub const get_log_lock = lib.logger.get_log_lock;
+pub const release_log_lock = lib.logger.release_log_lock;
