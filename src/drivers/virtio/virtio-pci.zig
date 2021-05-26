@@ -1,3 +1,5 @@
+const std = @import("std");
+
 /// Descriptor iterator helper.
 pub const DescIter = struct {
   drv: *Driver,
@@ -103,7 +105,7 @@ pub const Driver = struct {
   }
 
   /// Negotiate feature bitmask with device, ZIG BUG, bad codegen without .Inline, no issue open
-  fn feature(drv: *Driver, i: u32, req: u32, opt: u32) callconv(.Inline) !void {
+  fn feature(drv: *Driver, i: u32, req: u32, opt: u32) callconv(if(@hasField(std.builtin.CallingConvention, "Inline")) .Inline else .Unspecified) !void {
     drv.cfg.device_feature_select = i;
     const f = drv.cfg.device_feature & (req | opt);
     if ((f & req) != req) return error.FeatureNotAvailable;
