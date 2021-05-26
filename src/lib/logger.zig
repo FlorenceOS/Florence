@@ -100,6 +100,9 @@ pub fn hexdump_obj(val: anytype) void {
 }
 
 pub fn hexdump(in_bytes: []const u8) void {
+    const l = os.get_log_lock();
+    defer os.release_log_lock(l);
+
     var bytes = in_bytes;
     while (bytes.len != 0) {
         log("{X:0>16}: ", .{@ptrToInt(bytes.ptr)});
