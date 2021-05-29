@@ -7,7 +7,7 @@ pub const SingleListener = struct {
     /// Value that will be used for blocking
     const BLOCK_VAL: usize = @divFloor(std.math.maxInt(usize), 2);
 
-    /// Index of last event that was aknowledged by the consumer
+    /// Index of last event that was acknowledged by the consumer
     last_ack: usize = 0,
     /// Index of last event that was triggered
     last_triggered: usize = 0,
@@ -18,7 +18,7 @@ pub const SingleListener = struct {
     /// True if thread can be woken up
     wakeup_allowed: bool = false,
 
-    /// Get the number of not aknowledged events
+    /// Get the number of not acknowledged events
     pub fn diff(self: *const @This()) usize {
         const triggered = @atomicLoad(usize, &self.last_triggered, .Acquire);
         if (triggered >= BLOCK_VAL) {

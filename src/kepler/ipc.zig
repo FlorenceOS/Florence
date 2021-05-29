@@ -530,9 +530,10 @@ pub const Stream = struct {
         if (self.assert_status(target, .Abandoned)) {
             return;
         }
-        self.notes[target.idx()].typ = if (peer == .Producer) .ProducerLeft else .ConsumerLeft;
-        self.notes[target.idx()].owner_ref = .{ .stream = self.borrow() };
-        try self.note_queues[target.idx()].send(&self.notes[target.idx()]);
+        const death_node = &self.death_notes[target.idx()];
+        death_node.typ = if (peer == .Producer) .ProducerLeft else .ConsumerLeft;
+        death_node.owner_ref = .{ .stream = self.borrow() };
+        try self.note_queues[target.idx()].send(death_node);
     }
 
     /// Abandon connection from a given peer's side

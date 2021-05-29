@@ -20,7 +20,7 @@ fn server_task(allocator: *std.mem.Allocator, server_noteq: *kepler.ipc.NoteQueu
     try connect_note.owner_ref.stream.accept();
     os.log("Request was accepted!\n", .{});
 
-    // Test 10000000 requests
+    // Test `tries` requests
     var i: usize = 0;
     var server_send_rdtsc: u64 = 0;
     var server_recv_rdtsc: u64 = 0;
@@ -89,7 +89,7 @@ fn client_task(
     conn.finalize_connection();
     os.log("Connection finalized!\n", .{});
 
-    // Test 10000000 requests
+    // Test `tries` requests
     var i: usize = 0;
     var client_send_rdtsc: usize = 0;
     var client_recv_rdtsc: usize = 0;
