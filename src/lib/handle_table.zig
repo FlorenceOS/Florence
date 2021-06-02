@@ -172,7 +172,6 @@ pub fn LockedHandleTable(comptime T: type) type {
 
         /// Initialize LockedHandleTable
         pub fn init(self: *@This(), allocator: *std.mem.Allocator) void {
-            self.mutex.init();
             self.table = HandleTable(T).init(allocator);
         }
 

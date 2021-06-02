@@ -26,11 +26,6 @@ pub fn MPSCUnboundedQueue(comptime T: type, comptime member_name: []const u8) ty
             return @fieldParentPtr(T, member_name, node);
         }
 
-        /// Create lock-free queue
-        pub fn init(self: *@This()) void {
-            self.* = .{};
-        }
-
         /// Enqueue element by reference to the node
         pub fn enqueue_impl(self: *@This(), node: *Node) void {
             node.next = null;
@@ -107,7 +102,6 @@ test "insertion tests" {
         val: u64,
     };
     var queue: MPSCUnboundedQueue(TestNode, "hook") = .{};
-    queue.init();
     var elems = [_]TestNode{
         .{ .val = 1 },
         .{ .val = 2 },

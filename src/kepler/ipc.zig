@@ -166,7 +166,7 @@ pub const NoteQueue = struct {
     /// Create notification stream object
     pub fn create(allocator: *std.mem.Allocator) !*@This() {
         const instance = try allocator.create(@This());
-        instance.queue.init();
+        instance.queue = .{};
         instance.ref_count = 1;
         instance.state = .Up;
         instance.allocator = allocator;

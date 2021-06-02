@@ -59,8 +59,4 @@ pub const Mutex = struct {
   pub fn held_by_me(self: *const @This()) bool {
     return @atomicLoad(?*os.thread.Task, &self.held_by, .Acquire) == os.platform.get_current_task();
   }
-
-  pub fn init(self: *@This()) void {
-    self.queue.init();
-  }
 };
