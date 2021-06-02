@@ -4,7 +4,7 @@ const atmcqueue = os.lib.atmcqueue;
 /// Task queue is a generic helper for the queue of tasks (allows to enqueue/dequeue them)
 /// It does no locking (though it disables interrupts) for its operations
 pub const TaskQueue = struct {
-  queue: atmcqueue.MPSCUnboundedQueue(os.thread.Task, "atmcqueue_hook") = undefined,
+  queue: atmcqueue.MPSCUnboundedQueue(os.thread.Task, "atmcqueue_hook") = .{},
   last_ack: usize = 0,
   last_triggered: usize = 0,
 
@@ -30,11 +30,6 @@ pub const TaskQueue = struct {
     _ = @atomicRmw(usize, &self.last_triggered, .Add, 1, .AcqRel);
     self.queue.enqueue(t);
     os.platform.set_interrupts(state);
-  }
-
-  /// Initialize atomic queue used to store tasks
-  pub fn init(self: *@This()) void {
-    self.queue.init();
   }
 };
 
@@ -76,7 +71,6 @@ pub const ReadyQueue = struct {
 
   /// Initialize atomic queue used to store tasks
   pub fn init(self: *@This(), cpu: *os.platform.smp.CoreData) void {
-    self.queue.init();
     self.cpu = cpu;
   }
 };

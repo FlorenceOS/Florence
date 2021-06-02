@@ -215,8 +215,6 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     os.log("Stivale2: Registered status UART\n", .{});
   }
 
-  os.memory.pmm.init();
-
   os.log(
     \\Bootloader: {s}
     \\Bootloader version: {s}

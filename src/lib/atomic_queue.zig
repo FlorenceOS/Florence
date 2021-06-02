@@ -10,11 +10,11 @@ pub const Node = struct {
 pub fn MPSCUnboundedQueue(comptime T: type, comptime member_name: []const u8) type {
     return struct {
         /// Head of the queue
-        head: *Node,
+        head: ?*Node = null,
         /// Tail of the queue
-        tail: *Node,
+        tail: ?*Node = null,
         /// Dummy node
-        dummy: Node,
+        dummy: Node = .{ .next = null },
 
         /// Convert reference to T to reference to atomic queue node
         fn ref_to_node(ref: *T) *Node {
@@ -26,28 +26,10 @@ pub fn MPSCUnboundedQueue(comptime T: type, comptime member_name: []const u8) ty
             return @fieldParentPtr(T, member_name, node);
         }
 
-        /// Convert nullable reference to T to mullable reference to atomic queue node
-        fn ref_to_node_opt(ref: *T) *Node {
-            return if (ref) |ref_nonnull| ref_to_node(ref_nonnull) else null;
-        }
-
-        /// Convert mullable reference to atomic queue node to nullable reference to T
-        fn node_to_ref_opt(node: *Node) *T {
-            return if (node) |node_nonnull| node_to_ref(node_nonnull) else null;
-        }
-
-        /// Create lock-free queue
-        pub fn init(self: *@This()) void {
-            self.head = &self.dummy;
-            self.tail = self.head;
-            self.head.next = null;
-        }
-
         /// Enqueue element by reference to the node
         pub fn enqueue_impl(self: *@This(), node: *Node) void {
-            // We don't want this to be reordered (as otherwise next may be not null). Use .Release
-            @atomicStore(?*Node, &node.next, null, .Release);
-            const prev = @atomicRmw(*Node, &self.head, .Xchg, node, .AcqRel);
+            node.next = null;
+            const prev = @atomicRmw(?*Node, &self.head, .Xchg, node, .AcqRel) orelse &self.dummy;
             @atomicStore(?*Node, &prev.next, node, .Release);
         }
 
@@ -58,17 +40,21 @@ pub fn MPSCUnboundedQueue(comptime T: type, comptime member_name: []const u8) ty
 
         /// Try to dequeue
         pub fn dequeue(self: *@This()) ?*T {
-            // Consumer thread will also have consistent
-            // view of tail, as its the one
-            // that reads it / writes to it
-            var tail = self.tail;
+            // Consumer thread will always have consistent view of tail, as its the one that reads
+            // it / writes to it
+            var tail: *Node = undefined;
+            if (self.tail) |node| {
+                tail = node;
+            } else {
+                tail = &self.dummy;
+                self.tail = tail;
+            }
             // Load next with acquire, as we don't want that to be reordered
             var next = @atomicLoad(?*Node, &tail.next, .Acquire);
             // Make sure that queue tail is not pointing at dummy element
             if (tail == &self.dummy) {
                 if (next) |next_nonnull| {
-                    // Skip dummy element. At this point,
-                    // there is not a single pointer to dummy
+                    // Skip dummy element. At this point, there is not a single pointer to dummy
                     self.tail = next_nonnull;
                     tail = next_nonnull;
                     next = @atomicLoad(?*Node, &tail.next, .Acquire);
@@ -88,7 +74,7 @@ pub fn MPSCUnboundedQueue(comptime T: type, comptime member_name: []const u8) ty
             // Tail exists, but next has not existed (it may now as code is lock free)
             // Check if head points to the same element as tail
             // (there is actually only one element)
-            var head = @atomicLoad(*Node, &self.head, .Acquire);
+            var head = @atomicLoad(?*Node, &self.head, .Acquire) orelse &self.dummy;
             // If tail != head, update is going on, as head was not linked with
             // next pointer
             // Condvar should pick up push event
@@ -115,8 +101,7 @@ test "insertion tests" {
         hook: Node = undefined,
         val: u64,
     };
-    var queue: MPSCUnboundedQueue(TestNode, "hook") = undefined;
-    queue.init();
+    var queue: MPSCUnboundedQueue(TestNode, "hook") = .{};
     var elems = [_]TestNode{
         .{ .val = 1 },
         .{ .val = 2 },

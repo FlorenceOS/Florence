@@ -9,7 +9,6 @@ var sbrk_head: usize = undefined;
 
 pub fn init(phys_high: usize) !void {
   os.log("Initializing vmm with base 0x{X}\n", .{phys_high});
-  sbrk_mutex.init();
   sbrk_head = phys_high;
 }
 

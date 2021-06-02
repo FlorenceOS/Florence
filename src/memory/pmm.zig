@@ -119,7 +119,3 @@ pub fn phys_to_write_combining_virt(phys: usize) usize {
 pub fn phys_to_write_back_virt(phys: usize) usize {
     return os.memory.paging.kernel_context.phys_to_write_back_virt(phys);
 }
-
-pub fn init() void {
-    pmm_mutex.init();
-}
