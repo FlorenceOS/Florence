@@ -484,15 +484,6 @@ pub const Stream = struct {
 
     /// React to the join request by sending accept/request note
     fn react(self: *@This(), typ: Note.Type) !void {
-        // Check that consumer and producer both have pending status
-        if (!self.is_pending()) {
-            // If we have sent a response already, return
-            // .ResponseAlreadySent error
-            if (self.assert_status(.Producer, .ResponseSent)) {
-                return error.ResponseAlreadySent;
-            }
-            return error.ConnectionEstablished;
-        }
         // Transition to .ResponseAlreadySent state
         @atomicStore(PeerStatus, &self.status[Peer.Producer.idx()], .ResponseSent, .Release);
         // Send message
@@ -520,6 +511,9 @@ pub const Stream = struct {
 
     /// Accept join request
     pub fn accept(self: *@This()) !void {
+        if (!self.is_pending()) {
+            return error.NotPending;
+        }
         try self.react(.RequestAccepted);
     }
 
@@ -538,8 +532,9 @@ pub const Stream = struct {
 
     /// Abandon connection from a given peer's side
     pub fn abandon(self: *@This(), peer: Peer) void {
+        const pending = self.is_pending();
         @atomicStore(PeerStatus, &self.status[peer.idx()], .Abandoned, .Release);
-        if (self.is_pending()) {
+        if (pending) {
             if (peer == .Producer) {
                 self.react(.RequestDenied) catch {};
             }
