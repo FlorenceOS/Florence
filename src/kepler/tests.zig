@@ -2,7 +2,7 @@ const std = @import("std");
 const os = @import("root").os;
 const kepler = os.kepler;
 
-const tries = 100_000;
+const tries = 1_000_000;
 
 fn kepler_assert(condition: bool, comptime panic_msg: []const u8) void {
     if (!condition) @panic("kepler tests failed: " ++ panic_msg);
@@ -13,7 +13,8 @@ fn server_task(allocator: *std.mem.Allocator, server_noteq: *kepler.ipc.NoteQueu
     server_noteq.wait();
     const connect_note = server_noteq.try_recv() orelse unreachable;
     kepler_assert(connect_note.typ == .RequestPending, "Not .RequestPending node was recieved");
-    const conn = connect_note.owner_ref.stream;
+    const conn = connect_note.owner_ref.stream.borrow();
+    connect_note.drop();
     os.log(".Request note recieved!\n", .{});
 
     // Accept the requests
@@ -168,6 +169,86 @@ fn notifications(allocator: *std.mem.Allocator) !void {
     // Launch server task inline
     try server_task(allocator, server_noteq);
     os.log("Server has terminated! Let's hope that client would finish as needed", .{});
+}
+
+fn rejection(allocator: *std.mem.Allocator) !void {
+    os.log("\nRejection test...\n", .{});
+    // Server notificaiton queue
+    const server_noteq = try kepler.ipc.NoteQueue.create(allocator);
+    os.log("Created server queue!\n", .{});
+    // Client notification queue
+    const client_noteq = try kepler.ipc.NoteQueue.create(allocator);
+    os.log("Created client queue!\n", .{});
+    // Server endpoint
+    const endpoint = try kepler.ipc.Endpoint.create(allocator, server_noteq);
+    os.log("Created server endpoint!\n", .{});
+    // Stream connection object
+    const conn_params = kepler.ipc.Stream.UserspaceInfo{
+        .consumer_rw_buf_size = 1024,
+        .producer_rw_buf_size = 1024,
+        .obj_mailbox_size = 16,
+    };
+    const conn = try kepler.ipc.Stream.create(allocator, client_noteq, endpoint, conn_params);
+    os.log("Created connection!\n", .{});
+    // Get .Request note
+    server_noteq.wait();
+    const connect_note = server_noteq.try_recv() orelse unreachable;
+    kepler_assert(connect_note.typ == .RequestPending, "Not .RequestPending node was recieved");
+    const server_conn = connect_note.owner_ref.stream.borrow();
+    connect_note.drop();
+    os.log("Request recieved\n", .{});
+    // Reject connection
+    server_conn.abandon(.Producer);
+    os.log("Connection denied\n", .{});
+    // Client should get .RequestDenied note
+    client_noteq.wait();
+    const denied_note = client_noteq.try_recv() orelse unreachable;
+    kepler_assert(denied_note.typ == .RequestDenied, "Not .RequestDenied note was recieved");
+    denied_note.drop();
+    os.log("Request denied note was recieved!\n", .{});
+    conn.drop();
+    server_noteq.terminate();
+    client_noteq.terminate();   
+}
+
+fn late_accept(allocator: *std.mem.Allocator) !void {
+    os.log("\nLate accept test...\n", .{});
+    // Server notificaiton queue
+    const server_noteq = try kepler.ipc.NoteQueue.create(allocator);
+    os.log("Created server queue!\n", .{});
+    // Client notification queue
+    const client_noteq = try kepler.ipc.NoteQueue.create(allocator);
+    os.log("Created client queue!\n", .{});
+    // Server endpoint
+    const endpoint = try kepler.ipc.Endpoint.create(allocator, server_noteq);
+    os.log("Created server endpoint!\n", .{});
+    // Stream connection object
+    const conn_params = kepler.ipc.Stream.UserspaceInfo{
+        .consumer_rw_buf_size = 1024,
+        .producer_rw_buf_size = 1024,
+        .obj_mailbox_size = 16,
+    };
+    const conn = try kepler.ipc.Stream.create(allocator, client_noteq, endpoint, conn_params);
+    os.log("Created connection!\n", .{});
+    // Get .Request note
+    server_noteq.wait();
+    const connect_note = server_noteq.try_recv() orelse unreachable;
+    kepler_assert(connect_note.typ == .RequestPending, "Not .RequestPending node was recieved");
+    const server_conn = connect_note.owner_ref.stream.borrow();
+    connect_note.drop();
+    os.log("Request recieved\n", .{});
+    // Shutdown connection from consumer
+    conn.abandon(.Consumer);
+    // Send accept note
+    if (server_conn.accept()) {
+        @panic("No error in late accept test");
+    } else |err| {
+        kepler_assert(err == error.NotPending, "Not error.NotPending");
+    }
+    os.log("Thread unreachable error was recieved\n", .{});
+    conn.abandon(.Producer);
+    client_noteq.terminate();
+    server_noteq.terminate();
 }
 
 fn memory_objects(allocator: *std.mem.Allocator) !void {
@@ -422,6 +503,8 @@ pub fn run_tests() !void {
     const allocator = &fixed_buffer.allocator;
 
     try notifications(allocator);
+    try rejection(allocator);
+    try late_accept(allocator);
     try memory_objects(allocator);
     try object_passing(allocator);
     try locked_handles(allocator);
