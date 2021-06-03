@@ -9,6 +9,3 @@ pub const handle_table = @import("handle_table.zig");
 
 /// Red-black tree
 pub const rbtree = @import("rbtree.zig");
-
-/// Ring buffer
-pub const ringbuffer = @import("ringbuffer.zig");
