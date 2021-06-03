@@ -1,13 +1,12 @@
 const std = @import("std");
 const exec = @import("../../buildutil/exec.zig");
+const config = @import("../../config/config.zig");
 
 pub fn buildKernel(params: struct {
     builder: *std.build.Builder,
     arch: std.builtin.Arch,
     boot_proto: []const u8 = "stivale2",
     mode: ?std.builtin.Mode = null,
-    build_source_blob: bool = true,
-    strip_symbols: bool = false,
 }) *std.build.LibExeObjStep {
     const arch = params.arch;
     const proto = params.boot_proto;
@@ -23,7 +22,7 @@ pub fn buildKernel(params: struct {
         .ctx = .kernel,
         .filename = kernel_filename,
         .main = main_file,
-        .source_blob = if (params.build_source_blob)
+        .source_blob = if (config.kernel.build_source_blob)
             .{
                 .global_source_path = flork_path ++ "/src",
                 .source_blob_name = kernel_filename,
@@ -31,7 +30,7 @@ pub fn buildKernel(params: struct {
         else
             null,
         .mode = params.mode,
-        .strip_symbols = params.strip_symbols,
+        .strip_symbols = config.kernel.strip_symbols,
     });
 
     kernel.addAssemblyFile(params.builder.fmt(flork_path ++ "src/boot/{s}_{s}.S", .{

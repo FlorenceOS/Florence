@@ -1,6 +1,12 @@
 pub const kernel = .{
   // Max number of CPU cores to use
   .max_cpus = 0x200,
+
+  // True if symbols should be stripped
+  .strip_symbols = false,
+
+  // True if source blob should be created
+  .build_source_blob = true,
   
   .x86_64 = .{
     // Allow using the `syscall` instruction to do syscalls
