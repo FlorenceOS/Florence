@@ -75,7 +75,7 @@ pub const InterruptFrame = struct {
   }
 
   pub fn trace_stack(self: *const @This()) void {
-    os.lib.debug.dump_frame(self.x29, self.pc);
+    os.kernel.debug.dump_frame(self.x29, self.pc);
   }
 };
 

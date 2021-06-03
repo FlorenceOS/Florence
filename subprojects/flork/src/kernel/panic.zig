@@ -26,7 +26,7 @@ pub fn panic(message_in: ?[]const u8, stack_trace: ?*StackTrace) noreturn {
 
     if (stack_trace) |trace| {
         os.log("TODO: print stack trace.\nI bet this is very helpful. No problem.\n", .{});
-        os.lib.debug.dump_stack_trace(trace);
+        os.kernel.debug.dump_stack_trace(trace);
     } else {
         os.log("idfk I didn't get a stack trace.\n", .{});
     }
