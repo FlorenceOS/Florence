@@ -440,8 +440,10 @@ fn locked_handles(allocator: *std.mem.Allocator) !void {
 }
 
 fn locked_handle_table(allocator: *std.mem.Allocator) !void {
+    const Table = lib.containers.handle_table.LockedHandleTable(u64, os.thread.Mutex);
+
     os.log("\nLocked handle table test...\n", .{});
-    var instance: lib.containers.handle_table.LockedHandleTable(u64) = .{};
+    var instance: Table = .{};
     instance.init(allocator);
 
     const result1 = try instance.new_cell();
@@ -467,7 +469,7 @@ fn locked_handle_table(allocator: *std.mem.Allocator) !void {
 
         pub fn dispose(
             self: *@This(),
-            loc: lib.containers.handle_table.LockedHandleTable(u64).Location,
+            loc: Table.Location,
         ) void {
             self.called += 1;
         }

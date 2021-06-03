@@ -1,5 +1,4 @@
 const std = @import("std");
-const os = @import("root").os;
 
 /// HandleTable is the class for table of generic handles
 /// It manages a map from integers to handles (type T)
@@ -157,10 +156,8 @@ test "handle_table" {
     std.testing.expect(disposer.called);
 }
 
-/// Locked handle table is a wrapper on HandleTable that
-/// allows only one reader/writer using os.thread.Mutex
-/// TODO: generic Lock trait for migration from kernel code
-pub fn LockedHandleTable(comptime T: type) type {
+/// Locked handle table is a wrapper on HandleTable that allows only one reader/writer using lock
+pub fn LockedHandleTable(comptime T: type, comptime Lock: type) type {
     return struct {
         /// Location type that is reused from HandleTable
         pub const Location = HandleTable(T).Location;
@@ -168,7 +165,7 @@ pub fn LockedHandleTable(comptime T: type) type {
         /// Handle table itself
         table: HandleTable(T) = undefined,
         /// Protecting lock
-        mutex: os.thread.Mutex = .{},
+        mutex: Lock = .{},
 
         /// Initialize LockedHandleTable
         pub fn init(self: *@This(), allocator: *std.mem.Allocator) void {
@@ -200,15 +197,11 @@ pub fn LockedHandleTable(comptime T: type) type {
 
         /// Deinitialize the table
         pub fn deinit(self: *@This(), comptime disposer_type: type, disposer: *disposer_type) void {
-            self.mutex.lock();
             self.table.deinit(disposer_type, disposer);
         }
 
         /// Unlock the table
         pub fn unlock(self: *@This()) void {
-            if (!self.mutex.held_by_me()) {
-                @panic("LMAO");
-            }
             self.mutex.unlock();
         }
     };
