@@ -1,5 +1,8 @@
 const std = @import("std");
+
 pub const os = @import("../os.zig");
+pub const lib = @import("../../../../lib/lib.zig");
+pub const config = @import("../../../../config/config.zig");
 
 const stivale = @import("stivale_common.zig");
 

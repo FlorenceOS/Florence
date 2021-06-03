@@ -4,150 +4,15 @@ const builtin = std.builtin;
 const assert = std.debug.assert;
 
 const sabaton = @import("boot/Sabaton/build.zig");
-
-const Context = enum {
-    kernel,
-    blobspace,
-    userspace,
-};
-
-var source_blob: *std.build.RunStep = undefined;
-var source_blob_path: []u8 = undefined;
-
-fn make_source_blob(b: *Builder) void {
-    source_blob_path = b.fmt("{s}/sources.tar", .{b.cache_root});
-
-    source_blob = b.addSystemCommand(
-        &[_][]const u8{
-            "tar", "--no-xattrs", "-cf", source_blob_path, "src", "build.zig",
-        },
-    );
-}
-
-fn target(exec: *std.build.LibExeObjStep, arch: builtin.Arch, context: Context) void {
-    var disabled_features = std.Target.Cpu.Feature.Set.empty;
-    var enabled_feautres = std.Target.Cpu.Feature.Set.empty;
-
-    switch (arch) {
-        .x86_64 => {
-            const features = std.Target.x86.Feature;
-            if (context == .kernel) {
-                // Disable SIMD registers
-                disabled_features.addFeature(@enumToInt(features.mmx));
-                disabled_features.addFeature(@enumToInt(features.sse));
-                disabled_features.addFeature(@enumToInt(features.sse2));
-                disabled_features.addFeature(@enumToInt(features.avx));
-                disabled_features.addFeature(@enumToInt(features.avx2));
-
-                enabled_feautres.addFeature(@enumToInt(features.soft_float));
-                exec.code_model = .kernel;
-            } else {
-                exec.code_model = .small;
-            }
-        },
-        .aarch64 => {
-            const features = std.Target.aarch64.Feature;
-            if (context == .kernel) {
-                // This is equal to -mgeneral-regs-only
-                disabled_features.addFeature(@enumToInt(features.fp_armv8));
-                disabled_features.addFeature(@enumToInt(features.crypto));
-                disabled_features.addFeature(@enumToInt(features.neon));
-            }
-            exec.code_model = .small;
-        },
-        .riscv64 => {
-            // idfk
-            exec.code_model = .small;
-        },
-        else => unreachable,
-    }
-
-    exec.disable_stack_probing = switch (context) {
-        .kernel => true,
-        .blobspace => true,
-        else => false,
-    };
-
-    exec.setTarget(.{
-        .cpu_arch = arch,
-        .os_tag = std.Target.Os.Tag.freestanding,
-        .abi = std.Target.Abi.none,
-        .cpu_features_sub = disabled_features,
-        .cpu_features_add = enabled_feautres,
-    });
-}
-
-fn add_libs(exec: *std.build.LibExeObjStep) void {
-}
-
-fn make_exec(b: *Builder, arch: builtin.Arch, ctx: Context, filename: []const u8, main: []const u8) *std.build.LibExeObjStep {
-    const exec = b.addExecutable(filename, main);
-    exec.addBuildOption([]const u8, "source_blob_path", b.fmt("../../{s}", .{source_blob_path}));
-    target(exec, arch, ctx);
-    add_libs(exec);
-    exec.setBuildMode(.ReleaseSafe);
-    exec.strip = false;
-    if(@hasField(@TypeOf(exec.*), "want_lto"))
-        exec.want_lto = false;
-    exec.setMainPkgPath("src/");
-    exec.setOutputDir(b.cache_root);
-
-    exec.install();
-
-    exec.step.dependOn(&source_blob.step);
-
-    return exec;
-}
-
-fn build_kernel(b: *Builder, arch: builtin.Arch, name: []const u8) *std.build.LibExeObjStep {
-    const kernel_filename = b.fmt("Flork_{s}_{s}", .{ name, @tagName(arch) });
-    const main_file = b.fmt("src/boot/{s}.zig", .{name});
-
-    const kernel = make_exec(b, arch, .kernel, kernel_filename, main_file);
-    kernel.addAssemblyFile(b.fmt("src/boot/{s}_{s}.S", .{ name, @tagName(arch) }));
-    kernel.setLinkerScriptPath("src/kernel/kernel.ld");
-
-    const laipath = "src/extern/lai/";
-    kernel.addIncludeDir(laipath ++ "include/");
-    const laiflags = &[_][]const u8{"-std=c99"};
-    kernel.addCSourceFile(laipath ++ "core/error.c", laiflags);
-    kernel.addCSourceFile(laipath ++ "core/eval.c", laiflags);
-    kernel.addCSourceFile(laipath ++ "core/exec-operand.c", laiflags);
-    kernel.addCSourceFile(laipath ++ "core/exec.c", laiflags);
-    kernel.addCSourceFile(laipath ++ "core/libc.c", laiflags);
-    kernel.addCSourceFile(laipath ++ "core/ns.c", laiflags);
-    kernel.addCSourceFile(laipath ++ "core/object.c", laiflags);
-    kernel.addCSourceFile(laipath ++ "core/opregion.c", laiflags); 
-    kernel.addCSourceFile(laipath ++ "core/os_methods.c", laiflags);
-    kernel.addCSourceFile(laipath ++ "core/variable.c", laiflags);
-    kernel.addCSourceFile(laipath ++ "core/vsnprintf.c", laiflags);
-    kernel.addCSourceFile(laipath ++ "drivers/ec.c", laiflags);
-    kernel.addCSourceFile(laipath ++ "drivers/timer.c", laiflags);
-    if(arch == .x86_64)
-        kernel.addCSourceFile(laipath ++ "helpers/pc-bios.c", laiflags);
-    kernel.addCSourceFile(laipath ++ "helpers/pci.c", laiflags);
-    kernel.addCSourceFile(laipath ++ "helpers/pm.c", laiflags);
-    kernel.addCSourceFile(laipath ++ "helpers/resource.c", laiflags);
-    kernel.addCSourceFile(laipath ++ "helpers/sci.c", laiflags);
-
-    //kernel.step.dependOn(&build_dyld(b, arch).step);
-
-    return kernel;
-}
-
-fn build_dyld(b: *Builder, arch: builtin.Arch) *std.build.LibExeObjStep {
-    const dyld_filename = b.fmt("Dyld_", .{@tagName(arch)});
-
-    const dyld = make_exec(b, arch, .blobspace, dyld_filename, "src/userspace/dyld/dyld.zig");
-    dyld.setLinkerScriptPath("src/userspace/dyld/dyld.ld");
-
-    return dyld;
-}
+const flork = @import("subprojects/flork/build.zig");
 
 fn qemu_run_aarch64_sabaton(b: *Builder, board_name: []const u8, desc: []const u8) !void {
     const sabaton_blob = try sabaton.build_blob(b, .aarch64, board_name, "boot/Sabaton/");
 
-    const flork = build_kernel(b, .aarch64, "stivale2");
+    const kernel_step = flork.buildKernel(.{
+        .builder = b, 
+        .arch = .aarch64,
+    });
 
     const command_step = b.step(board_name, desc);
 
@@ -156,7 +21,7 @@ fn qemu_run_aarch64_sabaton(b: *Builder, board_name: []const u8, desc: []const u
         "-M", board_name, 
         "-cpu", "cortex-a57",
         "-drive", b.fmt("if=pflash,format=raw,file={s},readonly=on", .{sabaton_blob.output_path}),
-        "-fw_cfg", b.fmt("opt/Sabaton/kernel,file={s}", .{flork.getOutputPath()}),
+        "-fw_cfg", b.fmt("opt/Sabaton/kernel,file={s}", .{kernel_step.getOutputPath()}),
         "-m", "4G",
         "-serial", "stdio",
         //"-S", "-s",
@@ -168,7 +33,7 @@ fn qemu_run_aarch64_sabaton(b: *Builder, board_name: []const u8, desc: []const u
 
     const run_step = b.addSystemCommand(params);
     run_step.step.dependOn(&sabaton_blob.step);
-    run_step.step.dependOn(&flork.step);
+    run_step.step.dependOn(&kernel_step.step);
     command_step.dependOn(&run_step.step);
 }
 
@@ -260,8 +125,6 @@ fn limine_target(b: *Builder, command: []const u8, desc: []const u8, image_path:
 }
 
 pub fn build(b: *Builder) !void {
-    const sources = make_source_blob(b);
-
     // try qemu_run_aarch64_sabaton(
     //     b,
     //     "raspi3",
@@ -286,6 +149,9 @@ pub fn build(b: *Builder) !void {
         "Run x86_64 kernel with limine stivale2",
         b.fmt("{s}/stivale2.img", .{b.cache_root}),
         "boot/stivale2_image",
-        build_kernel(b, builtin.Arch.x86_64, "stivale2"),
+        flork.buildKernel(.{
+            .builder = b, 
+            .arch = .x86_64,
+        }),
     );
 }

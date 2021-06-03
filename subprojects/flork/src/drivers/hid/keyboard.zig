@@ -1,4 +1,5 @@
 const os = @import("root").os;
+const config = @import("root").config;
 const std = @import("std");
 
 pub const layouts = @import("keyboard_layouts.zig");
@@ -13,7 +14,7 @@ const pressed_state = std.PackedIntArray(bool, @typeInfo(keys.Location).Enum.fie
 
 pub const KeyboardState = struct {
   is_pressed: pressed_state = std.mem.zeroInit(pressed_state, .{}),
-  layout: layouts.KeyboardLayout = os.config.user.keyboard_layout,
+  layout: layouts.KeyboardLayout = config.user.keyboard_layout,
 
   pub fn pressed(self: *const @This(), location: keys.Location) bool {
     return self.is_pressed.get(@enumToInt(location));

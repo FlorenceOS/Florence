@@ -1,4 +1,5 @@
 const os = @import("root").os;
+const config = @import("root").config;
 const regs = @import("regs.zig");
 const std = @import("std");
 const builtin = @import("builtin");
@@ -155,7 +156,7 @@ fn gsi_to_ioapic(gsi: u32) u8 {
   @panic("Can't find ioapic for gsi!");
 }
 
-var ioapics = [1]?IOAPIC{null} ** os.config.kernel.x86_64.max_ioapics;
+var ioapics = [1]?IOAPIC{null} ** config.kernel.x86_64.max_ioapics;
 
 pub fn handle_madt(madt: []u8) void {
   os.log("APIC: Got MADT (size={x})\n", .{madt.len});

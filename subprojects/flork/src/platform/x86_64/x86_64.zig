@@ -1,4 +1,5 @@
 const os = @import("root").os;
+const config = @import("root").config;
 const std = @import("std");
 
 const interrupts = @import("interrupts.zig");
@@ -22,7 +23,7 @@ pub const InterruptState = interrupts.InterruptState;
 pub const irq_eoi = apic.eoi;
 
 fn setup_syscall_instr() void {
-  if(comptime !os.config.kernel.x86_64.allow_syscall_instr)
+  if(comptime !config.kernel.x86_64.allow_syscall_instr)
     return;
 
   regs.IA32_LSTAR.write(@ptrToInt(interrupts.syscall_handler));
@@ -60,7 +61,7 @@ pub fn platform_init() !void {
   try os.platform.acpi.init_acpi();
   set_interrupts(true);
 
-  if(comptime(os.config.kernel.x86_64.ps2.enable_keyboard)) {
+  if(comptime(config.kernel.x86_64.ps2.enable_keyboard)) {
     const ps2 = @import("ps2.zig");
     ps2.kb_interrupt_vector = interrupts.allocate_vector();
     os.log("PS2 keyboard: vector 0x{X}\n", .{ps2.kb_interrupt_vector});

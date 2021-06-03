@@ -1,10 +1,11 @@
 const std = @import("std");
 const os = @import("root").os;
+const config = @import("root").config;
 
 const CoreID = os.platform.CoreID;
 
 /// Maximum number of supported CPUs
-const max_cpus = comptime os.config.kernel.max_cpus;
+const max_cpus = comptime config.kernel.max_cpus;
 
 /// CPUs data
 var core_datas: [max_cpus]CoreData = [1]CoreData{undefined} ** max_cpus;

@@ -8,5 +8,5 @@
 	path = boot/echfs
 	url = https://github.com/echfs/echfs
 [submodule "src/extern/lai"]
-	path = src/extern/lai
+	path = subprojects/flork/src/extern/lai
 	url = https://github.com/managarm/lai.git
