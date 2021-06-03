@@ -7,9 +7,6 @@ pub const bitset = @import("bitset.zig");
 /// Alignment library
 pub const libalign = @import("libalign.zig");
 
-/// Packed integers library
-pub const packed_int = @import("packed_int.zig");
-
 /// Comptime ranges library
 pub const range = @import("range.zig");
 
