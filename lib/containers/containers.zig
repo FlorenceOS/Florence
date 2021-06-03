@@ -1,9 +1,6 @@
 /// Atomic queues
 pub const atomic_queue = @import("atomic_queue.zig");
 
-/// Comptime buddy allocator
-pub const buddy = @import("buddy.zig");
-
 /// Handle table.
 pub const handle_table = @import("handle_table.zig");
 
