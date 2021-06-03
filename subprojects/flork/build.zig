@@ -14,7 +14,6 @@ pub fn buildKernel(params: struct {
     const flork_path = "subprojects/flork/";
 
     const kernel_filename = params.builder.fmt("Flork_{s}_{s}", .{ proto, @tagName(arch) });
-    std.log.emerg("{s}\n", .{kernel_filename});
     const main_file = params.builder.fmt(flork_path ++ "src/boot/{s}.zig", .{proto});
 
     // For some reason if I define this directly in exec.makeExec param struct, it will

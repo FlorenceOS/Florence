@@ -3,7 +3,7 @@ const os = @import("root").os;
 const lib = @import("root").lib;
 
 const paging     = os.memory.paging;
-const RangeAlloc = lib.memory.range_alloc.RangeAlloc;
+const RangeAlloc = os.memory.range_alloc.RangeAlloc;
 const Mutex      = os.thread.Mutex;
 
 var sbrk_head: usize = undefined;
