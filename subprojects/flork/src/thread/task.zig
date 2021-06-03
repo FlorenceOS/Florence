@@ -1,5 +1,6 @@
 const os = @import("root").os;
-const atmcqueue = os.lib.atmcqueue;
+const lib = @import("root").lib;
+const atomic_queue = lib.containers.atomic_queue;
 
 const guard_size = os.platform.thread.stack_guard_size;
 const map_size = os.platform.thread.task_stack_size;
@@ -18,7 +19,7 @@ pub const Task = struct {
   platform_data: os.platform.thread.TaskData = undefined,
 
   /// Hook for the task queue
-  atmcqueue_hook: atmcqueue.Node = undefined,
+  atomic_queue_hook: atomic_queue.Node = undefined,
 
   /// Virtual memory space task runs in
   paging_context: *os.platform.paging.PagingContext = undefined,

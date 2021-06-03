@@ -1,7 +1,8 @@
 const os = @import("root").os;
+const lib = @import("root").lib;
 const std = @import("std");
 
-const range = os.lib.range.range;
+const range = lib.util.range.range;
 
 const paging = os.memory.paging;
 const pmm    = os.memory.pmm;

@@ -1,6 +1,7 @@
 const os = @import("root").os;
+const lib = @import("root").lib;
 const std = @import("std");
-const libalign = os.lib.libalign;
+const libalign = lib.util.libalign;
 
 /// Class that handles calling a function with any arguments on a new stack
 /// Used as a helper for task creation in platform-specific code

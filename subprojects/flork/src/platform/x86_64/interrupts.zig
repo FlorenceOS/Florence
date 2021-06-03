@@ -1,8 +1,9 @@
 const std = @import("std");
 const os = @import("root").os;
+const lib = @import("root").lib;
 
 const platform  = os.platform;
-const range     = os.lib.range.range;
+const range     = lib.util.range.range;
 const scheduler = os.thread.scheduler;
 
 const idt = @import("idt.zig");

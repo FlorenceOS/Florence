@@ -1,7 +1,8 @@
 const os = @import("root").os;
 const std = @import("std");
+const lib = @import("root").lib;
 const builtin = std.builtin;
-const atmcqueue = os.lib.atmcqueue;
+const atomic_queue = lib.containers.atomic_queue;
 const thread = os.thread;
 const kepler = os.kepler;
 
@@ -65,7 +66,7 @@ pub const Note = struct {
     };
 
     /// Hook for the atomic queue in NoteQueue
-    hook: atmcqueue.Node = undefined,
+    hook: atomic_queue.Node = undefined,
     /// Type of the notification
     typ: Type,
     /// Borrowed reference to the owner
@@ -153,7 +154,7 @@ pub const NoteQueue = struct {
     };
 
     /// Atomic queue that acts as a contatiner for the messages
-    queue: atmcqueue.MPSCUnboundedQueue(Note, "hook"),
+    queue: atomic_queue.MPSCUnboundedQueue(Note, "hook"),
     /// Event object to listen for incoming messages
     event: thread.SingleListener,
     /// Refernce count

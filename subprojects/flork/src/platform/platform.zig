@@ -1,4 +1,5 @@
 const os = @import("root").os;
+const lib = @import("root").lib;
 const std = @import("std");
 
 // Submodules
@@ -29,7 +30,7 @@ fn attempt_handle_physmem_page_fault(base: usize, addr: usize, map_type: os.plat
   if(base <= addr and addr < base + os.memory.paging.kernel_context.max_phys) {
     // Map 1G of this memory
     const phys = addr - base;
-    const phys_gb_aligned = os.lib.libalign.align_down(usize, 1024 * 1024 * 1024, phys);
+    const phys_gb_aligned = lib.util.libalign.align_down(usize, 1024 * 1024 * 1024, phys);
 
     os.vital(os.memory.paging.map_phys(.{
       .virt = base + phys_gb_aligned,

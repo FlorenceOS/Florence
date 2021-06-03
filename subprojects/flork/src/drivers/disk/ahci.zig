@@ -1,4 +1,5 @@
 const os = @import("root").os;
+const lib = @import("root").lib;
 const std = @import("std");
 const builtin = @import("builtin");
 
@@ -13,8 +14,8 @@ const scheduler = os.thread.scheduler;
 const abar_size = 0x1100;
 const port_control_registers_size = 0x80;
 
-const bf = os.lib.bitfields;
-const libalign = os.lib.libalign;
+const bf = lib.util.bitfields;
+const libalign = lib.util.libalign;
 
 const Port = packed struct {
     command_list_base: [2]u32,

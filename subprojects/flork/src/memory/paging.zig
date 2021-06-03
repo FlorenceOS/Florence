@@ -1,12 +1,13 @@
 const os = @import("root").os;
+const lib = @import("root").lib;
 
 const platform = os.platform;
 
 const log = os.log;
 
-const libalign      = os.lib.libalign;
-const range         = os.lib.range.range;
-const range_reverse = os.lib.range.range_reverse;
+const libalign      = lib.util.libalign;
+const range         = lib.util.range.range;
+const range_reverse = lib.util.range.range_reverse;
 
 const pmm = os.memory.pmm;
 

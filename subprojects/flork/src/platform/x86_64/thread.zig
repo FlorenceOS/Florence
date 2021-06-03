@@ -1,4 +1,5 @@
 const os = @import("root").os;
+const lib = @import("root").lib;
 const std = @import("std");
 
 const gdt = @import("gdt.zig");
@@ -67,7 +68,7 @@ pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry)
 
   new_task.registers.eflags = regs.eflags();
   new_task.registers.rdi = @ptrToInt(entry);
-  new_task.registers.rsp = os.lib.libalign.align_down(usize, 16, @ptrToInt(entry));
+  new_task.registers.rsp = lib.util.libalign.align_down(usize, 16, @ptrToInt(entry));
   new_task.registers.cs = gdt.selector.code64;
   new_task.registers.ss = gdt.selector.data64;
   new_task.registers.es = gdt.selector.data64;

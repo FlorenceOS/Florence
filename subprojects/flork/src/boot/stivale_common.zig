@@ -1,8 +1,9 @@
 const os = @import("root").os;
+const lib = @import("root").lib;
 
 const paging   = os.memory.paging;
 const platform = os.platform;
-const libalign = os.lib.libalign;
+const libalign = lib.util.libalign;
 
 const std = @import("std");
 

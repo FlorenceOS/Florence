@@ -6,6 +6,20 @@ pub const logger = @import("logger.zig");
 pub const panic = @import("panic.zig");
 pub const vital = @import("vital.zig");
 
+pub const lai = @cImport({
+  @cInclude("lai/core.h");
+  @cInclude("lai/error.h");
+  @cInclude("lai/host.h");
+  @cInclude("lai/drivers/ec.h");
+  @cInclude("lai/drivers/timer.h");
+  @cInclude("lai/helpers/pc-bios.h");
+  @cInclude("lai/helpers/pci.h");
+  @cInclude("lai/helpers/pm.h");
+  @cInclude("lai/helpers/resource.h");
+  @cInclude("lai/helpers/sci.h");
+});
+
+
 pub fn kmain() noreturn {
   os.log("Hello, kmain!\n", .{});
   os.vital(os.kepler.tests.run_tests(), "Kepler tests terminated with error");

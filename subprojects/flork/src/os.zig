@@ -1,5 +1,4 @@
 /// Submodules
-pub const lib = @import("lib/lib.zig");
 pub const memory = @import("memory/memory.zig");
 pub const thread = @import("thread/thread.zig");
 pub const platform = @import("platform/platform.zig");

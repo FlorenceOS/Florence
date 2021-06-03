@@ -484,7 +484,7 @@ pub const MemoryType = enum {
 };
 
 const phys_bitmask = 0x0000FFFFFFFFF000;
-const bf = os.lib.bitfields;
+const bf = lib.util.bitfields;
 
 const PTEEncoding = extern union {
   raw: u64,

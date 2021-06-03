@@ -1,4 +1,5 @@
 const os = @import("root").os;
+const lib = @import("root").lib;
 const std = @import("std");
 
 pub const paging = @import("paging.zig");
@@ -12,7 +13,7 @@ pub const set_interrupts = interrupts.set_interrupts;
 const interrupts = @import("interrupts.zig");
 
 const pmm       = os.memory.pmm;
-const bf        = os.lib.bitfields;
+const bf        = lib.lib.bitfields;
 
 const assert = std.debug.assert;
 

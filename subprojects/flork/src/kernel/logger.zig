@@ -1,8 +1,9 @@
 const os = @import("root").os;
+const lib = @import("root").lib;
 const fmt = @import("std").fmt;
 const arch = @import("builtin").arch;
 
-const range = os.lib.range.range;
+const range = lib.util.range.range;
 
 const Printer = struct {
     pub fn writeAll(self: *const Printer, str: []const u8) !void {

@@ -1,8 +1,9 @@
 const std = @import("std");
 const os = @import("root").os;
+const lib = @import("root").lib;
 
 const paging     = os.memory.paging;
-const RangeAlloc = os.lib.range_alloc.RangeAlloc;
+const RangeAlloc = lib.memory.range_alloc.RangeAlloc;
 const Mutex      = os.thread.Mutex;
 
 var sbrk_head: usize = undefined;
@@ -84,8 +85,8 @@ pub fn nonbacked() *std.mem.Allocator {
 }
 
 export fn laihost_malloc(sz: usize) ?*c_void {
-  if(sz == 0) return os.lib.lai.NULL;
-  const mem = os.memory.vmm.backed(.Ephemeral).alloc(u8, sz) catch return os.lib.lai.NULL;
+  if(sz == 0) return os.kernel.lai.NULL;
+  const mem = os.memory.vmm.backed(.Ephemeral).alloc(u8, sz) catch return os.kernel.lai.NULL;
   return @ptrCast(*c_void, mem.ptr);
 }
 
@@ -96,7 +97,7 @@ export fn laihost_realloc(ptr: ?*c_void, newsize: usize, oldsize: usize) ?*c_voi
   }
   if(newsize == 0) {
     laihost_free(ptr, oldsize);
-    return os.lib.lai.NULL;
+    return os.kernel.lai.NULL;
   }
   const ret = laihost_malloc(newsize);
   @memcpy(@ptrCast([*]u8, ret), @ptrCast([*]const u8, ptr), oldsize);

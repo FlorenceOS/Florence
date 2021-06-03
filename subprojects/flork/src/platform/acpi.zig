@@ -1,12 +1,13 @@
 const os = @import("root").os;
+const lib = @import("root").lib;
 const builtin = @import("builtin");
 const std = @import("std");
 
 const paging = os.memory.paging;
 const pci    = os.platform.pci;
 
-const libalign = os.lib.libalign;
-const range    = os.lib.range;
+const libalign = lib.util.libalign;
+const range = lib.util.range;
 
 const RSDP = packed struct {
   signature: [8]u8,
@@ -110,7 +111,7 @@ comptime {
   std.debug.assert(@byteOffsetOf(FADT, "x_dsdt") == 140);
 }
 
-const lai = os.lib.lai;
+const lai = os.kernel.lai;
 
 var rsdp_phys: usize = 0;
 var rsdp: *RSDP = undefined;

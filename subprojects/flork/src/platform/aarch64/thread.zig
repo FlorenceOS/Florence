@@ -1,4 +1,5 @@
-pub const os = @import("root").os;
+const os = @import("root").os;
+const lib = @import("root").lib;
 
 pub var bsp_task: os.thread.Task = .{};
 
@@ -50,7 +51,7 @@ pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry)
 
   new_task.registers.pc = @ptrToInt(entry.function);
   new_task.registers.x0 = @ptrToInt(entry);
-  new_task.registers.sp = os.lib.libalign.align_down(usize, 16, @ptrToInt(entry));
+  new_task.registers.sp = lib.util.libalign.align_down(usize, 16, @ptrToInt(entry));
   new_task.registers.spsr = 0b0100; // EL1t / EL1 with SP0
 }
 

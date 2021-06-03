@@ -1,9 +1,10 @@
 const std = @import("std");
 const os = @import("root").os;
+const lib = @import("root").lib;
 
 const Order = std.math.Order;
 
-const rb = os.lib.rbtree;
+const rb = lib.containers.rbtree;
 const sbrk = os.memory.vmm.sbrk;
 const Mutex = os.thread.Mutex;
 
@@ -317,7 +318,7 @@ pub const RangeAlloc = struct {
 
     fn make_range(self: *@This(), minBytes: usize) !*Range {
         const page_size = os.platform.paging.page_sizes[0];
-        const size = os.lib.libalign.align_up(
+        const size = lib.util.libalign.align_up(
             usize,
             page_size,
             std.math.max(min_materialize_size, minBytes),

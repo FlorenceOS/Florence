@@ -1,10 +1,11 @@
 const os = @import("root").os;
+const lib = @import("root").lib;
 const std = @import("std");
 const builtin = @import("builtin");
 
 const paging = os.memory.paging;
 
-const range = os.lib.range.range;
+const range = lib.util.range.range;
 
 pub const Handler = struct {
   function: fn(*os.platform.InterruptFrame, u64)void,

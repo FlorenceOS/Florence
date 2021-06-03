@@ -1,4 +1,5 @@
 const os = @import("root").os;
+const lib = @import("root").lib;
 const std = @import("std");
 const regs = @import("regs.zig");
 const paging = @import("../paging.zig");
@@ -403,7 +404,7 @@ pub const MemoryType = extern enum {
 
 const phys_bitmask = 0x7ffffffffffff000;
 const phys_bitmask_high = 0x7fffffffffffe000;
-const bf = os.lib.bitfields;
+const bf = lib.util.bitfields;
 
 const PTEEncoding = extern union {
   raw: u64,

@@ -1,7 +1,8 @@
 const os = @import("root").os;
+const lib = @import("root").lib;
 const arch = @import("builtin").arch;
 
-const libalign = os.lib.libalign;
+const libalign = lib.util.libalign;
 
 const paging = os.memory.paging;
 const pmm    = os.memory.pmm;

@@ -1,9 +1,10 @@
 const os = @import("root").os;
+const lib = @import("root").lib;
 const std = @import("std");
 
 const assert = std.debug.assert;
 const platform = os.platform;
-const lalign = os.lib.libalign;
+const lalign = lib.util.libalign;
 
 const pmm_sizes = {
     comptime var shift = 12;

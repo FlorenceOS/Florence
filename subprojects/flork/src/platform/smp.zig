@@ -1,5 +1,6 @@
 const std = @import("std");
 const os = @import("root").os;
+const lib = @import("root").lib;
 const config = @import("root").config;
 
 const CoreID = os.platform.CoreID;
@@ -29,7 +30,7 @@ pub const CoreData = struct {
   sched_stack: usize,
 
   pub fn id(self: *@This()) usize {
-    return os.lib.get_index(self, cpus);
+    return lib.util.pointers.get_index(self, cpus);
   }
 
   fn bootstrap_stack(size: usize) usize {

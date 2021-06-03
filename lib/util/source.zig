@@ -1,10 +1,10 @@
-const os = @import("root").os;
+const tar = @import("root").lib.format.tar;
 const std = @import("std");
 
 const source_blob = @embedFile(@import("build_options").source_blob_path);
 
 pub fn file_line(filename: []const u8, line: usize) ![]const u8 {
-    var iterator = os.lib.tar.iterate_files(source_blob) catch unreachable;
+    var iterator = tar.iterate_files(source_blob) catch unreachable;
     while (iterator.has_file) : (iterator.next()) {
         if (!std.mem.endsWith(u8, filename, iterator.file_name)) {
             continue;

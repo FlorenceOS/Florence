@@ -1,4 +1,4 @@
-const libalign = @import("libalign.zig");
+const libalign = @import("root").lib.libalign;
 const std = @import("std");
 const expect = std.testing.expect;
 const assert = std.debug.assert;

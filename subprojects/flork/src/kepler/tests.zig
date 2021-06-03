@@ -1,5 +1,6 @@
 const std = @import("std");
 const os = @import("root").os;
+const lib = @import("root").lib;
 const kepler = os.kepler;
 
 const tries = 1_000_000;
@@ -440,7 +441,7 @@ fn locked_handles(allocator: *std.mem.Allocator) !void {
 
 fn locked_handle_table(allocator: *std.mem.Allocator) !void {
     os.log("\nLocked handle table test...\n", .{});
-    var instance: os.lib.handle_table.LockedHandleTable(u64) = .{};
+    var instance: lib.containers.handle_table.LockedHandleTable(u64) = .{};
     instance.init(allocator);
 
     const result1 = try instance.new_cell();
@@ -466,7 +467,7 @@ fn locked_handle_table(allocator: *std.mem.Allocator) !void {
 
         pub fn dispose(
             self: *@This(),
-            loc: os.lib.handle_table.LockedHandleTable(u64).Location,
+            loc: lib.containers.handle_table.LockedHandleTable(u64).Location,
         ) void {
             self.called += 1;
         }
