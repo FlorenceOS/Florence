@@ -86,13 +86,14 @@ pub fn makeExec(params: struct {
         source_blob_name: []const u8,
     },
     mode: ?std.builtin.Mode = null,
+    strip_symbols: bool = false,
 }) *std.build.LibExeObjStep {
     const mode = params.mode orelse params.builder.standardReleaseOptions();
 
     const exec = params.builder.addExecutable(params.filename, params.main);
     setTargetFlags(exec, params.arch, params.ctx);
     exec.setBuildMode(mode);
-    exec.strip = false;
+    exec.strip = params.strip_symbols;
 
     if (@hasField(@TypeOf(exec.*), "want_lto"))
         exec.want_lto = false;
@@ -106,12 +107,14 @@ pub fn makeExec(params: struct {
             cache_root,
             blob.source_blob_name,
         });
-        exec.addBuildOption([]const u8, "source_blob_path", source_blob_path);
+        exec.addBuildOption(?[]const u8, "source_blob_path", source_blob_path);
         exec.step.dependOn(&makeSourceBlobStep(
             params.builder,
             source_blob_path,
             blob.global_source_path,
         ).step);
+    } else {
+        exec.addBuildOption(?[]const u8, "source_blob_path", null);
     }
 
     exec.install();

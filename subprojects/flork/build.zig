@@ -7,6 +7,7 @@ pub fn buildKernel(params: struct {
     boot_proto: []const u8 = "stivale2",
     mode: ?std.builtin.Mode = null,
     build_source_blob: bool = true,
+    strip_symbols: bool = false,
 }) *std.build.LibExeObjStep {
     const arch = params.arch;
     const proto = params.boot_proto;
@@ -30,6 +31,7 @@ pub fn buildKernel(params: struct {
         else
             null,
         .mode = params.mode,
+        .strip_symbols = params.strip_symbols,
     });
 
     kernel.addAssemblyFile(params.builder.fmt(flork_path ++ "src/boot/{s}_{s}.S", .{
