@@ -101,12 +101,12 @@ pub fn bsp_pre_scheduler_init() void {
   const cpu = &os.platform.smp.cpus[0];
   
   // Init BSP TSS
-  cpu.platform_data.shared_tss = .{};
+  cpu.platform_data.shared_tss.init();
   cpu.platform_data.shared_tss.set_interrupt_stack(cpu.int_stack);
   cpu.platform_data.shared_tss.set_scheduler_stack(cpu.sched_stack);
   // Init BSP task TSS
   thread.bsp_task.platform_data.tss = os.vital(os.memory.vmm.backed(.Eternal).create(Tss), "alloc bsp tss");
-  thread.bsp_task.platform_data.tss.* = .{};
+  thread.bsp_task.platform_data.tss.init();
   thread.bsp_task.platform_data.tss.set_interrupt_stack(cpu.int_stack);
   thread.bsp_task.platform_data.tss.set_scheduler_stack(cpu.sched_stack);
   // Load BSP TSS
@@ -122,7 +122,7 @@ pub fn ap_init() void {
 
   cpu.platform_data.gdt.load();
 
-  cpu.platform_data.shared_tss = .{};
+  cpu.platform_data.shared_tss.init();
   cpu.platform_data.shared_tss.set_interrupt_stack(cpu.int_stack);
   cpu.platform_data.shared_tss.set_scheduler_stack(cpu.sched_stack);
   cpu.platform_data.gdt.update_tss(&cpu.platform_data.shared_tss);

@@ -6,6 +6,11 @@ pub const Tss = packed struct {
     _3: u80 = 0,
     iobp_offset: u16 = 104,
     bitset: [8192]u8 = [1]u8{0} ** 8192,
+
+    pub noinline fn init(self: *@This()) void {
+        @memset(@intToPtr([*]u8, @ptrToInt(self)), 0, @sizeOf(@This()));
+        self.iobp_offset = 104;
+    }
  
     pub fn set_interrupt_stack(self: *@This(), stack: usize) void {
         self.ist[0] = stack;

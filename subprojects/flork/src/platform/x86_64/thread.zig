@@ -76,7 +76,7 @@ pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry)
   new_task.registers.rip = @ptrToInt(entry.function);
 
   const tss = try os.memory.vmm.backed(.Ephemeral).create(Tss);
-  tss.* = .{};
+  tss.init();
 
   new_task.platform_data.tss = tss;
   tss.set_syscall_stack(new_task.stack);
