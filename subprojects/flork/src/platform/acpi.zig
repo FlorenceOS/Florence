@@ -170,7 +170,7 @@ fn parse_sdt(addr: usize) void {
     signature_value("SPCR") => { }, // Ignore for now
     signature_value("GTDT") => { }, // Ignore for now
     signature_value("APIC") => {
-      switch(builtin.arch) {
+      switch(os.platform.arch) {
         .x86_64 => @import("x86_64/apic.zig").handle_madt(sdt),
         else => os.log("ACPI: MADT found on unsupported architecture!\n", .{}),
       }

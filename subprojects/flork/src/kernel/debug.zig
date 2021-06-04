@@ -18,7 +18,7 @@ extern var __debug_ranges_start: u8;
 extern var __debug_ranges_end: u8;
 
 var debug_info = std.dwarf.DwarfInfo{
-    .endian = std.builtin.endian,
+    .endian = os.platform.endian,
     .debug_info = undefined,
     .debug_abbrev = undefined,
     .debug_str = undefined,

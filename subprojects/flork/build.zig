@@ -2,9 +2,11 @@ const std = @import("std");
 const exec = @import("../../buildutil/exec.zig");
 const config = @import("../../config/config.zig");
 
+const Arch = if(@hasField(std.builtin, "Arch")) std.builtin.Arch else std.Target.Cpu.Arch;
+
 pub fn buildKernel(params: struct {
     builder: *std.build.Builder,
-    arch: std.builtin.Arch,
+    arch: Arch,
     boot_proto: []const u8 = "stivale2",
     mode: ?std.builtin.Mode = null,
 }) *std.build.LibExeObjStep {

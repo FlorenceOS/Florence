@@ -60,7 +60,7 @@ pub fn phys_high(map: []const MemmapEntry) usize {
 pub fn init_paging() void {
   os.platform.paging.init();
 
-  const base: usize = switch(std.builtin.arch) {
+  const base: usize = switch(os.platform.arch) {
     .aarch64 => 0xFFFF800000000000,
     .x86_64 =>
       if(os.platform.paging.is_5levelpaging())

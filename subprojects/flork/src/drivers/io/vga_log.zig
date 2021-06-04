@@ -1,6 +1,5 @@
 const os = @import("root").os;
 const lib = @import("root").lib;
-const arch = @import("builtin").arch;
 
 const libalign = lib.util.libalign;
 
@@ -17,7 +16,7 @@ const Framebuffer = struct {
 var framebuffer: ?Framebuffer = null;
 
 pub fn register() void {
-  if(arch == .x86_64) {
+  if(os.platform.arch == .x86_64) {
     framebuffer = Framebuffer{};
   }
 }
@@ -57,7 +56,7 @@ fn feed_line() void {
 }
 
 pub fn putch(ch: u8) void {
-  if(arch == .x86_64) {
+  if(os.platform.arch == .x86_64) {
     if(framebuffer == null)
       return;
 

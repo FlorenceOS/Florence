@@ -1,4 +1,4 @@
-const StackTrace = @import("builtin").StackTrace;
+const StackTrace = @import("std").builtin.StackTrace;
 
 const os = @import("root").os;
 

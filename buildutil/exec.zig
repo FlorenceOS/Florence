@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const Arch = if(@hasField(std.builtin, "Arch")) std.builtin.Arch else std.Target.Cpu.Arch;
+
 pub const Context = enum {
     kernel,
     userlib,
@@ -20,7 +22,7 @@ fn makeSourceBlobStep(
 
 pub fn setTargetFlags(
     exec: *std.build.LibExeObjStep,
-    arch: std.builtin.Arch,
+    arch: Arch,
     context: Context,
 ) void {
     var disabled_features = std.Target.Cpu.Feature.Set.empty;
@@ -77,7 +79,7 @@ pub fn setTargetFlags(
 
 pub fn makeExec(params: struct {
     builder: *std.build.Builder,
-    arch: std.builtin.Arch,
+    arch: Arch,
     ctx: Context,
     filename: []const u8,
     main: []const u8,

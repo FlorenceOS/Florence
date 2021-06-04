@@ -1,7 +1,6 @@
 const os = @import("root").os;
 const lib = @import("root").lib;
 const fmt = @import("std").fmt;
-const arch = @import("builtin").arch;
 
 const range = lib.util.range.range;
 
@@ -91,7 +90,7 @@ fn putch(ch: u8) void {
     platform.putch(ch);
     mmio_serial.putch(ch);
     vesa_log.putch(ch);
-    if (arch == .x86_64) {
+    if (os.platform.arch == .x86_64) {
         vga_log.putch(ch);
     }
 }

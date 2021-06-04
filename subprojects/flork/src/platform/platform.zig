@@ -9,7 +9,8 @@ pub const devicetree = @import("devicetree.zig");
 pub const smp        = @import("smp.zig");
 
 // Anything else comes from this platform specific file
-const arch = @import("builtin").arch;
+pub const arch = if(@hasField(std.builtin, "arch")) std.builtin.arch else std.Target.current.cpu.arch;
+pub const endian = if(@hasField(std.builtin, "endian")) std.builtin.endian else std.Target.current.cpu.arch.endian();
 usingnamespace @import(
   switch(arch) {
     .aarch64 => "aarch64/aarch64.zig",
