@@ -10,7 +10,7 @@ pub const smp        = @import("smp.zig");
 
 // Anything else comes from this platform specific file
 pub const arch = if(@hasField(std.builtin, "arch")) std.builtin.arch else std.Target.current.cpu.arch;
-pub const endian = if(@hasField(std.builtin, "endian")) std.builtin.endian else std.Target.current.cpu.arch.endian();
+pub const endian = if(@hasField(std.builtin, "endian")) std.builtin.endian else arch.endian();
 usingnamespace @import(
   switch(arch) {
     .aarch64 => "aarch64/aarch64.zig",
