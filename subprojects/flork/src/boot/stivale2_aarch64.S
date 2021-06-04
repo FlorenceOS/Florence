@@ -1,5 +1,7 @@
 .set stivale_flags_value, 1 // we disable kaslr for now as the linker is not emitting relocations.
 
+.global __bootstrap_stack_top
+
 .section .stivale2hdr, "a"
 .8byte _start
 .8byte __bootstrap_stack_top
@@ -30,3 +32,8 @@ _start:
 .section .rodata
 stivale_flags_value:
 .2byte stivale_flags_value
+
+.section .bss.stk, "a"
+__bootstrap_stack_bottom:
+.space 128 * 1024
+__bootstrap_stack_top:

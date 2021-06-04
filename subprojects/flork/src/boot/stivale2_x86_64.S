@@ -1,6 +1,6 @@
 .intel_syntax noprefix
 
-.extern __bootstrap_stack_top
+.global __bootstrap_stack_top
 
 .section .stivale2hdr, "a"
 .8byte _start
@@ -40,3 +40,8 @@ _start:
   
 .extern stivale2_main
   call  stivale2_main
+
+.section .bss.stk, "a"
+__bootstrap_stack_bottom:
+.space 128 * 1024
+__bootstrap_stack_top:

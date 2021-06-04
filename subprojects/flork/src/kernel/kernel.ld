@@ -25,7 +25,7 @@ SECTIONS {
   . += 64K;
   .stk . : {
     __bootstrap_stack_bottom = .;
-    . += 128K;
+    KEEP(*(.bss.stk))
     __bootstrap_stack_top = .;
   }:stk
   . = ALIGN(64K);
