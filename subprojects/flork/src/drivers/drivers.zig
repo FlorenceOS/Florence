@@ -1,5 +1,11 @@
-pub const mmio_serial = @import("io/mmio_serial.zig");
-pub const vesa_log = @import("io/vesa_log.zig");
-pub const vga_log = @import("io/vga_log.zig");
-pub const ahci = @import("disk/ahci.zig");
-pub const virtio_gpu = @import("virtio/virtio-gpu.zig");
+/// Block device drivers
+pub const block = @import("block/block.zig");
+
+/// Bus drivers
+pub const bus = @import("bus/bus.zig");
+
+/// GPU drivers
+pub const gpu = @import("gpu/gpu.zig");
+
+/// Output device drivers
+pub const output = @import("output/output.zig");
