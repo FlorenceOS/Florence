@@ -5,7 +5,7 @@ const paging = os.memory.paging;
 const platform = os.platform;
 
 /// Get the smallest page size available on the system
-pub fn get_smallest_page_size() usize {
+pub fn getSmallestPageSize() usize {
     // TODO: Update method of obtaining page size. Rounding up is done here to ensure
     // that object is mappable
     std.debug.assert(platform.paging.page_sizes.len > 0);
@@ -18,7 +18,7 @@ pub const MemoryPerms = struct {
     writable: bool = false,
     executable: bool = false,
 
-    pub fn to_paging_perms(self: @This(), user: bool) paging.Perms {
+    pub fn toPagingPerms(self: @This(), user: bool) paging.Perms {
         return paging.Perms{
             .writable = self.writable,
             .executable = self.executable,
@@ -26,7 +26,7 @@ pub const MemoryPerms = struct {
         };
     }
 
-    pub fn is_perm_drop_allowed(self: @This(), new: @This()) bool {
+    pub fn isPermDropAllowed(self: @This(), new: @This()) bool {
         if (!self.writable and new.writable) {
             return false;
         }
@@ -86,7 +86,7 @@ pub const MemoryObject = struct {
     allocator: *std.mem.Allocator,
 
     /// Create memory object
-    fn create_object(allocator: *std.mem.Allocator) !*MemoryObject {
+    fn createObject(allocator: *std.mem.Allocator) !*MemoryObject {
         const instance = try allocator.create(@This());
         instance.ref_count = 1;
         instance.allocator = allocator;
@@ -94,10 +94,10 @@ pub const MemoryObject = struct {
     }
 
     /// Create simple shared memory object with minimal size "size" and page size "pagesz"
-    fn create_plain(allocator: *std.mem.Allocator, size: usize, pagesz: usize) !*MemoryObject {
+    fn createPlain(allocator: *std.mem.Allocator, size: usize, pagesz: usize) !*MemoryObject {
         std.debug.assert(size % pagesz == 0);
 
-        const instance = try create_object(allocator);
+        const instance = try createObject(allocator);
         errdefer allocator.destroy(instance);
 
         const page_count = lib.util.libalign.alignUp(usize, size, pagesz) / pagesz;
@@ -119,12 +119,12 @@ pub const MemoryObject = struct {
     }
 
     /// Create physically continous managed memory object with minimal size "size"
-    fn create_phys_managed(allocator: *std.mem.Allocator, size: usize) !*MemoryObject {
-        std.debug.assert(size % get_smallest_page_size() == 0);
-        const instance = try create_object(allocator);
+    fn createPhysManaged(allocator: *std.mem.Allocator, size: usize) !*MemoryObject {
+        std.debug.assert(size % getSmallestPageSize() == 0);
+        const instance = try createObject(allocator);
         errdefer allocator.destroy(instance);
 
-        const page_size = get_smallest_page_size();
+        const page_size = getSmallestPageSize();
 
         const area = try pmm.alloc_phys(size);
         instance.memory = .{
@@ -137,8 +137,8 @@ pub const MemoryObject = struct {
     }
 
     /// Create unmanaged physical memory object
-    fn create_phys_unmanaged(allocator: *std.mem.Allocator) !*MemoryObject {
-        const instance = try create_object(allocator);
+    fn createPhysUnmanaged(allocator: *std.mem.Allocator) !*MemoryObject {
+        const instance = try createObject(allocator);
         instance.memory = .phys_unmanaged;
         return instance;
     }
@@ -170,21 +170,21 @@ pub const MemoryObject = struct {
     }
 
     /// Get object "page size"
-    fn get_used_page_size(self: *const @This()) usize {
+    fn getUsedPageSize(self: *const @This()) usize {
         switch (self.memory) {
             .plain => plain.page_size,
-            else => get_smallest_page_size(),
+            else => getSmallestPageSize(),
         }
     }
 
     /// Returns true if span memory object with given size and offset can be created from this
     /// memory object
-    fn validate_span(self: *const @This(), offset: usize, size: usize) bool {
-        return offset % get_used_page_size() == 0 and size % get_used_page_size() == 0;
+    fn validateSpan(self: *const @This(), offset: usize, size: usize) bool {
+        return offset % getUsedPageSize() == 0 and size % getUsedPageSize() == 0;
     }
 
     /// Map memory object in the given context
-    fn map_in(self: *const @This(), params: struct {
+    fn mapIn(self: *const @This(), params: struct {
         context: *os.platform.paging.PagingContext,
         base: usize,
         offset: usize,
@@ -254,7 +254,7 @@ pub const MemoryObjectRef = struct {
 
     /// Create simple shared memory object with size "size" and page size "pagesz" and
     /// return reference to it
-    pub fn create_plain(
+    pub fn createPlain(
         allocator: *std.mem.Allocator,
         size: usize,
         pagesz: usize,
@@ -263,7 +263,7 @@ pub const MemoryObjectRef = struct {
         if (size % pagesz != 0) {
             return error.AlignError;
         }
-        const obj = try MemoryObject.create_plain(allocator, size, pagesz);
+        const obj = try MemoryObject.createPlain(allocator, size, pagesz);
         return MemoryObjectRef{
             .val = obj,
             .start = 0,
@@ -274,15 +274,15 @@ pub const MemoryObjectRef = struct {
 
     /// Create managed physically continous shared memory object with size "size" and return
     /// reference
-    pub fn create_phys_managed(
+    pub fn createPhysManaged(
         allocator: *std.mem.Allocator,
         size: usize,
         perms: MemoryPerms,
     ) !MemoryObjectRef {
-        if (size % MemoryObject.get_smallest_page_size() != 0) {
+        if (size % MemoryObject.getSmallestPageSize() != 0) {
             return error.AlignError;
         }
-        const obj = try MemoryObject.create_phys_managed(allocator, size);
+        const obj = try MemoryObject.createPhysManaged(allocator, size);
         return MemoryObjectRef{
             .val = obj,
             .start = 0,
@@ -293,14 +293,14 @@ pub const MemoryObjectRef = struct {
 
     /// Create memory object representing the entire physical address space and return reference to
     /// it
-    pub fn create_phys_unmanaged(
+    pub fn createPhysUnmanaged(
         allocator: *std.mem.Allocator,
         perms: MemoryPerms,
     ) !MemoryObjectRef {
-        if (size % MemoryObject.get_smallest_page_size() != 0) {
+        if (size % MemoryObject.getSmallestPageSize() != 0) {
             return error.AlignError;
         }
-        const obj = try MemoryObject.create_phys_managed(allocator, size);
+        const obj = try MemoryObject.createPhysManaged(allocator, size);
         return MemoryObjectRef{
             .val = obj,
             .start = 0,
@@ -322,7 +322,7 @@ pub const MemoryObjectRef = struct {
     }
 
     /// Shrink view on the memory object
-    pub fn shrink_view(self: *@This(), start: usize, size: usize) !void {
+    pub fn shrinkView(self: *@This(), start: usize, size: usize) !void {
         var border: usize = undefined;
         if (@addWithOverflow(usize, start, size, &border)) {
             return error.OutOfBounds;
@@ -335,15 +335,15 @@ pub const MemoryObjectRef = struct {
     }
 
     /// Drop permissions from the memory object
-    pub fn drop_into_perms(self: *@This(), new_perms: MemoryPerms) !void {
-        if (!self.perms.is_perm_drop_allowed(new_perms)) {
+    pub fn dropIntoPerms(self: *@This(), new_perms: MemoryPerms) !void {
+        if (!self.perms.isPermDropAllowed(new_perms)) {
             return error.AccessViolation;
         }
         self.perms = new_perms;
     }
 
     /// Map memory object in the given context
-    pub fn map_in(self: @This(), params: struct {
+    pub fn mapIn(self: @This(), params: struct {
         context: *os.platform.paging.PagingContext,
         base: usize,
         offset: usize,
@@ -359,20 +359,20 @@ pub const MemoryObjectRef = struct {
         if (params.offset + params.size > self.size) {
             return error.OutOfBounds;
         }
-        if (!self.perms.is_perm_drop_allowed(params.perms)) {
+        if (!self.perms.isPermDropAllowed(params.perms)) {
             return error.AccessViolation;
         }
-        try self.val.map_in(.{
+        try self.val.mapIn(.{
             .context = params.context,
             .base = params.base,
             .offset = self.start + params.offset,
             .size = params.size,
-            .perms = params.perms.to_paging_perms(params.user),
+            .perms = params.perms.toPagingPerms(params.user),
             .memtype = params.memtype,
         });
     }
 
-    pub fn unmap_from(self: @This(), params: struct {
+    pub fn unmapFrom(self: @This(), params: struct {
         context: *os.platform.paging.PagingContext,
         base: usize,
         size: usize,

@@ -2,25 +2,19 @@ usingnamespace @import("root").preamble;
 const kepler = os.kepler;
 
 /// InterruptObject is a source of interrupts of some kind
-/// InterruptObject will typically be embedded in the other
-/// object that contains info about the interrupt vector like
-/// gsi vector etc (depends on the interrupt source)
-/// To create InterruptObject, two callback fields
-/// unlink() and dispose() should be set.
-/// NOTE: InterruptObject is strictly thread local
-/// and assumes that raise() is called from the
+/// InterruptObject will typically be embedded in the other object that contains info about the
+/// interrupt vector like gsi vector etc (depends on the interrupt source)
+/// To create InterruptObject, two callback fields unlink() and dispose() should be set.
+/// NOTE: InterruptObject is strictly thread local and assumes that raise() is called from the
 /// thread owning queue.
-/// NOTE: After unlink() was called, raise()
-/// can no longer be called
+/// NOTE: After unlink() was called, raise() can no longer be called
 pub const InterruptObject = struct {
     /// Unlink function pointer
-    /// Called when owner of InterruptObject unsubscribes
-    /// from further interrupt notifications. Called
-    /// with interrupts disabled
+    /// Called when owner of InterruptObject unsubscribes from further interrupt notifications.
+    /// Called with interrupts disabled
     unlink: fn (*@This()) void,
     /// Dispose function pointer.
-    /// Allows interrupt controller driver to free
-    /// InterruptObject along with all other things
+    /// Allows interrupt controller driver to free InterruptObject along with all other things
     dispose: fn (*@This()) void,
 
     /// Set to true if owner has unsubscribed from
@@ -28,13 +22,18 @@ pub const InterruptObject = struct {
     dying: bool,
     /// Set to true if note was sent
     sent: bool,
-    /// Note that is sent on InterruptRaised event
+    /// Note that is sent on interrupt_raised event
     note: kepler.ipc.Note,
     /// Target queue
     queue: *kepler.ipc.NoteQueue,
 
     /// Init method. Queue reference is borrowed
-    pub fn init(self: *@This(), queue: *kepler.ipc.NoteQueue, unlink: fn (*@This()) void, dispose: fn (*@This()) void) void {
+    pub fn init(
+        self: *@This(),
+        queue: *kepler.ipc.NoteQueue,
+        unlink: fn (*@This()) void,
+        dispose: fn (*@This()) void,
+    ) void {
         self.dying = false;
         self.sent = false;
         self.queue = queue.borrow();
@@ -50,14 +49,13 @@ pub const InterruptObject = struct {
             return;
         }
         // Fill out note fields
-        self.note.typ = .InterruptRaised;
+        self.note.typ = .interrupt_raised;
         self.note.owner_ref = .{ .interrupt = self };
         // Try sending note
         @atomicStore(bool, &self.sent, true, .Unordered);
         self.queue.send(&self.note) catch {
-            // Queue could not be shut down, as object is not dying
-            // and hence thread was not yet terminated => it's
-            // queue has not been destroyed yet.
+            // Queue could not be shut down, as object is not dying and hence thread was not yet
+            // terminated => it's queue has not been destroyed yet.
             @panic("Failed to sent note from interrupt handler");
         };
     }
@@ -84,9 +82,8 @@ pub const InterruptObject = struct {
         }
     }
 
-    /// Returns true if object is still subscribed
-    /// to interrupt notifications
-    pub fn is_active(self: *@This()) bool {
+    /// Returns true if object is still subscribed to interrupt notifications
+    pub fn isActive(self: *@This()) bool {
         return !self.dying;
     }
 };
