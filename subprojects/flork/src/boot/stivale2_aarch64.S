@@ -26,8 +26,8 @@ smp:
 .section .text
 .global _start
 _start:
-.extern stivale2_main
-  BL    stivale2_main
+.extern stivale2Main
+  BL    stivale2Main
 
 .section .rodata
 stivale_flags_value:

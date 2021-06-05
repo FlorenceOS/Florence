@@ -35,7 +35,7 @@ pub fn map(args: struct {
     });
 }
 
-pub fn map_phys(args: struct {
+pub fn mapPhys(args: struct {
     virt: usize,
     phys: usize,
     size: usize,
@@ -157,7 +157,7 @@ fn map_kernel_section(new_paging_context: Context, start: *u8, end: *u8, perm: P
     const phys = os.vital(translate_virt(.{ .virt = virt }), "Translating kaddr");
     const region_size = @ptrToInt(end) - virt;
 
-    os.vital(map_phys(.{
+    os.vital(mapPhys(.{
         .virt = virt,
         .phys = phys,
         .size = region_size,
@@ -167,12 +167,12 @@ fn map_kernel_section(new_paging_context: Context, start: *u8, end: *u8, perm: P
     }), "Mapping kernel section");
 }
 
-pub fn map_physmem(args: struct {
+pub fn mapPhysmem(args: struct {
     context: Context,
     map_limit: usize,
 }) !void {
     // Map once with each memory type
-    try map_phys(.{
+    try mapPhys(.{
         .virt = args.context.phys_to_write_back_virt(0),
         .phys = 0,
         .size = args.map_limit,
@@ -181,7 +181,7 @@ pub fn map_physmem(args: struct {
         .memtype = .MemoryWriteBack,
     });
 
-    try map_phys(.{
+    try mapPhys(.{
         .virt = args.context.phys_to_write_combining_virt(0),
         .phys = 0,
         .size = args.map_limit,
@@ -190,7 +190,7 @@ pub fn map_physmem(args: struct {
         .memtype = .DeviceWriteCombining,
     });
 
-    try map_phys(.{
+    try mapPhys(.{
         .virt = args.context.phys_to_uncached_virt(0),
         .phys = 0,
         .size = args.map_limit,

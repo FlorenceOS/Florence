@@ -210,7 +210,7 @@ pub const MemoryObject = struct {
                         .size = page_size * i,
                         .reclaim_pages = false,
                     });
-                    try paging.map_phys(.{
+                    try paging.mapPhys(.{
                         .virt = virt,
                         .phys = phys,
                         .size = page_size,
@@ -220,7 +220,7 @@ pub const MemoryObject = struct {
                 }
             },
             .phys_managed => |span| {
-                try paging.map_phys(.{
+                try paging.mapPhys(.{
                     .virt = params.base,
                     .phys = span.start + params.offset,
                     .size = params.size,
@@ -229,7 +229,7 @@ pub const MemoryObject = struct {
                 });
             },
             .phys_unmanaged => {
-                try paging.map_phys(.{
+                try paging.mapPhys(.{
                     .virt = params.base,
                     .phys = params.offset,
                     .size = params.size,

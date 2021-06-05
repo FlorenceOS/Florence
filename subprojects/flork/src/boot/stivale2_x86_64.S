@@ -38,8 +38,8 @@ _start:
 
   mov rbp, rsp
   
-.extern stivale2_main
-  call  stivale2_main
+.extern stivale2Main
+  call  stivale2Main
 
 .section .bss.stk, "a"
 __bootstrap_stack_bottom:

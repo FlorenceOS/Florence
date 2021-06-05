@@ -29,7 +29,7 @@ fn attempt_handle_physmem_page_fault(base: usize, addr: usize, map_type: os.plat
         const phys = addr - base;
         const phys_gb_aligned = lib.util.libalign.alignDown(usize, 1024 * 1024 * 1024, phys);
 
-        os.vital(os.memory.paging.map_phys(.{
+        os.vital(os.memory.paging.mapPhys(.{
             .virt = base + phys_gb_aligned,
             .phys = phys_gb_aligned,
             .size = 1024 * 1024 * 1024,

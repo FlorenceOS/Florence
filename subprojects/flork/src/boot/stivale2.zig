@@ -1,46 +1,66 @@
 pub const preamble = @import("../preamble.zig");
 usingnamespace preamble;
 
-const stivale = @import("stivale_common.zig");
-
-const paging = os.memory.paging;
-const vmm = os.memory.vmm;
-
+const memory = os.memory;
 const platform = os.platform;
-const kmain = os.kernel.kmain;
+const drivers = os.drivers;
+const libalign = lib.util.libalign;
+const builtin = std.builtin;
 
-const mmio_serial = os.drivers.mmio_serial;
-const vesa_log = os.drivers.vesa_log;
-const vga_log = os.drivers.vga_log;
+const MemmapEntry = packed struct {
+    base: u64,
+    length: u64,
+    kind: u32,
+    unused: u32,
 
-const MemmapEntry = stivale.MemmapEntry;
+    pub fn format(
+        self: *const MemmapEntry,
+        fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        try writer.print("Base: 0x{X}, length: 0x{X}, type=0x{X}", .{
+            self.base,
+            self.length,
+            self.kind,
+        });
+    }
+};
 
-const arch = @import("builtin").arch;
-
-const stivale2_tag = packed struct {
+const Tag = packed struct {
     identifier: u64,
-    next: ?*stivale2_tag,
+    next: ?*Tag,
 
-    pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+    pub fn format(
+        self: *const @This(),
+        fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
         try writer.print("Identifier: 0x{X:0>16}", .{self.identifier});
     }
 };
 
-const stivale2_info = packed struct {
+const Info = packed struct {
     bootloader_brand: [64]u8,
     bootloader_version: [64]u8,
-    tags: ?*stivale2_tag,
+    tags: ?*Tag,
 };
 
-const stivale2_memmap = packed struct {
-    tag: stivale2_tag,
+const MemmapTag = packed struct {
+    tag: Tag,
     entries: u64,
 
     pub fn get(self: *const @This()) []MemmapEntry {
         return @intToPtr([*]MemmapEntry, @ptrToInt(&self.entries) + 8)[0..self.entries];
     }
 
-    pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+    pub fn format(
+        self: *const @This(),
+        fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
         try writer.print("{} entries:\n", .{self.entries});
         for (self.get()) |ent| {
             try writer.print("    {}\n", .{ent});
@@ -48,54 +68,80 @@ const stivale2_memmap = packed struct {
     }
 };
 
-const stivale2_commandline = packed struct {
-    tag: stivale2_tag,
+const CmdLineTag = packed struct {
+    tag: Tag,
     commandline: [*:0]u8,
 
-    pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+    pub fn format(
+        self: *const @This(),
+        fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
         try writer.print("Commandline: {s}", .{self.commandline});
     }
 };
 
-const stivale2_framebuffer = packed struct {
-    tag: stivale2_tag,
+const FramebufferTag = packed struct {
+    tag: Tag,
     addr: u64,
     width: u16,
     height: u16,
     pitch: u16,
     bpp: u16,
 
-    pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
-        try writer.print("0x{X}, {}x{}, bpp={}, pitch={}", .{ self.addr, self.width, self.height, self.bpp, self.pitch });
+    pub fn format(
+        self: *const @This(),
+        fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        try writer.print("0x{X}, {}x{}, bpp={}, pitch={}", .{
+            self.addr,
+            self.width,
+            self.height,
+            self.bpp,
+            self.pitch,
+        });
     }
 };
 
-const stivale2_rsdp = packed struct {
-    tag: stivale2_tag,
+const RsdpTag = packed struct {
+    tag: Tag,
     rsdp: u64,
 
-    pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+    pub fn format(
+        self: *const @This(),
+        fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
         try writer.print("0x{X}", .{self.rsdp});
     }
 };
 
-const stivale2_smp = packed struct {
-    tag: stivale2_tag,
+const SMPTag = packed struct {
+    tag: Tag,
     flags: u64,
     bsp_lapic_id: u32,
     _: u32,
     entries: u64,
 
-    pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+    pub fn format(
+        self: *const @This(),
+        fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
         try writer.print("{} CPU(s): {}", .{ self.entries, self.get() });
     }
 
-    pub fn get(self: *const @This()) []stivale2_smp_info {
-        return @intToPtr([*]stivale2_smp_info, @ptrToInt(&self.entries) + 8)[0..self.entries];
+    pub fn get(self: *const @This()) []CoreInfo {
+        return @intToPtr([*]CoreInfo, @ptrToInt(&self.entries) + 8)[0..self.entries];
     }
 };
 
-const stivale2_smp_info = extern struct {
+const CoreInfo = extern struct {
     acpi_proc_uid: u32,
     lapic_id: u32,
     target_stack: u64,
@@ -103,29 +149,44 @@ const stivale2_smp_info = extern struct {
     argument: u64,
 };
 
-const stivale2_mmio32_uart = packed struct {
-    tag: stivale2_tag,
+const Mmio32UartTag = packed struct {
+    tag: Tag,
     uart_addr: u64,
 
-    pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+    pub fn format(
+        self: *const @This(),
+        fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
         try writer.print("0x{X}", .{self.uart_addr});
     }
 };
 
-const stivale2_mmio32_status_uart = packed struct {
-    tag: stivale2_tag,
+const Mmio32StatusUartTag = packed struct {
+    tag: Tag,
     uart_addr: u64,
     uart_status: u64,
     status_mask: u32,
     status_value: u32,
 
-    pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
-        try writer.print("0x{X}, 0x{X}, (val & 0x{X}) == 0x{X}", .{ self.uart_addr, self.uart_status, self.status_mask, self.status_value });
+    pub fn format(
+        self: *const @This(),
+        fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        try writer.print("0x{X}, 0x{X}, (val & 0x{X}) == 0x{X}", .{
+            self.uart_addr,
+            self.uart_status,
+            self.status_mask,
+            self.status_value,
+        });
     }
 };
 
-const stivale2_dtb = packed struct {
-    tag: stivale2_tag,
+const DtbTag = packed struct {
+    tag: Tag,
     addr: [*]u8,
     size: u64,
 
@@ -133,30 +194,40 @@ const stivale2_dtb = packed struct {
         return self.addr[0..self.size];
     }
 
-    pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+    pub fn format(
+        self: *const @This(),
+        fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
         try writer.print("0x{X} bytes at 0x{X}", .{ self.size, @ptrToInt(self.addr) });
     }
 };
 
-const parsed_info = struct {
-    memmap: ?*stivale2_memmap = null,
-    framebuffer: ?stivale2_framebuffer = null,
+const ParsedInfo = struct {
+    memmap: ?*MemmapTag = null,
+    framebuffer: ?FramebufferTag = null,
     rsdp: ?u64 = null,
-    smp: ?os.platform.phys_ptr(*stivale2_smp) = null,
-    dtb: ?stivale2_dtb = null,
-    uart: ?stivale2_mmio32_uart = null,
-    uart_status: ?stivale2_mmio32_status_uart = null,
+    smp: ?platform.phys_ptr(*SMPTag) = null,
+    dtb: ?DtbTag = null,
+    uart: ?Mmio32UartTag = null,
+    uart_status: ?Mmio32StatusUartTag = null,
 
-    pub fn valid(self: *const parsed_info) bool {
+    pub fn valid(self: *const ParsedInfo) bool {
         if (self.memmap == null) return false;
         return true;
     }
 
-    pub fn format(self: *const parsed_info, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+    pub fn format(
+        self: *const ParsedInfo,
+        fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
         try writer.print(
             \\Parsed stivale2 tags:
-            \\  Memmap: {}
-            \\  Framebuffer: {}
+            \\  MemmapTag: {}
+            \\  FramebufferTag: {}
             \\  RSDP: {}
             \\  SMP: {}
             \\  DTB: {}
@@ -164,16 +235,87 @@ const parsed_info = struct {
             \\  UART with status: {}
             \\
             \\
-        , .{ self.memmap, self.framebuffer, self.rsdp, self.smp, self.dtb, self.uart, self.uart_status });
+        , .{
+            self.memmap,
+            self.framebuffer,
+            self.rsdp,
+            self.smp,
+            self.dtb,
+            self.uart,
+            self.uart_status,
+        });
     }
 };
 
-fn smp_entry(info_in: u64) callconv(.C) noreturn {
-    const smp_info = os.platform.phys_ptr(*stivale2_smp_info).from_int(info_in);
+fn consumePhysMem(ent: *const MemmapEntry) void {
+    if (ent.kind == 1) {
+        os.log("Stivale: Consuming 0x{X} to 0x{X}\n", .{ ent.base, ent.base + ent.length });
+        os.memory.pmm.consume(ent.base, ent.length);
+    }
+}
+
+fn mapPhys(ent: *const MemmapEntry, context: *platform.paging.PagingContext) void {
+    if (ent.kind != 1 and ent.kind != 0x1000) {
+        return;
+    }
+
+    var new_ent = ent.*;
+
+    new_ent.base = libalign.alignDown(u64, platform.paging.page_sizes[0], new_ent.base);
+    // If there is nothing left of the entry
+    if (new_ent.base >= ent.base + ent.length)
+        return;
+
+    new_ent.length = libalign.alignUp(u64, platform.paging.page_sizes[0], new_ent.length);
+    if (new_ent.length == 0)
+        return;
+
+    os.log("Stivale: Mapping phys mem 0x{X} to 0x{X}\n", .{
+        new_ent.base,
+        new_ent.base + new_ent.length,
+    });
+
+    os.vital(paging.add_physical_mapping(.{
+        .context = context,
+        .phys = new_ent.base,
+        .size = new_ent.length,
+    }), "mapping physical stivale mem");
+}
+
+fn getPhysLimit(map: []const MemmapEntry) usize {
+    if (map.len == 0) {
+        @panic("No memmap!");
+    }
+    const ent = map[map.len - 1];
+    return ent.base + ent.length;
+}
+
+fn initPaging() void {
+    os.platform.paging.init();
+
+    const base: usize = switch (os.platform.arch) {
+        .aarch64 => 0xFFFF800000000000,
+        .x86_64 => if (os.platform.paging.is_5levelpaging())
+            @as(usize, 0xFF00000000000000)
+        else
+            0xFFFF800000000000,
+        else => @panic("Phys base for platform unknown!"),
+    };
+
+    const context = &os.memory.paging.kernel_context;
+
+    context.wb_virt_base = base;
+    context.wc_virt_base = base;
+    context.uc_virt_base = base;
+    context.max_phys = 0x7F0000000000;
+}
+
+fn smpEntry(info_in: u64) callconv(.C) noreturn {
+    const smp_info = platform.phys_ptr(*CoreInfo).from_int(info_in);
     const core_id = smp_info.get_writeback().argument;
 
-    const cpu = &os.platform.smp.cpus[core_id];
-    os.platform.thread.set_current_cpu(cpu);
+    const cpu = &platform.smp.cpus[core_id];
+    platform.thread.set_current_cpu(cpu);
 
     cpu.booted = true;
     platform.ap_init();
@@ -181,39 +323,44 @@ fn smp_entry(info_in: u64) callconv(.C) noreturn {
     cpu.bootstrap_tasking();
 }
 
-export fn stivale2_main(info_in: *stivale2_info) noreturn {
+export fn stivale2Main(info_in: *Info) noreturn {
     platform.platform_early_init();
 
     os.log("Stivale2: Boot!\n", .{});
 
-    var info = parsed_info{};
+    var info = ParsedInfo{};
 
     var tag = info_in.tags;
     while (tag != null) : (tag = tag.?.next) {
         switch (tag.?.identifier) {
-            0x2187f79e8612de07 => info.memmap = @ptrCast(*stivale2_memmap, tag),
-            0xe5e76a1b4597a781 => os.log("{s}\n", .{@ptrCast(*stivale2_commandline, tag)}),
-            0x506461d2950408fa => info.framebuffer = @ptrCast(*stivale2_framebuffer, tag).*,
-            0x9e1786930a375e78 => info.rsdp = @ptrCast(*stivale2_rsdp, tag).rsdp,
-            0x34d1d96339647025 => info.smp = os.platform.phys_ptr(*stivale2_smp).from_int(@ptrToInt(tag)),
-            0xabb29bd49a2833fa => info.dtb = @ptrCast(*stivale2_dtb, tag).*,
-            0xb813f9b8dbc78797 => info.uart = @ptrCast(*stivale2_mmio32_uart, tag).*,
-            0xf77485dbfeb260f9 => info.uart_status = @ptrCast(*stivale2_mmio32_status_uart, tag).*,
+            0x2187f79e8612de07 => info.memmap = @ptrCast(*MemmapTag, tag),
+            0xe5e76a1b4597a781 => os.log("{s}\n", .{@ptrCast(*CmdLineTag, tag)}),
+            0x506461d2950408fa => info.framebuffer = @ptrCast(*FramebufferTag, tag).*,
+            0x9e1786930a375e78 => info.rsdp = @ptrCast(*RsdpTag, tag).rsdp,
+            0x34d1d96339647025 => info.smp = platform.phys_ptr(*SMPTag).from_int(@ptrToInt(tag)),
+            0xabb29bd49a2833fa => info.dtb = @ptrCast(*DtbTag, tag).*,
+            0xb813f9b8dbc78797 => info.uart = @ptrCast(*Mmio32UartTag, tag).*,
+            0xf77485dbfeb260f9 => info.uart_status = @ptrCast(*Mmio32StatusUartTag, tag).*,
             else => {
                 os.log("Unknown stivale2 tag identifier: 0x{X:0>16}\n", .{tag.?.identifier});
             },
         }
     }
 
-    stivale.init_paging();
+    initPaging();
 
     if (info.uart) |uart| {
-        mmio_serial.register_mmio32_serial(uart.uart_addr);
+        drivers.mmio_serial.register_mmio32_serial(uart.uart_addr);
         os.log("Stivale2: Registered UART\n", .{});
     }
 
     if (info.uart_status) |u| {
-        mmio_serial.register_mmio32_status_serial(u.uart_addr, u.uart_status, u.status_mask, u.status_value);
+        drivers.mmio_serial.register_mmio32_status_serial(
+            u.uart_addr,
+            u.uart_status,
+            u.status_mask,
+            u.status_value,
+        );
         os.log("Stivale2: Registered status UART\n", .{});
     }
 
@@ -233,10 +380,10 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     }
 
     for (info.memmap.?.get()) |*ent| {
-        stivale.consume_physmem(ent);
+        consumePhysMem(ent);
     }
 
-    var phys_high = stivale.phys_high(info.memmap.?.get());
+    var phys_high = getPhysLimit(info.memmap.?.get());
     // Eagerly map UART too, as it's initialized before exc handlers
     if (info.uart) |uart| {
         phys_high = std.math.max(phys_high, uart.uart_addr + 4);
@@ -246,35 +393,42 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
         phys_high = std.math.max(phys_high, uart.uart_status + 4);
     }
 
-    const page_size = os.platform.paging.page_sizes[0];
+    const page_size = platform.paging.page_sizes[0];
 
     phys_high += page_size - 1;
     phys_high &= ~(page_size - 1);
 
-    var context = os.vital(paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
+    var context = os.vital(memory.paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
 
-    os.vital(os.memory.paging.map_physmem(.{
+    os.vital(memory.paging.mapPhysmem(.{
         .context = &context,
         .map_limit = phys_high,
     }), "Mapping physmem");
 
-    os.memory.paging.kernel_context = context;
-    platform.thread.bsp_task.paging_context = &os.memory.paging.kernel_context;
+    memory.paging.kernel_context = context;
+    platform.thread.bsp_task.paging_context = &memory.paging.kernel_context;
 
     context.apply();
 
     os.log("Doing vmm\n", .{});
 
-    const heap_base = os.memory.paging.kernel_context.make_heap_base();
+    const heap_base = memory.paging.kernel_context.make_heap_base();
 
-    os.vital(vmm.init(heap_base), "initializing vmm");
+    os.vital(memory.vmm.init(heap_base), "initializing vmm");
 
     os.log("Doing framebuffer\n", .{});
 
     if (info.framebuffer) |fb| {
-        vesa_log.register_fb(vesa_log.lfb_updater, fb.addr, fb.pitch, fb.width, fb.height, fb.bpp);
+        drivers.vesa_log.register_fb(
+            drivers.vesa_log.lfb_updater,
+            fb.addr,
+            fb.pitch,
+            fb.width,
+            fb.height,
+            fb.bpp,
+        );
     } else {
-        vga_log.register();
+        drivers.vga_log.register();
     }
 
     os.log("Doing scheduler\n", .{});
@@ -286,20 +440,20 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
     if (info.smp) |smp| {
         const cpus = smp.get_writeback().get();
 
-        os.platform.smp.init(cpus.len);
+        platform.smp.init(cpus.len);
 
-        const ap_init_stack_size = os.platform.thread.ap_init_stack_size;
+        const ap_init_stack_size = platform.thread.ap_init_stack_size;
 
         // Allocate stacks for all CPUs
         var bootstrap_stack_pool_sz = ap_init_stack_size * cpus.len;
-        var stacks = os.vital(os.memory.pmm.alloc_phys(bootstrap_stack_pool_sz), "allocating ap stacks");
+        var stacks = os.vital(memory.pmm.alloc_phys(bootstrap_stack_pool_sz), "no ap stacks");
 
         // Setup counter used for waiting
-        @atomicStore(usize, &os.platform.smp.cpus_left, cpus.len - 1, .Release);
+        @atomicStore(usize, &platform.smp.cpus_left, cpus.len - 1, .Release);
 
         // Initiate startup sequence for all cores in parallel
         for (cpus) |*cpu_info, i| {
-            const cpu = &os.platform.smp.cpus[i];
+            const cpu = &platform.smp.cpus[i];
 
             cpu.acpi_id = cpu_info.acpi_proc_uid;
 
@@ -312,17 +466,18 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
             const stack = stacks + ap_init_stack_size * i;
 
             cpu_info.argument = i;
-            cpu_info.target_stack = os.memory.pmm.phys_to_write_back_virt(stack + ap_init_stack_size - 16);
-            @atomicStore(u64, &cpu_info.goto_address, @ptrToInt(smp_entry), .Release);
+            const stack_top = stack + ap_init_stack_size - 16;
+            cpu_info.target_stack = memory.pmm.phys_to_write_back_virt(stack_top);
+            @atomicStore(u64, &cpu_info.goto_address, @ptrToInt(smpEntry), .Release);
         }
 
         // Wait for the counter to become 0
-        while (@atomicLoad(usize, &os.platform.smp.cpus_left, .Acquire) != 0) {
-            os.platform.spin_hint();
+        while (@atomicLoad(usize, &platform.smp.cpus_left, .Acquire) != 0) {
+            platform.spin_hint();
         }
 
         // Free memory pool used for stacks. Unreachable for now
-        os.memory.pmm.free_phys(stacks, bootstrap_stack_pool_sz);
+        memory.pmm.free_phys(stacks, bootstrap_stack_pool_sz);
         os.log("All cores are ready for tasks!\n", .{});
     }
 
@@ -331,7 +486,7 @@ export fn stivale2_main(info_in: *stivale2_info) noreturn {
         platform.acpi.register_rsdp(rsdp);
     }
 
-    os.vital(os.platform.platform_init(), "calling platform_init");
+    os.vital(platform.platform_init(), "calling platform_init");
 
-    kmain();
+    os.kernel.kmain();
 }
