@@ -19,15 +19,15 @@ pub var bsp_task: os.thread.Task = .{};
 pub const kernel_gs_base = regs.MSR(u64, 0xC0000102);
 
 pub const TaskData = struct {
-  tss: *Tss = undefined,
+  //tss: *Tss = undefined,
+  syscall_stack: usize,
   
   pub fn load_state(self: *@This()) void {
     const cpu = os.platform.thread.get_current_cpu();
-
-    self.tss.set_interrupt_stack(cpu.int_stack);
-    self.tss.set_scheduler_stack(cpu.sched_stack);
-
-    cpu.platform_data.gdt.update_tss(self.tss);
+    //self.tss.set_interrupt_stack(cpu.int_stack);
+    //self.tss.set_scheduler_stack(cpu.sched_stack);
+    //cpu.platform_data.gdt.update_tss(self.tss);
+    cpu.platform_data.shared_tss.set_syscall_stack(self.syscall_stack);
   }
 };
 
@@ -75,11 +75,12 @@ pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry)
   new_task.registers.ds = gdt.selector.data64;
   new_task.registers.rip = @ptrToInt(entry.function);
 
-  const tss = try os.memory.vmm.backed(.Ephemeral).create(Tss);
-  tss.init();
+  //const tss = try os.memory.vmm.backed(.Ephemeral).create(Tss);
+  //tss = .{};
 
-  new_task.platform_data.tss = tss;
-  tss.set_syscall_stack(new_task.stack);
+  //new_task.platform_data.tss = tss;
+  //tss.set_syscall_stack(new_task.stack);
+  new_task.platform_data.syscall_stack = new_task.stack;
 }
 
 pub fn sched_call_impl(fun: usize, ctx: usize) void {
