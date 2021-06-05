@@ -22,13 +22,13 @@ fn parse_scancode(ext: Extendedness, scancode: u8) !void {
                 0x2A => { // Print screen press
                     std.debug.assert(kb_wait_byte() == scancode_extended);
                     std.debug.assert(kb_wait_byte() == 0x37);
-                    try state.event(.press, .printScreen);
+                    try state.event(.press, .print_screen);
                     return;
                 },
                 0xB7 => { // Print screen release
                     std.debug.assert(kb_wait_byte() == scancode_extended);
                     std.debug.assert(kb_wait_byte() == 0xAA);
-                    try state.event(.release, .printScreen);
+                    try state.event(.release, .print_screen);
                     return;
                 },
                 else => {},
@@ -42,10 +42,10 @@ fn parse_scancode(ext: Extendedness, scancode: u8) !void {
                     std.debug.assert(kb_wait_byte() == 0xE1);
                     std.debug.assert(kb_wait_byte() == 0x9D);
                     std.debug.assert(kb_wait_byte() == 0xC5);
-                    try state.event(.press, .pauseBreak);
+                    try state.event(.press, .pause_break);
                     // There is no event for releasing this key,
                     // so we just gotta pretend it's released instantly
-                    try state.event(.release, .pauseBreak);
+                    try state.event(.release, .pause_break);
                     return;
                 },
                 else => {},
@@ -111,18 +111,18 @@ fn key_location(ext: Extendedness, scancode: u8) !kb.keys.Location {
         .NotExtended => {
             return switch (scancode) {
                 0x01 => .escape,
-                0x02 => .numberKey1,
-                0x03 => .numberKey2,
-                0x04 => .numberKey3,
-                0x05 => .numberKey4,
-                0x06 => .numberKey5,
-                0x07 => .numberKey6,
-                0x08 => .numberKey7,
-                0x09 => .numberKey8,
-                0x0A => .numberKey9,
-                0x0B => .numberKey0,
-                0x0C => .rightOf0,
-                0x0D => .leftOfbackspace,
+                0x02 => .number_key1,
+                0x03 => .number_key2,
+                0x04 => .number_key3,
+                0x05 => .number_key4,
+                0x06 => .number_key5,
+                0x07 => .number_key6,
+                0x08 => .number_key7,
+                0x09 => .number_key8,
+                0x0A => .number_key9,
+                0x0B => .number_key0,
+                0x0C => .right_of0,
+                0x0D => .left_of_backspace,
                 0x0E => .backspace,
                 0x0F => .tab,
                 0x10 => .line1_1,
@@ -138,7 +138,7 @@ fn key_location(ext: Extendedness, scancode: u8) !kb.keys.Location {
                 0x1A => .line1_11,
                 0x1B => .line1_12,
                 0x1C => .enter,
-                0x1D => .leftCtrl,
+                0x1D => .left_ctrl,
                 0x1E => .line2_1,
                 0x1F => .line2_2,
                 0x20 => .line2_3,
@@ -150,8 +150,8 @@ fn key_location(ext: Extendedness, scancode: u8) !kb.keys.Location {
                 0x26 => .line2_9,
                 0x27 => .line2_10,
                 0x28 => .line2_11,
-                0x29 => .leftOf1,
-                0x2A => .leftShift,
+                0x29 => .left_of1,
+                0x2A => .left_shift,
                 0x2B => .line2_12,
                 0x2C => .line3_1,
                 0x2D => .line3_2,
@@ -163,11 +163,11 @@ fn key_location(ext: Extendedness, scancode: u8) !kb.keys.Location {
                 0x33 => .line3_8,
                 0x34 => .line3_9,
                 0x35 => .line3_10,
-                0x36 => .rightShift,
-                0x37 => .numpadMultiplication,
-                0x38 => .leftAlt,
+                0x36 => .right_shift,
+                0x37 => .numpad_mul,
+                0x38 => .left_alt,
                 0x39 => .spacebar,
-                0x3A => .capsLock,
+                0x3A => .capslock,
                 0x3B => .f1,
                 0x3C => .f2,
                 0x3D => .f3,
@@ -178,23 +178,23 @@ fn key_location(ext: Extendedness, scancode: u8) !kb.keys.Location {
                 0x42 => .f8,
                 0x43 => .f9,
                 0x44 => .f10,
-                0x45 => .numLock,
-                0x46 => .scrollLock,
+                0x45 => .numlock,
+                0x46 => .scroll_lock,
                 0x47 => .numpad7,
                 0x48 => .numpad8,
                 0x49 => .numpad9,
-                0x4A => .numpadSubtraction,
+                0x4A => .numpad_sub,
                 0x4B => .numpad4,
                 0x4C => .numpad5,
                 0x4D => .numpad6,
-                0x4E => .numpadAddition,
+                0x4E => .numpad_add,
                 0x4F => .numpad1,
                 0x50 => .numpad2,
                 0x51 => .numpad3,
                 0x52 => .numpad0,
-                0x53 => .numpadPoint,
+                0x53 => .numpad_point,
 
-                0x56 => .rightOfleftShift,
+                0x56 => .right_of_left_shift,
                 0x57 => .f11,
                 0x58 => .f12,
 
@@ -206,30 +206,30 @@ fn key_location(ext: Extendedness, scancode: u8) !kb.keys.Location {
         },
         .Extended => {
             return switch (scancode) {
-                0x10 => .mediaRewind,
-                0x19 => .mediaForward,
-                0x20 => .mediaMute,
-                0x1C => .numpadEnter,
-                0x1D => .rightCtrl,
-                0x22 => .mediaPausePlay,
-                0x24 => .mediaStop,
-                0x2E => .mediaVolumeDown,
-                0x30 => .mediaVolumeUp,
-                0x35 => .numpadDivision,
-                0x38 => .rightAlt,
+                0x10 => .media_rewind,
+                0x19 => .media_forward,
+                0x20 => .media_mute,
+                0x1C => .numpad_enter,
+                0x1D => .right_ctrl,
+                0x22 => .media_pause_play,
+                0x24 => .media_stop,
+                0x2E => .media_volume_down,
+                0x30 => .media_volume_up,
+                0x35 => .numpad_div,
+                0x38 => .right_alt,
                 0x47 => .home,
-                0x48 => .arrowUp,
-                0x49 => .pageUp,
-                0x4B => .arrowleft,
-                0x4D => .arrowright,
+                0x48 => .arrow_up,
+                0x49 => .page_up,
+                0x4B => .arrow_left,
+                0x4D => .arrow_right,
                 0x4F => .end,
-                0x50 => .arrowDown,
-                0x51 => .pageDown,
+                0x50 => .arrow_down,
+                0x51 => .page_down,
                 0x52 => .insert,
                 0x53 => .delete,
-                0x5B => .leftSuper,
-                0x5C => .rightSuper,
-                0x5D => .optionKey,
+                0x5B => .left_super,
+                0x5C => .right_super,
+                0x5D => .option_key,
 
                 else => {
                     os.log("PS2: Unhandled extended scancode 0x{X}\n", .{scancode});

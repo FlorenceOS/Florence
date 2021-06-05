@@ -13,19 +13,19 @@ pub const KeyboardState = struct {
     }
 
     pub fn isShiftPressed(self: *const @This()) bool {
-        return self.pressed(.leftShift) or self.pressed(.rightShift);
+        return self.pressed(.left_shift) or self.pressed(.right_shift);
     }
 
     pub fn isAltPressed(self: *const @This()) bool {
-        return self.pressed(.leftAlt) or self.pressed(.rightAlt);
+        return self.pressed(.left_alt) or self.pressed(.right_alt);
     }
 
     pub fn isSuperPressed(self: *const @This()) bool {
-        return self.pressed(.leftSuper) or self.pressed(.rightSuper);
+        return self.pressed(.left_super) or self.pressed(.right_super);
     }
 
     pub fn isCtrlPressed(self: *const @This()) bool {
-        return self.pressed(.leftCtrl) or self.pressed(.rightCtrl);
+        return self.pressed(.left_ctrl) or self.pressed(.right_ctrl);
     }
 
     pub fn event(self: *@This(), t: kb.event.EventType, location: kb.keys.Location) !void {

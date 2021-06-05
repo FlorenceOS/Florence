@@ -11,64 +11,64 @@ pub const KeyboardLayout = enum {
 fn keyLookupDefault(key: kb.keys.Location) error{UnknownKey}!kb.keys.Input {
     return switch (key) {
         .escape => .escape,
-        .leftShift => .leftShift,
-        .rightShift => .rightShift,
-        .leftCtrl => .leftCtrl,
-        .rightCtrl => .rightCtrl,
-        .leftSuper => .leftSuper,
-        .rightSuper => .rightSuper,
-        .leftAlt => .leftAlt,
-        .rightAlt => .rightAlt,
+        .left_shift => .left_shift,
+        .right_shift => .right_shift,
+        .left_ctrl => .left_ctrl,
+        .right_ctrl => .right_ctrl,
+        .left_super => .left_super,
+        .right_super => .right_super,
+        .left_alt => .left_alt,
+        .right_alt => .right_alt,
         .spacebar => .spacebar,
-        .optionKey => .optionKey,
-        .printScreen => .printScreen,
-        .pauseBreak => .pauseBreak,
-        .scrollLock => .scrollLock,
+        .option_key => .option_key,
+        .print_screen => .print_screen,
+        .pause_break => .pause_break,
+        .scroll_lock => .scroll_lock,
         .insert => .insert,
         .home => .home,
-        .pageUp => .pageUp,
+        .page_up => .page_up,
         .delete => .delete,
         .end => .end,
-        .pageDown => .pageDown,
-        .arrowUp => .arrowUp,
-        .arrowleft => .arrowleft,
-        .arrowDown => .arrowDown,
-        .arrowright => .arrowright,
+        .page_down => .page_down,
+        .arrow_up => .arrow_up,
+        .arrow_left => .arrow_left,
+        .arrow_down => .arrow_down,
+        .arrow_right => .arrow_right,
         .backspace => .backspace,
 
-        .mediaStop => .mediaStop,
-        .mediaRewind => .mediaRewind,
-        .mediaPausePlay => .mediaPausePlay,
-        .mediaForward => .mediaForward,
-        .mediaMute => .mediaMute,
-        .mediaVolumeUp => .mediaVolumeUp,
-        .mediaVolumeDown => .mediaVolumeDown,
+        .media_stop => .media_stop,
+        .media_rewind => .media_rewind,
+        .media_pause_play => .media_pause_play,
+        .media_forward => .media_forward,
+        .media_mute => .media_mute,
+        .media_volume_up => .media_volume_up,
+        .media_volume_down => .media_volume_down,
 
         .tab => .tab,
-        .capsLock => .capsLock,
+        .capslock => .capslock,
         .enter => .enter,
 
-        .numLock => .numLock,
-        .numpadDivision => .numpadDivision,
-        .numpadMultiplication => .numpadMultiplication,
+        .numlock => .numlock,
+        .numpad_div => .numpad_div,
+        .numpad_mul => .numpad_mul,
 
         .numpad7 => .numpad7,
         .numpad8 => .numpad8,
         .numpad9 => .numpad9,
-        .numpadSubtraction => .numpadSubtraction,
+        .numpad_sub => .numpad_sub,
 
         .numpad4 => .numpad4,
         .numpad5 => .numpad5,
         .numpad6 => .numpad6,
-        .numpadAddition => .numpadAddition,
+        .numpad_add => .numpad_add,
 
         .numpad1 => .numpad1,
         .numpad2 => .numpad2,
         .numpad3 => .numpad3,
 
         .numpad0 => .numpad0,
-        .numpadPoint => .numpadPoint,
-        .numpadEnter => .numpadEnter,
+        .numpad_point => .numpad_point,
+        .numpad_enter => .numpad_enter,
 
         .f1 => .f1,
         .f2 => .f2,
@@ -135,73 +135,73 @@ fn sv_SE_QWERTY(state: *const kb.state.KeyboardState, key: kb.keys.Location) !kb
     const alt = state.isAltPressed();
 
     switch (key) {
-        .leftOf1 => {
-            if (alt) return kb.keys.Input.paragraphSign;
-            return kb.keys.Input.sectionSign;
+        .left_of1 => {
+            if (alt) return kb.keys.Input.paragraph_sign;
+            return kb.keys.Input.section_sign;
         },
-        .numberKey1 => {
-            if (shift) return kb.keys.Input.exclamationMark;
+        .number_key1 => {
+            if (shift) return kb.keys.Input.exclamation_mark;
             return kb.keys.Input.@"1";
         },
-        .numberKey2 => {
+        .number_key2 => {
             if (alt) return kb.keys.Input.at;
-            if (shift) return kb.keys.Input.quotationMark;
+            if (shift) return kb.keys.Input.quotation_mark;
             return kb.keys.Input.@"2";
         },
-        .numberKey3 => {
-            if (alt) return kb.keys.Input.poundSign;
+        .number_key3 => {
+            if (alt) return kb.keys.Input.pound_sign;
             if (shift) return kb.keys.Input.hash;
             return kb.keys.Input.@"3";
         },
-        .numberKey4 => {
-            if (alt) return kb.keys.Input.dollarSign;
-            if (shift) return kb.keys.Input.currencySign;
+        .number_key4 => {
+            if (alt) return kb.keys.Input.dollar_sign;
+            if (shift) return kb.keys.Input.currency_sign;
             return kb.keys.Input.@"4";
         },
-        .numberKey5 => {
-            if (alt) return kb.keys.Input.euroSign;
+        .number_key5 => {
+            if (alt) return kb.keys.Input.euro_sign;
             if (shift) return kb.keys.Input.percent;
             return kb.keys.Input.@"5";
         },
-        .numberKey6 => {
-            if (alt) return kb.keys.Input.yenCurrency;
+        .number_key6 => {
+            if (alt) return kb.keys.Input.yen_sign;
             if (shift) return kb.keys.Input.ampersand;
             return kb.keys.Input.@"6";
         },
-        .numberKey7 => {
-            if (alt) return kb.keys.Input.openCurlyBrace;
-            if (shift) return kb.keys.Input.forwardSlash;
+        .number_key7 => {
+            if (alt) return kb.keys.Input.open_curly_brace;
+            if (shift) return kb.keys.Input.forward_slash;
             return kb.keys.Input.@"7";
         },
-        .numberKey8 => {
-            if (alt) return kb.keys.Input.openSqBracket;
-            if (shift) return kb.keys.Input.openParen;
+        .number_key8 => {
+            if (alt) return kb.keys.Input.open_sq_bracket;
+            if (shift) return kb.keys.Input.open_paren;
             return kb.keys.Input.@"8";
         },
-        .numberKey9 => {
-            if (alt) return kb.keys.Input.closeSqBracket;
-            if (shift) return kb.keys.Input.closeParen;
+        .number_key9 => {
+            if (alt) return kb.keys.Input.close_sq_bracket;
+            if (shift) return kb.keys.Input.close_paren;
             return kb.keys.Input.@"9";
         },
-        .numberKey0 => {
-            if (alt) return kb.keys.Input.closeCurlyBrace;
+        .number_key0 => {
+            if (alt) return kb.keys.Input.close_curly_brace;
             if (shift) return kb.keys.Input.equals;
             return kb.keys.Input.@"0";
         },
-        .rightOf0 => {
-            if (alt) return kb.keys.Input.backSlash;
-            if (shift) return kb.keys.Input.questionMark;
+        .right_of0 => {
+            if (alt) return kb.keys.Input.back_slash;
+            if (shift) return kb.keys.Input.question_mark;
             return kb.keys.Input.plus;
         },
-        .leftOfbackspace => {
+        .left_of_backspace => {
             if (alt) return kb.keys.Input.plusminus;
-            if (shift) return kb.keys.Input.backTick;
+            if (shift) return kb.keys.Input.back_tick;
             return kb.keys.Input.acute;
         },
 
         .line1_11 => {
             if (alt) return kb.keys.Input.umlaut;
-            return kb.keys.Input.aWithRing;
+            return kb.keys.Input.a_with_ring;
         },
         .line1_12 => {
             if (alt) return kb.keys.Input.tilde;
@@ -211,22 +211,22 @@ fn sv_SE_QWERTY(state: *const kb.state.KeyboardState, key: kb.keys.Location) !kb
 
         .line2_10 => {
             if (alt) return kb.keys.Input.slashedO;
-            return kb.keys.Input.oWithUmlaut;
+            return kb.keys.Input.o_with_umlaut;
         },
         .line2_11 => {
             if (alt) return kb.keys.Input.ash;
-            return kb.keys.Input.aWithUmlaut;
+            return kb.keys.Input.a_with_umlaut;
         },
         .line2_12 => {
-            if (alt) return kb.keys.Input.backTick;
+            if (alt) return kb.keys.Input.back_tick;
             if (shift) return kb.keys.Input.asterisk;
             return kb.keys.Input.apostrophe;
         },
 
-        .rightOfleftShift => {
-            if (alt) return kb.keys.Input.verticalBar;
-            if (shift) return kb.keys.Input.greaterThan;
-            return kb.keys.Input.lessThan;
+        .right_of_left_shift => {
+            if (alt) return kb.keys.Input.vertical_bar;
+            if (shift) return kb.keys.Input.greater_than;
+            return kb.keys.Input.less_than;
         },
         .line3_8 => {
             if (shift) return kb.keys.Input.semicolon;
@@ -249,71 +249,71 @@ fn en_US_QWERTY(state: *const kb.state.KeyboardState, key: kb.keys.Location) !kb
     const shift = state.isShiftPressed();
 
     switch (key) {
-        .leftOf1 => {
+        .left_of1 => {
             if (shift) return kb.keys.Input.tilde;
-            return kb.keys.Input.backTick;
+            return kb.keys.Input.back_tick;
         },
-        .numberKey1 => {
-            if (shift) return kb.keys.Input.exclamationMark;
+        .number_key1 => {
+            if (shift) return kb.keys.Input.exclamation_mark;
             return kb.keys.Input.@"1";
         },
-        .numberKey2 => {
+        .number_key2 => {
             if (shift) return kb.keys.Input.at;
             return kb.keys.Input.@"2";
         },
-        .numberKey3 => {
+        .number_key3 => {
             if (shift) return kb.keys.Input.hash;
             return kb.keys.Input.@"3";
         },
-        .numberKey4 => {
-            if (shift) return kb.keys.Input.dollarSign;
+        .number_key4 => {
+            if (shift) return kb.keys.Input.dollar_sign;
             return kb.keys.Input.@"4";
         },
-        .numberKey5 => {
+        .number_key5 => {
             if (shift) return kb.keys.Input.percent;
             return kb.keys.Input.@"5";
         },
-        .numberKey6 => {
+        .number_key6 => {
             if (shift) return kb.keys.Input.caret;
             return kb.keys.Input.@"6";
         },
-        .numberKey7 => {
+        .number_key7 => {
             if (shift) return kb.keys.Input.ampersand;
             return kb.keys.Input.@"7";
         },
-        .numberKey8 => {
+        .number_key8 => {
             if (shift) return kb.keys.Input.asterisk;
             return kb.keys.Input.@"8";
         },
-        .numberKey9 => {
-            if (shift) return kb.keys.Input.openParen;
+        .number_key9 => {
+            if (shift) return kb.keys.Input.open_paren;
             return kb.keys.Input.@"9";
         },
-        .numberKey0 => {
-            if (shift) return kb.keys.Input.closeParen;
+        .number_key0 => {
+            if (shift) return kb.keys.Input.close_paren;
             return kb.keys.Input.@"0";
         },
-        .rightOf0 => {
+        .right_of0 => {
             if (shift) return kb.keys.Input.underscore;
             return kb.keys.Input.minus;
         },
 
-        .leftOfbackspace => {
+        .left_of_backspace => {
             if (shift) return kb.keys.Input.plus;
             return kb.keys.Input.equals;
         },
 
         .line1_11 => {
-            if (shift) return kb.keys.Input.openCurlyBrace;
-            return kb.keys.Input.openSqBracket;
+            if (shift) return kb.keys.Input.open_curly_brace;
+            return kb.keys.Input.open_sq_bracket;
         },
         .line1_12 => {
-            if (shift) return kb.keys.Input.closeCurlyBrace;
-            return kb.keys.Input.closeSqBracket;
+            if (shift) return kb.keys.Input.close_curly_brace;
+            return kb.keys.Input.close_sq_bracket;
         },
         .line1_13 => {
-            if (shift) return kb.keys.Input.verticalBar;
-            return kb.keys.Input.backSlash;
+            if (shift) return kb.keys.Input.vertical_bar;
+            return kb.keys.Input.back_slash;
         },
 
         .line2_10 => {
@@ -322,20 +322,20 @@ fn en_US_QWERTY(state: *const kb.state.KeyboardState, key: kb.keys.Location) !kb
         },
         .line2_11 => {
             if (shift) return kb.keys.Input.apostrophe;
-            return kb.keys.Input.quotationMark;
+            return kb.keys.Input.quotation_mark;
         },
 
         .line3_8 => {
-            if (shift) return kb.keys.Input.lessThan;
+            if (shift) return kb.keys.Input.less_than;
             return kb.keys.Input.comma;
         },
         .line3_9 => {
-            if (shift) return kb.keys.Input.greaterThan;
+            if (shift) return kb.keys.Input.greater_than;
             return kb.keys.Input.period;
         },
         .line3_10 => {
-            if (shift) return kb.keys.Input.questionMark;
-            return kb.keys.Input.forwardSlash;
+            if (shift) return kb.keys.Input.question_mark;
+            return kb.keys.Input.forward_slash;
         },
 
         else => return queryQwertyFamily(key),
