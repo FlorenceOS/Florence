@@ -480,33 +480,33 @@ const bf = lib.util.bitfields;
 const PTEEncoding = extern union {
     raw: u64,
 
-    present: bf.boolean(u64, 0),
-    walk: bf.boolean(u64, 1),
+    present: bf.Boolean(u64, 0),
+    walk: bf.Boolean(u64, 1),
 };
 
 const MappingEncoding = extern union {
     raw: u64,
 
-    present: bf.boolean(u64, 0),
-    walk: bf.boolean(u64, 1),
-    attr_index: bf.bitfield(u64, 2, 3),
-    nonsecure: bf.boolean(u64, 5),
-    no_user: bf.boolean(u64, 6),
-    no_write: bf.boolean(u64, 7),
-    shareability: bf.bitfield(u64, 8, 2),
-    access: bf.boolean(u64, 10),
-    no_execute: bf.boolean(u64, 54),
+    present: bf.Boolean(u64, 0),
+    walk: bf.Boolean(u64, 1),
+    attr_index: bf.Bitfield(u64, 2, 3),
+    nonsecure: bf.Boolean(u64, 5),
+    no_user: bf.Boolean(u64, 6),
+    no_write: bf.Boolean(u64, 7),
+    shareability: bf.Bitfield(u64, 8, 2),
+    access: bf.Boolean(u64, 10),
+    no_execute: bf.Boolean(u64, 54),
 };
 
 const TableEncoding = extern union {
     raw: u64,
 
-    present: bf.boolean(u64, 0),
-    walk: bf.boolean(u64, 1),
-    no_execute: bf.boolean(u64, 60),
-    no_user: bf.boolean(u64, 61),
-    no_write: bf.boolean(u64, 62),
-    nonsecure: bf.boolean(u64, 63),
+    present: bf.Boolean(u64, 0),
+    walk: bf.Boolean(u64, 1),
+    no_execute: bf.Boolean(u64, 60),
+    no_user: bf.Boolean(u64, 61),
+    no_write: bf.Boolean(u64, 62),
+    nonsecure: bf.Boolean(u64, 63),
 };
 
 fn virt_index_at_level(vaddr: u64, level: u6) u9 {

@@ -349,10 +349,10 @@ pub const PagingContext = struct {
     pub fn encode_mapping(self: *const @This(), pte: MappingPTE) !EncodedPTE {
         var map = MappingEncoding{ .raw = pte.phys };
 
-        // writethrough: bf.boolean(u64, 3),
-        // cache_disable: bf.boolean(u64, 4),
-        // is_mapping_or_pat_low: bf.boolean(u64, 7),
-        // pat_high: bf.boolean(u64, 12),
+        // writethrough: bf.Boolean(u64, 3),
+        // cache_disable: bf.Boolean(u64, 4),
+        // is_mapping_or_pat_low: bf.Boolean(u64, 7),
+        // pat_high: bf.Boolean(u64, 12),
 
         map.present.write(true);
 
@@ -401,33 +401,33 @@ const bf = lib.util.bitfields;
 const PTEEncoding = extern union {
     raw: u64,
 
-    present: bf.boolean(u64, 0),
-    is_mapping: bf.boolean(u64, 7),
+    present: bf.Boolean(u64, 0),
+    is_mapping: bf.Boolean(u64, 7),
 };
 
 const MappingEncoding = extern union {
     raw: u64,
 
-    present: bf.boolean(u64, 0),
-    writable: bf.boolean(u64, 1),
-    user: bf.boolean(u64, 2),
-    writethrough: bf.boolean(u64, 3),
-    cache_disable: bf.boolean(u64, 4),
-    accessed: bf.boolean(u64, 5),
-    is_mapping_or_pat_low: bf.boolean(u64, 7),
-    pat_high: bf.boolean(u64, 12),
-    execute_disable: bf.boolean(u64, 63),
+    present: bf.Boolean(u64, 0),
+    writable: bf.Boolean(u64, 1),
+    user: bf.Boolean(u64, 2),
+    writethrough: bf.Boolean(u64, 3),
+    cache_disable: bf.Boolean(u64, 4),
+    accessed: bf.Boolean(u64, 5),
+    is_mapping_or_pat_low: bf.Boolean(u64, 7),
+    pat_high: bf.Boolean(u64, 12),
+    execute_disable: bf.Boolean(u64, 63),
 };
 
 const TableEncoding = extern union {
     raw: u64,
 
-    present: bf.boolean(u64, 0),
-    writable: bf.boolean(u64, 1),
-    user: bf.boolean(u64, 2),
-    accessed: bf.boolean(u64, 5),
-    is_mapping: bf.boolean(u64, 7),
-    execute_disable: bf.boolean(u64, 63),
+    present: bf.Boolean(u64, 0),
+    writable: bf.Boolean(u64, 1),
+    user: bf.Boolean(u64, 2),
+    accessed: bf.Boolean(u64, 5),
+    is_mapping: bf.Boolean(u64, 7),
+    execute_disable: bf.Boolean(u64, 63),
 };
 
 fn virt_index_at_level(vaddr: u64, level: u6) u9 {

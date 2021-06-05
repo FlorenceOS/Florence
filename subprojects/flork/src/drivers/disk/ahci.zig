@@ -23,17 +23,17 @@ const Port = packed struct {
     command_status: extern union {
         raw: u32,
 
-        start: bf.boolean(u32, 0),
-        recv_enable: bf.boolean(u32, 4),
-        fis_recv_running: bf.boolean(u32, 14),
-        command_list_running: bf.boolean(u32, 15),
+        start: bf.Boolean(u32, 0),
+        recv_enable: bf.Boolean(u32, 4),
+        fis_recv_running: bf.Boolean(u32, 14),
+        command_list_running: bf.Boolean(u32, 15),
     },
     reserved_0x1C: u32,
     task_file_data: extern union {
         raw: u32,
 
-        transfer_requested: bf.boolean(u32, 3),
-        interface_busy: bf.boolean(u32, 7),
+        transfer_requested: bf.Boolean(u32, 3),
+        interface_busy: bf.Boolean(u32, 7),
     },
     signature: u32,
     sata_status: u32,
@@ -151,9 +151,9 @@ const ABAR = struct {
     version: extern union {
         value: u32,
 
-        major: bf.bitfield(u32, 16, 16),
-        minor_high: bf.bitfield(u32, 8, 8),
-        minor_low: bf.bitfield(u32, 0, 8),
+        major: bf.Bitfield(u32, 16, 16),
+        minor_high: bf.Bitfield(u32, 8, 8),
+        minor_low: bf.Bitfield(u32, 0, 8),
 
         pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
             try writer.print("{}.{}", .{ self.major.read(), self.minor_high.read() });
@@ -173,9 +173,9 @@ const ABAR = struct {
     hba_capabilities_extended: u32,
     bios_handoff: extern union {
         value: u32,
-        bios_owned: bf.boolean(u32, 4),
-        os_owned: bf.boolean(u32, 1),
-        bios_busy: bf.boolean(u32, 0),
+        bios_owned: bf.Boolean(u32, 4),
+        os_owned: bf.Boolean(u32, 1),
+        bios_busy: bf.Boolean(u32, 0),
 
         fn set_handoff(self: *volatile @This()) void {
             self.os_owned.write(true);
