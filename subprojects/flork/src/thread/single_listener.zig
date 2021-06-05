@@ -1,5 +1,4 @@
-const std = @import("std");
-const os = @import("root").os;
+usingnamespace @import("root").preamble;
 
 /// SingleListener is a helper that allows one thread
 /// to listen for events triggered by many producers

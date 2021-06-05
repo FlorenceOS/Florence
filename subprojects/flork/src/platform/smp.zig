@@ -1,7 +1,4 @@
-const std = @import("std");
-const os = @import("root").os;
-const lib = @import("root").lib;
-const config = @import("root").config;
+usingnamespace @import("root").preamble;
 
 const CoreID = os.platform.CoreID;
 

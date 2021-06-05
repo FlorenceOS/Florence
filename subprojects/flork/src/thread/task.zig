@@ -1,5 +1,4 @@
-const os = @import("root").os;
-const lib = @import("root").lib;
+usingnamespace @import("root").preamble;
 const atomic_queue = lib.containers.atomic_queue;
 
 const guard_size = os.platform.thread.stack_guard_size;

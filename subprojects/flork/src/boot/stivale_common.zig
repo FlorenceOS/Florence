@@ -1,11 +1,8 @@
-const os = @import("root").os;
-const lib = @import("root").lib;
+usingnamespace @import("root").preamble;
 
 const paging = os.memory.paging;
 const platform = os.platform;
 const libalign = lib.util.libalign;
-
-const std = @import("std");
 
 pub const MemmapEntry = packed struct {
     base: u64,

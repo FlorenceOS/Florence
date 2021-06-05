@@ -1,4 +1,4 @@
-const os = @import("root").os;
+usingnamespace @import("root").preamble;
 
 const reg_ptr = os.platform.phys_ptr(*volatile u32);
 

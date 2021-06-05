@@ -1,3 +1,10 @@
+usingnamespace @import("root").preamble;
+
+const virtio = @import("virtio-pci.zig");
+const paging = os.memory.paging;
+const pmm = os.memory.pmm;
+const pci = os.platform.pci;
+
 /// virtio-gpu driver instance
 const Driver = struct {
     transport: virtio.Driver,
@@ -150,12 +157,6 @@ fn updater(bb: [*]u8, yoff_src: usize, yoff_dest: usize, ysize: usize, pitch: us
     var self = @intToPtr(*Driver, ctx);
     self.update_rect(self.pitch * yoff_src, .{ .x = 0, .y = @truncate(u32, yoff_dest), .width = self.width, .height = @truncate(u32, ysize) });
 }
-
-const virtio = @import("virtio-pci.zig");
-const os = @import("root").os;
-const paging = os.memory.paging;
-const pmm = os.memory.pmm;
-const pci = os.platform.pci;
 
 const ConfHdr = packed struct {
     cmdtype: u32,

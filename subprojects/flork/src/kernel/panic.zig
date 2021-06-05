@@ -1,6 +1,5 @@
-const StackTrace = @import("std").builtin.StackTrace;
-
-const os = @import("root").os;
+usingnamespace @import("root").preamble;
+const StackTrace = std.builtin.StackTrace;
 
 pub fn breakpoint_panic(message: ?[]const u8, stack_trace: ?*StackTrace) noreturn {
     @breakpoint();

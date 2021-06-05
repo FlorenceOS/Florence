@@ -1,5 +1,4 @@
-const os = @import("root").os;
-const std = @import("std");
+usingnamespace @import("root").preamble;
 const kepler = os.kepler;
 
 /// InterruptObject is a source of interrupts of some kind

@@ -1,4 +1,4 @@
-const os = @import("root").os;
+usingnamespace @import("root").preamble;
 
 pub const InterruptState = bool;
 

@@ -1,6 +1,5 @@
-const std = @import("std");
+usingnamespace @import("root").preamble;
 
-const os = @import("root").os;
 const apic = @import("apic.zig");
 const ports = @import("ports.zig");
 const kb = os.drivers.hid.keyboard;

@@ -1,3 +1,5 @@
+usingnamespace @import("root").preamble;
+
 /// Represents the physical location of a key on the keyboard, not affected by keyboard layouts
 pub const Location = enum {
     Escape,

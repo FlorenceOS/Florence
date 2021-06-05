@@ -1,6 +1,4 @@
-const os = @import("root").os;
-const config = @import("root").config;
-const std = @import("std");
+usingnamespace @import("root").preamble;
 
 pub const layouts = @import("keyboard_layouts.zig");
 pub const keys = @import("keyboard_keys.zig");

@@ -1,5 +1,4 @@
-const std = @import("std");
-const os = @import("root").os;
+usingnamespace @import("root").preamble;
 
 /// Allocator used to allocate memory for new tasks
 const task_alloc = os.memory.vmm.backed(.Ephemeral);

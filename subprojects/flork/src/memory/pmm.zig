@@ -1,6 +1,4 @@
-const os = @import("root").os;
-const lib = @import("root").lib;
-const std = @import("std");
+usingnamespace @import("root").preamble;
 
 const assert = std.debug.assert;
 const platform = os.platform;

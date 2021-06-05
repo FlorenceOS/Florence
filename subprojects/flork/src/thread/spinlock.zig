@@ -1,4 +1,4 @@
-const os = @import("root").os;
+usingnamespace @import("root").preamble;
 
 /// A simple spinlock
 /// Can be used as an SMP synchronization primitive

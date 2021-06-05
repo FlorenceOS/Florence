@@ -1,4 +1,5 @@
-const os = @import("root").os;
+usingnamespace @import("root").preamble;
+
 const platform = os.platform;
 const ports = @import("ports.zig");
 

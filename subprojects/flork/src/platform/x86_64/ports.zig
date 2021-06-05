@@ -1,3 +1,5 @@
+usingnamespace @import("root").preamble;
+
 pub fn out(comptime T: type, port: u16, value: T) void {
     switch (T) {
         u8 => outb(port, value),

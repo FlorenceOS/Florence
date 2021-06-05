@@ -1,6 +1,4 @@
-const std = @import("std");
-
-const os = @import("root").os;
+usingnamespace @import("root").preamble;
 
 var debug_allocator_bytes: [1024 * 1024]u8 = undefined;
 var debug_allocator_state = std.heap.FixedBufferAllocator.init(debug_allocator_bytes[0..]);

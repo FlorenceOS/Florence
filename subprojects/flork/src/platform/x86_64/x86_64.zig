@@ -1,6 +1,4 @@
-const os = @import("root").os;
-const config = @import("root").config;
-const std = @import("std");
+usingnamespace @import("root").preamble;
 
 const interrupts = @import("interrupts.zig");
 const idt = @import("idt.zig");

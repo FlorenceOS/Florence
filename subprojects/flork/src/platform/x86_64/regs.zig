@@ -1,5 +1,4 @@
-const std = @import("std");
-const os = @import("root").os;
+usingnamespace @import("root").preamble;
 
 pub const IA32_EFER = MSR(u64, 0xC0000080);
 pub const IA32_STAR = MSR(u64, 0xC0000081);

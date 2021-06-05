@@ -1,6 +1,4 @@
-const std = @import("std");
-const os = @import("root").os;
-const lib = @import("root").lib;
+usingnamespace @import("root").preamble;
 const pmm = os.memory.pmm;
 const vmm = os.memory.vmm;
 const paging = os.memory.paging;

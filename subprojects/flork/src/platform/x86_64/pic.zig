@@ -1,3 +1,4 @@
+usingnamespace @import("root").preamble;
 const ports = @import("ports.zig");
 
 fn wait() void {

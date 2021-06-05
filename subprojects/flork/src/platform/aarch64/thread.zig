@@ -1,5 +1,4 @@
-const os = @import("root").os;
-const lib = @import("root").lib;
+usingnamespace @import("root").preamble;
 
 pub var bsp_task: os.thread.Task = .{};
 

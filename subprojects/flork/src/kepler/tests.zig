@@ -1,6 +1,4 @@
-const std = @import("std");
-const os = @import("root").os;
-const lib = @import("root").lib;
+usingnamespace @import("root").preamble;
 const kepler = os.kepler;
 
 const tries = 1_000_000;

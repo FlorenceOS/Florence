@@ -1,5 +1,4 @@
-const os = @import("root").os;
-const lib = @import("root").lib;
+usingnamespace @import("root").preamble;
 
 const platform = os.platform;
 

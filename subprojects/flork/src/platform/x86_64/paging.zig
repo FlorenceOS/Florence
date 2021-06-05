@@ -1,6 +1,5 @@
-const os = @import("root").os;
-const lib = @import("root").lib;
-const std = @import("std");
+usingnamespace @import("root").preamble;
+
 const regs = @import("regs.zig");
 const paging = @import("../paging.zig");
 

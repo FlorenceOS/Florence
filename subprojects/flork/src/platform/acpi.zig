@@ -1,7 +1,4 @@
-const os = @import("root").os;
-const lib = @import("root").lib;
-const builtin = @import("builtin");
-const std = @import("std");
+usingnamespace @import("root").preamble;
 
 const paging = os.memory.paging;
 const pci = os.platform.pci;

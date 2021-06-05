@@ -1,5 +1,4 @@
-const os = @import("root").os;
-const std = @import("std");
+usingnamespace @import("root").preamble;
 
 /// Mutex is lock that should be used for synchronizing operations
 /// that may take too long and/or can't be run in interrupt disabled context

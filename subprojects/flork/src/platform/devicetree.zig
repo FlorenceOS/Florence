@@ -1,5 +1,4 @@
-const os = @import("root").os;
-const std = @import("std");
+usingnamespace @import("root").preamble;
 const assert = std.debug.assert;
 
 var parsed_dt: bool = false;

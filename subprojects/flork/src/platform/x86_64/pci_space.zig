@@ -1,3 +1,5 @@
+usingnamespace @import("root").preamble;
+
 const ports = @import("ports.zig");
 const pci = @import("root").os.platform.pci;
 

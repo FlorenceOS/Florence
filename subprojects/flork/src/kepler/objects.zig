@@ -1,5 +1,4 @@
-const std = @import("std");
-const os = @import("root").os;
+usingnamespace @import("root").preamble;
 const kepler = os.kepler;
 
 /// Type of the object that can be stored in local object namespace

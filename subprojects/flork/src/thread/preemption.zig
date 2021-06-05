@@ -1,4 +1,4 @@
-const os = @import("root").os;
+usingnamespace @import("root").preamble;
 
 /// Store state of the current thread
 pub fn store_current_state(frame: *os.platform.InterruptFrame) void {

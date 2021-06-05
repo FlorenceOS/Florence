@@ -1,5 +1,5 @@
-const os = @import("root").os;
-const arch = @import("builtin").arch;
+usingnamespace @import("root").preamble;
+const arch = std.builtin.arch;
 
 pub const debug = @import("debug.zig");
 pub const logger = @import("logger.zig");

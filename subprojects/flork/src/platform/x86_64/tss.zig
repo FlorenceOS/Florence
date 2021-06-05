@@ -1,3 +1,5 @@
+usingnamespace @import("root").preamble;
+
 pub const Tss = packed struct {
     _1: u32 = 0,
     rsp: [3]u64 = [1]u64{0} ** 3,

@@ -1,6 +1,4 @@
-const os = @import("root").os;
-const lib = @import("root").lib;
-const std = @import("std");
+usingnamespace @import("root").preamble;
 const libalign = lib.util.libalign;
 
 /// Class that handles calling a function with any arguments on a new stack

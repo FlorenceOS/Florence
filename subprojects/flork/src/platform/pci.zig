@@ -1,7 +1,4 @@
-const os = @import("root").os;
-const lib = @import("root").lib;
-const std = @import("std");
-const builtin = @import("builtin");
+usingnamespace @import("root").preamble;
 
 const paging = os.memory.paging;
 

@@ -1,4 +1,4 @@
-const os = @import("root").os;
+usingnamespace @import("root").preamble;
 
 pub fn vital(val: anytype, context: []const u8) @TypeOf(val catch unreachable) {
     return val catch |err| {

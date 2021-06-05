@@ -1,3 +1,5 @@
+usingnamespace @import("root").preamble;
+
 const keyboard = @import("keyboard.zig");
 const keys = @import("keyboard_keys.zig");
 

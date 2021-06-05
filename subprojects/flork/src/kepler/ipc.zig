@@ -1,6 +1,4 @@
-const os = @import("root").os;
-const std = @import("std");
-const lib = @import("root").lib;
+usingnamespace @import("root").preamble;
 const builtin = std.builtin;
 const atomic_queue = lib.containers.atomic_queue;
 const thread = os.thread;

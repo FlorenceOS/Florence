@@ -1,3 +1,5 @@
+usingnamespace @import("root").preamble;
+
 const Tss = @import("tss.zig").Tss;
 
 pub const selector = .{

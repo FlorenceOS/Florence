@@ -1,9 +1,5 @@
-const os = @import("root").os;
+usingnamespace @import("root").preamble;
 const paging_common = @import("../paging.zig");
-
-const std = @import("std");
-
-const lib = @import("root").lib;
 
 pub var page_sizes: []const usize = undefined;
 

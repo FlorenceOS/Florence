@@ -1,6 +1,5 @@
-const os = @import("root").os;
-const lib = @import("root").lib;
-const fmt = @import("std").fmt;
+usingnamespace @import("root").preamble;
+const fmt = std.fmt;
 
 const range = lib.util.range.range;
 

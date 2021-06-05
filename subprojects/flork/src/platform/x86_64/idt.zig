@@ -1,4 +1,5 @@
-const os = @import("root").os;
+usingnamespace @import("root").preamble;
+
 const assert = @import("std").debug.assert;
 
 const interrupts = @import("interrupts.zig");

@@ -1,4 +1,11 @@
-const std = @import("std");
+usingnamespace @import("root").preamble;
+
+const libalign = lib.libalign;
+const allocator = os.memory.vmm.backed(.Ephemeral);
+const pmm = os.memory.pmm;
+const paging = os.memory.paging;
+const pci = os.platform.pci;
+const assert = std.debug.assert;
 
 /// Descriptor iterator helper.
 pub const DescIter = struct {
@@ -194,15 +201,6 @@ pub const Driver = struct {
 };
 
 pub const Descriptor = u16; // descriptor id
-
-const os = @import("root").os;
-const lib = @import("root");
-const libalign = lib.libalign;
-const allocator = os.memory.vmm.backed(.Ephemeral);
-const pmm = os.memory.pmm;
-const paging = os.memory.paging;
-const pci = os.platform.pci;
-const assert = @import("std").debug.assert;
 
 /// Ring descriptor, actual structure (`Descriptor` is only its id)
 const VirtqDesc = packed struct {
