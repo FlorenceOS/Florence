@@ -419,8 +419,8 @@ export fn stivale2Main(info_in: *Info) noreturn {
     os.log("Doing framebuffer\n", .{});
 
     if (info.framebuffer) |fb| {
-        drivers.vesa_log.register_fb(
-            drivers.vesa_log.lfb_updater,
+        drivers.vesa_log.registerFb(
+            drivers.vesa_log.lfbUpdater,
             fb.addr,
             fb.pitch,
             fb.width,

@@ -129,13 +129,13 @@ pub fn handle_controller(addr: pci.Addr) void {
         os.log("Virtio display controller: Init has failed!\n", .{});
         return;
     };
-    if (os.drivers.vesa_log.get_info()) |vesa| {
+    if (os.drivers.vesa_log.getInfo()) |vesa| {
         drv.modeset(os.drivers.vesa_log.framebuffer.?.bb_phys, vesa.width, vesa.height);
-        os.drivers.vesa_log.set_updater(updater, @ptrToInt(drv));
+        os.drivers.vesa_log.setUpdater(updater, @ptrToInt(drv));
         os.log("Virtio display controller: Initialized with preexisting fb\n", .{});
     } else {
-        os.drivers.vesa_log.register_fb(updater, @ptrToInt(drv), 800 * 4, 800, 600, 32);
-        drv.modeset(os.drivers.vesa_log.get_backbuffer_phy(), 800, 600);
+        os.drivers.vesa_log.registerFb(updater, @ptrToInt(drv), 800 * 4, 800, 600, 32);
+        drv.modeset(os.drivers.vesa_log.getBackbufferPhys(), 800, 600);
         os.log("Virtio display controller: Initialized\n", .{});
     }
 }

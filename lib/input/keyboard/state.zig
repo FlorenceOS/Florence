@@ -6,7 +6,7 @@ pub const KeyboardState = struct {
     const pressedState = std.PackedIntArray(bool, @typeInfo(kb.keys.Location).Enum.fields.len);
 
     is_pressed: pressedState = std.mem.zeroInit(pressedState, .{}),
-    layout: kb.layouts.KeyboardLayout = config.user.keyboard_layout,
+    layout: kb.layouts.KeyboardLayout = config.keyboard_layout,
 
     pub fn pressed(self: *const @This(), location: kb.keys.Location) bool {
         return self.is_pressed.get(@enumToInt(location));

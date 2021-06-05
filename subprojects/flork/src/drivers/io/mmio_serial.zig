@@ -10,7 +10,12 @@ var write_status: ?struct {
     status_value: u32,
 } = null;
 
-pub fn register_mmio32_status_serial(uart_reg: u64, uart_status: u64, status_mask: u32, status_value: u32) void {
+pub fn register_mmio32_status_serial(
+    uart_reg: u64,
+    uart_status: u64,
+    status_mask: u32,
+    status_value: u32,
+) void {
     write_status = .{
         .status_ptr = reg_ptr.from_int(uart_status),
         .status_mask = status_mask,

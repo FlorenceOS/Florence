@@ -1,12 +1,5 @@
 usingnamespace @import("root").preamble;
 
-const libalign = lib.util.libalign;
-
-const paging = os.memory.paging;
-const pmm = os.memory.pmm;
-
-const page_size = os.platform.paging.page_sizes[0];
-
 const Framebuffer = struct {
     x_pos: u64 = 0,
     y_pos: u64 = 0,
@@ -24,7 +17,7 @@ fn buffer(comptime T: type) [*]volatile T {
     return os.platform.phys_ptr([*]volatile T).from_int(0xB8000).get_uncached();
 }
 
-fn scroll_buffer() void {
+fn scroll() void {
     {
         var y: u64 = 1;
         while (y < 25) {
@@ -44,10 +37,10 @@ fn scroll_buffer() void {
     }
 }
 
-fn feed_line() void {
+fn feedLine() void {
     framebuffer.?.x_pos = 0;
     if (framebuffer.?.y_pos == 24) {
-        scroll_buffer();
+        scroll();
     } else {
         framebuffer.?.y_pos += 1;
     }
@@ -59,12 +52,12 @@ pub fn putch(ch: u8) void {
             return;
 
         if (ch == '\n') {
-            feed_line();
+            feedLine();
             return;
         }
 
         if (framebuffer.?.x_pos == 80)
-            feed_line();
+            feedLine();
 
         buffer(u16)[(framebuffer.?.y_pos * 80 + framebuffer.?.x_pos)] = 0x0700 | @as(u16, ch);
         framebuffer.?.x_pos += 1;

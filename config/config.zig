@@ -1,3 +1,5 @@
+usingnamespace @import("../preamble.zig");
+
 pub const kernel = .{
   // Max number of CPU cores to use
   .max_cpus = 0x200,
@@ -23,9 +25,11 @@ pub const kernel = .{
       .enable_keyboard = true,
     },
   },
+
 };
 
-pub const user = .{
-  // The default keyboard layout
-  .keyboard_layout = .en_US_QWERTY,
-};
+// Terminal font
+pub const font = assets.fonts.fixed_6x13;
+
+// Default keyboard layout
+pub const keyboard_layout = .en_US_QWERTY;
