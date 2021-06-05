@@ -8,7 +8,6 @@ pub fn buildKernel(params: struct {
     builder: *std.build.Builder,
     arch: Arch,
     boot_proto: []const u8 = "stivale2",
-    mode: ?std.builtin.Mode = null,
 }) *std.build.LibExeObjStep {
     const arch = params.arch;
     const proto = params.boot_proto;
@@ -35,7 +34,7 @@ pub fn buildKernel(params: struct {
             blob
         else
             null,
-        .mode = params.mode,
+        .mode = config.kernel.build_mode,
         .strip_symbols = config.kernel.strip_symbols,
     });
 
