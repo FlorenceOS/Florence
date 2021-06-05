@@ -39,10 +39,6 @@ pub fn RefCounted(comptime T: type, comptime dispose_handler: ?(fn (*T) void)) t
 }
 
 test "RefCounted" {
-    var buffer: [4096]u8 = undefined;
-    var fixed_buffer = std.heap.FixedBufferAllocator.init(&buffer);
-    const allocator = &fixed_buffer.allocator;
-
     var test_var: usize = 2;
     const TestType = RefCounted(usize, struct {
         fn destructor(self: *usize) void {
@@ -50,7 +46,11 @@ test "RefCounted" {
             pointer.* = 1;
         }
     }.destructor);
-    const val = TestType.create(allocator, @ptrToInt(&test_var)) catch @panic("Failed to allocate");
+
+    const val = TestType.create(std.testing.allocator, @ptrToInt(&test_var)) catch {
+        @panic("Failed to allocate");
+    };
+
     std.debug.assert(test_var == 2);
     const val2 = val.borrow();
     std.debug.assert(test_var == 2);

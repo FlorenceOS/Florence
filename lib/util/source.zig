@@ -5,7 +5,7 @@ const source_blob = if (@import("build_options").source_blob_path) |path| @embed
 
 pub fn file_line(filename: []const u8, line: usize) ![]const u8 {
     const blob = source_blob orelse return error.FileNotFound;
-    var iterator = tar.iterate_files(blob) catch unreachable;
+    var iterator = tar.iterate(blob) catch unreachable;
     while (iterator.has_file) : (iterator.next()) {
         if (!std.mem.endsWith(u8, filename, iterator.file_name)) {
             continue;

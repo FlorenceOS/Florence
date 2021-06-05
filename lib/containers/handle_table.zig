@@ -38,7 +38,7 @@ pub fn HandleTable(comptime T: type) type {
         }
 
         /// Allocate a new cell for a new handle
-        pub fn new_cell(self: *@This()) !Location {
+        pub fn newCell(self: *@This()) !Location {
             std.debug.assert(self.first_cell != used_cell);
             if (self.first_cell == no_next) {
                 // Increase dynarray length
@@ -55,8 +55,8 @@ pub fn HandleTable(comptime T: type) type {
             return Location{ .id = index, .ref = &cell.item };
         }
 
-        /// Validate ID. Returns true if index is ID that was returned by new_cell
-        pub fn validate_id(self: *const @This(), index: usize) bool {
+        /// Validate ID. Returns true if index is ID that was returned by newCell
+        pub fn validateId(self: *const @This(), index: usize) bool {
             if (self.cells.items.len <= index) {
                 return false;
             }
@@ -67,31 +67,31 @@ pub fn HandleTable(comptime T: type) type {
         }
 
         /// Free cell
-        pub fn free_cell(self: *@This(), id: usize) !void {
-            if (!self.validate_id(id)) {
-                return error.InvalidID;
+        pub fn freeCell(self: *@This(), id: usize) !void {
+            if (!self.validateId(id)) {
+                return error.InvalidId;
             }
             self.cells.items[id].next_free = self.first_cell;
             self.first_cell = id;
         }
 
         /// Get access to handle data
-        pub fn get_data(self: *const @This(), id: usize) !*T {
-            if (!self.validate_id(id)) {
-                return error.InvalidID;
+        pub fn getData(self: *const @This(), id: usize) !*T {
+            if (!self.validateId(id)) {
+                return error.InvalidId;
             }
             return &self.cells.items[id].item;
         }
 
         /// Dispose handle array. Dispose handler is the struct with .dispose(loc: Location) method
         /// that is called for every remaining alive handle
-        pub fn deinit(self: *@This(), comptime disposer_type: type, disposer: *disposer_type) void {
+        pub fn deinit(self: *@This(), comptime DisposerType: type, disposer: *DisposerType) void {
             comptime {
-                if (!@hasDecl(disposer_type, "dispose")) {
+                if (!@hasDecl(DisposerType, "dispose")) {
                     @compileError("Disposer type should define \"dispose\" function");
                 }
-                const expect_disposer_type = fn (*disposer_type, Location) void;
-                if (@TypeOf(disposer_type.dispose) != expect_disposer_type) {
+                const ExpectedDisposeType = fn (*DisposerType, Location) void;
+                if (@TypeOf(DisposerType.dispose) != ExpectedDisposeType) {
                     @compileError("Invalid type of dispose function");
                 }
             }
@@ -103,57 +103,6 @@ pub fn HandleTable(comptime T: type) type {
             self.cells.deinit();
         }
     };
-}
-
-test "handle_table" {
-    var buffer: [4096]u8 = undefined;
-    var fixed_buffer = std.heap.FixedBufferAllocator.init(&buffer);
-    const allocator = &fixed_buffer.allocator;
-
-    var instance = HandleTable(u64).init(allocator);
-
-    const result1 = try instance.new_cell();
-    result1.ref.* = 69;
-    std.testing.expect(result1.id == 0);
-
-    const result2 = try instance.new_cell();
-    result2.ref.* = 420;
-    std.testing.expect(result2.id == 1);
-
-    if (instance.get_data(2)) {
-        unreachable;
-    } else |err| {
-        std.testing.expect(err == error.InvalidID);
-    }
-    std.testing.expect((try instance.get_data(0)).* == 69);
-
-    try instance.free_cell(0);
-    if (instance.get_data(0)) {
-        unreachable;
-    } else |err| {
-        std.testing.expect(err == error.InvalidID);
-    }
-
-    std.testing.expect((try instance.get_data(1)).* == 420);
-
-    const TestDisposer = struct {
-        called: bool,
-
-        fn init() @This() {
-            return .{ .called = false };
-        }
-
-        fn dispose(self: *@This(), loc: HandleTable(u64).Location) void {
-            std.debug.assert(!self.called);
-            std.debug.assert(loc.id == 1);
-            std.debug.assert(loc.ref.* == 420);
-            self.called = true;
-        }
-    };
-
-    var disposer = TestDisposer.init();
-    instance.deinit(TestDisposer, &disposer);
-    std.testing.expect(disposer.called);
 }
 
 /// Locked handle table is a wrapper on HandleTable that allows only one reader/writer using lock
@@ -175,24 +124,24 @@ pub fn LockedHandleTable(comptime T: type, comptime Lock: type) type {
         /// Allocate a new cell for a new handle and
         /// leave the table locked
         /// NOTE: Don't forget to call unlock lol :^)
-        pub fn new_cell(self: *@This()) !Location {
+        pub fn newCell(self: *@This()) !Location {
             self.mutex.lock();
             errdefer self.mutex.unlock();
-            return self.table.new_cell();
+            return self.table.newCell();
         }
 
         /// Free cell.
-        pub fn free_cell(self: *@This(), id: usize) !void {
+        pub fn freeCell(self: *@This(), id: usize) !void {
             self.mutex.lock();
             defer self.mutex.unlock();
-            return self.table.free_cell(id);
+            return self.table.freeCell(id);
         }
 
         /// Get cell data and leave the table locked
-        pub fn get_data(self: *@This(), id: usize) !*T {
+        pub fn getData(self: *@This(), id: usize) !*T {
             self.mutex.lock();
             errdefer self.mutex.unlock();
-            return self.table.get_data(id);
+            return self.table.getData(id);
         }
 
         /// Deinitialize the table
@@ -205,4 +154,51 @@ pub fn LockedHandleTable(comptime T: type, comptime Lock: type) type {
             self.mutex.unlock();
         }
     };
+}
+
+test "handle_table" {
+    var instance = HandleTable(u64).init(std.testing.allocator);
+
+    const result1 = try instance.newCell();
+    result1.ref.* = 69;
+    std.testing.expect(result1.id == 0);
+
+    const result2 = try instance.newCell();
+    result2.ref.* = 420;
+    std.testing.expect(result2.id == 1);
+
+    if (instance.getData(2)) {
+        unreachable;
+    } else |err| {
+        std.testing.expect(err == error.InvalidId);
+    }
+    std.testing.expect((try instance.getData(0)).* == 69);
+
+    try instance.freeCell(0);
+    if (instance.getData(0)) {
+        unreachable;
+    } else |err| {
+        std.testing.expect(err == error.InvalidId);
+    }
+
+    std.testing.expect((try instance.getData(1)).* == 420);
+
+    const TestDisposer = struct {
+        called: bool,
+
+        fn init() @This() {
+            return .{ .called = false };
+        }
+
+        fn dispose(self: *@This(), loc: HandleTable(u64).Location) void {
+            std.debug.assert(!self.called);
+            std.debug.assert(loc.id == 1);
+            std.debug.assert(loc.ref.* == 420);
+            self.called = true;
+        }
+    };
+
+    var disposer = TestDisposer.init();
+    instance.deinit(TestDisposer, &disposer);
+    std.testing.expect(disposer.called);
 }

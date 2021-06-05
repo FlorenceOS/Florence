@@ -444,14 +444,14 @@ fn locked_handle_table(allocator: *std.mem.Allocator) !void {
     var instance: Table = .{};
     instance.init(allocator);
 
-    const result1 = try instance.new_cell();
+    const result1 = try instance.newCell();
     result1.ref.* = 69;
     kepler_assert(result1.id == 0, "Allocated handle is not 0");
 
     instance.unlock();
     os.log("First alloc done!...\n", .{});
 
-    const result2 = try instance.new_cell();
+    const result2 = try instance.newCell();
     result2.ref.* = 420;
     kepler_assert(result2.id == 1, "Allocated handle is not 1");
 

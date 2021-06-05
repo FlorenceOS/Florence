@@ -1,12 +1,12 @@
 const std = @import("std");
-const builtin = @import("builtin");
 
+/// Node hook for the queue. Embedded inside queue element.
 pub const Node = struct {
     next: ?*Node,
 };
 
 /// Multi producer single consumer unbounded atomic queue.
-/// Consumer is responsible for managing memory for nodes.
+/// NOTE: Consumer is responsible for managing memory for nodes.
 pub fn MPSCUnboundedQueue(comptime T: type, comptime member_name: []const u8) type {
     return struct {
         /// Head of the queue
@@ -17,17 +17,17 @@ pub fn MPSCUnboundedQueue(comptime T: type, comptime member_name: []const u8) ty
         dummy: Node = .{ .next = null },
 
         /// Convert reference to T to reference to atomic queue node
-        fn ref_to_node(ref: *T) *Node {
+        fn refToNode(ref: *T) *Node {
             return &@field(ref, member_name);
         }
 
         /// Convert reference to atomic queue node to reference to T
-        fn node_to_ref(node: *Node) *T {
+        fn nodeToRef(node: *Node) *T {
             return @fieldParentPtr(T, member_name, node);
         }
 
         /// Enqueue element by reference to the node
-        pub fn enqueue_impl(self: *@This(), node: *Node) void {
+        pub fn enqueueImpl(self: *@This(), node: *Node) void {
             node.next = null;
             const prev = @atomicRmw(?*Node, &self.head, .Xchg, node, .AcqRel) orelse &self.dummy;
             @atomicStore(?*Node, &prev.next, node, .Release);
@@ -35,7 +35,7 @@ pub fn MPSCUnboundedQueue(comptime T: type, comptime member_name: []const u8) ty
 
         /// Enqueue element
         pub fn enqueue(self: *@This(), elem: *T) void {
-            self.enqueue_impl(ref_to_node(elem));
+            self.enqueueImpl(refToNode(elem));
         }
 
         /// Try to dequeue
@@ -69,7 +69,7 @@ pub fn MPSCUnboundedQueue(comptime T: type, comptime member_name: []const u8) ty
                 // Tail can be returned without worrying
                 // about updates (they may only take place for the next node)
                 self.tail = next_nonnull;
-                return node_to_ref(tail);
+                return nodeToRef(tail);
             }
             // Tail exists, but next has not existed (it may now as code is lock free)
             // Check if head points to the same element as tail
@@ -85,11 +85,11 @@ pub fn MPSCUnboundedQueue(comptime T: type, comptime member_name: []const u8) ty
             // and we have only one node left
             // Reinsert it as a marker for as to know
             // Where current queue ends
-            self.enqueue_impl(&self.dummy);
+            self.enqueueImpl(&self.dummy);
             next = @atomicLoad(?*Node, &tail.next, .Acquire);
             if (next) |next_nonnull| {
                 self.tail = next_nonnull;
-                return node_to_ref(tail);
+                return nodeToRef(tail);
             }
             return null;
         }

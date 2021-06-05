@@ -257,12 +257,12 @@ pub const RangeAlloc = struct {
             const size_finder: struct {
                 size: usize,
 
-                pub fn check(finder: *const @This(), range: *Range) bool {
+                pub fn check(finder: *const @This(), range: *const Range) bool {
                     return range.size >= finder.size;
                 }
             } = .{ .size = size };
 
-            var current_range = self.by_size.lower_bound(@TypeOf(size_finder), &size_finder);
+            var current_range = self.by_size.lowerBound(@TypeOf(size_finder), &size_finder);
 
             while (current_range) |range| {
                 if (range.try_place(size, alignment, size_alignment)) |placement| {
