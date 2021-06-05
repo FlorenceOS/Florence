@@ -134,7 +134,7 @@ fn function_scan(addr: Addr) void {
                 },
                 0x06 => {
                     os.log("SATA controller\n", .{});
-                    os.drivers.ahci.register_controller(addr);
+                    os.drivers.ahci.registerController(addr);
                 },
             }
         },

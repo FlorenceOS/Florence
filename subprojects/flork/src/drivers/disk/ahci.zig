@@ -1,19 +1,13 @@
 usingnamespace @import("root").preamble;
-const builtin = @import("builtin");
 
-const log = os.log;
-
-const pci = os.platform.pci;
-
-const paging = os.memory.paging;
-const pmm = os.memory.pmm;
-const scheduler = os.thread.scheduler;
+const memory = os.memory;
+const thread = os.thread;
+const platform = os.platform;
+const bf = lib.util.bitfields;
+const libalign = lib.util.libalign;
 
 const abar_size = 0x1100;
 const port_control_registers_size = 0x80;
-
-const bf = lib.util.bitfields;
-const libalign = lib.util.libalign;
 
 const Port = packed struct {
     command_list_base: [2]u32,
@@ -47,103 +41,106 @@ const Port = packed struct {
     reserved_0x48: [0x70 - 0x48]u8,
     vendor_0x70: [0x80 - 0x70]u8,
 
-    pub fn command_headers(self: *const volatile @This()) *volatile [32]CommandTableHeader {
+    fn getCommandHeaders(self: *const volatile @This()) *volatile [32]CommandTableHeader {
         const addr = read_u64(&self.command_list_base);
-        return &os.platform.phys_ptr(*volatile CommandList).from_int(addr).get_uncached().command_headers;
+        const cmd_list = os.platform.phys_ptr(*volatile CommandList).from_int(addr).get_uncached();
+        return &cmd_list.command_headers;
     }
 
-    pub fn start_command_engine(self: *volatile @This()) void {
+    pub fn startCommandEngine(self: *volatile @This()) void {
         os.log("AHCI: Starting command engine for port at 0x{X}\n", .{@ptrToInt(self)});
 
-        self.wait_ready();
+        self.waitRdy();
 
         self.command_status.start.write(false);
         self.command_status.recv_enable.write(false);
 
-        while (self.command_status.command_list_running.read() or self.command_status.fis_recv_running.read())
-            scheduler.yield();
+        const status = &self.command_status;
+
+        while (status.command_list_running.read() or status.fis_recv_running.read()) {
+            thread.scheduler.yield();
+        }
 
         self.command_status.recv_enable.write(true);
         self.command_status.start.write(true);
     }
 
-    pub fn stop_command_engine(self: *volatile @This()) void {
+    pub fn stopCommandEngine(self: *volatile @This()) void {
         os.log("AHCI: Stopping command engine for port at 0x{X}\n", .{@ptrToInt(self)});
         self.command_status.start.write(false);
 
-        while (self.command_status.command_list_running.read())
-            scheduler.yield();
+        while (self.command_status.command_list_running.read()) {
+            thread.scheduler.yield();
+        }
 
         self.command_status.recv_enable.write(false);
 
-        while (self.command_status.fis_recv_running.read())
-            scheduler.yield();
+        while (self.command_status.fis_recv_running.read()) {
+            thread.scheduler.yield();
+        }
     }
 
-    pub fn wait_ready(self: *volatile @This()) void {
-        while (self.task_file_data.transfer_requested.read() or self.task_file_data.interface_busy.read())
-            scheduler.yield();
+    pub fn waitRdy(self: *volatile @This()) void {
+        const task_file_data = &self.task_file_data;
+        while (task_file_data.transfer_requested.read() or task_file_data.interface_busy.read()) {
+            thread.scheduler.yield();
+        }
     }
 
-    pub fn issue_commands(self: *volatile @This(), slot_bits: u32) void {
-        log("AHCI: Sending {} command(s) to port 0x{X}\n", .{ @popCount(u32, slot_bits), @ptrToInt(self) });
+    pub fn issueCommands(self: *volatile @This(), slot_bits: u32) void {
+        os.log("AHCI: Sending {} command(s) to port 0x{X}\n", .{
+            @popCount(u32, slot_bits),
+            @ptrToInt(self),
+        });
 
-        self.wait_ready();
+        self.waitRdy();
 
         self.command_issue |= slot_bits;
 
-        while ((self.command_issue & slot_bits) != 0)
-            scheduler.yield();
+        while ((self.command_issue & slot_bits) != 0) {
+            thread.scheduler.yield();
+        }
     }
 
-    pub fn command_header(self: *const volatile @This(), slot: u5) *volatile CommandTableHeader {
-        return &self.command_headers()[slot];
+    pub fn getCommandHeader(self: *const volatile @This(), slot: u5) *volatile CommandTableHeader {
+        return &self.getCommandHeaders()[slot];
     }
 
-    pub fn command_table(self: *const volatile @This(), slot: u5) *volatile CommandTable {
-        return self.command_header(slot).table();
+    pub fn getCommandTable(self: *const volatile @This(), slot: u5) *volatile CommandTable {
+        return self.getCommandHeader(slot).table();
     }
 
-    pub fn get_fis(self: *volatile @This(), slot: u5) *volatile CommandFis {
-        return &self.command_table(slot).command_fis;
+    pub fn getFis(self: *volatile @This(), slot: u5) *volatile CommandFis {
+        return &self.getCommandTable(slot).command_fis;
     }
 
-    pub fn make_h2d(self: *volatile @This(), slot: u5) *volatile FisH2D {
-        const fis = &self.get_fis(slot).h2d;
+    pub fn makeH2D(self: *volatile @This(), slot: u5) *volatile FisH2D {
+        const fis = &self.getFis(slot).h2d;
         fis.fis_type = 0x27;
         return fis;
     }
 
-    pub fn prd(self: *volatile @This(), slot: u5, prd_idx: usize) *volatile PRD {
-        return &self.command_table(slot).prds[prd_idx];
+    pub fn getPrd(self: *volatile @This(), slot: u5, prd_idx: usize) *volatile PRD {
+        return &self.getCommandTable(slot).prds[prd_idx];
     }
 
     pub fn buffer(self: *volatile @This(), slot: u5, prd_idx: usize) []u8 {
-        const prd_ptr = self.prd(slot, 0);
+        const prd_ptr = self.getPrd(slot, 0);
         const buf_addr = read_u64(&prd_ptr.data_base_addr);
         const buf_size = @as(usize, prd_ptr.sizem1) + 1;
         return os.platform.phys_slice(u8).init(buf_addr, buf_size).to_slice_writeback();
     }
 
     pub fn read_single_sector(self: *volatile @This(), slot: u5) void {
-        self.issue_commands(1 << slot);
+        self.issueCommands(1 << slot);
     }
 };
-
-fn write_u64(mmio: anytype, value: u64) void {
-    mmio[0] = @truncate(u32, value);
-    mmio[1] = @truncate(u32, value >> 32);
-}
-
-fn read_u64(mmio: anytype) u64 {
-    return @as(u64, mmio[0]) | (@as(u64, mmio[1]) << 32);
-}
 
 comptime {
     std.debug.assert(@sizeOf(Port) == 0x80);
 }
 
-const ABAR = struct {
+const Abar = struct {
     hba_capabilities: u32,
     global_hba_control: u32,
     interrupt_status: u32,
@@ -155,10 +152,16 @@ const ABAR = struct {
         minor_high: bf.Bitfield(u32, 8, 8),
         minor_low: bf.Bitfield(u32, 0, 8),
 
-        pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+        pub fn format(
+            self: *const @This(),
+            fmt: []const u8,
+            options: std.fmt.FormatOptions,
+            writer: anytype,
+        ) !void {
             try writer.print("{}.{}", .{ self.major.read(), self.minor_high.read() });
-            if (self.minor_low.read() != 0)
+            if (self.minor_low.read() != 0) {
                 try writer.print(".{}", .{self.minor_low.read()});
+            }
         }
 
         comptime {
@@ -177,11 +180,11 @@ const ABAR = struct {
         os_owned: bf.Boolean(u32, 1),
         bios_busy: bf.Boolean(u32, 0),
 
-        fn set_handoff(self: *volatile @This()) void {
+        fn setHandoff(self: *volatile @This()) void {
             self.os_owned.write(true);
         }
 
-        fn check_handoff(self: *volatile @This()) bool {
+        fn checkHandoff(self: *volatile @This()) bool {
             if (self.bios_owned.read())
                 return false;
 
@@ -194,9 +197,9 @@ const ABAR = struct {
             return false;
         }
 
-        fn try_claim(self: *volatile @This()) bool {
-            self.set_handoff();
-            return self.check_handoff();
+        fn tryToClaim(self: *volatile @This()) bool {
+            self.setHandoff();
+            return self.checkHandoff();
         }
 
         comptime {
@@ -211,33 +214,11 @@ const ABAR = struct {
 };
 
 comptime {
-    std.debug.assert(@sizeOf(ABAR) == 0x1100);
+    std.debug.assert(@sizeOf(Abar) == 0x1100);
 }
 
-fn claim_controller(abar: *volatile ABAR) void {
-    {
-        const version = abar.version;
-        log("AHCI: Version: {}\n", .{version});
 
-        if (version.major.read() < 1 or version.minor_high.read() < 2) {
-            log("AHCI: Handoff not supported (version)\n", .{});
-            return;
-        }
-    }
-
-    if (abar.hba_capabilities_extended & 1 == 0) {
-        log("AHCI: Handoff not supported (capabilities)\n", .{});
-        return;
-    }
-
-    while (!abar.bios_handoff.try_claim()) {
-        scheduler.yield();
-    }
-
-    log("AHCI: Got handoff!\n", .{});
-}
-
-const sata_port_type = enum {
+const SataPortType = enum {
     ata,
     atapi,
     semb,
@@ -353,8 +334,8 @@ const CommandTable = struct {
 };
 
 const ReadOrWrite = enum {
-    Read,
-    Write,
+    read,
+    write,
 };
 
 // Our own structure for keeping track of everything we need for a port
@@ -362,7 +343,7 @@ const PortState = struct {
     mmio: *volatile Port = undefined,
     num_sectors: usize = undefined,
     sector_size: usize = 512,
-    port_type: sata_port_type = undefined,
+    port_type: SataPortType = undefined,
 
     pub fn init(port: *volatile Port) !PortState {
         var result: PortState = .{};
@@ -374,38 +355,42 @@ const PortState = struct {
             else => return error.UnknownSignature,
         };
 
-        result.mmio.stop_command_engine();
-
-        try result.setup_command_headers();
-
-        try result.setup_prdts();
-
-        result.mmio.start_command_engine();
-
+        result.mmio.stopCommandEngine();
+        try result.setupCommandHeaders();
+        try result.setupPrdts();
+        result.mmio.startCommandEngine();
         try result.identify();
 
         return result;
     }
 
-    fn setup_command_headers(self: *@This()) !void {
+    fn setupCommandHeaders(self: *@This()) !void {
         const port_io_size = @sizeOf(CommandList) + @sizeOf(RecvFis);
 
-        const commands_phys = try pmm.alloc_phys(port_io_size);
+        const commands_phys = try memory.pmm.alloc_phys(port_io_size);
         const fis_phys = commands_phys + @sizeOf(CommandList);
-        @memset(os.platform.phys_ptr([*]u8).from_int(commands_phys).get_uncached(), 0, port_io_size);
+        @memset(
+            os.platform.phys_ptr([*]u8).from_int(commands_phys).get_uncached(),
+            0,
+            port_io_size,
+        );
         write_u64(&self.mmio.command_list_base, commands_phys);
         write_u64(&self.mmio.fis_base, fis_phys);
     }
 
-    fn setup_prdts(self: *@This()) !void {
+    fn setupPrdts(self: *@This()) !void {
         const page_size = os.platform.paging.page_sizes[0];
         var current_table_addr: usize = undefined;
         var reamining_table_size: usize = 0;
-        for (self.mmio.command_headers()) |*header| {
+        for (self.mmio.getCommandHeaders()) |*header| {
             if (reamining_table_size < @sizeOf(CommandTable)) {
                 reamining_table_size = page_size;
-                current_table_addr = try pmm.alloc_phys(page_size);
-                @memset(os.platform.phys_ptr([*]u8).from_int(current_table_addr).get_uncached(), 0, page_size);
+                current_table_addr = try memory.pmm.alloc_phys(page_size);
+                @memset(
+                    os.platform.phys_ptr([*]u8).from_int(current_table_addr).get_uncached(),
+                    0,
+                    page_size,
+                );
             }
 
             write_u64(&header.command_table_addr, current_table_addr);
@@ -416,14 +401,14 @@ const PortState = struct {
             reamining_table_size -= @sizeOf(CommandTable);
 
             // First PRD is just a small preallocated single page buffer
-            const buf = try pmm.alloc_phys(page_size);
+            const buf = try memory.pmm.alloc_phys(page_size);
             @memset(os.platform.phys_ptr([*]u8).from_int(buf).get_uncached(), 0, page_size);
             write_u64(&header.table().prds[0].data_base_addr, buf);
             header.table().prds[0].sizem1 = @intCast(u22, page_size - 1);
         }
     }
 
-    fn identify_command(self: *@This()) u8 {
+    fn identifyCommand(self: *@This()) u8 {
         return switch (self.port_type) {
             .ata => 0xEC,
             .atapi => 0xA1,
@@ -432,15 +417,15 @@ const PortState = struct {
     }
 
     fn identify(self: *@This()) !void {
-        //log("AHCI: Identifying drive...\n", .{});
-        const identify_fis = self.mmio.make_h2d(0);
+        //os.log("AHCI: Identifying drive...\n", .{});
+        const identify_fis = self.mmio.makeH2D(0);
 
-        identify_fis.command = self.identify_command();
+        identify_fis.command = self.identifyCommand();
 
         identify_fis.c = 1;
         identify_fis.device = 0;
 
-        self.mmio.issue_commands(1);
+        self.mmio.issueCommands(1);
 
         const buf = self.mmio.buffer(0, 0);
 
@@ -448,33 +433,50 @@ const PortState = struct {
 
         const data_valid = std.mem.readIntLittle(u16, buf[212..][0..2]);
 
-        if (data_valid & (1 << 15) == 0 and data_valid & (1 << 14) != 0 and data_valid & (1 << 12) != 0)
+        var read_sector_size = true;
+        read_sector_size = read_sector_size and (data_valid & (1 << 15) == 0);
+        read_sector_size = read_sector_size and (data_valid & (1 << 14) != 0);
+        read_sector_size = read_sector_size and (data_valid & (1 << 12) != 0);
+
+        if (read_sector_size) {
             self.sector_size = std.mem.readIntLittle(u32, buf[234..][0..4]);
+        }
 
         self.num_sectors = std.mem.readIntLittle(u64, buf[200..][0..8]);
+
         if (self.num_sectors == 0)
             self.num_sectors = std.mem.readIntLittle(u32, buf[120..][0..4]);
 
-        if (self.num_sectors == 0)
+        if (self.num_sectors == 0) {
             return error.NoSectors;
+        }
 
-        log("AHCI: Disk has 0x{X} sectors of size {}\n", .{ self.num_sectors, self.sector_size });
+        os.log("AHCI: Disk has 0x{X} sectors of size {}\n", .{
+            self.num_sectors,
+            self.sector_size,
+        });
     }
 
-    fn issue_command_on_port(self: *@This(), command_slot: u5) void {
+    fn issueCommandOnPort(self: *@This(), command_slot: u5) void {
         // TODO: Call this from command slot task and
         // make this dispatch work to the port task
-        self.mmio.issue_commands(@as(u32, 1) << command_slot);
+        self.mmio.issueCommands(@as(u32, 1) << command_slot);
     }
 
-    fn finalize_io(self: *@This(), command_slot: u5, lba: u48, sector_count: u16, mode: ReadOrWrite) void {
-        const fis = self.mmio.make_h2d(0);
+    fn finalizeIo(
+        self: *@This(),
+        command_slot: u5,
+        lba: u48,
+        sector_count: u16,
+        mode: ReadOrWrite,
+    ) void {
+        const fis = self.mmio.makeH2D(0);
 
         fis.command =
             switch (self.port_type) {
             .ata => switch (mode) {
-                .Read => @as(u8, 0x25),
-                .Write => 0x35,
+                .read => @as(u8, 0x25),
+                .write => 0x35,
             },
             else => unreachable,
         };
@@ -487,20 +489,26 @@ const PortState = struct {
 
         fis.count = sector_count;
 
-        self.issue_command_on_port(command_slot);
+        self.issueCommandOnPort(command_slot);
     }
 
     // All the following functions will sooner or later be moved out into a general
     // block dev interface, and this will just have a simple dma interface instead.
-    pub fn offset_to_sector(self: *@This(), offset: usize) u48 {
+    pub fn offsetToSector(self: *@This(), offset: usize) u48 {
         return @intCast(u48, offset / self.sector_size);
     }
 
-    fn do_small_write(self: *@This(), command_slot: u5, buffer: []const u8, lba: u48, offset: usize) void {
-        self.mmio.command_header(command_slot).pdrt_count = 1;
+    fn doSmallWrite(
+        self: *@This(),
+        command_slot: u5,
+        buffer: []const u8,
+        lba: u48,
+        offset: usize,
+    ) void {
+        self.mmio.getCommandHeader(command_slot).pdrt_count = 1;
 
         // Read the shit we're not going to overwite
-        self.finalize_io(command_slot, lba, 1, .Read);
+        self.finalizeIo(command_slot, lba, 1, .read);
 
         // Overwrite what we want to buffer
         for (buffer) |b, i| {
@@ -508,28 +516,28 @@ const PortState = struct {
         }
 
         // Write buffer to disk
-        self.finalize_io(command_slot, lba, 1, .Write);
+        self.finalizeIo(command_slot, lba, 1, .write);
     }
 
-    fn do_small_read(self: *@This(), command_slot: u5, buffer: []u8, lba: u48, offset: usize) void {
-        self.finalize_io(command_slot, lba, 1, .Read);
+    fn doSmallRead(self: *@This(), command_slot: u5, buffer: []u8, lba: u48, offset: usize) void {
+        self.finalizeIo(command_slot, lba, 1, .read);
         for (buffer) |*b, i|
             b.* = self.mmio.buffer(command_slot, 0)[offset + i];
     }
 
-    fn do_large_write(self: *@This(), command_slot: u5, buffer: []const u8, lba: u48) void {
+    fn doLargeWrite(self: *@This(), command_slot: u5, buffer: []const u8, lba: u48) void {
         for (buffer[0..self.sector_size]) |b, i|
             self.mmio.buffer(command_slot, 0)[i] = b;
-        self.finalize_io(command_slot, lba, 1, .Write);
+        self.finalizeIo(command_slot, lba, 1, .write);
     }
 
-    fn do_large_read(self: *@This(), command_slot: u5, buffer: []u8, lba: u48) void {
-        self.finalize_io(command_slot, lba, 1, .Read);
+    fn doLargeRead(self: *@This(), command_slot: u5, buffer: []u8, lba: u48) void {
+        self.finalizeIo(command_slot, lba, 1, .read);
         for (buffer[0..self.sector_size]) |*b, i|
             b.* = self.mmio.buffer(command_slot, 0)[i];
     }
 
-    fn iterate_byte_sectors(
+    fn iterateByteSectors(
         self: *@This(),
         command_slot: u5,
         buffer_in: anytype,
@@ -540,13 +548,19 @@ const PortState = struct {
         if (buffer_in.len == 0)
             return;
 
-        self.mmio.command_header(command_slot).pdrt_count = 1;
+        self.mmio.getCommandHeader(command_slot).pdrt_count = 1;
 
-        var first_sector = self.offset_to_sector(disk_offset_in);
-        const last_sector = self.offset_to_sector(disk_offset_in + buffer_in.len - 1);
+        var first_sector = self.offsetToSector(disk_offset_in);
+        const last_sector = self.offsetToSector(disk_offset_in + buffer_in.len - 1);
 
         if (first_sector == last_sector) {
-            small_callback(self, command_slot, buffer_in, first_sector, disk_offset_in % self.sector_size);
+            small_callback(
+                self,
+                command_slot,
+                buffer_in,
+                first_sector,
+                disk_offset_in % self.sector_size,
+            );
             return;
         }
 
@@ -557,7 +571,13 @@ const PortState = struct {
         if (!libalign.isAligned(usize, self.sector_size, disk_offset)) {
             const step = libalign.alignUp(usize, self.sector_size, disk_offset) - disk_offset;
 
-            small_callback(self, command_slot, buffer[0..step], first_sector, self.sector_size - step);
+            small_callback(
+                self,
+                command_slot,
+                buffer[0..step],
+                first_sector,
+                self.sector_size - step,
+            );
 
             buffer.ptr += step;
             buffer.len -= step;
@@ -585,12 +605,22 @@ const PortState = struct {
         small_callback(self, command_slot, buffer, first_sector, 0);
     }
 
-    pub fn do_io_bytes_write(self: *@This(), command_slot: u5, buffer: []const u8, disk_offset: usize) void {
-        self.iterate_byte_sectors(command_slot, buffer, disk_offset, do_small_write, do_large_write);
+    pub fn doIOBytesWrite(
+        self: *@This(),
+        command_slot: u5,
+        buffer: []const u8,
+        disk_offset: usize,
+    ) void {
+        self.iterateByteSectors(command_slot, buffer, disk_offset, doSmallWrite, doLargeWrite);
     }
 
-    pub fn do_io_bytes_read(self: *@This(), command_slot: u5, buffer: []u8, disk_offset: usize) void {
-        self.iterate_byte_sectors(command_slot, buffer, disk_offset, do_small_read, do_large_read);
+    pub fn doIOBytesRead(
+        self: *@This(),
+        command_slot: u5,
+        buffer: []u8,
+        disk_offset: usize,
+    ) void {
+        self.iterateByteSectors(command_slot, buffer, disk_offset, doSmallRead, doLargeRead);
     }
 };
 
@@ -598,54 +628,85 @@ comptime {
     std.debug.assert(@sizeOf(CommandTable) == 0x100);
 }
 
+fn write_u64(mmio: anytype, value: u64) void {
+    mmio[0] = @truncate(u32, value);
+    mmio[1] = @truncate(u32, value >> 32);
+}
+
+fn read_u64(mmio: anytype) u64 {
+    return @as(u64, mmio[0]) | (@as(u64, mmio[1]) << 32);
+}
+
+fn claim_controller(abar: *volatile Abar) void {
+    {
+        const version = abar.version;
+        os.log("AHCI: Version: {}\n", .{version});
+
+        if (version.major.read() < 1 or version.minor_high.read() < 2) {
+            os.log("AHCI: Handoff not supported (version)\n", .{});
+            return;
+        }
+    }
+
+    if (abar.hba_capabilities_extended & 1 == 0) {
+        os.log("AHCI: Handoff not supported (capabilities)\n", .{});
+        return;
+    }
+
+    while (!abar.bios_handoff.tryToClaim()) {
+        thread.scheduler.yield();
+    }
+
+    os.log("AHCI: Got handoff!\n", .{});
+}
+
 fn command(port: *volatile Port, slot: u5) void {}
 
-fn command_with_buffer(port: *volatile Port, slot: u5, buf: usize, bufsize: usize) void {
-    const header = &port.command_headers()[slot];
+fn commandWithBuffer(port: *volatile Port, slot: u5, buf: usize, bufsize: usize) void {
+    const header = &port.getCommandHeaders()[slot];
     //const oldbuf = header.;
     //const oldsize = ;
 }
 
-var test_buf: [4096]u8 = undefined;
-
-fn sata_port_task(port_type: sata_port_type, port: *volatile Port) !void {
+fn sataPortTask(port_type: SataPortType, port: *volatile Port) !void {
     switch (port_type) {
         .ata, .atapi => {},
         else => return,
     }
 
-    log("AHCI: {s} task started for port at 0x{X}\n", .{ @tagName(port_type), @ptrToInt(port) });
+    os.log("AHCI: {s} task started for port at 0x{X}\n", .{ @tagName(port_type), @ptrToInt(port) });
 
     var port_state = try PortState.init(port);
 
     // Put 0x204 'x's across 3 sectors if sector size is 0x200
-    //port_state.do_io_bytes_write(0, "x" ** 0x204, port_state.sector_size - 2);
-    //port_state.finalize_io(0, 0, 3, .Read);
-    //os.hexdump(port_state.mmio.buffer(0, 0)[port_state.sector_size - 0x10..port_state.sector_size * 2 + 0x10]);
+    //port_state.doIOBytesWrite(0, "x" ** 0x204, port_state.sector_size - 2);
+    //port_state.finalizeIo(0, 0, 3, .read);
+    //const sector_size = port_state.sector_size;
+    //os.hexdump(port_state.mmio.buffer(0, 0)[sector_size - 0x10..sector_size * 2 + 0x10]);
 
     // Read first disk sector
-    port_state.finalize_io(0, 0, 1, .Read);
+    port_state.finalizeIo(0, 0, 1, .read);
     os.hexdump(port_state.mmio.buffer(0, 0)[0..port_state.sector_size]);
 
     // Read first sector into buffer
-    //port_state.do_io_bytes_read(0, test_buf[0..512], 0);
+    //port_state.doIOBytesRead(0, test_buf[0..512], 0);
     //os.hexdump(test_buf[0..512]);
 }
 
-fn controller_task(abar: *volatile ABAR) !void {
+fn controllerTask(abar: *volatile Abar) !void {
     claim_controller(abar);
 
-    log("AHCI: Claimed controller.\n", .{});
+    os.log("AHCI: Claimed controller.\n", .{});
 
     const ports_implemented = abar.ports_implemented;
 
     for (abar.ports) |*port, i| {
-        if ((ports_implemented >> @intCast(u5, i)) & 1 == 0)
+        if ((ports_implemented >> @intCast(u5, i)) & 1 == 0) {
             continue;
+        }
 
         {
             const sata_status = port.sata_status;
-
             {
                 const com_status = sata_status & 0xF;
 
@@ -653,7 +714,7 @@ fn controller_task(abar: *volatile ABAR) !void {
                     continue;
 
                 if (com_status != 3) {
-                    log("AHCI: Warning: Unknown port com_status: {}\n", .{com_status});
+                    os.log("AHCI: Warning: Unknown port com_status: {}\n", .{com_status});
                     continue;
                 }
             }
@@ -662,47 +723,48 @@ fn controller_task(abar: *volatile ABAR) !void {
                 const ipm_status = (sata_status >> 8) & 0xF;
 
                 if (ipm_status != 1) {
-                    log("AHCI: Warning: Device sleeping: {}\n", .{ipm_status});
+                    os.log("AHCI: Warning: Device sleeping: {}\n", .{ipm_status});
                     continue;
                 }
             }
         }
 
         switch (port.signature) {
-            0x00000101 => try scheduler.spawn_task(sata_port_task, .{ .ata, port }),
-            //0xEB140101 => try scheduler.spawn_task(sata_port_task, .{.atapi, port}),
+            0x00000101 => try thread.scheduler.spawn_task(sataPortTask, .{ .ata, port }),
+            //0xEB140101 => try thread.scheduler.spawn_task(sataPortTask, .{.atapi, port}),
             0xC33C0101, 0x96690101 => {
-                log("AHCI: Known TODO port signature: 0x{X}\n", .{port.signature});
-                //scheduler.spawn_task(sata_port_task, .{.semb,   port})
-                //scheduler.spawn_task(sata_port_task, .{.pm,     port})
+                os.log("AHCI: Known TODO port signature: 0x{X}\n", .{port.signature});
+                //thread.scheduler.spawn_task(sataPortTask, .{.semb,   port})
+                //thread.scheduler.spawn_task(sataPortTask, .{.pm,     port})
             },
             else => {
-                log("AHCI: Unknown port signature: 0x{X}\n", .{port.signature});
+                os.log("AHCI: Unknown port signature: 0x{X}\n", .{port.signature});
                 return;
             },
         }
     }
 }
 
-pub fn register_controller(addr: pci.Addr) void {
+pub fn registerController(addr: platform.pci.Addr) void {
     // Busty master bit
     addr.command().write(addr.command().read() | 0x6);
 
-    const abar = os.platform.phys_ptr(*volatile ABAR).from_int(addr.barinfo(5).phy & 0xFFFFF000).get_uncached();
+    const AbarPhysPtr = os.platform.phys_ptr(*volatile Abar);
+    const abar = AbarPhysPtr.from_int(addr.barinfo(5).phy & 0xFFFFF000).get_uncached();
 
     const cap = abar.hba_capabilities;
 
     if ((cap & (1 << 31)) == 0) {
-        log("AHCI: Controller is 32 bit only, ignoring.\n", .{});
+        os.log("AHCI: Controller is 32 bit only, ignoring.\n", .{});
         return;
     }
 
     if (abar.global_hba_control & (1 << 31) == 0) {
-        log("AHCI: AE not set!\n", .{});
+        os.log("AHCI: AE not set!\n", .{});
         return;
     }
 
-    scheduler.spawn_task(controller_task, .{abar}) catch |err| {
-        log("AHCI: Failed to make controller task: {s}\n", .{@errorName(err)});
+    thread.scheduler.spawn_task(controllerTask, .{abar}) catch |err| {
+        os.log("AHCI: Failed to make controller task: {s}\n", .{@errorName(err)});
     };
 }
