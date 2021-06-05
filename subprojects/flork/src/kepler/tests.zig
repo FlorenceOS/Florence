@@ -133,8 +133,8 @@ fn client_task(
         "Incorrect owning stream ref on ping of death",
     );
     keplerAssert(
-        server_death_note.typ == .consumer_left,
-        "Note type on ping of death is not .consumer_left",
+        server_death_note.typ == .producer_left,
+        "Note type on ping of death is not .producer_left",
     );
     os.log("Ping of death recieved!\n", .{});
     server_death_note.drop();
