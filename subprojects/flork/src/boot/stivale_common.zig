@@ -29,12 +29,12 @@ pub fn map_phys(ent: *const MemmapEntry, context: *platform.paging.PagingContext
 
     var new_ent = ent.*;
 
-    new_ent.base = libalign.align_down(u64, platform.paging.page_sizes[0], new_ent.base);
+    new_ent.base = libalign.alignDown(u64, platform.paging.page_sizes[0], new_ent.base);
     // If there is nothing left of the entry
     if (new_ent.base >= ent.base + ent.length)
         return;
 
-    new_ent.length = libalign.align_up(u64, platform.paging.page_sizes[0], new_ent.length);
+    new_ent.length = libalign.alignUp(u64, platform.paging.page_sizes[0], new_ent.length);
     if (new_ent.length == 0)
         return;
 

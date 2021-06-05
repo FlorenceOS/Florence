@@ -6,7 +6,7 @@ const log = os.log;
 
 const libalign = lib.util.libalign;
 const range = lib.util.range.range;
-const range_reverse = lib.util.range.range_reverse;
+const rangeReverse = lib.util.range.rangeReverse;
 
 const pmm = os.memory.pmm;
 
@@ -213,7 +213,7 @@ fn map_impl_with_rollback(args: struct {
     const start_virt = args.virt.*;
 
     if (!is_aligned(args.virt.*, args.phys, 0, args.context) or
-        !libalign.is_aligned(usize, os.platform.paging.page_sizes[0], args.size.*))
+        !libalign.isAligned(usize, os.platform.paging.page_sizes[0], args.size.*))
     {
         // virt, phys and size all need to be aligned
         return error.BadAlignment;
@@ -239,11 +239,11 @@ fn map_impl_with_rollback(args: struct {
 }
 
 fn is_aligned(virt: usize, phys: ?*usize, level: anytype, context: Context) bool {
-    if (!libalign.is_aligned(usize, os.platform.paging.page_sizes[level], virt))
+    if (!libalign.isAligned(usize, os.platform.paging.page_sizes[level], virt))
         return false;
 
     if (phys) |p|
-        return libalign.is_aligned(usize, os.platform.paging.page_sizes[level], p.*);
+        return libalign.isAligned(usize, os.platform.paging.page_sizes[level], p.*);
 
     return true;
 }

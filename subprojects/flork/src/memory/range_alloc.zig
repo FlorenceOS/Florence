@@ -316,7 +316,7 @@ pub const RangeAlloc = struct {
 
     fn make_range(self: *@This(), minBytes: usize) !*Range {
         const page_size = os.platform.paging.page_sizes[0];
-        const size = lib.util.libalign.align_up(
+        const size = lib.util.libalign.alignUp(
             usize,
             page_size,
             std.math.max(min_materialize_size, minBytes),

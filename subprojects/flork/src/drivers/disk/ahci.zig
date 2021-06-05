@@ -554,8 +554,8 @@ const PortState = struct {
         var buffer = buffer_in;
 
         // We need to preserve data on the first sector
-        if (!libalign.is_aligned(usize, self.sector_size, disk_offset)) {
-            const step = libalign.align_up(usize, self.sector_size, disk_offset) - disk_offset;
+        if (!libalign.isAligned(usize, self.sector_size, disk_offset)) {
+            const step = libalign.alignUp(usize, self.sector_size, disk_offset) - disk_offset;
 
             small_callback(self, command_slot, buffer[0..step], first_sector, self.sector_size - step);
 

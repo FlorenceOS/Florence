@@ -1,10 +1,16 @@
-const tar = @import("root").lib.format.tar;
-const std = @import("std");
+usingnamespace @import("root").preamble;
 
-const source_blob = if (@import("build_options").source_blob_path) |path| @embedFile(path) else null;
+const tar = lib.format.tar;
 
-pub fn file_line(filename: []const u8, line: usize) ![]const u8 {
-    const blob = source_blob orelse return error.FileNotFound;
+fn getSourceBlob() ?[]const u8 {
+    if (@import("build_options").source_blob_path) |path| {
+        return @embedFile(path);
+    }
+    return null;
+}
+
+pub fn getFileLine(filename: []const u8, line: usize) ![]const u8 {
+    const blob = getSourceBlob() orelse return error.FileNotFound;
     var iterator = tar.iterate(blob) catch unreachable;
     while (iterator.has_file) : (iterator.next()) {
         if (!std.mem.endsWith(u8, filename, iterator.file_name)) {
@@ -34,6 +40,6 @@ pub fn file_line(filename: []const u8, line: usize) ![]const u8 {
     return error.FileNotFound;
 }
 
-pub fn source_line(sl: std.builtin.SourceLocation) ![]const u8 {
-    return file_line(sl.file, sl.line);
+pub fn getSourceLine(sl: std.builtin.SourceLocation) ![]const u8 {
+    return getFileLine(sl.file, sl.line);
 }

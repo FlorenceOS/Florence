@@ -100,7 +100,7 @@ pub const MemoryObject = struct {
         const instance = try create_object(allocator);
         errdefer allocator.destroy(instance);
 
-        const page_count = lib.util.libalign.align_up(usize, size, pagesz) / pagesz;
+        const page_count = lib.util.libalign.alignUp(usize, size, pagesz) / pagesz;
 
         const frames = try allocator.alloc(usize, page_count);
         errdefer allocator.free(frames);

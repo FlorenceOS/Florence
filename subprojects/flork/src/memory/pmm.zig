@@ -37,7 +37,7 @@ pub fn consume(phys: usize, size: usize) void {
     outer: while (sz != 0) {
         for (reverse_sizes) |psz, ri| {
             const i = pmm_sizes.len - ri - 1;
-            if (sz >= psz and lalign.is_aligned(usize, psz, pp)) {
+            if (sz >= psz and lalign.isAligned(usize, psz, pp)) {
                 free_impl(pp, i);
                 sz -= psz;
                 pp += psz;
@@ -100,7 +100,7 @@ pub fn free_phys(phys: usize, size: usize) void {
     for (reverse_sizes) |psz, ri| {
         const i = pmm_sizes.len - ri - 1;
 
-        if (size <= psz and lalign.is_aligned(usize, psz, phys)) {
+        if (size <= psz and lalign.isAligned(usize, psz, phys)) {
             return free_impl(phys, i);
         }
     }

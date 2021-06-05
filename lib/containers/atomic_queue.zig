@@ -1,4 +1,4 @@
-const std = @import("std");
+usingnamespace @import("root").preamble;
 
 /// Node hook for the queue. Embedded inside queue element.
 pub const Node = struct {

@@ -1,10 +1,7 @@
-const libalign = @import("root").lib.libalign;
-const std = @import("std");
-const expect = std.testing.expect;
-const assert = std.debug.assert;
+usingnamespace @import("root").preamble;
 
 pub fn Bitset(num_bits: usize) type {
-    const num_bytes = libalign.align_up(usize, 8, num_bits) / 8;
+    const num_bytes = libalign.alignUp(usize, 8, num_bits) / 8;
 
     return struct {
         pub fn set(self: *@This(), idx: usize) void {
@@ -15,7 +12,7 @@ pub fn Bitset(num_bits: usize) type {
             data[idx / 8] &= ~(@as(u8, 1) << @intCast(u3, idx % 8));
         }
 
-        pub fn is_set(self: *const @This(), idx: usize) bool {
+        pub fn isSet(self: *const @This(), idx: usize) bool {
             return (data[idx / 8] >> @intCast(u3, idx % 8)) == 1;
         }
 
@@ -31,12 +28,12 @@ const DynamicBitset = struct {
     len: usize,
     data: [*]u8,
 
-    pub fn size_needed(len: usize) usize {
-        return libalign.align_up(usize, 8, len) / 8;
+    pub fn sizeNeeded(len: usize) usize {
+        return libalign.alignUp(usize, 8, len) / 8;
     }
 
     pub fn init(len: usize, data: []u8) DynamicBitset {
-        std.debug.assert(data.len >= DynamicBitset.size_needed(len));
+        std.debug.assert(data.len >= DynamicBitset.sizeNeeded(len));
         for (data) |*cell| {
             cell.* = 0;
         }
@@ -53,7 +50,7 @@ const DynamicBitset = struct {
         self.data[idx / 8] &= ~(@as(u8, 1) << @intCast(u3, idx % 8));
     }
 
-    pub fn is_set(self: *const @This(), idx: usize) bool {
+    pub fn isSet(self: *const @This(), idx: is_setusize) bool {
         std.debug.assert(idx < self.len);
         return (self.data[idx / 8] >> @intCast(u3, idx % 8)) == 1;
     }
@@ -61,21 +58,21 @@ const DynamicBitset = struct {
 
 test "bitset" {
     var bs: Bitset(8) = .{};
-    expect(!bs.is_set(0));
+    std.testing.expect(!bs.isSet(0));
     bs.set(0);
-    expect(bs.is_set(0));
+    std.testing.expect(bs.isSet(0));
     bs.unset(0);
-    expect(!bs.is_set(0));
+    std.testing.expect(!bs.isSet(0));
 }
 
 test "dynamic bitset" {
     var mem: [2]u8 = undefined;
     var bs = DynamicBitset.init(16, &mem);
-    expect(!bs.is_set(0));
+    std.testing.expect(!bs.isSet(0));
     bs.set(0);
-    expect(bs.is_set(0));
+    std.testing.expect(bs.isSet(0));
     bs.set(13);
     bs.unset(0);
-    expect(!bs.is_set(0));
-    expect(bs.is_set(13));
+    std.testing.expect(!bs.isSet(0));
+    std.testing.expect(bs.isSet(13));
 }

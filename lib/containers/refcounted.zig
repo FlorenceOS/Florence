@@ -1,4 +1,4 @@
-const std = @import("std");
+usingnamespace @import("root").preamble;
 
 /// Creates a refcounted version of the object
 pub fn RefCounted(comptime T: type, comptime dispose_handler: ?(fn (*T) void)) type {

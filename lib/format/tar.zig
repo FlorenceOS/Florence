@@ -1,4 +1,4 @@
-const std = @import("std");
+usingnamespace @import("root").preamble;
 
 const FileIterator = struct {
     has_file: bool,

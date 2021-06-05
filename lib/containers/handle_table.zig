@@ -1,4 +1,4 @@
-const std = @import("std");
+usingnamespace @import("root").preamble;
 
 /// HandleTable is the class for table of generic handles
 /// It manages a map from integers to handles (type T)

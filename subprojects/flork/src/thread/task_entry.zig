@@ -33,7 +33,7 @@ pub const NewTaskEntry = struct {
 
             /// Creates Wrapper on the stack
             fn create(function: anytype, arguments: anytype, boot_stack_top: usize, boot_stack_bottom: usize) *@This() {
-                const addr = libalign.align_down(usize, @alignOf(@This()), boot_stack_top - @sizeOf(@This()));
+                const addr = libalign.alignDown(usize, @alignOf(@This()), boot_stack_top - @sizeOf(@This()));
                 std.debug.assert(addr > boot_stack_bottom);
                 const wrapper_ptr = @intToPtr(*@This(), addr);
                 wrapper_ptr.* = .{
