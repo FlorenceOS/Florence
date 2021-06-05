@@ -6,7 +6,7 @@ pub const Tss = packed struct {
     _3: u80 = 0,
     iobp_offset: u16 = 104,
     //bitset: [8192]u8 = [1]u8{0} ** 8192,
- 
+
     pub fn set_interrupt_stack(self: *@This(), stack: usize) void {
         self.ist[0] = stack;
     }
@@ -14,7 +14,7 @@ pub const Tss = packed struct {
     pub fn set_scheduler_stack(self: *@This(), stack: usize) void {
         self.ist[1] = stack;
     }
- 
+
     pub fn set_syscall_stack(self: *@This(), stack: usize) void {
         self.rsp[0] = stack;
     }

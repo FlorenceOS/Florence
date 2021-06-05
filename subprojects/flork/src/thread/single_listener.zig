@@ -88,7 +88,7 @@ pub const SingleListener = struct {
 
     /// Trigger one event
     pub fn trigger(self: *@This()) bool {
-        const ticket =  @atomicRmw(usize, &self.last_triggered, .Add, 1, .AcqRel);
+        const ticket = @atomicRmw(usize, &self.last_triggered, .Add, 1, .AcqRel);
         if (self.diff() != 0) {
             // We don't care if last_triggered is greater than BLOCK_VAL
             // since at this point wakeup_allowed would be false anyway

@@ -370,11 +370,11 @@ const PortState = struct {
         var result: PortState = .{};
         result.mmio = port;
         result.port_type =
-            switch(result.mmio.signature) {
-                0x00000101 => .ata,
-                //0xEB140101 => .atapi, // Drop atapi for now
-                else => return error.UnknownSignature,
-            };
+            switch (result.mmio.signature) {
+            0x00000101 => .ata,
+            //0xEB140101 => .atapi, // Drop atapi for now
+            else => return error.UnknownSignature,
+        };
 
         result.mmio.stop_command_engine();
 
@@ -435,7 +435,6 @@ const PortState = struct {
 
     fn identify(self: *@This()) !void {
         //log("AHCI: Identifying drive...\n", .{});
-
         const identify_fis = self.mmio.make_h2d(0);
 
         identify_fis.command = self.identify_command();
@@ -451,17 +450,17 @@ const PortState = struct {
 
         const data_valid = std.mem.readIntLittle(u16, buf[212..][0..2]);
 
-        if(data_valid & (1 << 15) == 0 and data_valid & (1 << 14) != 0 and data_valid & (1 << 12) != 0)
+        if (data_valid & (1 << 15) == 0 and data_valid & (1 << 14) != 0 and data_valid & (1 << 12) != 0)
             self.sector_size = std.mem.readIntLittle(u32, buf[234..][0..4]);
 
         self.num_sectors = std.mem.readIntLittle(u64, buf[200..][0..8]);
-        if(self.num_sectors == 0)
+        if (self.num_sectors == 0)
             self.num_sectors = std.mem.readIntLittle(u32, buf[120..][0..4]);
 
-        if(self.num_sectors == 0)
+        if (self.num_sectors == 0)
             return error.NoSectors;
 
-        log("AHCI: Disk has 0x{X} sectors of size {}\n", .{self.num_sectors, self.sector_size});
+        log("AHCI: Disk has 0x{X} sectors of size {}\n", .{ self.num_sectors, self.sector_size });
     }
 
     fn issue_command_on_port(self: *@This(), command_slot: u5) void {
@@ -475,7 +474,7 @@ const PortState = struct {
 
         fis.command =
             switch (self.port_type) {
-            .ata => switch(mode) {
+            .ata => switch (mode) {
                 .Read => @as(u8, 0x25),
                 .Write => 0x35,
             },
@@ -485,7 +484,7 @@ const PortState = struct {
         fis.device = 0xA0 | (1 << 6);
         fis.control = 0x08;
 
-        fis.lba_low  = @truncate(u24, lba);
+        fis.lba_low = @truncate(u24, lba);
         fis.lba_high = @truncate(u24, lba >> 24);
 
         fis.count = sector_count;
@@ -506,7 +505,7 @@ const PortState = struct {
         self.finalize_io(command_slot, lba, 1, .Read);
 
         // Overwrite what we want to buffer
-        for(buffer) |b, i| {
+        for (buffer) |b, i| {
             self.mmio.buffer(command_slot, 0)[offset + i] = b;
         }
 
@@ -516,19 +515,19 @@ const PortState = struct {
 
     fn do_small_read(self: *@This(), command_slot: u5, buffer: []u8, lba: u48, offset: usize) void {
         self.finalize_io(command_slot, lba, 1, .Read);
-        for(buffer) |*b, i|
+        for (buffer) |*b, i|
             b.* = self.mmio.buffer(command_slot, 0)[offset + i];
     }
 
     fn do_large_write(self: *@This(), command_slot: u5, buffer: []const u8, lba: u48) void {
-        for(buffer[0..self.sector_size]) |b, i|
+        for (buffer[0..self.sector_size]) |b, i|
             self.mmio.buffer(command_slot, 0)[i] = b;
         self.finalize_io(command_slot, lba, 1, .Write);
     }
 
     fn do_large_read(self: *@This(), command_slot: u5, buffer: []u8, lba: u48) void {
         self.finalize_io(command_slot, lba, 1, .Read);
-        for(buffer[0..self.sector_size]) |*b, i|
+        for (buffer[0..self.sector_size]) |*b, i|
             b.* = self.mmio.buffer(command_slot, 0)[i];
     }
 
@@ -540,7 +539,7 @@ const PortState = struct {
         small_callback: anytype,
         large_callback: anytype,
     ) void {
-        if(buffer_in.len == 0)
+        if (buffer_in.len == 0)
             return;
 
         self.mmio.command_header(command_slot).pdrt_count = 1;
@@ -548,7 +547,7 @@ const PortState = struct {
         var first_sector = self.offset_to_sector(disk_offset_in);
         const last_sector = self.offset_to_sector(disk_offset_in + buffer_in.len - 1);
 
-        if(first_sector == last_sector) {
+        if (first_sector == last_sector) {
             small_callback(self, command_slot, buffer_in, first_sector, disk_offset_in % self.sector_size);
             return;
         }
@@ -557,7 +556,7 @@ const PortState = struct {
         var buffer = buffer_in;
 
         // We need to preserve data on the first sector
-        if(!libalign.is_aligned(usize, self.sector_size, disk_offset)) {
+        if (!libalign.is_aligned(usize, self.sector_size, disk_offset)) {
             const step = libalign.align_up(usize, self.sector_size, disk_offset) - disk_offset;
 
             small_callback(self, command_slot, buffer[0..step], first_sector, self.sector_size - step);
@@ -570,7 +569,7 @@ const PortState = struct {
 
         // Now we're sector aligned, we can do the transfer sector by sector
         // TODO: make this faster, doing multiple sectors at a time
-        while(buffer.len > self.sector_size) {
+        while (buffer.len > self.sector_size) {
             os.log("Doing entire sector {}\n", .{first_sector});
 
             large_callback(self, command_slot, buffer, first_sector);
@@ -580,7 +579,7 @@ const PortState = struct {
             first_sector += 1;
         }
 
-        if(buffer.len == 0)
+        if (buffer.len == 0)
             return;
 
         os.log("Doing last partial sector {}\n", .{first_sector});

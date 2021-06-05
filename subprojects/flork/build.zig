@@ -2,7 +2,7 @@ const std = @import("std");
 const exec = @import("../../buildutil/exec.zig");
 const config = @import("../../config/config.zig");
 
-const Arch = if(@hasField(std.builtin, "Arch")) std.builtin.Arch else std.Target.Cpu.Arch;
+const Arch = if (@hasField(std.builtin, "Arch")) std.builtin.Arch else std.Target.Cpu.Arch;
 
 pub fn buildKernel(params: struct {
     builder: *std.build.Builder,

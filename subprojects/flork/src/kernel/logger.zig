@@ -33,7 +33,7 @@ const LogLock = struct {
 pub fn get_log_lock() LogLock {
     const current_cpu = os.platform.thread.get_current_cpu();
 
-    if(@atomicLoad(?*os.platform.smp.CoreData, &lock_owner, .Acquire) == current_cpu) {
+    if (@atomicLoad(?*os.platform.smp.CoreData, &lock_owner, .Acquire) == current_cpu) {
         return .{ .lock = null };
     }
 
@@ -42,7 +42,7 @@ pub fn get_log_lock() LogLock {
 }
 
 pub fn release_log_lock(ll: LogLock) void {
-    if(ll.lock) |l| {
+    if (ll.lock) |l| {
         @atomicStore(?*os.platform.smp.CoreData, &lock_owner, null, .Release);
         log_lock.unlock(l);
     }
@@ -71,7 +71,7 @@ fn protected_putchar(comptime putch_func: anytype) type {
         is_inside: bool = false,
 
         pub fn putch(self: *@This(), ch: u8) void {
-            if(self.is_inside)
+            if (self.is_inside)
                 return;
 
             self.is_inside = true;

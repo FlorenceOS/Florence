@@ -209,7 +209,7 @@ fn rejection(allocator: *std.mem.Allocator) !void {
     os.log("Request denied note was recieved!\n", .{});
     conn.drop();
     server_noteq.terminate();
-    client_noteq.terminate();   
+    client_noteq.terminate();
 }
 
 fn late_accept(allocator: *std.mem.Allocator) !void {
