@@ -134,7 +134,7 @@ fn function_scan(addr: Addr) void {
                 },
                 0x06 => {
                     os.log("SATA controller\n", .{});
-                    os.drivers.ahci.registerController(addr);
+                    os.drivers.block.ahci.registerController(addr);
                 },
             }
         },
@@ -154,7 +154,7 @@ fn function_scan(addr: Addr) void {
         0x03 => {
             if (addr.vendor_id().read() == 0x1AF4 or addr.device_id().read() == 0x1050) {
                 os.log("Virtio display controller\n", .{});
-                os.drivers.virtio_gpu.handle_controller(addr);
+                os.drivers.gpu.virtio_gpu.registerController(addr);
             } else switch (addr.sub_class().read()) {
                 else => {
                     os.log("Unknown display controller!\n", .{});

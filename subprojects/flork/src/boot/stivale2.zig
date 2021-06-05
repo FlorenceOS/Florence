@@ -350,12 +350,12 @@ export fn stivale2Main(info_in: *Info) noreturn {
     initPaging();
 
     if (info.uart) |uart| {
-        drivers.mmio_serial.register_mmio32_serial(uart.uart_addr);
+        drivers.output.mmio_serial.register_mmio32_serial(uart.uart_addr);
         os.log("Stivale2: Registered UART\n", .{});
     }
 
     if (info.uart_status) |u| {
-        drivers.mmio_serial.register_mmio32_status_serial(
+        drivers.output.mmio_serial.register_mmio32_status_serial(
             u.uart_addr,
             u.uart_status,
             u.status_mask,
@@ -419,8 +419,8 @@ export fn stivale2Main(info_in: *Info) noreturn {
     os.log("Doing framebuffer\n", .{});
 
     if (info.framebuffer) |fb| {
-        drivers.vesa_log.registerFb(
-            drivers.vesa_log.lfbUpdater,
+        drivers.output.vesa_log.registerFb(
+            drivers.output.vesa_log.lfbUpdater,
             fb.addr,
             fb.pitch,
             fb.width,
@@ -428,7 +428,7 @@ export fn stivale2Main(info_in: *Info) noreturn {
             fb.bpp,
         );
     } else {
-        drivers.vga_log.register();
+        drivers.output.vga_log.register();
     }
 
     os.log("Doing scheduler\n", .{});

@@ -81,9 +81,9 @@ fn protected_putchar(comptime putch_func: anytype) type {
 }
 
 var platform: protected_putchar(os.platform.debugputch) = .{};
-var mmio_serial: protected_putchar(os.drivers.mmio_serial.putch) = .{};
-var vesa_log: protected_putchar(os.drivers.vesa_log.putch) = .{};
-var vga_log: protected_putchar(os.drivers.vga_log.putch) = .{};
+var mmio_serial: protected_putchar(os.drivers.output.mmio_serial.putch) = .{};
+var vesa_log: protected_putchar(os.drivers.output.vesa_log.putch) = .{};
+var vga_log: protected_putchar(os.drivers.output.vga_log.putch) = .{};
 
 fn putch(ch: u8) void {
     platform.putch(ch);

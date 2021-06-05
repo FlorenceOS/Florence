@@ -15,21 +15,26 @@ pub const DescIter = struct {
     next: Descriptor,
 
     /// Put the head of a descriptor chain on the available ring
-    pub fn begin(iter: *DescIter) void {
+    pub fn begin(iter: *@This()) void {
         var i = &iter.drv.queues[iter.i];
         iter.next = iter.drv.descr(iter.i);
         i.avail.rings(i.wrap(i.avail.idx +% i.pending)).* = iter.next;
         i.pending += 1;
     }
     /// Put a descriptor to be part of the descriptor chain
-    pub fn put(iter: *DescIter, a: anytype, len: u32, flags: u16) void {
+    pub fn put(iter: *@This(), a: anytype, len: u32, flags: u16) void {
         iter.curr = iter.next;
-        iter.next = if ((flags & VRING_DESC_F_NEXT) != 0) iter.drv.descr(iter.i) else 0xFFFF;
+        iter.next = if ((flags & vring_desc_flag_next) != 0) iter.drv.descr(iter.i) else 0xFFFF;
         assert(len <= 0x1000);
         const addr = paging.translate_virt(.{ .virt = @ptrToInt(a) }) catch |err| {
             @panic("virtio-pci: can't get the physical address");
         };
-        iter.drv.queues[iter.i].desc[iter.curr] = .{ .addr = addr, .len = len, .flags = flags, .next = iter.next };
+        iter.drv.queues[iter.i].desc[iter.curr] = .{
+            .addr = addr,
+            .len = len,
+            .flags = flags,
+            .next = iter.next,
+        };
     }
 };
 
@@ -38,47 +43,50 @@ pub const DescIter = struct {
 pub const Driver = struct {
     /// Find PCI BARs and initialize device
     pub fn init(a: pci.Addr, reqFeatures: u64, optFeatures: u64) !Driver {
-        var drv: Driver = detectbars(a);
+        var drv: Driver = detectBars(a);
         drv.cfg.device_status = 0; // reset
-        drv.cfg.device_status |= VIRTIO_ACKNOWLEDGE; // guest acknowledged device
-        drv.cfg.device_status |= VIRTIO_DRIVER; // driver has been loaded
-        errdefer drv.cfg.device_status |= VIRTIO_FAILED; // set the failed bit on unrecoverable errors
+        drv.cfg.device_status |= virtio_acknowledge; // guest acknowledged device
+        drv.cfg.device_status |= virtio_driver; // driver has been loaded
+        // set the failed bit on unrecoverable errors
+        errdefer drv.cfg.device_status |= virtio_failed;
 
         // negotiate features
-        var req = reqFeatures | (1 << VIRTIO_F_VERSION_1); // legacy devices aren't supported
+        var req = reqFeatures | (1 << virtio_feature_version_1); // legacy devices aren't supported
         try drv.feature(0, @truncate(u32, req), @truncate(u32, optFeatures));
         try drv.feature(1, @truncate(u32, req >> 32), @truncate(u32, optFeatures >> 32));
 
-        drv.cfg.device_status |= VIRTIO_FEATURES_OK; // features acknowledged
-        if ((drv.cfg.device_status & VIRTIO_FEATURES_OK) == 0) return error.FeaturesNotAccepted;
+        drv.cfg.device_status |= virtio_features_ok; // features acknowledged
+        if ((drv.cfg.device_status & virtio_features_ok) == 0) return error.FeaturesNotAccepted;
 
-        for (drv.queues) |_, i| drv.setupqueue(@truncate(u16, i));
+        for (drv.queues) |_, i| drv.setupQueue(@truncate(u16, i));
 
-        drv.cfg.device_status |= VIRTIO_DRIVER_OK; // driver initialized, start normal operation
+        drv.cfg.device_status |= virtio_driver_ok; // driver initialized, start normal operation
         return drv;
     }
 
     /// Create descriptor iterator
-    pub fn iter(drv: *Driver, i: u8) DescIter {
+    pub fn iter(drv: *@This(), i: u8) DescIter {
         return .{ .drv = drv, .i = i, .curr = 0xFFFF, .next = 0xFFFF };
     }
 
     /// Free the chain which starts at `head`
-    pub fn freechain(drv: *Driver, i: u8, head: Descriptor) void {
+    pub fn freeChain(drv: *@This(), i: u8, head: Descriptor) void {
         var q: *VirtQueue = &drv.queues[i];
         var last = &q.desc[head];
-        while ((last.flags & VRING_DESC_F_NEXT) != 0) { // follow descriptor chain
+        while ((last.flags & vring_desc_flag_next) != 0) { // follow descriptor chain
             q.num_unused += 1;
             last = &q.desc[last.next];
         } // last is now the descriptor *after* the chain
         q.num_unused += 1;
         last.next = q.first_unused;
-        last.flags = if (q.first_unused != 0xFFFF) VRING_DESC_F_NEXT else 0; // add the freed chain before the current freelist
+        // add the freed chain before the current freelist
+        last.flags = if (q.first_unused != 0xFFFF) vring_desc_flag_next else 0;
         q.first_unused = head;
     }
 
-    /// Process incoming events. NOTE: this does not acknowledge the interrupt, to do that, use acknowledge()
-    pub fn process(drv: *Driver, i: u8, cb: anytype, ctx: anytype) void {
+    /// Process incoming events.
+    /// NOTE: this does not acknowledge the interrupt, to do that, use acknowledge()
+    pub fn process(drv: *@This(), i: u8, cb: anytype, ctx: anytype) void {
         var q = &drv.queues[i];
         while (q.last_in_used != q.used.idx) {
             var elem = q.used.rings(q.wrap(q.last_in_used));
@@ -88,7 +96,7 @@ pub const Driver = struct {
     }
 
     /// Make the descriptors available to the device and notify it.
-    pub fn start(drv: *Driver, i: u8) void {
+    pub fn start(drv: *@This(), i: u8) void {
         // The virtio spec requires me to send values modulo 2^16, and not modulo size
         // This explains the ugly overflowing-adds
         drv.queues[i].avail.idx = drv.queues[i].avail.idx +% drv.queues[i].pending;
@@ -97,57 +105,67 @@ pub const Driver = struct {
     }
 
     /// Acknowledge virtio interrupt
-    pub fn acknowledge(drv: *Driver) void {
-        var result = drv.isr.*; // Doesn't look very robust, but it works. Definitively look here if something breaks.
+    pub fn acknowledge(drv: *@This()) void {
+        // Doesn't look very robust, but it works. Definitively look here if something break
+        var result = drv.isr.*;
     }
 
     /// Allocate a descriptor
-    pub fn descr(drv: *Driver, i: u8) Descriptor {
+    pub fn descr(drv: *@This(), i: u8) Descriptor {
         var q = &drv.queues[i];
         var first_un = q.first_unused;
-        if ((first_un == 0xFFFF) or (q.num_unused == 0)) @panic("virtio-pci: not enough descriptors");
+        if ((first_un == 0xFFFF) or (q.num_unused == 0)) {
+            @panic("virtio-pci: not enough descriptors");
+        }
         q.first_unused = q.desc[first_un].next;
         drv.queues[i].num_unused -= 1;
         return first_un;
     }
 
+    const fconv = if (@hasField(std.builtin.CallingConvention, "Inline")) .Inline else .Unspecified;
+
     /// Negotiate feature bitmask with device, ZIG BUG, bad codegen without .Inline, no issue open
-    fn feature(drv: *Driver, i: u32, req: u32, opt: u32) callconv(if (@hasField(std.builtin.CallingConvention, "Inline")) .Inline else .Unspecified) !void {
+    fn feature(drv: *Driver, i: u32, req: u32, opt: u32) callconv(fconv) !void {
         drv.cfg.device_feature_select = i;
         const f = drv.cfg.device_feature & (req | opt);
-        if ((f & req) != req) return error.FeatureNotAvailable;
+        if ((f & req) != req) {
+            return error.FeatureNotAvailable;
+        }
         drv.cfg.guest_feature_select = i;
         drv.cfg.guest_feature = f;
     }
 
     /// Detect BARs and capabilities and set up the cfg/notify/isr/dev structures
-    fn detectbars(a: pci.Addr) Driver {
+    fn detectBars(a: pci.Addr) Driver {
         var drv: Driver = undefined;
         var cap = a.cap();
         while (cap.off != 0) {
             const vndr = cap.vndr();
             if (vndr == 0x09) {
-                const cfg_typ = cap.read(u8, VIRTIO_PCI_CAP_CFG_TYPE);
-                const bar = cap.read(u8, VIRTIO_PCI_CAP_BAR);
-                const off = cap.read(u32, VIRTIO_PCI_CAP_OFFSET);
-                const len = cap.read(u32, VIRTIO_PCI_CAP_LENGTH);
+                const cfg_typ = cap.read(u8, virtio_pci_cap_cfg_type);
+                const bar = cap.read(u8, virtio_pci_cap_bar);
+                const off = cap.read(u32, virtio_pci_cap_offset);
+                const len = cap.read(u32, virtio_pci_cap_length);
 
                 const phy = a.barinfo(bar).phy + off;
                 switch (cfg_typ) {
-                    VIRTIO_PCI_CAP_COMMON_CFG => {
-                        drv.cfg = os.platform.phys_ptr(*volatile CommonCfg).from_int(phy).get_uncached();
+                    virtio_pci_cap_common_cfg => {
+                        const CommonCfgPtr = os.platform.phys_ptr(*volatile CommonCfg);
+                        drv.cfg = CommonCfgPtr.from_int(phy).get_uncached();
                     },
-                    VIRTIO_PCI_CAP_NOTIFY_CFG => {
-                        drv.notify_mul = cap.read(u32, VIRTIO_PCI_NOTIFY_CAP_MULT) / 2; // VIRTIO_PCI_NOTIFY_CAP_MULT is a byte offset, each field is u16
-                        drv.notify = os.platform.phys_ptr([*]volatile u16).from_int(phy).get_uncached();
+                    virtio_pci_cap_notify_cfg => {
+                        // virtio_pci_notify_cap_mult is a byte offset, each field is u16
+                        drv.notify_mul = cap.read(u32, virtio_pci_notify_cap_mult) / 2;
+                        const NotifyPtr = os.platform.phys_ptr([*]volatile u16);
+                        drv.notify = NotifyPtr.from_int(phy).get_uncached();
                     },
-                    VIRTIO_PCI_CAP_ISR_CFG => {
+                    virtio_pci_cap_jsr_cfg => {
                         drv.isr = os.platform.phys_ptr(*volatile u32).from_int(phy).get_uncached();
                     },
-                    VIRTIO_PCI_CAP_DEVICE_CFG => {
+                    virtio_pci_cap_device_cfg => {
                         drv.dev = os.platform.phys_ptr([*]volatile u8).from_int(phy).get_uncached();
                     },
-                    VIRTIO_PCI_CAP_PCI_CFG => {},
+                    virtio_pci_cap_pci_cfg => {},
                     else => {}, // ignore
                 }
             }
@@ -157,7 +175,7 @@ pub const Driver = struct {
     }
 
     /// Set up a specific queue
-    fn setupqueue(drv: *Driver, i: u16) void {
+    fn setupQueue(drv: *Driver, i: u16) void {
         drv.cfg.queue_select = i;
         const size = drv.cfg.queue_size;
         if (size == 0) return;
@@ -182,7 +200,12 @@ pub const Driver = struct {
 
         var m: u16 = 0;
         while (m < size - 1) : (m += 1) {
-            drv.queues[i].desc[m] = .{ .flags = VRING_DESC_F_NEXT, .next = m + 1, .addr = 0, .len = 0 };
+            drv.queues[i].desc[m] = .{
+                .flags = vring_desc_flag_next,
+                .next = m + 1,
+                .addr = 0,
+                .len = 0,
+            };
         }
         drv.queues[i].desc[m].next = 0xFFFF;
 
@@ -209,14 +232,11 @@ const VirtqDesc = packed struct {
     flags: u16,
     next: Descriptor,
 };
-// ring flags
-pub const VRING_DESC_F_NEXT: u32 = 1;
-pub const VRING_DESC_F_WRITE: u32 = 2;
-pub const VRING_DESC_F_INDIRECT: u32 = 4;
 
 const VirtqAvail = packed struct {
     flags: u16,
     idx: Descriptor, // important: virtio requires this field to have the index without wraparound
+
     pub fn rings(self: *volatile VirtqAvail, desc: Descriptor) *volatile u16 {
         return @intToPtr(*volatile u16, @ptrToInt(self) + @sizeOf(VirtqAvail) + desc * 2);
     }
@@ -230,8 +250,12 @@ const VirtqUsedItem = packed struct {
 const VirtqUsed = packed struct {
     flags: u16,
     idx: u16, // last used idx, the driver keeps the first in last_in_used
+
     pub fn rings(self: *volatile VirtqUsed, desc: Descriptor) *volatile VirtqUsedItem {
-        return @intToPtr(*volatile VirtqUsedItem, @ptrToInt(self) + @sizeOf(VirtqUsed) + desc * @sizeOf(VirtqUsedItem));
+        return @intToPtr(
+            *volatile VirtqUsedItem,
+            @ptrToInt(self) + @sizeOf(VirtqUsed) + desc * @sizeOf(VirtqUsedItem),
+        );
     }
 };
 
@@ -273,31 +297,36 @@ const CommonCfg = packed struct {
     queue_used: u64,
 };
 
-const VIRTIO_ACKNOWLEDGE: u8 = 1;
-const VIRTIO_DRIVER: u8 = 2;
-const VIRTIO_FAILED: u8 = 128;
-const VIRTIO_FEATURES_OK: u8 = 8;
-const VIRTIO_DRIVER_OK: u8 = 4;
-const VIRTIO_DEVICE_NEEDS_RESET: u8 = 64;
+const virtio_acknowledge: u8 = 1;
+const virtio_driver: u8 = 2;
+const virtio_failed: u8 = 128;
+const virtio_features_ok: u8 = 8;
+const virtio_driver_ok: u8 = 4;
+const virtio_device_needs_reset: u8 = 64;
 
 // Capability config types
-const VIRTIO_PCI_CAP_COMMON_CFG = 1;
-const VIRTIO_PCI_CAP_NOTIFY_CFG = 2;
-const VIRTIO_PCI_CAP_ISR_CFG = 3;
-const VIRTIO_PCI_CAP_DEVICE_CFG = 4;
-const VIRTIO_PCI_CAP_PCI_CFG = 5;
+const virtio_pci_cap_common_cfg = 1;
+const virtio_pci_cap_notify_cfg = 2;
+const virtio_pci_cap_jsr_cfg = 3;
+const virtio_pci_cap_device_cfg = 4;
+const virtio_pci_cap_pci_cfg = 5;
 
 // PCI capability list record offsets
-const VIRTIO_PCI_CAP_LEN = 2;
-const VIRTIO_PCI_CAP_CFG_TYPE = 3;
-const VIRTIO_PCI_CAP_BAR = 4;
-const VIRTIO_PCI_CAP_OFFSET = 8;
-const VIRTIO_PCI_CAP_LENGTH = 12;
-const VIRTIO_PCI_NOTIFY_CAP_MULT = 16;
+const virtio_pci_cap_len = 2;
+const virtio_pci_cap_cfg_type = 3;
+const virtio_pci_cap_bar = 4;
+const virtio_pci_cap_offset = 8;
+const virtio_pci_cap_length = 12;
+const virtio_pci_notify_cap_mult = 16;
 
 // Feature bits
-const VIRTIO_F_VERSION_1 = 32;
-const VIRTIO_F_ACCESS_PLATFORM = 33;
-const VIRTIO_F_RING_PACKED = 34;
-const VIRTIO_F_ORDER_PLATFORM = 36;
-const VIRTIO_F_SR_IOV = 37;
+const virtio_feature_version_1 = 32;
+const virtio_feature_access_platform = 33;
+const virtio_feature_ring_packed = 34;
+const virtio_feature_order_platform = 36;
+const virtio_feature_sr_iov = 37;
+
+// Ring flags
+pub const vring_desc_flag_next: u32 = 1;
+pub const vring_desc_flag_write: u32 = 2;
+pub const vring_desc_flag_indirect: u32 = 4;
