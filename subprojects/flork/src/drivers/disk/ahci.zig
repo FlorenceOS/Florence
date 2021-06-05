@@ -217,7 +217,6 @@ comptime {
     std.debug.assert(@sizeOf(Abar) == 0x1100);
 }
 
-
 const SataPortType = enum {
     ata,
     atapi,

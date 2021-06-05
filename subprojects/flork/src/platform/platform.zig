@@ -51,7 +51,7 @@ fn handle_physmem_page_fault(addr: usize) bool {
     if (attempt_handle_physmem_page_fault(context.wc_virt_base, addr, .DeviceWriteCombining)) {
         return true;
     }
-    if(attempt_handle_physmem_page_fault(context.uc_virt_base, addr, .DeviceUncacheable)) {
+    if (attempt_handle_physmem_page_fault(context.uc_virt_base, addr, .DeviceUncacheable)) {
         return true;
     }
     return false;

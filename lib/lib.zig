@@ -9,3 +9,6 @@ pub const format = @import("format/format.zig");
 
 /// Various utilities
 pub const util = @import("util/util.zig");
+
+/// Input libraries
+pub const input = @import("input/input.zig");
