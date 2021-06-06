@@ -265,11 +265,11 @@ const virtio_gpu_resp_ok_capset = 0x1103;
 const virtio_gpu_resp_ok_edid = 0x1104;
 
 // Error
-const VIRTIO_GPU_RESP_ERR_UNSPEC = 0x1200;
-const VIRTIO_GPU_RESP_ERR_OUT_OF_MEMORY = 0x1201;
-const VIRTIO_GPU_RESP_ERR_INVALID_SCANOUT_ID = 0x1202;
-const VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID = 0x1203;
-const VIRTIO_GPU_RESP_ERR_INVALID_CONTEXT_ID = 0x1204;
-const VIRTIO_GPU_RESP_ERR_INVALID_PARAMETER = 0x1205;
+const virtio_gpu_resp_err_unspecified = 0x1200;
+const virtio_gpu_resp_err_out_of_mem = 0x1201;
+const virtio_gpu_resp_err_invalid_scanout_id = 0x1202;
+const virtio_gpu_resp_err_invalid_res_id = 0x1203;
+const virtio_gpu_resp_err_invalid_ctx_id = 0x1204;
+const virtio_gpu_resp_err_invalid_parameter = 0x1205;
 
-const VIRTIO_GPU_FLAG_FENCE = (1 << 0);
+const virtio_gpu_flag_fence = (1 << 0);
