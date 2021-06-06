@@ -182,6 +182,47 @@ const ResourceFlush = packed struct {
     hdr: ConfHdr, rect: Rect, resid: u32, _: u32 = 0
 };
 
+// Feature bits
+const virtio_feature_version_1 = 32;
+const virtio_feature_access_platform = 33;
+const virtio_feature_ring_packed = 34;
+const virtio_feature_order_platform = 36;
+const virtio_feature_sr_iov = 37;
+
+// 2D cmds
+const virtio_gpu_cmd_get_display_info = 0x0100;
+const virtio_gpu_cmd_res_create_2d = 0x101;
+const virtio_gpu_cmd_res_unref = 0x102;
+const virtio_gpu_cmd_set_scanout = 0x103;
+const virtio_gpu_cmd_res_flush = 0x104;
+const virtio_gpu_cmd_transfer_to_host_2d = 0x105;
+const virtio_gpu_cmd_res_attach_backing = 0x106;
+const virtio_gpu_cmd_res_detatch_backing = 0x107;
+const virtio_gpu_cmd_get_capset_info = 0x108;
+const virtio_gpu_cmd_get_capset = 0x109;
+const virtio_gpu_cmd_get_edid = 0x10A;
+
+// Cursor cmds
+const virtio_gpu_cmd_update_cursor = 0x0300;
+const virtio_gpu_cmd_move_cursor = 0x301;
+
+// Success
+const virtio_gpu_resp_ok_nodata = 0x1100;
+const virtio_gpu_resp_ok_display_info = 0x1101;
+const virtio_gpu_resp_ok_capset_info = 0x1102;
+const virtio_gpu_resp_ok_capset = 0x1103;
+const virtio_gpu_resp_ok_edid = 0x1104;
+
+// Error
+const virtio_gpu_resp_err_unspecified = 0x1200;
+const virtio_gpu_resp_err_out_of_mem = 0x1201;
+const virtio_gpu_resp_err_invalid_scanout_id = 0x1202;
+const virtio_gpu_resp_err_invalid_res_id = 0x1203;
+const virtio_gpu_resp_err_invalid_ctx_id = 0x1204;
+const virtio_gpu_resp_err_invalid_parameter = 0x1205;
+
+const virtio_gpu_flag_fence = (1 << 0);
+
 fn process(self: *Driver, i: u8, head: virtio_pci.Descriptor) void {
     self.transport.freeChain(i, head);
     self.inflight -= 1;
@@ -232,44 +273,3 @@ pub fn interrupt(frame: *os.platform.InterruptFrame, context: u64) void {
     driver.transport.acknowledge();
     driver.transport.process(0, process, driver);
 }
-
-// Feature bits
-const virtio_feature_version_1 = 32;
-const virtio_feature_access_platform = 33;
-const virtio_feature_ring_packed = 34;
-const virtio_feature_order_platform = 36;
-const virtio_feature_sr_iov = 37;
-
-// 2D cmds
-const virtio_gpu_cmd_get_display_info = 0x0100;
-const virtio_gpu_cmd_res_create_2d = 0x101;
-const virtio_gpu_cmd_res_unref = 0x102;
-const virtio_gpu_cmd_set_scanout = 0x103;
-const virtio_gpu_cmd_res_flush = 0x104;
-const virtio_gpu_cmd_transfer_to_host_2d = 0x105;
-const virtio_gpu_cmd_res_attach_backing = 0x106;
-const virtio_gpu_cmd_res_detatch_backing = 0x107;
-const virtio_gpu_cmd_get_capset_info = 0x108;
-const virtio_gpu_cmd_get_capset = 0x109;
-const virtio_gpu_cmd_get_edid = 0x10A;
-
-// Cursor cmds
-const virtio_gpu_cmd_update_cursor = 0x0300;
-const virtio_gpu_cmd_move_cursor = 0x301;
-
-// Success
-const virtio_gpu_resp_ok_nodata = 0x1100;
-const virtio_gpu_resp_ok_display_info = 0x1101;
-const virtio_gpu_resp_ok_capset_info = 0x1102;
-const virtio_gpu_resp_ok_capset = 0x1103;
-const virtio_gpu_resp_ok_edid = 0x1104;
-
-// Error
-const virtio_gpu_resp_err_unspecified = 0x1200;
-const virtio_gpu_resp_err_out_of_mem = 0x1201;
-const virtio_gpu_resp_err_invalid_scanout_id = 0x1202;
-const virtio_gpu_resp_err_invalid_res_id = 0x1203;
-const virtio_gpu_resp_err_invalid_ctx_id = 0x1204;
-const virtio_gpu_resp_err_invalid_parameter = 0x1205;
-
-const virtio_gpu_flag_fence = (1 << 0);
