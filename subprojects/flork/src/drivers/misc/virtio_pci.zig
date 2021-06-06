@@ -26,7 +26,7 @@ pub const DescIter = struct {
         iter.curr = iter.next;
         iter.next = if ((flags & vring_desc_flag_next) != 0) iter.drv.descr(iter.i) else 0xFFFF;
         assert(len <= 0x1000);
-        const addr = paging.translate_virt(.{ .virt = @ptrToInt(a) }) catch |err| {
+        const addr = paging.translateVirt(.{ .virt = @ptrToInt(a) }) catch |err| {
             @panic("virtio-pci: can't get the physical address");
         };
         iter.drv.queues[iter.i].desc[iter.curr] = .{

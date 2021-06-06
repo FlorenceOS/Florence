@@ -398,7 +398,7 @@ export fn stivale2Main(info_in: *Info) noreturn {
     phys_high += page_size - 1;
     phys_high &= ~(page_size - 1);
 
-    var context = os.vital(memory.paging.bootstrap_kernel_paging(), "bootstrapping kernel paging");
+    var context = os.vital(memory.paging.bootstrapKernelPaging(), "bootstrapping kernel paging");
 
     os.vital(memory.paging.mapPhysmem(.{
         .context = &context,

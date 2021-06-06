@@ -563,7 +563,7 @@ const TablePTE = struct {
         return self.curr_level;
     }
 
-    pub fn add_perms(self: *const @This(), perms: os.memory.paging.Perms) void {
+    pub fn addPerms(self: *const @This(), perms: os.memory.paging.Perms) void {
         if (perms.executable)
             self.underlying.?.no_execute.write(false);
         if (perms.writable)
