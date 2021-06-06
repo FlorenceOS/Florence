@@ -39,7 +39,6 @@ pub const Perms = struct {
     }
 };
 
-
 extern var __kernel_text_begin: u8;
 extern var __kernel_text_end: u8;
 extern var __kernel_data_begin: u8;
@@ -419,7 +418,6 @@ pub fn switchToContext(context: Context) void {
     os.platform.get_current_task().paging_context = context;
     os.platform.set_interrupts(state);
 }
-
 
 pub fn physToUncachedVirt(phys: usize) usize {
     return kernel_context.physToUncachedVirt(phys);

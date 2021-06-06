@@ -6,29 +6,6 @@ const rb = lib.containers.rbtree;
 const sbrk = os.memory.vmm.sbrk;
 const Mutex = os.thread.Mutex;
 
-const min_materialize_size = 64 * 1024;
-const node_block_size = 0x1000 * @sizeOf(Range) / 16;
-
-const debug = false;
-
-const rb_features: rb.Features = .{
-    .enable_iterators_cache = true,
-    .enable_kth_queries = false,
-    .enable_not_associatve_augment = false,
-};
-
-const addr_config: rb.Config = .{
-    .features = rb_features,
-    .augment_callback = null,
-    .comparator = compare_addr,
-};
-
-const size_config: rb.Config = .{
-    .features = rb_features,
-    .augment_callback = null,
-    .comparator = compare_size,
-};
-
 const AddrNode = rb.Node(rb_features);
 const SizeNode = rb.Node(rb_features);
 const AddrTree = rb.Tree(Range, "addr_node", addr_config);
@@ -38,7 +15,12 @@ const PlacementResult = struct {
     effective_size: u64,
     offset: u64,
 
-    pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+    pub fn format(
+        self: *const @This(),
+        fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
         try writer.print("size=0x{X}, offset=0x{X}", .{ self.effective_size, self.offset });
     }
 };
@@ -47,7 +29,12 @@ const RangePlacement = struct {
     range: *Range,
     placement: PlacementResult,
 
-    pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+    pub fn format(
+        self: *const @This(),
+        fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
         try writer.print("Placement{{{}, within freenode {}}}", .{ self.placement, self.range });
     }
 };
@@ -58,21 +45,26 @@ const Range = struct {
     base: usize,
     size: usize,
 
-    fn returned_base(self: *const @This(), alignment: usize) usize {
+    fn getReturnedBase(self: *const @This(), alignment: usize) usize {
         if (alignment == 0)
             return self.base;
         return ((self.base + alignment - 1) / alignment) * alignment;
     }
 
-    fn effective_size(size: usize, size_alignment: usize) usize {
+    fn getEffectiveSize(size: usize, size_alignment: usize) usize {
         if (size_alignment == 0)
             return size;
         return ((size + size_alignment - 1) / size_alignment) * size_alignment;
     }
 
-    pub fn try_place(self: *const @This(), size: usize, alignment: usize, size_alignment: usize) ?PlacementResult {
-        const rbase = self.returned_base(alignment);
-        const es = effective_size(size, size_alignment);
+    pub fn tryPlace(
+        self: *const @This(),
+        size: usize,
+        alignment: usize,
+        size_alignment: usize,
+    ) ?PlacementResult {
+        const rbase = self.getReturnedBase(alignment);
+        const es = getEffectiveSize(size, size_alignment);
         const offset = rbase - self.base;
         if (offset + es <= self.size) {
             return PlacementResult{
@@ -83,18 +75,23 @@ const Range = struct {
         return null;
     }
 
-    pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+    pub fn format(
+        self: *const @This(),
+        fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
         try writer.print("[base: 0x{X} size: 0x{X}]", .{ self.base, self.size });
     }
 };
 
-const compare_addr = struct {
+const AddressComparator = struct {
     pub fn compare(self: *const @This(), left: *const Range, right: *const Range) bool {
         return left.base < right.base;
     }
 };
 
-const compare_size = struct {
+const SizeComparator = struct {
     pub fn compare(self: *const @This(), left: *const Range, right: *const Range) bool {
         return left.size < right.size;
     }
@@ -113,7 +110,7 @@ pub const RangeAlloc = struct {
     mutex: Mutex = .{},
     materialize_bytes: fn (usize) anyerror![]u8,
 
-    fn dump_state(self: *@This()) void {
+    fn dumpState(self: *@This()) void {
         if (!debug)
             return;
 
@@ -125,13 +122,19 @@ pub const RangeAlloc = struct {
         }
     }
 
-    fn alloc_impl(self: *@This(), len: usize, ptr_align: u29, len_align: u29, ret_addr: usize) ![]u8 {
+    fn allocImpl(
+        self: *@This(),
+        len: usize,
+        ptr_align: u29,
+        len_align: u29,
+        ret_addr: usize,
+    ) ![]u8 {
         if (debug) {
             os.log("Calling alloc(len=0x{X},pa=0x{X},la=0x{X})\n", .{ len, ptr_align, len_align });
-            self.dump_state();
+            self.dumpState();
         }
 
-        const placement = try self.find_placement(len, ptr_align, len_align);
+        const placement = try self.findPlacement(len, ptr_align, len_align);
 
         const range = placement.range;
         const pmt = placement.placement;
@@ -151,7 +154,7 @@ pub const RangeAlloc = struct {
                 os.log("Has data before and after\n", .{});
             // Add the new range
             const new_range_offset = pmt.offset + pmt.effective_size;
-            const new_range = self.add_range(.{
+            const new_range = self.addRange(.{
                 .base = range.base + new_range_offset,
                 .size = range.size - new_range_offset,
             });
@@ -188,21 +191,27 @@ pub const RangeAlloc = struct {
             self.by_addr.remove(range);
             self.by_size.remove(range);
 
-            self.free_range(range);
+            self.freeRange(range);
         }
 
         if (debug)
-            self.dump_state();
+            self.dumpState();
 
         return ret;
     }
 
-    fn alloc(allocator: *std.mem.Allocator, len: usize, ptr_align: u29, len_align: u29, ret_addr: usize) std.mem.Allocator.Error![]u8 {
+    fn alloc(
+        allocator: *std.mem.Allocator,
+        len: usize,
+        ptr_align: u29,
+        len_align: u29,
+        ret_addr: usize,
+    ) std.mem.Allocator.Error![]u8 {
         const self = @fieldParentPtr(@This(), "allocator", allocator);
         self.mutex.lock();
         defer self.mutex.unlock();
 
-        return self.alloc_impl(len, ptr_align, len_align, ret_addr) catch |err| {
+        return self.allocImpl(len, ptr_align, len_align, ret_addr) catch |err| {
             switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
                 else => {
@@ -213,7 +222,14 @@ pub const RangeAlloc = struct {
         };
     }
 
-    fn resize(allocator: *std.mem.Allocator, old_mem: []u8, old_align: u29, new_size: usize, len_align: u29, ret_addr: usize) std.mem.Allocator.Error!usize {
+    fn resize(
+        allocator: *std.mem.Allocator,
+        old_mem: []u8,
+        old_align: u29,
+        new_size: usize,
+        len_align: u29,
+        ret_addr: usize,
+    ) std.mem.Allocator.Error!usize {
         const self = @fieldParentPtr(@This(), "allocator", allocator);
         self.mutex.lock();
         defer self.mutex.unlock();
@@ -224,7 +240,7 @@ pub const RangeAlloc = struct {
         }
 
         // Free this address
-        const new_range = self.add_range(.{
+        const new_range = self.addRange(.{
             .base = @ptrToInt(old_mem.ptr),
             .size = old_mem.len,
         }) catch |err| {
@@ -238,12 +254,12 @@ pub const RangeAlloc = struct {
         };
 
         // Attempt to merge nodes
-        self.merge_ranges(new_range);
+        self.mergeRanges(new_range);
 
         return 0;
     }
 
-    fn locate_addr_node(self: *@This(), size_node: *Range) *Range {
+    fn locateAddressNode(self: *@This(), size_node: *Range) *Range {
         const node = self.by_addr.lookup(&size_node.node);
         if (node) |n| {
             return @fieldParentPtr(Range, "node", n);
@@ -252,7 +268,12 @@ pub const RangeAlloc = struct {
         @panic("");
     }
 
-    fn find_placement(self: *@This(), size: usize, alignment: usize, size_alignment: usize) !RangePlacement {
+    fn findPlacement(
+        self: *@This(),
+        size: usize,
+        alignment: usize,
+        size_alignment: usize,
+    ) !RangePlacement {
         {
             const size_finder: struct {
                 size: usize,
@@ -265,7 +286,7 @@ pub const RangeAlloc = struct {
             var current_range = self.by_size.lowerBound(@TypeOf(size_finder), &size_finder);
 
             while (current_range) |range| {
-                if (range.try_place(size, alignment, size_alignment)) |placement| {
+                if (range.tryPlace(size, alignment, size_alignment)) |placement| {
                     return RangePlacement{
                         .range = range,
                         .placement = placement,
@@ -278,35 +299,44 @@ pub const RangeAlloc = struct {
         }
 
         // We found nothing, make a new one
-        if (debug)
+        if (debug) {
             os.log("Existing range not found, creating a new one\n", .{});
-        const range = try self.make_range(size);
-        if (range.try_place(size, alignment, size_alignment)) |placement| {
+        }
+        const range = try self.makeRange(size);
+    
+        if (range.tryPlace(size, alignment, size_alignment)) |placement| {
             return RangePlacement{
                 .range = range,
                 .placement = placement,
             };
         } else if (debug) {
-            os.log("Could not place size = 0x{X}, alignment = {}, size_alignment = {} in new allocation {}\n", .{ size, alignment, size_alignment, range });
+            os.log("Could not place sz = 0x{X}, align = {}, szalign = {} in new allocation {}\n", .{
+                size,
+                alignment,
+                size_alignment,
+                range,
+            },);
         }
 
         return error.OutOfMemory;
     }
 
-    fn free_range(self: *@This(), node: *Range) void {
+    fn freeRange(self: *@This(), node: *Range) void {
         const new_head = @ptrCast(*?*Range, node);
         new_head.* = self.range_node_head;
         self.range_node_head = node;
     }
 
-    fn consume_node_bytes(self: *@This()) !void {
+    fn consumeNodeBytes(self: *@This()) !void {
         const base = try sbrk(node_block_size);
-        for (@ptrCast([*]Range, @alignCast(@alignOf(Range), base))[0 .. node_block_size / @sizeOf(Range)]) |*n|
-            self.free_range(n);
+        const nodes = @ptrCast([*]Range, @alignCast(@alignOf(Range), base));
+        for (nodes[0 .. node_block_size / @sizeOf(Range)]) |*n| {
+            self.freeRange(n);
+        }
     }
 
-    fn add_range(self: *@This(), in_range: Range) !*Range {
-        const range = try self.alloc_range();
+    fn addRange(self: *@This(), in_range: Range) !*Range {
+        const range = try self.allocRange();
         range.* = in_range;
 
         self.by_size.insert(range);
@@ -314,7 +344,7 @@ pub const RangeAlloc = struct {
         return range;
     }
 
-    fn make_range(self: *@This(), minBytes: usize) !*Range {
+    fn makeRange(self: *@This(), minBytes: usize) !*Range {
         const page_size = os.platform.paging.page_sizes[0];
         const size = lib.util.libalign.alignUp(
             usize,
@@ -326,12 +356,12 @@ pub const RangeAlloc = struct {
             .size = size,
         };
 
-        return self.add_range(result);
+        return self.addRange(result);
     }
 
-    fn alloc_range(self: *@This()) !*Range {
+    fn allocRange(self: *@This()) !*Range {
         if (self.range_node_head == null) {
-            try self.consume_node_bytes();
+            try self.consumeNodeBytes();
         }
         if (self.range_node_head) |head| {
             const ret = head;
@@ -342,15 +372,15 @@ pub const RangeAlloc = struct {
     }
 
     // Needs to be a node in the addr tree
-    fn merge_ranges(self: *@This(), range_in: *Range) void {
+    fn mergeRanges(self: *@This(), range_in: *Range) void {
         var current = range_in;
 
         // Try to merge to the left
         while (self.by_addr.iterators.prev(current)) |prev| {
-            if (self.try_merge(prev, current)) {
+            if (self.tryMerge(prev, current)) {
                 self.by_addr.remove(current);
                 self.by_size.remove(current);
-                self.free_range(current);
+                self.freeRange(current);
                 current = prev;
             } else {
                 break;
@@ -359,17 +389,17 @@ pub const RangeAlloc = struct {
 
         // Try to merge to the right
         while (self.by_addr.iterators.next(current)) |next| {
-            if (self.try_merge(current, next)) {
+            if (self.tryMerge(current, next)) {
                 self.by_addr.remove(next);
                 self.by_size.remove(next);
-                self.free_range(next);
+                self.freeRange(next);
             } else {
                 break;
             }
         }
     }
 
-    fn try_merge(self: *@This(), low: *Range, high: *const Range) bool {
+    fn tryMerge(self: *@This(), low: *Range, high: *const Range) bool {
         if (low.base + low.size == high.base) {
             low.size += high.size;
             return true;
@@ -380,4 +410,27 @@ pub const RangeAlloc = struct {
     fn init(self: *@This()) void {
         self.mutex.init();
     }
+};
+
+const min_materialize_size = 64 * 1024;
+const node_block_size = 0x1000 * @sizeOf(Range) / 16;
+
+const debug = false;
+
+const rb_features: rb.Features = .{
+    .enable_iterators_cache = true,
+    .enable_kth_queries = false,
+    .enable_not_associatve_augment = false,
+};
+
+const addr_config: rb.Config = .{
+    .features = rb_features,
+    .augment_callback = null,
+    .comparator = AddressComparator,
+};
+
+const size_config: rb.Config = .{
+    .features = rb_features,
+    .augment_callback = null,
+    .comparator = SizeComparator,
 };
