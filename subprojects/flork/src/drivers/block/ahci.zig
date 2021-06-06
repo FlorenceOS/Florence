@@ -366,7 +366,7 @@ const PortState = struct {
     fn setupCommandHeaders(self: *@This()) !void {
         const port_io_size = @sizeOf(CommandList) + @sizeOf(RecvFis);
 
-        const commands_phys = try memory.pmm.alloc_phys(port_io_size);
+        const commands_phys = try memory.pmm.allocPhys(port_io_size);
         const fis_phys = commands_phys + @sizeOf(CommandList);
         @memset(
             os.platform.phys_ptr([*]u8).from_int(commands_phys).get_uncached(),
@@ -384,7 +384,7 @@ const PortState = struct {
         for (self.mmio.getCommandHeaders()) |*header| {
             if (reamining_table_size < @sizeOf(CommandTable)) {
                 reamining_table_size = page_size;
-                current_table_addr = try memory.pmm.alloc_phys(page_size);
+                current_table_addr = try memory.pmm.allocPhys(page_size);
                 @memset(
                     os.platform.phys_ptr([*]u8).from_int(current_table_addr).get_uncached(),
                     0,
@@ -400,7 +400,7 @@ const PortState = struct {
             reamining_table_size -= @sizeOf(CommandTable);
 
             // First PRD is just a small preallocated single page buffer
-            const buf = try memory.pmm.alloc_phys(page_size);
+            const buf = try memory.pmm.allocPhys(page_size);
             @memset(os.platform.phys_ptr([*]u8).from_int(buf).get_uncached(), 0, page_size);
             write_u64(&header.table().prds[0].data_base_addr, buf);
             header.table().prds[0].sizem1 = @intCast(u22, page_size - 1);

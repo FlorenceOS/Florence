@@ -183,7 +183,7 @@ pub const Driver = struct {
         const avail_siz: u32 = @sizeOf(VirtqAvail) + 2 + 2 * size;
         const used_siz: u32 = @sizeOf(VirtqUsed) + 2 + @sizeOf(VirtqUsedItem) * size;
         const total_siz = desc_siz + avail_siz + used_siz;
-        const phys = os.memory.pmm.alloc_phys(size) catch unreachable;
+        const phys = os.memory.pmm.allocPhys(size) catch unreachable;
         const virt = os.platform.phys_ptr([*]volatile u8).from_int(phys).get_uncached();
         @memset(virt, 0x00, total_siz);
 

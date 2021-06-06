@@ -106,9 +106,9 @@ pub const MemoryObject = struct {
         errdefer allocator.free(frames);
 
         for (frames) |*page, i| {
-            page.* = pmm.alloc_phys(pagesz) catch |err| {
+            page.* = pmm.allocPhys(pagesz) catch |err| {
                 for (frames[0..i]) |*page_to_dispose| {
-                    pmm.free_phys(page_to_dispose.*, pagesz);
+                    pmm.freePhys(page_to_dispose.*, pagesz);
                 }
                 return err;
             };
@@ -126,7 +126,7 @@ pub const MemoryObject = struct {
 
         const page_size = getSmallestPageSize();
 
-        const area = try pmm.alloc_phys(size);
+        const area = try pmm.allocPhys(size);
         instance.memory = .{
             .phys_managed = .{
                 .start = area,
@@ -157,12 +157,12 @@ pub const MemoryObject = struct {
         switch (self.memory) {
             .plain => |plain| {
                 for (plain.frames[0..plain.frames.len]) |*page| {
-                    pmm.free_phys(page.*, plain.page_size);
+                    pmm.freePhys(page.*, plain.page_size);
                 }
                 self.allocator.free(plain.frames);
             },
             .phys_managed => |span| {
-                pmm.free_phys(span.start, span.size);
+                pmm.freePhys(span.start, span.size);
             },
             .phys_unmanaged => {},
         }

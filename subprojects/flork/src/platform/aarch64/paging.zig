@@ -204,7 +204,7 @@ const ttbr1 = os.platform.msr(ttbr_value, "TTBR1_EL1");
 const level_type = u3;
 
 pub fn make_page_table() !u64 {
-    const pt = try os.memory.pmm.alloc_phys(page_sizes[0]);
+    const pt = try os.memory.pmm.allocPhys(page_sizes[0]);
     const pt_bytes = os.platform.phys_slice(u8).init(pt, page_sizes[0]);
     @memset(pt_bytes.to_slice_writeback().ptr, 0x00, page_sizes[0]);
     return pt;
@@ -334,17 +334,17 @@ pub const PagingContext = struct {
         }
     }
 
-    pub fn phys_to_write_back_virt(self: *const @This(), phys: u64) u64 {
+    pub fn physToWriteBackVirt(self: *const @This(), phys: u64) u64 {
         self.check_phys(phys);
         return self.wb_virt_base + phys;
     }
 
-    pub fn phys_to_write_combining_virt(self: *const @This(), phys: u64) u64 {
+    pub fn physToWriteCombiningVirt(self: *const @This(), phys: u64) u64 {
         self.check_phys(phys);
         return self.wc_virt_base + phys;
     }
 
-    pub fn phys_to_uncached_virt(self: *const @This(), phys: u64) u64 {
+    pub fn physToUncachedVirt(self: *const @This(), phys: u64) u64 {
         self.check_phys(phys);
         return self.uc_virt_base + phys;
     }
@@ -574,7 +574,7 @@ const TablePTE = struct {
 
     pub fn make_child_table(self: *const @This(), enc: *u64, perms: os.memory.paging.Perms) !TablePTE {
         const pmem = try make_page_table();
-        errdefer os.memory.pmm.free_phys(pmem, page_sizes[0]);
+        errdefer os.memory.pmm.freePhys(pmem, page_sizes[0]);
 
         var result: TablePTE = .{
             .phys = pmem,
@@ -597,8 +597,8 @@ const TablePTE = struct {
         memtype: MemoryType,
     ) !MappingPTE {
         const psz = page_sizes[self.level() - 1];
-        const pmem = phys orelse try os.memory.pmm.alloc_phys(psz);
-        errdefer if (phys == null) os.memory.pmm.free_phys(pmem, psz);
+        const pmem = phys orelse try os.memory.pmm.allocPhys(psz);
+        errdefer if (phys == null) os.memory.pmm.freePhys(pmem, psz);
 
         var result: MappingPTE = .{
             .level = self.level() - 1,

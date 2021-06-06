@@ -215,7 +215,7 @@ fn unmapIter(
                     @panic("No partial unmapping");
 
                 if (reclaim_pages)
-                    pmm.free_phys(mapping.phys, dom.len);
+                    pmm.freePhys(mapping.phys, dom.len);
 
                 child.* = context.encode_empty(mapping.level);
                 context.invalidate(virt.*);
@@ -370,7 +370,7 @@ pub fn mapPhysmem(args: struct {
 }) !void {
     // Map once with each memory type
     try mapPhys(.{
-        .virt = args.context.phys_to_write_back_virt(0),
+        .virt = args.context.physToWriteBackVirt(0),
         .phys = 0,
         .size = args.map_limit,
         .perm = rw(),
@@ -379,7 +379,7 @@ pub fn mapPhysmem(args: struct {
     });
 
     try mapPhys(.{
-        .virt = args.context.phys_to_write_combining_virt(0),
+        .virt = args.context.physToWriteCombiningVirt(0),
         .phys = 0,
         .size = args.map_limit,
         .perm = rw(),
@@ -388,7 +388,7 @@ pub fn mapPhysmem(args: struct {
     });
 
     try mapPhys(.{
-        .virt = args.context.phys_to_uncached_virt(0),
+        .virt = args.context.physToUncachedVirt(0),
         .phys = 0,
         .size = args.map_limit,
         .perm = rw(),
@@ -418,4 +418,17 @@ pub fn switchToContext(context: Context) void {
     context.apply();
     os.platform.get_current_task().paging_context = context;
     os.platform.set_interrupts(state);
+}
+
+
+pub fn physToUncachedVirt(phys: usize) usize {
+    return kernel_context.physToUncachedVirt(phys);
+}
+
+pub fn physToWriteCombiningVirt(phys: usize) usize {
+    return kernel_context.physToWriteCombiningVirt(phys);
+}
+
+pub fn physToWriteBackVirt(phys: usize) usize {
+    return kernel_context.physToWriteBackVirt(phys);
 }

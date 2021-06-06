@@ -446,7 +446,7 @@ export fn stivale2Main(info_in: *Info) noreturn {
 
         // Allocate stacks for all CPUs
         var bootstrap_stack_pool_sz = ap_init_stack_size * cpus.len;
-        var stacks = os.vital(memory.pmm.alloc_phys(bootstrap_stack_pool_sz), "no ap stacks");
+        var stacks = os.vital(memory.pmm.allocPhys(bootstrap_stack_pool_sz), "no ap stacks");
 
         // Setup counter used for waiting
         @atomicStore(usize, &platform.smp.cpus_left, cpus.len - 1, .Release);
@@ -467,7 +467,7 @@ export fn stivale2Main(info_in: *Info) noreturn {
 
             cpu_info.argument = i;
             const stack_top = stack + ap_init_stack_size - 16;
-            cpu_info.target_stack = memory.pmm.phys_to_write_back_virt(stack_top);
+            cpu_info.target_stack = memory.paging.physToWriteBackVirt(stack_top);
             @atomicStore(u64, &cpu_info.goto_address, @ptrToInt(smpEntry), .Release);
         }
 
@@ -477,7 +477,7 @@ export fn stivale2Main(info_in: *Info) noreturn {
         }
 
         // Free memory pool used for stacks. Unreachable for now
-        memory.pmm.free_phys(stacks, bootstrap_stack_pool_sz);
+        memory.pmm.freePhys(stacks, bootstrap_stack_pool_sz);
         os.log("All cores are ready for tasks!\n", .{});
     }
 

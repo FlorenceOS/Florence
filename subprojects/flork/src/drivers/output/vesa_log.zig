@@ -145,7 +145,7 @@ pub fn lfbUpdater(
     ctx: usize,
 ) void {
     @setRuntimeSafety(false);
-    const virt = os.memory.pmm.phys_to_write_combining_virt(ctx);
+    const virt = os.memory.paging.physToWriteCombiningVirt(ctx);
     @memcpy(@intToPtr([*]u8, virt + pitch * yoff_dest), bb + pitch * yoff_src, ysize * pitch);
 }
 
@@ -181,12 +181,12 @@ pub fn registerFb(
     const fb_bpp = fb_bpp_in / 8;
     const fb_size = @as(usize, fb_pitch) * @as(usize, fb_height);
 
-    const bb_phys = os.memory.pmm.alloc_phys(fb_size) catch |err| {
+    const bb_phys = os.memory.pmm.allocPhys(fb_size) catch |err| {
         os.log("VESAlog: Could not allocate backbuffer: {s}\n", .{@errorName(err)});
         return;
     };
 
-    const bb_virt = os.memory.paging.kernel_context.phys_to_write_back_virt(bb_phys);
+    const bb_virt = os.memory.paging.kernel_context.physToWriteBackVirt(bb_phys);
 
     framebuffer = Framebuffer{
         .pitch = fb_pitch,

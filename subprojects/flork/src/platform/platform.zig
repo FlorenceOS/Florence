@@ -102,15 +102,15 @@ pub fn phys_ptr(comptime ptr_type: type) type {
         addr: usize,
 
         pub fn get_writeback(self: *const @This()) ptr_type {
-            return @intToPtr(ptr_type, os.memory.pmm.phys_to_write_back_virt(self.addr));
+            return @intToPtr(ptr_type, os.memory.paging.physToWriteBackVirt(self.addr));
         }
 
         pub fn get_write_combining(self: *const @This()) ptr_type {
-            return @intToPtr(ptr_type, os.memory.pmm.phys_to_write_combining_virt(self.addr));
+            return @intToPtr(ptr_type, os.memory.paging.physToWriteCombiningVirt(self.addr));
         }
 
         pub fn get_uncached(self: *const @This()) ptr_type {
-            return @intToPtr(ptr_type, os.memory.pmm.phys_to_uncached_virt(self.addr));
+            return @intToPtr(ptr_type, os.memory.paging.physToUncachedVirt(self.addr));
         }
 
         pub fn from_int(a: usize) @This() {
