@@ -1,14 +1,12 @@
 usingnamespace @import("root").preamble;
 const StackTrace = std.builtin.StackTrace;
 
-pub fn breakpoint_panic(message: ?[]const u8, stack_trace: ?*StackTrace) noreturn {
+var panic_counter: usize = 0;
+
+pub fn breakpointPanic(message: ?[]const u8, stack_trace: ?*StackTrace) noreturn {
     @breakpoint();
     unreachable;
 }
-
-var panic_counter: usize = 0;
-/// You only panic once
-const YOPO = false;
 
 pub fn panic(message_in: ?[]const u8, stack_trace: ?*StackTrace) noreturn {
     const panic_num = @atomicRmw(usize, &panic_counter, .Add, 1, .AcqRel) + 1;
@@ -18,14 +16,15 @@ pub fn panic(message_in: ?[]const u8, stack_trace: ?*StackTrace) noreturn {
     const cpu_id = cpu.id();
     const message: []const u8 = message_in orelse "no message";
 
-    if (YOPO and panic_num != 1)
+    if (config.kernel.panic_once and panic_num != 1) {
         os.platform.hang();
+    }
 
     os.log("PANIC {}: CPU {}: {s}!\n", .{ panic_num, cpu_id, message });
 
     if (stack_trace) |trace| {
         os.log("TODO: print stack trace.\nI bet this is very helpful. No problem.\n", .{});
-        os.kernel.debug.dump_stack_trace(trace);
+        os.kernel.debug.dumpStackTrace(trace);
     } else {
         os.log("idfk I didn't get a stack trace.\n", .{});
     }

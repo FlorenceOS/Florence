@@ -9,9 +9,9 @@ pub const kepler = @import("kepler/kepler.zig");
 /// OS module itself
 pub const log = kernel.logger.log;
 pub const hexdump = kernel.logger.hexdump;
-pub const hexdump_obj = kernel.logger.hexdump_obj;
+pub const hexdumpObj = kernel.logger.hexdumpObj;
 pub const vital = kernel.vital.vital;
 pub const panic = kernel.panic.panic;
 
-pub const get_log_lock = kernel.logger.get_log_lock;
-pub const release_log_lock = kernel.logger.release_log_lock;
+pub const getLogLock = kernel.logger.getLogLock;
+pub const releaseLogLock = kernel.logger.releaseLogLock;

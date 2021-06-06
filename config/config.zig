@@ -28,6 +28,9 @@ pub const kernel = .{
             .enable_keyboard = true,
         },
     },
+
+    // True if kernel should panic only once
+    .panic_once = true,
 };
 
 // Terminal font

@@ -186,7 +186,7 @@ pub const InterruptFrame = packed struct {
     }
 
     pub fn trace_stack(self: *const @This()) void {
-        os.kernel.debug.dump_frame(self.rbp, self.rip);
+        os.kernel.debug.dumpFrame(self.rbp, self.rip);
     }
 };
 

@@ -1,15 +1,15 @@
 usingnamespace @import("root").preamble;
-const fmt = std.fmt;
 
+const fmt = std.fmt;
 const range = lib.util.range.range;
 
 const Printer = struct {
     pub fn writeAll(self: *const Printer, str: []const u8) !void {
-        try @call(.{ .modifier = .never_inline }, print_str, .{str});
+        try @call(.{ .modifier = .never_inline }, printString, .{str});
     }
 
     pub fn print(self: *const Printer, comptime format: []const u8, args: anytype) !void {
-        log_nolock(format, args);
+        logWithoutLocking(format, args);
     }
 
     pub fn writeByteNTimes(self: *const Printer, val: u8, num: usize) !void {
@@ -22,50 +22,11 @@ const Printer = struct {
     pub const Error = anyerror;
 };
 
-var log_lock: os.thread.Spinlock = .{};
-var lock_owner: ?*os.platform.smp.CoreData = null;
-
 const LogLock = struct {
     lock: ?@typeInfo(@TypeOf(log_lock.lock)).BoundFn.return_type.?,
 };
 
-pub fn get_log_lock() LogLock {
-    const current_cpu = os.platform.thread.get_current_cpu();
-
-    if (@atomicLoad(?*os.platform.smp.CoreData, &lock_owner, .Acquire) == current_cpu) {
-        return .{ .lock = null };
-    }
-
-    defer @atomicStore(?*os.platform.smp.CoreData, &lock_owner, current_cpu, .Release);
-    return .{ .lock = log_lock.lock() };
-}
-
-pub fn release_log_lock(ll: LogLock) void {
-    if (ll.lock) |l| {
-        @atomicStore(?*os.platform.smp.CoreData, &lock_owner, null, .Release);
-        log_lock.unlock(l);
-    }
-}
-
-pub fn log(comptime format: []const u8, args: anytype) void {
-    const l = get_log_lock();
-    defer release_log_lock(l);
-
-    return log_nolock(format, args);
-}
-
-fn log_nolock(comptime format: []const u8, args: anytype) void {
-    var printer = Printer{};
-    fmt.format(printer, format, args) catch unreachable;
-}
-
-fn print_str(str: []const u8) !void {
-    for (str) |c| {
-        putch(c);
-    }
-}
-
-fn protected_putchar(comptime putch_func: anytype) type {
+fn ProtectedPutchar(comptime putch_func: anytype) type {
     return struct {
         is_inside: bool = false,
 
@@ -80,10 +41,23 @@ fn protected_putchar(comptime putch_func: anytype) type {
     };
 }
 
-var platform: protected_putchar(os.platform.debugputch) = .{};
-var mmio_serial: protected_putchar(os.drivers.output.mmio_serial.putch) = .{};
-var vesa_log: protected_putchar(os.drivers.output.vesa_log.putch) = .{};
-var vga_log: protected_putchar(os.drivers.output.vga_log.putch) = .{};
+var log_lock: os.thread.Spinlock = .{};
+var lock_owner: ?*os.platform.smp.CoreData = null;
+var platform: ProtectedPutchar(os.platform.debugputch) = .{};
+var mmio_serial: ProtectedPutchar(os.drivers.output.mmio_serial.putch) = .{};
+var vesa_log: ProtectedPutchar(os.drivers.output.vesa_log.putch) = .{};
+var vga_log: ProtectedPutchar(os.drivers.output.vga_log.putch) = .{};
+
+fn logWithoutLocking(comptime format: []const u8, args: anytype) void {
+    var printer = Printer{};
+    fmt.format(printer, format, args) catch unreachable;
+}
+
+fn printString(str: []const u8) !void {
+    for (str) |c| {
+        putch(c);
+    }
+}
 
 fn putch(ch: u8) void {
     platform.putch(ch);
@@ -94,13 +68,38 @@ fn putch(ch: u8) void {
     }
 }
 
-pub fn hexdump_obj(val: anytype) void {
+pub fn getLogLock() LogLock {
+    const current_cpu = os.platform.thread.get_current_cpu();
+
+    if (@atomicLoad(?*os.platform.smp.CoreData, &lock_owner, .Acquire) == current_cpu) {
+        return .{ .lock = null };
+    }
+
+    defer @atomicStore(?*os.platform.smp.CoreData, &lock_owner, current_cpu, .Release);
+    return .{ .lock = log_lock.lock() };
+}
+
+pub fn releaseLogLock(ll: LogLock) void {
+    if (ll.lock) |l| {
+        @atomicStore(?*os.platform.smp.CoreData, &lock_owner, null, .Release);
+        log_lock.unlock(l);
+    }
+}
+
+pub fn log(comptime format: []const u8, args: anytype) void {
+    const l = getLogLock();
+    defer releaseLogLock(l);
+
+    return logWithoutLocking(format, args);
+}
+
+pub fn hexdumpObj(val: anytype) void {
     hexdump(@ptrCast([*]u8, val)[0..@sizeOf(@TypeOf(val.*))]);
 }
 
 pub fn hexdump(in_bytes: []const u8) void {
-    const l = os.get_log_lock();
-    defer os.release_log_lock(l);
+    const l = os.getLogLock();
+    defer os.releaseLogLock(l);
 
     var bytes = in_bytes;
     while (bytes.len != 0) {
