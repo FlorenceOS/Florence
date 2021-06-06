@@ -7,12 +7,6 @@ const Framebuffer = struct {
 
 var framebuffer: ?Framebuffer = null;
 
-pub fn register() void {
-    if (os.platform.arch == .x86_64) {
-        framebuffer = Framebuffer{};
-    }
-}
-
 fn buffer(comptime T: type) [*]volatile T {
     return os.platform.phys_ptr([*]volatile T).from_int(0xB8000).get_uncached();
 }
@@ -43,6 +37,12 @@ fn feedLine() void {
         scroll();
     } else {
         framebuffer.?.y_pos += 1;
+    }
+}
+
+pub fn register() void {
+    if (os.platform.arch == .x86_64) {
+        framebuffer = Framebuffer{};
     }
 }
 
