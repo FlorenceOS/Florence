@@ -12,101 +12,103 @@ const Extendedness = enum {
 
 pub var kb_interrupt_vector: u8 = undefined;
 pub var kb_interrupt_gsi: u32 = undefined;
+pub var mouse_interrupt_vector: u8 = undefined;
+pub var mouse_interrupt_gsi: u32 = undefined;
 
 const scancode_extended = 0xE0;
 
-fn parse_scancode(ext: Extendedness, scancode: u8) !void {
-    switch (ext) {
-        .Extended => {
-            switch (scancode) {
-                0x2A => { // Print screen press
-                    std.debug.assert(kb_wait_byte() == scancode_extended);
-                    std.debug.assert(kb_wait_byte() == 0x37);
-                    try state.event(.press, .print_screen);
-                    return;
-                },
-                0xB7 => { // Print screen release
-                    std.debug.assert(kb_wait_byte() == scancode_extended);
-                    std.debug.assert(kb_wait_byte() == 0xAA);
-                    try state.event(.release, .print_screen);
-                    return;
-                },
-                else => {},
+var keyboard_buffer_data: [8]u8 = undefined;
+var keyboard_buffer_elements: usize = 0;
+
+fn keyboardBuffer() []const u8 {
+    return keyboard_buffer_data[0..keyboard_buffer_elements];
+}
+
+fn standardKey(ext: Extendedness, keycode: u8) void {
+    defer keyboard_buffer_elements = 0;
+
+    const loc = keyLocation(ext, keycode & 0x7F) catch return;
+    kb_state.event(if (keycode & 0x80 != 0) .release else .press, loc) catch return;
+}
+
+fn finishSequence(offset: usize, seq: []const u8) bool {
+    const buf = keyboardBuffer()[offset..];
+
+    if (buf.len < seq.len)
+        return false;
+
+    if (std.mem.eql(u8, buf, seq)) {
+        keyboard_buffer_elements = 0;
+        return true;
+    }
+
+    os.log("PS2: Unexpected scancode sequence: {any}, expected {any}\n", .{ buf, seq });
+    @panic("PS2: Unexpected scancode sequence!");
+}
+
+fn kbEvent() void {
+    switch (keyboardBuffer()[0]) {
+        0xE1 => {
+            if (finishSequence(1, "\x1D\x45\xE1\x9D\xC5")) {
+                kb_state.event(.press, .pause_break) catch return;
+                // There is no event for releasing this key,
+                // so we just gotta pretend it's released instantly
+                kb_state.event(.release, .pause_break) catch return;
             }
         },
-        .NotExtended => {
-            switch (scancode) {
-                0xE1 => {
-                    std.debug.assert(kb_wait_byte() == 0x1D);
-                    std.debug.assert(kb_wait_byte() == 0x45);
-                    std.debug.assert(kb_wait_byte() == 0xE1);
-                    std.debug.assert(kb_wait_byte() == 0x9D);
-                    std.debug.assert(kb_wait_byte() == 0xC5);
-                    try state.event(.press, .pause_break);
-                    // There is no event for releasing this key,
-                    // so we just gotta pretend it's released instantly
-                    try state.event(.release, .pause_break);
-                    return;
+        scancode_extended => {
+            if (keyboardBuffer().len < 2)
+                return;
+
+            switch (keyboardBuffer()[1]) {
+                0x2A => {
+                    if (finishSequence(2, &[_]u8{ scancode_extended, 0x37 })) {
+                        kb_state.event(.press, .print_screen) catch return;
+                    }
                 },
-                else => {},
+                0xB7 => {
+                    if (finishSequence(2, &[_]u8{ scancode_extended, 0xAA })) {
+                        kb_state.event(.release, .print_screen) catch return;
+                    }
+                },
+                else => {
+                    standardKey(.Extended, keyboardBuffer()[1]);
+                },
             }
         },
-    }
-
-    const loc = key_location(ext, scancode & 0x7F) catch return;
-
-    if (scancode & 0x80 != 0) {
-        try state.event(.release, loc);
-    } else {
-        try state.event(.press, loc);
+        else => {
+            standardKey(.NotExtended, keyboardBuffer()[0]);
+        },
     }
 }
 
-var state: kb.state.KeyboardState = .{};
+var kb_state: kb.state.KeyboardState = .{};
 
-fn kb_has_byte() bool {
-    return (ports.inb(0x64) & 1) != 0;
-}
+pub fn kbHandler(_: *os.platform.InterruptFrame) void {
+    os.log("Keyboard interrupt\n", .{});
 
-fn kb_wait_byte() u8 {
-    while (!kb_has_byte()) {}
-    return ports.inb(0x60);
-}
+    keyboard_buffer_data[keyboard_buffer_elements] = ports.inb(0x60);
+    keyboard_buffer_elements += 1;
 
-fn handle_keyboard_interrupt() void {
-    var ext: Extendedness = .NotExtended;
-
-    var scancode = kb_wait_byte();
-
-    if (scancode == scancode_extended) {
-        ext = .Extended;
-        scancode = kb_wait_byte();
-    }
-
-    parse_scancode(ext, scancode) catch |err| switch (err) {
-        error.UnknownKey => os.log("Unknown key!\n", .{}),
-        else => {},
-    };
-}
-
-pub fn kb_handler(_: *os.platform.InterruptFrame) void {
-    while (kb_has_byte()) {
-        handle_keyboard_interrupt();
-    }
+    kbEvent();
 
     eoi();
 }
 
-pub fn kb_init() void {
+fn kbHasByte() bool {
+    return (ports.inb(0x64) & 1) != 0;
+}
+
+pub fn kbInit() void {
     const i = os.platform.get_and_disable_interrupts();
     defer os.platform.set_interrupts(i);
 
-    if (kb_has_byte()) {
-        handle_keyboard_interrupt();
+    if (kbHasByte()) {
+        kbHandler(undefined);
     }
 }
 
-fn key_location(ext: Extendedness, scancode: u8) !kb.keys.Location {
+fn keyLocation(ext: Extendedness, scancode: u8) !kb.keys.Location {
     switch (ext) {
         .NotExtended => {
             return switch (scancode) {
@@ -238,4 +240,78 @@ fn key_location(ext: Extendedness, scancode: u8) !kb.keys.Location {
             };
         },
     }
+}
+
+var mouse_buffer_data: [8]u8 = undefined;
+var mouse_buffer_elements: usize = 0;
+
+fn mouseEvent() void {
+    if (mouse_buffer_elements == 3) {
+        os.log("Mouse: {any}\n", .{mouse_buffer_data[0..mouse_buffer_elements]});
+        mouse_buffer_elements = 0;
+    }
+}
+
+pub fn mouseHandler(_: *os.platform.InterruptFrame) void {
+    mouse_buffer_data[mouse_buffer_elements] = ports.inb(0x60);
+    mouse_buffer_elements += 1;
+
+    mouseEvent();
+
+    eoi();
+}
+
+fn mouseRead() u8 {
+    mouseWait(0);
+    return ports.inb(0x60);
+}
+
+fn mouse_write(value: u8) void {
+    mouseWait(1);
+    ports.outb(0x64, 0xD4);
+    mouseWait(1);
+    ports.outb(0x60, value);
+}
+
+fn mouseWait(comptime t: comptime_int) void {
+    var timeout: usize = 100000;
+
+    while (timeout != 0) : (timeout -= 1) {
+        switch (t) {
+            0 => {
+                if ((ports.inb(0x64) & (1 << 0)) != 0) return;
+            },
+            1 => {
+                if ((ports.inb(0x64) & (1 << 1)) == 0) return;
+            },
+            else => @compileError("Unknown wait method"),
+        }
+    }
+}
+
+pub fn mouseInit() void {
+    mouseWait(1);
+    ports.outb(0x64, 0xA8);
+
+    mouseWait(1);
+    ports.outb(0x64, 0x20);
+
+    var status = mouseRead();
+    _ = mouseRead();
+    status |= (1 << 1);
+    status &= ~@as(u8, 1 << 5);
+    mouseWait(1);
+    ports.outb(0x64, 0x60);
+    mouseWait(1);
+    ports.outb(0x60, status);
+    _ = mouseRead();
+
+    mouse_write(0xFF);
+    _ = mouseRead();
+
+    mouse_write(0xF6);
+    _ = mouseRead();
+
+    mouse_write(0xF4);
+    _ = mouseRead();
 }

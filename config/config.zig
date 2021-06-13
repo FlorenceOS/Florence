@@ -28,6 +28,10 @@ pub const kernel = .{
             .keyboard = .{
                 .enable = true,
             },
+
+            .mouse = .{
+                .enable = true,
+            },
         },
 
         // Port E9 debug logging
