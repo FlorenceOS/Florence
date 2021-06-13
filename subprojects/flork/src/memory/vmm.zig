@@ -30,14 +30,14 @@ var ephemeral_alloc =
 };
 
 /// Range allocator for nonbacked memory
-pub var nonbacked_range = RangeAlloc{ .materialize_bytes = nonbackedSbrk };
+pub var nonbacked_range = RangeAlloc{ .materialize_bytes = sbrkNonbacked };
 
 pub fn init(phys_high: usize) !void {
     os.log("Initializing vmm with base 0x{X}\n", .{phys_high});
     sbrk_head = phys_high;
 }
 
-pub fn nonbackedSbrk(num_bytes: usize) ![]u8 {
+pub fn sbrkNonbacked(num_bytes: usize) ![]u8 {
     sbrk_mutex.lock();
     defer sbrk_mutex.unlock();
 
@@ -49,7 +49,7 @@ pub fn nonbackedSbrk(num_bytes: usize) ![]u8 {
 }
 
 pub fn sbrk(num_bytes: usize) ![]u8 {
-    const ret = try nonbackedSbrk(num_bytes);
+    const ret = try sbrkNonbacked(num_bytes);
 
     try paging.map(.{
         .virt = @ptrToInt(ret.ptr),
