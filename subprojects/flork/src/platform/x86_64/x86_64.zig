@@ -57,31 +57,10 @@ pub fn set_interrupts(s: InterruptState) void {
 
 pub fn platform_init() !void {
     try os.platform.acpi.init_acpi();
+
+    @import("ps2.zig").init();
+
     set_interrupts(true);
-
-    if (comptime (config.kernel.x86_64.ps2.keyboard.enable)) {
-        const ps2 = @import("ps2.zig");
-        ps2.kb_interrupt_vector = interrupts.allocate_vector();
-        os.log("PS2 keyboard: vector 0x{X}\n", .{ps2.kb_interrupt_vector});
-
-        interrupts.add_handler(ps2.kb_interrupt_vector, ps2.kbHandler, true, 3, 1);
-
-        ps2.kb_interrupt_gsi = apic.route_irq(0, 1, ps2.kb_interrupt_vector);
-        os.log("PS2 keyboard: gsi 0x{X}\n", .{ps2.kb_interrupt_gsi});
-        ps2.kbInit();
-    }
-
-    if (comptime (config.kernel.x86_64.ps2.mouse.enable)) {
-        const ps2 = @import("ps2.zig");
-        ps2.mouseInit();
-        ps2.mouse_interrupt_vector = interrupts.allocate_vector();
-        os.log("PS2 mouse: vector 0x{X}\n", .{ps2.mouse_interrupt_vector});
-
-        interrupts.add_handler(ps2.mouse_interrupt_vector, ps2.mouseHandler, true, 3, 1);
-
-        ps2.mouse_interrupt_gsi = apic.route_irq(0, 12, ps2.mouse_interrupt_vector);
-        os.log("PS2 mouse: gsi 0x{X}\n", .{ps2.mouse_interrupt_gsi});
-    }
 
     try os.platform.pci.init_pci();
 }

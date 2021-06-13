@@ -3,6 +3,7 @@ usingnamespace @import("root").preamble;
 const apic = @import("apic.zig");
 const ports = @import("ports.zig");
 const eoi = @import("apic.zig").eoi;
+const interrupts = @import("interrupts.zig");
 const kb = lib.input.keyboard;
 
 const Extendedness = enum {
@@ -11,9 +12,9 @@ const Extendedness = enum {
 };
 
 pub var kb_interrupt_vector: u8 = undefined;
-pub var kb_interrupt_gsi: u32 = undefined;
+pub var kb_interrupt_gsi: ?u32 = null;
 pub var mouse_interrupt_vector: u8 = undefined;
-pub var mouse_interrupt_gsi: u32 = undefined;
+pub var mouse_interrupt_gsi: ?u32 = null;
 
 const scancode_extended = 0xE0;
 
@@ -84,28 +85,13 @@ fn kbEvent() void {
 
 var kb_state: kb.state.KeyboardState = .{};
 
-pub fn kbHandler(_: *os.platform.InterruptFrame) void {
-    os.log("Keyboard interrupt\n", .{});
-
+fn kbHandler(_: *os.platform.InterruptFrame) void {
     keyboard_buffer_data[keyboard_buffer_elements] = ports.inb(0x60);
     keyboard_buffer_elements += 1;
 
     kbEvent();
 
     eoi();
-}
-
-fn kbHasByte() bool {
-    return (ports.inb(0x64) & 1) != 0;
-}
-
-pub fn kbInit() void {
-    const i = os.platform.get_and_disable_interrupts();
-    defer os.platform.set_interrupts(i);
-
-    if (kbHasByte()) {
-        kbHandler(undefined);
-    }
 }
 
 fn keyLocation(ext: Extendedness, scancode: u8) !kb.keys.Location {
@@ -247,12 +233,11 @@ var mouse_buffer_elements: usize = 0;
 
 fn mouseEvent() void {
     if (mouse_buffer_elements == 3) {
-        os.log("Mouse: {any}\n", .{mouse_buffer_data[0..mouse_buffer_elements]});
         mouse_buffer_elements = 0;
     }
 }
 
-pub fn mouseHandler(_: *os.platform.InterruptFrame) void {
+fn mouseHandler(_: *os.platform.InterruptFrame) void {
     mouse_buffer_data[mouse_buffer_elements] = ports.inb(0x60);
     mouse_buffer_elements += 1;
 
@@ -289,29 +274,320 @@ fn mouseWait(comptime t: comptime_int) void {
     }
 }
 
-pub fn mouseInit() void {
-    mouseWait(1);
-    ports.outb(0x64, 0xA8);
+fn canWrite() bool {
+    return (ports.inb(0x64) & 2) == 0;
+}
 
-    mouseWait(1);
-    ports.outb(0x64, 0x20);
+fn canRead() bool {
+    return (ports.inb(0x64) & 1) != 0;
+}
 
-    var status = mouseRead();
-    _ = mouseRead();
-    status |= (1 << 1);
-    status &= ~@as(u8, 1 << 5);
-    mouseWait(1);
-    ports.outb(0x64, 0x60);
-    mouseWait(1);
-    ports.outb(0x60, status);
-    _ = mouseRead();
+const max_readwrite_attempts = 10000;
+const max_resend_attempts = 100;
 
-    mouse_write(0xFF);
-    _ = mouseRead();
+fn write(port: u16, value: u8) !void {
+    var counter: usize = 0;
+    while (counter < max_readwrite_attempts) : (counter += 1) {
+        if (canWrite()) {
+            return ports.outb(port, value);
+        }
+    }
 
-    mouse_write(0xF6);
-    _ = mouseRead();
+    os.log("PS2: Timeout while writing to port 0x{X}!\n", .{port});
+    return error.Timeout;
+}
 
-    mouse_write(0xF4);
-    _ = mouseRead();
+fn read() !u8 {
+    var counter: usize = 0;
+    while (counter < max_readwrite_attempts) : (counter += 1) {
+        if (canRead()) {
+            return ports.inb(0x60);
+        }
+    }
+
+    os.log("PS2: Timeout while reading!\n", .{});
+    return error.Timeout;
+}
+
+fn getConfigByte() !u8 {
+    try write(0x64, 0x20);
+    return read();
+}
+
+fn writeConfigByte(config_byte_value: u8) !void {
+    try write(0x64, 0x60);
+    try write(0x60, config_byte_value);
+}
+
+fn disableSecondaryPort() !void {
+    try write(0x64, 0xA7);
+}
+
+fn enableSecondaryPort() !void {
+    try write(0x64, 0xA8);
+}
+
+fn testSecondaryPort() !bool {
+    try write(0x64, 0xA9);
+    return portTest();
+}
+
+fn controllerSelfTest() !bool {
+    try write(0x64, 0xAA);
+    return 0x55 == try read();
+}
+
+fn testPrimaryPort() !bool {
+    try write(0x64, 0xAB);
+    return portTest();
+}
+
+fn disablePrimaryPort() !void {
+    try write(0x64, 0xAD);
+}
+
+fn enablePrimaryPort() !void {
+    try write(0x64, 0xAE);
+}
+
+const Device = enum {
+    primary,
+    secondary,
+};
+
+fn sendCommand(device: Device, command: u8) !void {
+    var resends: usize = 0;
+    while (resends < max_resend_attempts) : (resends += 1) {
+        if (device == .secondary) {
+            try write(0x64, 0xD4);
+        }
+        try write(0x60, command);
+        awaitAck() catch |err| {
+            switch (err) {
+                error.Resend => {
+                    os.log("PS2: Device requested command resend\n", .{});
+                    continue;
+                },
+                else => return err,
+            }
+        };
+        return;
+    }
+
+    return error.TooManyResends;
+}
+
+fn portTest() !bool {
+    switch (try read()) {
+        0x00 => return true, // Success
+        0x01 => os.log("PS2: Port test failed: Clock line stuck low\n", .{}),
+        0x02 => os.log("PS2: Port test failed: Clock line stuck high\n", .{}),
+        0x03 => os.log("PS2: Port test failed: Data line stuck low\n", .{}),
+        0x04 => os.log("PS2: Port test failed: Data line stuck high\n", .{}),
+        else => |result| os.log("PS2: Port test failed: Unknown reason (0x{X})\n", .{result}),
+    }
+
+    return false;
+}
+
+fn awaitAck() !void {
+    while (true) {
+        const v = read() catch |err| {
+            os.log("PS2: ACK read failed: {}!\n", .{err});
+            return err;
+        };
+
+        switch (v) {
+            // ACK
+            0xFA => return,
+
+            // Resend
+            0xFE => return error.Resend,
+
+            else => os.log("PS2: Got a different value: 0x{X}\n", .{v}),
+        }
+    }
+}
+
+fn finalizeDevice(device: Device) !void {
+    os.log("PS2: Enabling interrupts\n", .{});
+    var shift: u1 = 0;
+    if (device == .secondary) shift = 1;
+    try writeConfigByte((@as(u2, 1) << shift) | try getConfigByte());
+
+    os.log("PS2: Enabling scanning\n", .{});
+    try sendCommand(device, 0xF4);
+}
+
+fn initKeyboard(irq: u8, device: Device) !bool {
+    if (comptime (!config.kernel.x86_64.ps2.keyboard.enable))
+        return false;
+
+    if (kb_interrupt_gsi) |_|
+        return false;
+
+    kb_interrupt_vector = interrupts.allocate_vector();
+    interrupts.add_handler(kb_interrupt_vector, kbHandler, true, 3, 1);
+    kb_interrupt_gsi = apic.route_irq(0, irq, kb_interrupt_vector);
+
+    try finalizeDevice(device);
+
+    return true;
+}
+
+fn initMouse(irq: u8, device: Device) !bool {
+    if (comptime (!config.kernel.x86_64.ps2.mouse.enable))
+        return false;
+
+    if (mouse_interrupt_gsi) |_|
+        return false;
+
+    mouse_interrupt_vector = interrupts.allocate_vector();
+    interrupts.add_handler(mouse_interrupt_vector, mouseHandler, true, 3, 1);
+    mouse_interrupt_gsi = apic.route_irq(0, irq, mouse_interrupt_vector);
+
+    try finalizeDevice(device);
+
+    return true;
+}
+
+fn initDevice(irq: u8, device: Device) !bool {
+    os.log("PS2: Resetting device\n", .{});
+    try sendCommand(device, 0xFF);
+    if (0xAA != try read()) {
+        os.log("PS2: Device reset failed\n", .{});
+        return error.DeviceResetFailed;
+    }
+
+    os.log("PS2: Disabling scanning on device\n", .{});
+    try sendCommand(device, 0xF5);
+
+    os.log("PS2: Identifying device\n", .{});
+    try sendCommand(device, 0xF2);
+
+    const first = read() catch |err| {
+        switch (err) {
+            error.Timeout => {
+                os.log("PS2: No identity byte, assuming keyboard\n", .{});
+                return initKeyboard(irq, device);
+            },
+            else => return err,
+        }
+    };
+
+    switch (first) {
+        0x00 => {
+            os.log("PS2: Standard mouse\n", .{});
+            return initMouse(irq, device);
+        },
+        0x03 => {
+            os.log("PS2: Scrollwheel mouse\n", .{});
+            return initMouse(irq, device);
+        },
+        0x04 => {
+            os.log("PS2: 5-button mouse\n", .{});
+            return initMouse(irq, device);
+        },
+        0xAB => {
+            switch (try read()) {
+                0x41, 0xC1 => {
+                    os.log("PS2: MF2 keyboard with translation\n", .{});
+                    return initKeyboard(irq, device);
+                },
+                0x83 => {
+                    os.log("PS2: MF2 keyboard\n", .{});
+                    return initKeyboard(irq, device);
+                },
+                else => |wtf| {
+                    os.log("PS2: Identify: Unknown byte after 0xAB: 0x{X}\n", .{wtf});
+                },
+            }
+        },
+        else => {
+            os.log("PS2: Identify: Unknown first byte: 0x{X}\n", .{first});
+        },
+    }
+
+    return false;
+}
+
+pub fn initController() !void {
+    if (comptime (!(config.kernel.x86_64.ps2.mouse.enable or config.kernel.x86_64.ps2.keyboard.enable)))
+        return;
+
+    os.log("PS2: Disabling primary port\n", .{});
+    try disablePrimaryPort();
+
+    os.log("PS2: Disabling secondary port\n", .{});
+    try disableSecondaryPort();
+
+    os.log("PS2: Draining buffer\n", .{});
+
+    // Drain buffer
+    _ = ports.inb(0x60);
+
+    os.log("PS2: Setting up controller\n", .{});
+
+    // Disable interrupts, enable translation
+    const init_config_byte = (1 << 6) | (~@as(u8, 3) & try getConfigByte());
+
+    try writeConfigByte(init_config_byte);
+
+    if (!try controllerSelfTest()) {
+        os.log("PS2: Controller self-test failed!\n", .{});
+        return error.FailedSelfTest;
+    }
+
+    os.log("PS2: Controller self-test succeeded\n", .{});
+
+    // Sometimes the config value gets reset by the self-test, so we set it again
+    try writeConfigByte(init_config_byte);
+
+    var dual_channel = ((1 << 5) & init_config_byte) != 0;
+
+    if (dual_channel) {
+        // This may be a dual channel device if the secondary clock was
+        // disabled from disabling the secondary device
+        try enableSecondaryPort();
+        dual_channel = ((1 << 5) & try getConfigByte()) == 0;
+        try disableSecondaryPort();
+        if (!dual_channel) {
+            os.log("PS2: Not dual channel, determined late\n", .{});
+        }
+    } else {
+        os.log("PS2: Not dual channel, determined early\n", .{});
+    }
+
+    os.log("PS2: Detecting active ports, dual_channel = {}\n", .{dual_channel});
+
+    try enablePrimaryPort();
+
+    if (testPrimaryPort() catch false) {
+        os.log("PS2: Initializing primary port\n", .{});
+        try enablePrimaryPort();
+        if (!(initDevice(1, .primary) catch false)) {
+            try disablePrimaryPort();
+            os.log("PS2: Primary device init failed, disabled port\n", .{});
+        }
+    }
+
+    if (dual_channel and testSecondaryPort() catch false) {
+        os.log("PS2: Initializing secondary port\n", .{});
+        try enableSecondaryPort();
+        if (!(initDevice(12, .secondary) catch false)) {
+            try disableSecondaryPort();
+            os.log("PS2: Secondary device init failed, disabled port\n", .{});
+        }
+    }
+}
+
+pub fn init() void {
+    initController() catch |err| {
+        os.log("PS2: Error while initializing: {}\n", .{err});
+        if (@errorReturnTrace()) |trace| {
+            os.kernel.debug.dumpStackTrace(trace);
+        } else {
+            os.log("No error trace.\n", .{});
+        }
+    };
 }
