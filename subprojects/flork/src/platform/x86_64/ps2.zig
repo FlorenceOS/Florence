@@ -87,14 +87,14 @@ fn handle_keyboard_interrupt() void {
         error.UnknownKey => os.log("Unknown key!\n", .{}),
         else => {},
     };
-
-    eoi();
 }
 
 pub fn kb_handler(_: *os.platform.InterruptFrame) void {
     while (kb_has_byte()) {
         handle_keyboard_interrupt();
     }
+
+    eoi();
 }
 
 pub fn kb_init() void {
