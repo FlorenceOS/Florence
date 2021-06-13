@@ -745,6 +745,9 @@ fn controllerTask(abar: *volatile Abar) !void {
 }
 
 pub fn registerController(addr: platform.pci.Addr) void {
+    if (comptime (!config.drivers.block.ahci.enable))
+        return;
+
     // Busty master bit
     addr.command().write(addr.command().read() | 0x6);
 
