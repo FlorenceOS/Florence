@@ -139,11 +139,12 @@ pub fn await_interrupt() void {
 }
 
 pub fn debugputch(ch: u8) void {
-    ports.outb(0xe9, ch);
-    serial.port(1).write(ch);
-    serial.port(2).write(ch);
-    serial.port(3).write(ch);
-    serial.port(4).write(ch);
+    if (config.kernel.x86_64.e9.enable)
+        ports.outb(0xe9, ch);
+
+    inline for (config.kernel.x86_64.serial.enabled_ports) |port| {
+        serial.port(port).write(ch);
+    }
 }
 
 pub fn clock() usize {

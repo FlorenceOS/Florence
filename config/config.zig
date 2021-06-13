@@ -27,6 +27,20 @@ pub const kernel = .{
         .ps2 = .{
             .enable_keyboard = true,
         },
+
+        // Port E9 debug logging
+        .e9 = .{
+            .enable = true,
+        },
+
+        .serial = .{
+            .enabled_ports = [_]comptime_int{
+                //1,
+                //2,
+                //3,
+                //4,
+            },
+        },
     },
 
     // True if kernel should panic only once
