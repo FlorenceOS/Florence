@@ -108,7 +108,8 @@ pub const RangeAlloc = struct {
     by_size: SizeTree = SizeTree.init(.{}, {}),
 
     mutex: Mutex = .{},
-    materialize_bytes: fn (usize) anyerror![]u8,
+
+    backed: bool,
 
     fn dumpState(self: *@This()) void {
         if (!debug)
@@ -352,7 +353,10 @@ pub const RangeAlloc = struct {
             std.math.max(min_materialize_size, minBytes),
         );
         const result: Range = .{
-            .base = @ptrToInt((try self.materialize_bytes(size)).ptr),
+            .base = @ptrToInt(switch (self.backed) {
+                true => (try os.memory.vmm.sbrk(size)).ptr,
+                false => (try os.memory.vmm.sbrkNonbacked(size)).ptr,
+            }),
             .size = size,
         };
 

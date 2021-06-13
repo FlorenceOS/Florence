@@ -2,6 +2,7 @@ usingnamespace @import("root").preamble;
 
 const paging = os.memory.paging;
 const RangeAlloc = os.memory.range_alloc.RangeAlloc;
+const DebugAlloc = os.memory.debug_alloc.DebugAlloc;
 const Mutex = os.thread.Mutex;
 
 /// Describes the lifetime of the memory aquired from an allocator
@@ -19,18 +20,28 @@ var sbrk_head: usize = undefined;
 var sbrk_mutex = Mutex{};
 
 /// Range allocator for backed memory
-var range = RangeAlloc{ .materialize_bytes = sbrk };
+var backed_alloc = switch (config.kernel.heap_debug_allocator) {
+    true => DebugAlloc,
+    false => RangeAlloc,
+}{
+    .backed = true,
+};
 
 var ephemeral_alloc =
     std.heap.GeneralPurposeAllocator(.{
     .thread_safe = true,
     .MutexType = os.thread.Mutex,
 }){
-    .backing_allocator = &range.allocator,
+    .backing_allocator = &backed_alloc.allocator,
 };
 
 /// Range allocator for nonbacked memory
-pub var nonbacked_range = RangeAlloc{ .materialize_bytes = sbrkNonbacked };
+pub var nonbacked_alloc = switch (config.kernel.heap_debug_allocator) {
+    true => DebugAlloc,
+    false => RangeAlloc,
+}{
+    .backed = false,
+};
 
 pub fn init(phys_high: usize) !void {
     os.log("Initializing vmm with base 0x{X}\n", .{phys_high});
@@ -68,8 +79,13 @@ pub fn backed(
     lifetime: Lifetime,
 ) *std.mem.Allocator {
     switch (lifetime) {
-        .Ephemeral => return &ephemeral_alloc.allocator,
-        .Eternal => return &range.allocator,
+        .Ephemeral => {
+            if (comptime (config.kernel.heap_debug_allocator)) {
+                return &backed_alloc.allocator;
+            }
+            return &ephemeral_alloc.allocator;
+        },
+        .Eternal => return &backed_alloc.allocator,
     }
 }
 
@@ -78,7 +94,7 @@ pub fn backed(
 /// fault. The pointers into this memory cannot be dereferenced
 /// before mapping the memory to some physical memory.
 pub fn nonbacked() *std.mem.Allocator {
-    return &nonbacked_range.allocator;
+    return &nonbacked_alloc.allocator;
 }
 
 export fn laihost_malloc(sz: usize) ?*c_void {
