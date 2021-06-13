@@ -25,7 +25,9 @@ pub const kernel = .{
         // when you connect a usb keyboard. If you disable this,
         // that won't work.
         .ps2 = .{
-            .enable_keyboard = true,
+            .keyboard = .{
+                .enable = true,
+            },
         },
 
         // Port E9 debug logging
