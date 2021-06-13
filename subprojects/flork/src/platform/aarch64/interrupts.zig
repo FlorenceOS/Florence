@@ -309,7 +309,7 @@ export fn interrupt_handler(frame: *InterruptFrame) void {
             const present = (dfsc & 0b111100) != 0b000100;
 
             // addr: usize, present: bool, access: PageFaultAccess, frame: anytype
-            os.platform.page_fault(far, present, if (wnr == 1) .write else .Read, frame);
+            os.platform.page_fault(far, present, if (wnr == 1) .Write else .Read, frame);
         },
         0b00100001 => {
             // This could be an instruction fetch page fault if it's a prefetch abort
