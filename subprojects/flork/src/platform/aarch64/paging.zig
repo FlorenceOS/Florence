@@ -330,7 +330,10 @@ pub const PagingContext = struct {
 
     pub fn check_phys(self: *const @This(), phys: u64) void {
         if (comptime (std.debug.runtime_safety)) {
-            if (phys > self.max_phys) @panic("Physical address out of range");
+            if (phys > self.max_phys) {
+                os.log("Physaddr: 0x{X}\n", .{phys});
+                @panic("Physical address out of range");
+            }
         }
     }
 
