@@ -31,10 +31,39 @@ pub const kernel = .{
 
     // True if kernel should panic only once
     .panic_once = true,
+
+    .pci = .{
+        // Toggle for PCI bus enumeration and device discovery
+        .enable = true,
+    },
 };
 
-// Terminal font
-pub const font = assets.fonts.fixed_6x13;
+pub const drivers = .{
+    .block = .{
+        .ahci = .{
+            .enable = true,
+        },
+    },
+
+    .gpu = .{
+        .virtio_gpu = .{
+            .enable = true,
+        },
+    },
+
+    .misc = .{},
+
+    .output = .{
+        .vesa_log = .{
+            .enable = true,
+            .font = assets.fonts.fixed_6x13,
+        },
+
+        .vga_log = .{
+            .enable = true,
+        },
+    },
+};
 
 // Default keyboard layout
 pub const keyboard_layout = .en_US_QWERTY;

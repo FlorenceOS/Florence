@@ -123,7 +123,7 @@ pub const Updater = fn (
 ) void;
 pub const FBInfo = struct { width: u32, height: u32 };
 
-const font = config.font;
+const font = config.drivers.output.vesa_log.font;
 const bgcol = 0x20;
 const fgcol = 0xbf;
 const clear_screen = true;
@@ -155,7 +155,9 @@ pub fn getInfo() ?FBInfo {
     if (framebuffer) |fb| {
         var i = .{ .width = fb.width, .height = fb.height };
         return i;
-    } else return null;
+    }
+
+    return null;
 }
 
 pub fn setUpdater(u: Updater, ctx: usize) void {
@@ -177,6 +179,9 @@ pub fn registerFb(
     fb_height: u16,
     fb_bpp_in: u16,
 ) void {
+    if (comptime (!config.drivers.output.vesa_log.enable))
+        return;
+
     std.debug.assert(fb_bpp_in == 24 or fb_bpp_in == 32);
     const fb_bpp = fb_bpp_in / 8;
     const fb_size = @as(usize, fb_pitch) * @as(usize, fb_height);

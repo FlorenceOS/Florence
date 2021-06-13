@@ -419,16 +419,18 @@ export fn stivale2Main(info_in: *Info) noreturn {
     os.log("Doing framebuffer\n", .{});
 
     if (info.framebuffer) |fb| {
-        drivers.output.vesa_log.registerFb(
-            drivers.output.vesa_log.lfbUpdater,
-            fb.addr,
-            fb.pitch,
-            fb.width,
-            fb.height,
-            fb.bpp,
-        );
+        if (comptime (config.drivers.output.vesa_log.enable))
+            drivers.output.vesa_log.registerFb(
+                drivers.output.vesa_log.lfbUpdater,
+                fb.addr,
+                fb.pitch,
+                fb.width,
+                fb.height,
+                fb.bpp,
+            );
     } else {
-        drivers.output.vga_log.register();
+        if (comptime (config.drivers.output.vga_log.enable))
+            drivers.output.vga_log.register();
     }
 
     os.log("Doing scheduler\n", .{});

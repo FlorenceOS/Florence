@@ -41,25 +41,33 @@ fn feedLine() void {
 }
 
 pub fn register() void {
-    if (os.platform.arch == .x86_64) {
-        framebuffer = Framebuffer{};
-    }
+    if (comptime (os.platform.arch != .x86_64))
+        return;
+
+    if (comptime (!config.drivers.output.vga_log.enable))
+        return;
+
+    framebuffer = Framebuffer{};
 }
 
 pub fn putch(ch: u8) void {
-    if (os.platform.arch == .x86_64) {
-        if (framebuffer == null)
-            return;
+    if (comptime (os.platform.arch != .x86_64))
+        return;
 
-        if (ch == '\n') {
-            feedLine();
-            return;
-        }
+    if (comptime (!config.drivers.output.vga_log.enable))
+        return;
 
-        if (framebuffer.?.x_pos == 80)
-            feedLine();
+    if (framebuffer == null)
+        return;
 
-        buffer(u16)[(framebuffer.?.y_pos * 80 + framebuffer.?.x_pos)] = 0x0700 | @as(u16, ch);
-        framebuffer.?.x_pos += 1;
+    if (ch == '\n') {
+        feedLine();
+        return;
     }
+
+    if (framebuffer.?.x_pos == 80)
+        feedLine();
+
+    buffer(u16)[(framebuffer.?.y_pos * 80 + framebuffer.?.x_pos)] = 0x0700 | @as(u16, ch);
+    framebuffer.?.x_pos += 1;
 }

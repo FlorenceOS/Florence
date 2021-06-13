@@ -270,6 +270,9 @@ fn device_scan(bus: u8, device: u5) void {
 }
 
 fn bus_scan(bus: u8) void {
+    if(!config.kernel.pci.enable)
+        return;
+
     // We can't scan this bus
     if (!@hasDecl(os.platform, "pci_space") and pci_mmio[bus] == null)
         return;

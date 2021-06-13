@@ -247,6 +247,9 @@ fn updater(
 }
 
 pub fn registerController(addr: os.platform.pci.Addr) void {
+    if (comptime (!config.drivers.gpu.virtio_gpu.enable))
+        return;
+
     const alloc = os.memory.vmm.backed(.Eternal);
     const drv = alloc.create(Driver) catch {
         os.log("Virtio display controller: Allocation failure\n", .{});
@@ -256,6 +259,10 @@ pub fn registerController(addr: os.platform.pci.Addr) void {
         os.log("Virtio display controller: Init has failed!\n", .{});
         return;
     };
+
+    if (comptime (!config.drivers.output.vesa_log.enable))
+        return;
+
     if (os.drivers.output.vesa_log.getInfo()) |vesa| {
         drv.modeset(os.drivers.output.vesa_log.framebuffer.?.bb_phys, vesa.width, vesa.height);
         os.drivers.output.vesa_log.setUpdater(updater, @ptrToInt(drv));
