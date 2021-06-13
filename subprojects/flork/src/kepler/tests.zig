@@ -263,8 +263,8 @@ fn memoryObjectsTest(allocator: *std.mem.Allocator) !void {
     );
     os.log("Created memory object of size 0x10000!\n", .{});
     // Allocate space in non-paged pool
-    const fake_arr = try os.memory.vmm.nonbacked_range.allocator.allocFn(
-        &os.memory.vmm.nonbacked_range.allocator,
+    const fake_arr = try os.memory.vmm.nonbacked().allocFn(
+        os.memory.vmm.nonbacked(),
         0x10000,
         1,
         1,
@@ -312,8 +312,8 @@ fn memoryObjectsTest(allocator: *std.mem.Allocator) !void {
     test_obj.drop();
     os.log("Dropped memory object!\n", .{});
 
-    _ = os.memory.vmm.nonbacked_range.allocator.resizeFn(
-        &os.memory.vmm.nonbacked_range.allocator,
+    _ = os.memory.vmm.nonbacked().resizeFn(
+        os.memory.vmm.nonbacked(),
         fake_arr,
         1,
         0,
