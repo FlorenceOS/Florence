@@ -56,6 +56,9 @@ pub const kernel = .{
     // Never reuse any virtual address, unmap on free
     .heap_debug_allocator = false,
 
+    // If true, runs kepler tests after system initialization
+    .run_kepler_tests = true,
+
     .pci = .{
         // Toggle for PCI bus enumeration and device discovery
         .enable = true,

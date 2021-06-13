@@ -29,7 +29,9 @@ pub const lai = @cImport({
 
 pub fn kmain() noreturn {
     os.log("Hello, kmain!\n", .{});
-    os.vital(os.kepler.tests.run_tests(), "Kepler tests terminated with error");
+
+    if (config.kernel.run_kepler_tests)
+        os.vital(os.kepler.tests.run_tests(), "Kepler tests terminated with error");
 
     os.thread.scheduler.exit_task();
 }
