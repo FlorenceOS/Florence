@@ -246,34 +246,6 @@ fn mouseHandler(_: *os.platform.InterruptFrame) void {
     eoi();
 }
 
-fn mouseRead() u8 {
-    mouseWait(0);
-    return ports.inb(0x60);
-}
-
-fn mouse_write(value: u8) void {
-    mouseWait(1);
-    ports.outb(0x64, 0xD4);
-    mouseWait(1);
-    ports.outb(0x60, value);
-}
-
-fn mouseWait(comptime t: comptime_int) void {
-    var timeout: usize = 100000;
-
-    while (timeout != 0) : (timeout -= 1) {
-        switch (t) {
-            0 => {
-                if ((ports.inb(0x64) & (1 << 0)) != 0) return;
-            },
-            1 => {
-                if ((ports.inb(0x64) & (1 << 1)) == 0) return;
-            },
-            else => @compileError("Unknown wait method"),
-        }
-    }
-}
-
 fn canWrite() bool {
     return (ports.inb(0x64) & 2) == 0;
 }
