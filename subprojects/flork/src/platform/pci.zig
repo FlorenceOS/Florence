@@ -133,7 +133,7 @@ fn function_scan(addr: Addr) void {
                     os.log("Unknown storage controller!\n", .{});
                 },
                 0x06 => {
-                    os.log("SATA controller\n", .{});
+                    os.log("AHCI controller\n", .{});
                     os.drivers.block.ahci.registerController(addr);
                 },
             }
