@@ -440,9 +440,10 @@ export fn stivale2Main(info_in: *Info) noreturn {
     os.log("Doing SMP\n", .{});
 
     if (info.smp) |smp| {
-        const cpus = smp.get_writeback().get();
+        var cpus = smp.get_writeback().get();
 
         platform.smp.init(cpus.len);
+        cpus.len = platform.smp.cpus.len;
 
         const ap_init_stack_size = platform.thread.ap_init_stack_size;
 
