@@ -134,6 +134,9 @@ fn controllerTask(dev: os.platform.pci.Addr) !void {
 }
 
 pub fn registerController(dev: os.platform.pci.Addr) void {
+    if (comptime (!config.drivers.usb.xhci.enable))
+        return;
+
     dev.command().write(dev.command().read() | 0x6);
     os.vital(os.thread.scheduler.spawn_task(controllerTask, .{dev}), "Spawning XHCI controller task");
 }
