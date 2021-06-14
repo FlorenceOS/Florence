@@ -467,12 +467,12 @@ const TablePTE = struct {
     perms: os.memory.paging.Perms,
     underlying: ?*TableEncoding,
 
-    pub fn get_child_tables(self: *const @This()) []EncodedPTE {
+    pub fn get_children(self: *const @This()) []EncodedPTE {
         return os.platform.phys_slice(EncodedPTE).init(self.phys, 512).to_slice_writeback();
     }
 
     pub fn skip_to(self: *const @This(), virt: u64) []EncodedPTE {
-        return self.get_child_tables()[virt_index_at_level(virt, self.curr_level - 1)..];
+        return self.get_children()[virt_index_at_level(virt, self.curr_level - 1)..];
     }
 
     pub fn child_domain(self: *const @This(), virt: u64) os.platform.virt_slice {
