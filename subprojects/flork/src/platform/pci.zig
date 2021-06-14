@@ -136,6 +136,17 @@ fn function_scan(addr: Addr) void {
                     os.log("AHCI controller\n", .{});
                     os.drivers.block.ahci.registerController(addr);
                 },
+                0x08 => {
+                    switch (addr.prog_if().read()) {
+                        else => {
+                            os.log("Unknown non-volatile memory controller!\n", .{});
+                        },
+                        0x02 => {
+                            os.log("NVMe controller\n", .{});
+                            os.drivers.block.nvme.registerController(addr);
+                        },
+                    }
+                },
             }
         },
         0x02 => {

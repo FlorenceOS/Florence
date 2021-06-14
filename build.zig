@@ -6,6 +6,7 @@ const assert = std.debug.assert;
 const sabaton = @import("boot/Sabaton/build.zig");
 const flork = @import("subprojects/flork/build.zig");
 
+// zig fmt: off
 fn qemu_run_aarch64_sabaton(b: *Builder, board_name: []const u8, desc: []const u8) !void {
     const sabaton_blob = try sabaton.build_blob(b, .aarch64, board_name, "boot/Sabaton/");
 
@@ -124,6 +125,7 @@ fn limine_target(b: *Builder, command: []const u8, desc: []const u8, image_path:
     command_step.dependOn(&run_step.step);
 }
 
+// zig fmt: on
 pub fn build(b: *Builder) !void {
     // try qemu_run_aarch64_sabaton(
     //     b,
