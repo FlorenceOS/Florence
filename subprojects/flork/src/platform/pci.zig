@@ -212,6 +212,7 @@ fn function_scan(addr: Addr) void {
                         },
                         0x30 => {
                             os.log("USB3 XHCI controller\n", .{});
+                            os.drivers.usb.xhci.registerController(addr);
                         },
                     }
                 },

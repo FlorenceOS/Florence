@@ -90,6 +90,12 @@ pub const drivers = .{
             .enable = true,
         },
     },
+
+    .usb = .{
+        .xhci = .{
+            .enable = true,
+        },
+    },
 };
 
 // Default keyboard layout
