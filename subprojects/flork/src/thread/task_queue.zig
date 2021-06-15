@@ -65,7 +65,7 @@ pub const ReadyQueue = struct {
     }
 
     /// Try to dequeue task
-    pub fn try_dequeue(self: *@This()) ?*os.thread.Task {
+    pub fn tryDequeue(self: *@This()) ?*os.thread.Task {
         return self.queue.dequeue();
     }
 

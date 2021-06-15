@@ -26,11 +26,18 @@ pub const Task = struct {
     /// Top of the stack used by the task
     stack: usize = undefined,
 
-    /// Allocate stack for the task. Used in scheduler make_task routine
-    pub fn allocate_stack(self: *@This()) !void {
+    /// Allocate stack for the task. Used in scheduler makeTask routine
+    pub fn allocStack(self: *@This()) !void {
         // Allocate non-backing virtual memory
         const slice = (try nonbacked.allocFn(nonbacked, total_size, 1, 1, 0));
-        errdefer _ = nonbacked.resizeFn(nonbacked, slice, 1, 0, 1, 0) catch @panic("task alloc stack");
+        errdefer _ = nonbacked.resizeFn(
+            nonbacked,
+            slice,
+            1,
+            0,
+            1,
+            0,
+        ) catch @panic("task alloc stack");
         // Map pages
         const virt = @ptrToInt(slice.ptr);
         try os.memory.paging.map(.{
@@ -43,11 +50,22 @@ pub const Task = struct {
     }
 
     /// Free stack used by the task. Used in User Request Monitor on task termination
-    pub fn free_stack(self: *@This()) void {
+    pub fn freeStack(self: *@This()) void {
         const virt = self.stack - total_size;
         // Unmap stack pages
-        os.memory.paging.unmap(.{ .virt = virt + guard_size, .size = map_size, .reclaim_pages = true });
+        os.memory.paging.unmap(.{
+            .virt = virt + guard_size,
+            .size = map_size,
+            .reclaim_pages = true,
+        });
         // Free nonbacked memory
-        _ = nonbacked.resizeFn(nonbacked, @intToPtr([*]u8, virt)[0..total_size], 1, 0, 1, 0) catch @panic("task free stack");
+        _ = nonbacked.resizeFn(
+            nonbacked,
+            @intToPtr([*]u8, virt)[0..total_size],
+            1,
+            0,
+            1,
+            0,
+        ) catch @panic("task free stack");
     }
 };

@@ -20,7 +20,7 @@ pub const TaskData = struct {
     //tss: *Tss = undefined,
     syscall_stack: usize,
 
-    pub fn load_state(self: *@This()) void {
+    pub fn loadState(self: *@This()) void {
         const cpu = os.platform.thread.get_current_cpu();
         //self.tss.set_interrupt_stack(cpu.int_stack);
         //self.tss.set_scheduler_stack(cpu.sched_stack);

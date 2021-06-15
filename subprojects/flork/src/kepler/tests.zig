@@ -147,7 +147,7 @@ fn client_task(
     client_noteq.terminate();
 
     // Exit client task
-    os.thread.scheduler.exit_task();
+    os.thread.scheduler.exitTask();
 }
 
 fn notificationsStressTest(allocator: *std.mem.Allocator) !void {
@@ -163,7 +163,7 @@ fn notificationsStressTest(allocator: *std.mem.Allocator) !void {
     os.log("Created server endpoint!\n", .{});
 
     // Run client task separately
-    try os.thread.scheduler.spawn_task(client_task, .{ allocator, client_noteq, endpoint });
+    try os.thread.scheduler.spawnTask(client_task, .{ allocator, client_noteq, endpoint });
 
     // Launch server task inline
     try server_task(allocator, server_noteq);

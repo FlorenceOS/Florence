@@ -63,7 +63,7 @@ pub const CoreData = struct {
                 frame.* = task.registers;
                 task.paging_context.apply();
                 os.platform.set_current_task(task);
-                task.platform_data.load_state();
+                task.platform_data.loadState();
             }
         }.bootstrap;
         // Call bootstrap callback on a scheduler stack
