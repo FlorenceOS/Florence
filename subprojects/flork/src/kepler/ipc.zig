@@ -196,7 +196,7 @@ pub const NoteQueue = struct {
 
     /// Try to get a note from the queue
     pub fn tryRecv(self: *@This()) ?*Note {
-        retry: while (self.event.try_ack()) {
+        retry: while (self.event.tryAck()) {
             // Poll until we get the message
             while (true) {
                 const note = self.queue.dequeue() orelse continue;
@@ -222,7 +222,7 @@ pub const NoteQueue = struct {
         @atomicStore(State, &self.state, .Down, .Release);
         self.event.block();
         // Poll until we deallocate everything
-        while (self.event.try_ack()) {
+        while (self.event.tryAck()) {
             const note = self.queue.dequeue() orelse continue;
             note.drop();
         }

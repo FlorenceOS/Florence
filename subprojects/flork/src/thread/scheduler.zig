@@ -11,13 +11,13 @@ var balancer_lock = os.thread.Spinlock{};
 /// NOTE: Should be called in interrupt disabled context if its
 /// not the last time task runs
 pub fn wait() void {
-    const wait_callback = struct {
-        fn wait_callback(frame: *os.platform.InterruptFrame, _: usize) void {
-            os.thread.preemption.store_current_state(frame);
-            os.thread.preemption.await_task_and_yield(frame);
+    const waitCallback = struct {
+        fn waitCallback(frame: *os.platform.InterruptFrame, _: usize) void {
+            os.thread.preemption.saveCurrentState(frame);
+            os.thread.preemption.awaitForTaskAndYield(frame);
         }
-    }.wait_callback;
-    os.platform.sched_call(wait_callback, undefined);
+    }.waitCallback;
+    os.platform.sched_call(waitCallback, undefined);
 }
 
 /// Terminate current task to never run it again
@@ -41,12 +41,12 @@ pub fn wake(task: *os.thread.Task) void {
 
 /// Create a new task that calls a function with given arguments.
 /// Uses heap, so don't create tasks in interrupt context
-pub fn make_task(func: anytype, args: anytype) !*os.thread.Task {
+pub fn makeTask(func: anytype, args: anytype) !*os.thread.Task {
     const task = try task_alloc.create(os.thread.Task);
     errdefer task_alloc.destroy(task);
 
-    try task.allocate_stack();
-    errdefer task.free_stack();
+    try task.allocStack();
+    errdefer task.freeStack();
 
     task.paging_context = os.platform.get_current_task().paging_context;
     // Find the best CPU for the task
@@ -79,14 +79,14 @@ pub fn make_task(func: anytype, args: anytype) !*os.thread.Task {
 }
 
 /// Create and start a new task that calls a function with given arguments.
-pub fn spawn_task(func: anytype, args: anytype) !void {
-    const task = try make_task(func, args);
+pub fn spawnTask(func: anytype, args: anytype) !void {
+    const task = try makeTask(func, args);
     os.platform.smp.cpus[task.allocated_core_id].executable_tasks.enqueue(task);
 }
 
 /// Exit current task
 /// TODO: Should be reimplemented with URM
-pub fn exit_task() noreturn {
+pub fn exitTask() noreturn {
     const task = os.platform.thread.self_exited();
     const id = if (task) |t| t.allocated_core_id else 0;
 

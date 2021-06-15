@@ -18,22 +18,31 @@ pub const NewTaskEntry = struct {
             args: Args,
 
             /// Error guard
-            fn calL_with_error_guard(self: *@This()) !void {
+            fn callWithErrorGuard(self: *@This()) !void {
                 return @call(.{}, self.function, self.args);
             }
 
             /// Implementation of invoke
             fn invoke(entry: *NewTaskEntry) noreturn {
                 const self = @fieldParentPtr(@This(), "entry", entry);
-                self.calL_with_error_guard() catch |err| {
+                self.callWithErrorGuard() catch |err| {
                     os.log("Task has finished with error {s}\n", .{@errorName(err)});
                 };
-                os.thread.scheduler.exit_task();
+                os.thread.scheduler.exitTask();
             }
 
             /// Creates Wrapper on the stack
-            fn create(function: anytype, arguments: anytype, boot_stack_top: usize, boot_stack_bottom: usize) *@This() {
-                const addr = libalign.alignDown(usize, @alignOf(@This()), boot_stack_top - @sizeOf(@This()));
+            fn create(
+                function: anytype,
+                arguments: anytype,
+                boot_stack_top: usize,
+                boot_stack_bottom: usize,
+            ) *@This() {
+                const addr = libalign.alignDown(
+                    usize,
+                    @alignOf(@This()),
+                    boot_stack_top - @sizeOf(@This()),
+                );
                 std.debug.assert(addr > boot_stack_bottom);
                 const wrapper_ptr = @intToPtr(*@This(), addr);
                 wrapper_ptr.* = .{

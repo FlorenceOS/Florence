@@ -1,8 +1,8 @@
 usingnamespace @import("root").preamble;
 
-/// Mutex is lock that should be used for synchronizing operations
-/// that may take too long and/or can't be run in interrupt disabled context
-/// (e.g. you need to use it if you allocate memory in locked section)
+/// Mutex is lock that should be used for synchronizing operations that may take too long and/or
+/// can't be run in interrupt disabled context (e.g. you need to use it if you allocate memory
+/// in locked section)
 pub const Mutex = struct {
     /// Thread that holds the mutex
     held_by: ?*os.thread.Task = null,
@@ -44,7 +44,7 @@ pub const Mutex = struct {
     /// Unlock mutex.
     pub fn unlock(self: *@This()) void {
         const lock_state = self.spinlock.lock();
-        std.debug.assert(self.held_by_me());
+        std.debug.assert(self.heldByMe());
         if (self.queue.dequeue()) |task| {
             @atomicStore(?*os.thread.Task, &self.held_by, task, .Release);
             os.thread.scheduler.wake(task);
@@ -55,7 +55,8 @@ pub const Mutex = struct {
     }
 
     /// Check if mutex is held by current task
-    pub fn held_by_me(self: *const @This()) bool {
-        return @atomicLoad(?*os.thread.Task, &self.held_by, .Acquire) == os.platform.get_current_task();
+    pub fn heldByMe(self: *const @This()) bool {
+        const current_task = os.platform.get_current_task();
+        return @atomicLoad(?*os.thread.Task, &self.held_by, .Acquire) == current_task;
     }
 };

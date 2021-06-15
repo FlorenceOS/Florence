@@ -29,7 +29,7 @@ pub fn set_current_cpu(ptr: *os.platform.smp.CoreData) void {
 }
 
 pub const TaskData = struct {
-    pub fn load_state(self: *@This()) void {
+    pub fn loadState(self: *@This()) void {
         const cpu = os.platform.thread.get_current_cpu();
     }
 };

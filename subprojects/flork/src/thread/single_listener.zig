@@ -15,7 +15,7 @@ pub const SingleListener = struct {
     /// Pointer to the waiting task
     thread: *os.thread.Task = undefined,
     /// True if thread can be woken up
-    wakeup_allowed: bool = false,
+    asleep: bool = false,
 
     /// Get the number of not acknowledged events
     pub fn diff(self: *const @This()) usize {
@@ -27,7 +27,7 @@ pub const SingleListener = struct {
     }
 
     /// Aknowledge one event if present
-    pub fn try_ack(self: *@This()) bool {
+    pub fn tryAck(self: *@This()) bool {
         if (self.diff() > 0) {
             self.last_ack += 1;
             return true;
@@ -54,18 +54,17 @@ pub const SingleListener = struct {
         const handler = struct {
             fn handler(frame: *os.platform.InterruptFrame, ctx: usize) void {
                 // Get point to the queue passed as context pointer
-                const listener = @intToPtr(*SingleListener, ctx);
+                const this = @intToPtr(*SingleListener, ctx);
                 // Save state of the current task
-                os.thread.preemption.store_current_state(frame);
-                //os.log("Current state preserved!\n", .{});
+                os.thread.preemption.saveCurrentState(frame);
                 // Enable wakeup. After this point, task can be enqueued any minute
-                @atomicStore(bool, &listener.wakeup_allowed, true, .SeqCst);
+                @atomicStore(bool, &this.asleep, true, .SeqCst);
                 // Check if there are any events
-                if (listener.diff() != 0) {
-                    // If there are some events, we race with trigger()
-                    // (in a safe way of course) by doing CAS on thread member
-                    const result = @cmpxchgStrong(bool, &listener.wakeup_allowed, true, false, .AcqRel, .Acquire);
-                    if (result == null) {
+                if (this.diff() != 0) {
+                    // If there are some events, we race with trigger() (in a safe way of course)
+                    // by doing CAS on thread member
+                    const res = @cmpxchgStrong(bool, &this.asleep, true, false, .AcqRel, .Acquire);
+                    if (res == null) {
                         // We got to wake thread up. Simply return, since frame is in a well-defined
                         // state
                         return;
@@ -73,7 +72,7 @@ pub const SingleListener = struct {
                 }
                 // If we are here, it is not worth waking up the thread or
                 // someone else did it for us. Just sit waiting for the next task
-                os.thread.preemption.await_task_and_yield(frame);
+                os.thread.preemption.awaitForTaskAndYield(frame);
             }
         }.handler;
         os.platform.sched_call(handler, @ptrToInt(self));
@@ -89,10 +88,10 @@ pub const SingleListener = struct {
     pub fn trigger(self: *@This()) bool {
         const ticket = @atomicRmw(usize, &self.last_triggered, .Add, 1, .AcqRel);
         if (self.diff() != 0) {
-            // We don't care if last_triggered is greater than BLOCK_VAL
-            // since at this point wakeup_allowed would be false anyway
-            const result = @cmpxchgStrong(bool, &self.wakeup_allowed, true, false, .AcqRel, .Acquire);
-            if (result == null) {
+            // We don't care if last_triggered is greater than BLOCK_VAL since at this point
+            // asleep would be false anyway
+            const res = @cmpxchgStrong(bool, &self.asleep, true, false, .AcqRel, .Acquire);
+            if (res == null) {
                 os.thread.scheduler.wake(self.thread);
             }
         }
