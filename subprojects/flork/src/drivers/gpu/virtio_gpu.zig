@@ -6,9 +6,7 @@ const virtio_pci = os.drivers.misc.virtio_pci;
 const Driver = struct {
     transport: virtio_pci.Driver,
     inflight: u32 = 0,
-    pitch: u32 = 0,
-    width: u32 = 0,
-    height: u32 = 0,
+    display_region: lib.graphics.image_region.ImageRegion = undefined,
 
     // Initialize the virtio transport, but don't change modes
     pub fn init(pciaddr: os.platform.pci.Addr) !Driver {
@@ -17,11 +15,18 @@ const Driver = struct {
         return d;
     }
 
+    fn invalidateRectFunc(region: *lib.graphics.image_region.ImageRegion, x: usize, y: usize, width: usize, height: usize) void {
+        const self = @fieldParentPtr(Driver, "display_region", region);
+        self.updateRect(0, .{
+            .x = @intCast(u32, x),
+            .y = @intCast(u32, y),
+            .width = @intCast(u32, width),
+            .height = @intCast(u32, height),
+        });
+    }
+
     // Do a modeswitch to the described mode
-    pub fn modeset(self: *Driver, addr: u64, width: u32, height: u32) void {
-        self.pitch = width * 4;
-        self.width = width;
-        self.height = height;
+    pub fn modeset(self: *Driver, phys: usize) void {
         var iter = self.transport.iter(0);
         {
             var msg: ResourceCreate2D = .{
@@ -33,8 +38,8 @@ const Driver = struct {
                 },
                 .resid = 1,
                 .format = 1,
-                .width = width,
-                .height = height,
+                .width = @intCast(u32, self.display_region.width),
+                .height = @intCast(u32, self.display_region.height),
             };
             var resp: ConfHdr = undefined;
             iter.begin();
@@ -54,7 +59,10 @@ const Driver = struct {
                 .resid = 1,
                 .entrynum = 1,
             };
-            var msg1: ResourceAttachBackingEntry = .{ .addr = addr, .len = width * height * 4 };
+            var msg1: ResourceAttachBackingEntry = .{
+                .addr = phys,
+                .len = @intCast(u32, self.display_region.width) * @intCast(u32, self.display_region.height) * 4,
+            };
             var resp: ConfHdr = undefined;
             iter.begin();
             iter.put(&msg, @sizeOf(ResourceAttachBacking), virtio_pci.vring_desc_flag_next);
@@ -73,7 +81,12 @@ const Driver = struct {
                 },
                 .resid = 1,
                 .scanid = 0,
-                .rect = .{ .x = 0, .y = 0, .width = width, .height = height },
+                .rect = .{
+                    .x = 0,
+                    .y = 0,
+                    .width = @intCast(u32, self.display_region.width),
+                    .height = @intCast(u32, self.display_region.height),
+                },
             };
             var resp: ConfHdr = undefined;
             iter.begin();
@@ -84,8 +97,6 @@ const Driver = struct {
 
         self.transport.start(0);
         self.wait();
-
-        self.updateRect(0, .{ .x = 0, .y = 0, .width = width, .height = height });
     }
 
     /// Update *only* the rectangle
@@ -263,15 +274,26 @@ pub fn registerController(addr: os.platform.pci.Addr) void {
     if (comptime (!config.drivers.output.vesa_log.enable))
         return;
 
-    if (os.drivers.output.vesa_log.getInfo()) |vesa| {
-        drv.modeset(os.drivers.output.vesa_log.framebuffer.?.bb_phys, vesa.width, vesa.height);
-        os.drivers.output.vesa_log.setUpdater(updater, @ptrToInt(drv));
-        os.log("Virtio display controller: Initialized with preexisting fb\n", .{});
-    } else {
-        os.drivers.output.vesa_log.registerFb(updater, @ptrToInt(drv), 800 * 4, 800, 600, 32);
-        drv.modeset(os.drivers.output.vesa_log.getBackbufferPhys(), 800, 600);
-        os.log("Virtio display controller: Initialized\n", .{});
-    }
+    // @TODO: Get the actual screen resolution
+    const res = config.drivers.gpu.virtio_gpu.default_resolution;
+
+    const num_bytes = res.width * res.height * 4;
+
+    const phys = os.memory.pmm.allocPhys(num_bytes) catch return;
+    errdefer os.memory.pmm.freePhys(phys, num_bytes);
+
+    drv.display_region = .{
+        .bytes = os.platform.phys_ptr([*]u8).from_int(phys).get_writeback()[0..num_bytes],
+        .pitch = res.width * 4,
+        .width = res.width,
+        .height = res.height,
+        .invalidateRectFunc = Driver.invalidateRectFunc,
+        .pixel_format = .rgbx,
+    };
+
+    drv.modeset(phys);
+
+    os.drivers.output.vesa_log.use(&drv.display_region);
 }
 
 /// General callback on an interrupt, context is a pointer to a Driver structure

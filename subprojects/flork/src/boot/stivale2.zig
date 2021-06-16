@@ -7,6 +7,8 @@ const drivers = os.drivers;
 const libalign = lib.util.libalign;
 const builtin = std.builtin;
 
+var display: os.drivers.output.single_mode_display.SingleModeDisplay = undefined;
+
 const MemmapEntry = packed struct {
     base: u64,
     length: u64,
@@ -364,6 +366,23 @@ export fn stivale2Main(info_in: *Info) noreturn {
         os.log("Stivale2: Registered status UART\n", .{});
     }
 
+    os.log("Doing framebuffer\n", .{});
+
+    if (info.framebuffer) |fb| {
+        const ptr = os.platform.phys_ptr([*]u8).from_int(fb.addr).get_writeback();
+        display.init(
+            ptr[0 .. @as(usize, fb.height) * @as(usize, fb.pitch)],
+            fb.width,
+            fb.height,
+            fb.pitch,
+            if (fb.bpp == 32) .rgbx else .rgb,
+            null, // No invalidation needed for stivale2 framebuffer
+        );
+        drivers.output.vesa_log.use(&display.context.region);
+    } else {
+        drivers.output.vga_log.register();
+    }
+
     os.log(
         \\Bootloader: {s}
         \\Bootloader version: {s}
@@ -415,23 +434,6 @@ export fn stivale2Main(info_in: *Info) noreturn {
     const heap_base = memory.paging.kernel_context.make_heap_base();
 
     os.vital(memory.vmm.init(heap_base), "initializing vmm");
-
-    os.log("Doing framebuffer\n", .{});
-
-    if (info.framebuffer) |fb| {
-        if (comptime (config.drivers.output.vesa_log.enable))
-            drivers.output.vesa_log.registerFb(
-                drivers.output.vesa_log.lfbUpdater,
-                fb.addr,
-                fb.pitch,
-                fb.width,
-                fb.height,
-                fb.bpp,
-            );
-    } else {
-        if (comptime (config.drivers.output.vga_log.enable))
-            drivers.output.vga_log.register();
-    }
 
     os.log("Doing scheduler\n", .{});
 

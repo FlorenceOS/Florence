@@ -60,6 +60,9 @@ fn printString(str: []const u8) !void {
 }
 
 fn putch(ch: u8) void {
+    if (ch == 0)
+        return;
+
     platform.putch(ch);
     mmio_serial.putch(ch);
     vesa_log.putch(ch);
