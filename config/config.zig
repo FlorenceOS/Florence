@@ -75,6 +75,11 @@ pub const drivers = .{
     .gpu = .{
         .virtio_gpu = .{
             .enable = true,
+
+            .default_resolution = .{
+                .width = 1280,
+                .height = 720,
+            },
         },
     },
 
@@ -83,7 +88,18 @@ pub const drivers = .{
     .output = .{
         .vesa_log = .{
             .enable = true,
+
             .font = assets.fonts.fixed_6x13,
+            .background = .{
+                .red = 0x20,
+                .green = 0x20,
+                .blue = 0x20,
+            },
+            .foreground = .{
+                .red = 0xbf,
+                .green = 0xbf,
+                .blue = 0xbf,
+            },
         },
 
         .vga_log = .{
