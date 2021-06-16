@@ -70,6 +70,9 @@ pub const drivers = .{
         .ahci = .{
             .enable = true,
         },
+        .nvme = .{
+            .enable = true,
+        },
     },
 
     .gpu = .{
