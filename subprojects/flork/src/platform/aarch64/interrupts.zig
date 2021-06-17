@@ -197,7 +197,7 @@ export fn interrupt_sched_stack() callconv(.Naked) void {
         \\
         \\B handle_interrupt_on_stack
         :
-        : [sched_stack_offset] "i" (@as(usize, @byteOffsetOf(os.platform.smp.CoreData, "sched_stack")))
+        : [sched_stack_offset] "i" (@as(usize, @offsetOf(os.platform.smp.CoreData, "sched_stack")))
     );
     unreachable;
 }
@@ -213,8 +213,8 @@ export fn interrupt_syscall_stack() callconv(.Naked) void {
         \\
         \\B handle_interrupt_on_stack
         :
-        : [task_offset] "i" (@as(usize, @byteOffsetOf(os.platform.smp.CoreData, "current_task"))),
-          [syscall_stack_offset] "i" (@as(usize, @byteOffsetOf(os.thread.Task, "stack")))
+        : [task_offset] "i" (@as(usize, @offsetOf(os.platform.smp.CoreData, "current_task"))),
+          [syscall_stack_offset] "i" (@as(usize, @offsetOf(os.thread.Task, "stack")))
     );
     unreachable;
 }

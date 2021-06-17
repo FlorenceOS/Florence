@@ -15,6 +15,8 @@ fn qemu_run_aarch64_sabaton(b: *Builder, board_name: []const u8, desc: []const u
         .arch = .aarch64,
     });
 
+    const kernel_path = b.getInstallPath(kernel_step.install_step.?.dest_dir, kernel_step.out_filename);
+
     const command_step = b.step(board_name, desc);
 
     const params = &[_][]const u8 {
@@ -22,7 +24,7 @@ fn qemu_run_aarch64_sabaton(b: *Builder, board_name: []const u8, desc: []const u
         "-M", board_name, 
         "-cpu", "cortex-a57",
         "-drive", b.fmt("if=pflash,format=raw,file={s},readonly=on", .{sabaton_blob.output_path}),
-        "-fw_cfg", b.fmt("opt/Sabaton/kernel,file={s}", .{kernel_step.getOutputPath()}),
+        "-fw_cfg", b.fmt("opt/Sabaton/kernel,file={s}", .{kernel_path}),
         "-m", "4G",
         "-serial", "stdio",
         //"-S", "-s",
@@ -34,19 +36,21 @@ fn qemu_run_aarch64_sabaton(b: *Builder, board_name: []const u8, desc: []const u
 
     const run_step = b.addSystemCommand(params);
     run_step.step.dependOn(&sabaton_blob.step);
-    run_step.step.dependOn(&kernel_step.step);
+    run_step.step.dependOn(&kernel_step.install_step.?.step);
     command_step.dependOn(&run_step.step);
 }
 
 fn qemu_run_riscv_sabaton(b: *Builder, board_name: []const u8, desc: []const u8, dep: *std.build.LibExeObjStep) void {
     const command_step = b.step(board_name, desc);
 
+    const kernel_path = b.getInstallPath(kernel_stepdep.install_step.?.dest_dir, dep.out_filename);
+
     const params = &[_][]const u8{
         "qemu-system-riscv64",
         "-M", board_name,
         "-cpu", "rv64",
         "-drive", b.fmt("if=pflash,format=raw,file=Sabaton/out/riscv64_{s}.bin,readonly=on", .{board_name}),
-        "-drive", b.fmt("if=pflash,format=raw,file={s},readonly=on", .{dep.getOutputPath()}),
+        "-drive", b.fmt("if=pflash,format=raw,file={s},readonly=on", .{kernel_path}),
         "-m", "4G",
         "-serial", "stdio",
         //"-S", "-s",
@@ -57,12 +61,12 @@ fn qemu_run_riscv_sabaton(b: *Builder, board_name: []const u8, desc: []const u8,
 
     const pad_step = b.addSystemCommand(
         &[_][]const u8{
-            "truncate", "-s", "64M", dep.getOutputPath(),
+            "truncate", "-s", "64M", kernel_path,
         },
     );
 
     const run_step = b.addSystemCommand(params);
-    pad_step.step.dependOn(&dep.step);
+    pad_step.step.dependOn(&dep.install_step.?.step);
     run_step.step.dependOn(&pad_step.step);
     command_step.dependOn(&run_step.step);
 }
@@ -112,7 +116,10 @@ fn limine_target(b: *Builder, command: []const u8, desc: []const u8, image_path:
 
     const command_step = b.step(command, desc);
     const run_step = qemu_run_image_x86_64(b, image_path);
-    const image_step = echfs_image(b, image_path, dep.getOutputPath(), std.mem.concat(b.allocator, u8, &[_][]const u8{
+
+    const kernel_path = b.getInstallPath(dep.install_step.?.dest_dir, dep.out_filename);
+
+    const image_step = echfs_image(b, image_path, kernel_path, std.mem.concat(b.allocator, u8, &[_][]const u8{
         "make -C boot/limine limine-install && ",
         "make -C boot/echfs && ",
         "./boot/echfs/echfs-utils -m -p0 ", image_path, " import ", root_path, "/limine.cfg limine.cfg && ",
@@ -120,7 +127,7 @@ fn limine_target(b: *Builder, command: []const u8, desc: []const u8, image_path:
         image_path,
     }) catch unreachable);
 
-    image_step.step.dependOn(&dep.step);
+    image_step.step.dependOn(&dep.install_step.?.step);
     run_step.step.dependOn(&image_step.step);
     command_step.dependOn(&run_step.step);
 }

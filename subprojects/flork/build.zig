@@ -42,7 +42,7 @@ pub fn buildKernel(params: struct {
         proto,
         @tagName(arch),
     }));
-    kernel.setLinkerScriptPath(flork_path ++ "src/kernel/kernel.ld");
+    kernel.setLinkerScriptPath(.{ .path = flork_path ++ "src/kernel/kernel.ld" });
 
     const laipath = flork_path ++ "src/extern/lai/";
     kernel.addIncludeDir(laipath ++ "include/");

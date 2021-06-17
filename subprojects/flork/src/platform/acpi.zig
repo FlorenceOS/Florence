@@ -104,8 +104,8 @@ const FADT = packed struct {
 };
 
 comptime {
-    std.debug.assert(@byteOffsetOf(FADT, "dsdt") == 40);
-    std.debug.assert(@byteOffsetOf(FADT, "x_dsdt") == 140);
+    std.debug.assert(@offsetOf(FADT, "dsdt") == 40);
+    std.debug.assert(@offsetOf(FADT, "x_dsdt") == 140);
 }
 
 const lai = os.kernel.lai;

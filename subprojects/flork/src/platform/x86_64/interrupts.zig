@@ -292,10 +292,10 @@ fn push_reg(comptime regnum: u3) [1]u8 {
 
 // Assumes IA32_FMASK (0xC0000084) disables interrupts
 const rsp_stash_offset =
-    @byteOffsetOf(os.platform.smp.CoreData, "platform_data") +
-    @byteOffsetOf(os.platform.thread.CoreData, "rsp_stash");
-const task_offset = @byteOffsetOf(os.platform.smp.CoreData, "current_task");
-const kernel_stack_offset = @byteOffsetOf(os.thread.Task, "stack");
+    @offsetOf(os.platform.smp.CoreData, "platform_data") +
+    @offsetOf(os.platform.thread.CoreData, "rsp_stash");
+const task_offset = @offsetOf(os.platform.smp.CoreData, "current_task");
+const kernel_stack_offset = @offsetOf(os.thread.Task, "stack");
 
 const syscall_handler_bytes = [0]u8{}
 // First make sure we get a proper stack pointer while

@@ -272,11 +272,11 @@ const RecvFis = struct {
 };
 
 comptime {
-    std.debug.assert(@byteOffsetOf(RecvFis, "dma_setup") == 0);
-    std.debug.assert(@byteOffsetOf(RecvFis, "pio_setup") == 0x20);
-    std.debug.assert(@byteOffsetOf(RecvFis, "d2h_register") == 0x40);
-    std.debug.assert(@byteOffsetOf(RecvFis, "set_device_bits") == 0x58);
-    std.debug.assert(@byteOffsetOf(RecvFis, "unknown_fis") == 0x60);
+    std.debug.assert(@offsetOf(RecvFis, "dma_setup") == 0);
+    std.debug.assert(@offsetOf(RecvFis, "pio_setup") == 0x20);
+    std.debug.assert(@offsetOf(RecvFis, "d2h_register") == 0x40);
+    std.debug.assert(@offsetOf(RecvFis, "set_device_bits") == 0x58);
+    std.debug.assert(@offsetOf(RecvFis, "unknown_fis") == 0x60);
     std.debug.assert(@sizeOf(RecvFis) == 0x100);
 }
 
@@ -313,7 +313,7 @@ const FisH2D = packed struct {
 };
 
 comptime {
-    std.debug.assert(@byteOffsetOf(FisH2D, "command") == 2);
+    std.debug.assert(@offsetOf(FisH2D, "command") == 2);
 }
 
 const CommandFis = extern union {
