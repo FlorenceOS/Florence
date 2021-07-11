@@ -181,7 +181,7 @@ pub const ImageRegion = struct {
 
                     curr_x += 1;
 
-                    if (curr_x < width)
+                    if (curr_x == width)
                         break;
 
                     target_pixels = target_pixels[comptime fmt.bytesPerPixel()..];
