@@ -266,10 +266,12 @@ pub fn registerController(addr: os.platform.pci.Addr) void {
         os.log("Virtio display controller: Allocation failure\n", .{});
         return;
     };
+    errdefer alloc.destroy(drv);
     drv.* = Driver.init(addr) catch {
         os.log("Virtio display controller: Init has failed!\n", .{});
         return;
     };
+    errdefer drv.deinit();
 
     if (comptime (!config.drivers.output.vesa_log.enable))
         return;
