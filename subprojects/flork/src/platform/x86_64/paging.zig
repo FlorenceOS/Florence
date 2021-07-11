@@ -172,6 +172,25 @@ pub const PagingContext = struct {
 
         const pt = try make_page_table();
 
+        {
+            // Initialize top half with tables
+            const root = TablePTE{
+                .phys = pt,
+                .curr_level = if (curr.level5paging) 5 else 4,
+                .context = curr,
+                .perms = os.memory.paging.rwx(),
+                .underlying = null,
+            };
+
+            for (root.get_children()[256..]) |*child| {
+                _ = try root.make_child_table(child, .{
+                    .userspace = false,
+                    .writable = true,
+                    .executable = true,
+                });
+            }
+        }
+
         // 32TB ought to be enough for anyone...
         const max_phys = 0x200000000000;
 
@@ -186,6 +205,37 @@ pub const PagingContext = struct {
             .uc_virt_base = curr_base + max_phys * 2,
             .max_phys = max_phys,
         };
+    }
+
+    pub fn make_userspace() !@This() {
+        const curr_kernel = &os.memory.paging.kernel_context;
+        var result = curr_kernel.*;
+
+        const pt = try make_page_table();
+        result.cr3_val = pt;
+        errdefer result.deinit();
+
+        {
+            // Initialize top half with tables
+            const root = TablePTE{
+                .phys = pt,
+                .curr_level = if (curr_kernel.level5paging) 5 else 4,
+                .context = &result,
+                .perms = os.memory.paging.rwx(),
+                .underlying = null,
+            };
+
+            const kernel_root = curr_kernel.root_table(0).get_children();
+
+            // Copy higher half into the page table
+            std.mem.copy(u64, root.get_children()[256..], kernel_root[256..]);
+        }
+
+        return result;
+    }
+
+    pub fn deinit(self: *@This()) void {
+        os.log("TODO: PagingContext deinit\n", .{});
     }
 
     pub fn can_map_at_level(self: *const @This(), level: LevelType) bool {
