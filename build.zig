@@ -31,7 +31,6 @@ fn qemu_run_aarch64_sabaton(b: *Builder, board_name: []const u8, desc: []const u
         "-smp", "4",
         "-device", "virtio-gpu-pci",
         "-device", "ramfb",
-        "-display", "gtk,zoom-to-fit=off",
     };
 
     const run_step = b.addSystemCommand(params);
@@ -79,13 +78,11 @@ fn qemu_run_image_x86_64(b: *Builder, image_path: []const u8) *std.build.RunStep
         "-vga", "virtio",
         //"-serial", "stdio",
         "-m", "4G",
-        "-display", "gtk,zoom-to-fit=off",
         "-no-reboot",
         "-no-shutdown",
-        "-machine", "q35",
+        "-machine", "q35,accel=kvm:whpx:tcg",
         "-device", "qemu-xhci",
         "-smp", "8",
-        "-cpu", "host", "-enable-kvm",
         //"-d", "int",
         //"-s", "-S",
         //"-trace", "ahci_*",
@@ -99,16 +96,17 @@ fn universal_x86_64_image(b: *Builder, image_path: []const u8, kernel_path: []co
     const image_params = &[_][]const u8{
         "/bin/sh", "-c",
         std.mem.concat(b.allocator, u8, &[_][]const u8{
+            "make -C boot/limine-bin install PREFIX=/usr/local/var/florence-limine && ",
             "mkdir -p ", image_dir, " && ",
-            "install -t ", image_dir, " ./boot/stivale2_image/limine.cfg ",
-              "/usr/local/florence-limine/share/limine/limine{.sys,-cd.bin,-eltorito-efi.bin} ",
-            "&&",
+            "install -vC ./boot/stivale2_image/limine.cfg ",
+              "/usr/local/var/florence-limine/share/limine/limine{.sys,-cd.bin,-eltorito-efi.bin} ",
+            image_dir, " &&",
             "cp ", kernel_path, " ", image_dir, "/flork.elf && ",
             "xorriso -as mkisofs -b limine-cd.bin -no-emul-boot -boot-load-size 4 ",
               "-boot-info-table -part_like_isohybrid -eltorito-alt-boot -e limine-eltorito-efi.bin ",
               "-no-emul-boot -isohybrid-gpt-basdat ", image_dir, " -o ", image_path,
             "&&",
-            "/usr/local/florence-limine/bin/limine-install ", image_path,
+            "/usr/local/var/florence-limine/bin/limine-install ", image_path,
         }) catch unreachable,
     };
     return b.addSystemCommand(image_params);
