@@ -390,7 +390,7 @@ export fn stivale2Main(info_in: *Info) noreturn {
     , .{ info_in.bootloader_brand, info_in.bootloader_version, info });
 
     if (!info.valid()) {
-        @panic("Stivale2: Info not valid!");
+        @panic("Stivale2: Info not valid!\n");
     }
 
     if (info.dtb) |dtb| {
