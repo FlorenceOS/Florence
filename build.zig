@@ -105,6 +105,7 @@ fn echfs_image(b: *Builder, image_path: []const u8, kernel_path: []const u8, ins
             "parted -s ", image_path, " set 1 boot on && ",
             "./boot/echfs/echfs-utils -m -p0 ", image_path, " quick-format 32768 && ",
             "./boot/echfs/echfs-utils -m -p0 ", image_path, " import '", kernel_path, "' flork.elf && ",
+            "./boot/echfs/echfs-utils -m -p0 ", image_path, " import /usr/local/florence-limine/share/limine/limine.sys limine.sys && ",
             install_command,
         }) catch unreachable,
     };
@@ -120,11 +121,10 @@ fn limine_target(b: *Builder, command: []const u8, desc: []const u8, image_path:
     const kernel_path = b.getInstallPath(dep.install_step.?.dest_dir, dep.out_filename);
 
     const image_step = echfs_image(b, image_path, kernel_path, std.mem.concat(b.allocator, u8, &[_][]const u8{
-        "make -C boot/limine limine-install && ",
+        "make -C boot/limine-bin install PREFIX=/usr/local/florence-limine/ && ",
         "make -C boot/echfs && ",
         "./boot/echfs/echfs-utils -m -p0 ", image_path, " import ", root_path, "/limine.cfg limine.cfg && ",
-        "./boot/limine/limine-install ",
-        image_path,
+        "/usr/local/florence-limine/bin/limine-install ", image_path,
     }) catch unreachable);
 
     image_step.step.dependOn(&dep.install_step.?.step);
