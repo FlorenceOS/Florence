@@ -93,20 +93,22 @@ fn qemu_run_image_x86_64(b: *Builder, image_path: []const u8) *std.build.RunStep
     return b.addSystemCommand(run_params);
 }
 
-fn echfs_image(b: *Builder, image_path: []const u8, kernel_path: []const u8, install_command: []const u8) *std.build.RunStep {
+fn universal_x86_64_image(b: *Builder, image_path: []const u8, kernel_path: []const u8) *std.build.RunStep {
+    const image_dir = b.fmt("./{s}/universal_image", .{b.cache_root});
+
     const image_params = &[_][]const u8{
         "/bin/sh", "-c",
         std.mem.concat(b.allocator, u8, &[_][]const u8{
-            "make -C boot/echfs && ",
-            "rm ", image_path, " || true && ",
-            "dd if=/dev/zero bs=1048576 count=0 seek=8 of=", image_path, " && ",
-            "parted -s ", image_path, " mklabel msdos && ",
-            "parted -s ", image_path, " mkpart primary 1 100% && ",
-            "parted -s ", image_path, " set 1 boot on && ",
-            "./boot/echfs/echfs-utils -m -p0 ", image_path, " quick-format 32768 && ",
-            "./boot/echfs/echfs-utils -m -p0 ", image_path, " import '", kernel_path, "' flork.elf && ",
-            "./boot/echfs/echfs-utils -m -p0 ", image_path, " import /usr/local/florence-limine/share/limine/limine.sys limine.sys && ",
-            install_command,
+            "mkdir -p ", image_dir, " && ",
+            "install -t ", image_dir, " ./boot/stivale2_image/limine.cfg ",
+              "/usr/local/florence-limine/share/limine/limine{.sys,-cd.bin,-eltorito-efi.bin} ",
+            "&&",
+            "cp ", kernel_path, " ", image_dir, "/flork.elf && ",
+            "xorriso -as mkisofs -b limine-cd.bin -no-emul-boot -boot-load-size 4 ",
+              "-boot-info-table -part_like_isohybrid -eltorito-alt-boot -e limine-eltorito-efi.bin ",
+              "-no-emul-boot -isohybrid-gpt-basdat ", image_dir, " -o ", image_path,
+            "&&",
+            "/usr/local/florence-limine/bin/limine-install ", image_path,
         }) catch unreachable,
     };
     return b.addSystemCommand(image_params);
@@ -120,12 +122,7 @@ fn limine_target(b: *Builder, command: []const u8, desc: []const u8, image_path:
 
     const kernel_path = b.getInstallPath(dep.install_step.?.dest_dir, dep.out_filename);
 
-    const image_step = echfs_image(b, image_path, kernel_path, std.mem.concat(b.allocator, u8, &[_][]const u8{
-        "make -C boot/limine-bin install PREFIX=/usr/local/florence-limine/ && ",
-        "make -C boot/echfs && ",
-        "./boot/echfs/echfs-utils -m -p0 ", image_path, " import ", root_path, "/limine.cfg limine.cfg && ",
-        "/usr/local/florence-limine/bin/limine-install ", image_path,
-    }) catch unreachable);
+    const image_step = universal_x86_64_image(b, image_path, kernel_path);
 
     image_step.step.dependOn(&dep.install_step.?.step);
     run_step.step.dependOn(&image_step.step);
