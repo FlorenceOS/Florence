@@ -46,6 +46,7 @@ fn write_msr(comptime T: type, msr_num: u32, val: T) void {
             asm volatile ("wrmsr"
                 :
                 : [_] "{eax}" (val),
+                  [_] "{edx}" (@as(u32, 0)),
                   [_] "{ecx}" (msr_num)
             );
         },
