@@ -88,6 +88,15 @@ pub fn allocPhys(size: usize) !usize {
     return error.PhysAllocTooSmall;
 }
 
+pub fn getAllocationSize(size: usize) usize {
+    for (pmm_sizes) |psz, i| {
+        if (size <= psz) {
+            return size;
+        }
+    }
+    @panic("getAllocationSize");
+}
+
 pub fn freePhys(phys: usize, size: usize) void {
     pmm_mutex.lock();
     defer pmm_mutex.unlock();
@@ -101,3 +110,60 @@ pub fn freePhys(phys: usize, size: usize) void {
     }
     unreachable;
 }
+
+const PhysAllocator = struct {
+    allocator: std.mem.Allocator = .{
+        .allocFn = allocFn,
+        .resizeFn = resizeFn,
+    },
+
+    fn allocFn(alloc: *std.mem.Allocator, len: usize, ptr_align: u29, len_align: u29, ret_addr: usize) std.mem.Allocator.Error![]u8 {
+        const alloc_len = getAllocationSize(len);
+
+        const ptr = os.platform.phys_ptr([*]u8).from_int(allocPhys(alloc_len) catch |err| {
+            switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+                else => {
+                    os.log("PMM allocator: {}\n", .{err});
+                    @panic("PMM allocator allocation error");
+                },
+            }
+        });
+
+        return ptr.get_writeback()[0..len];
+    }
+
+    fn resizeFn(alloc: *std.mem.Allocator, old_mem: []u8, old_align: u29, new_size: usize, len_align: u29, ret_addr: usize) std.mem.Allocator.Error!usize {
+        const old_alloc = getAllocationSize(old_mem.len);
+
+        const addr = @ptrToInt(old_mem.ptr);
+        const base_vaddr = @ptrToInt(os.platform.phys_ptr([*]u8).from_int(0).get_writeback());
+        const paddr = base_vaddr - addr;
+
+        if (new_size == 0) {
+            freePhys(paddr, old_alloc);
+            return 0;
+        } else {
+            const new_alloc = getAllocationSize(new_size);
+
+            if (new_alloc > old_alloc)
+                return error.OutOfMemory;
+
+            var curr_alloc = old_alloc;
+            while (new_alloc < curr_alloc) {
+                freePhys(paddr + curr_alloc / 2, curr_alloc / 2);
+                curr_alloc /= 2;
+            }
+
+            return new_size;
+        }
+    }
+};
+
+var phys_alloc = PhysAllocator{};
+var phys_gpa = std.heap.GeneralPurposeAllocator(.{
+    .thread_safe = false,
+}){
+    .backing_allocator = &phys_alloc.allocator,
+};
+pub const phys_heap = &phys_gpa.allocator;
