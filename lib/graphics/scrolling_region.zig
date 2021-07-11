@@ -5,8 +5,9 @@ const Color = lib.graphics.color.Color;
 
 pub const ScrollingRegion = struct {
     used_height: usize = 0,
+    used_width: usize = 0,
 
-    pub fn putBottom(self: *@This(), region: ImageRegion, into: ImageRegion) void {
+    pub fn putBottom(self: *@This(), region: ImageRegion, into: ImageRegion, used_width: usize) void {
         if (region.width != into.width) unreachable;
 
         if (self.used_height + region.height > into.height) {
@@ -14,17 +15,21 @@ pub const ScrollingRegion = struct {
             const to_scroll = self.used_height + region.height - into.height;
 
             // Do the scroll without invalidating
-            into.drawImage(into.subregion(0, to_scroll, into.width, into.height - to_scroll), 0, 0, false);
+            into.drawImage(into.subregion(0, to_scroll, self.used_width, into.height - to_scroll), 0, 0, false);
             self.used_height -= to_scroll;
 
+            self.used_width = std.math.max(self.used_width, used_width);
+
             // Draw the next line without invalidating
-            into.drawImage(region, 0, self.used_height, false);
+            into.drawImage(region.subregion(0, 0, self.used_width, region.height), 0, self.used_height, false);
 
             // Invalidate entire region
-            into.invalidateRect(0, 0, into.width, into.height);
+            into.invalidateRect(0, 0, self.used_width, into.height);
         } else {
             // Just add the line and invalidate it
-            into.drawImage(region, 0, self.used_height, true);
+            into.drawImage(region.subregion(0, 0, used_width, region.height), 0, self.used_height, true);
+
+            self.used_width = std.math.max(self.used_width, used_width);
         }
 
         self.used_height += region.height;
@@ -32,7 +37,7 @@ pub const ScrollingRegion = struct {
 
     pub fn retarget(self: *@This(), old: ImageRegion, new: ImageRegion, bg: Color) void {
         // Switching targets, calculate max copy size
-        const copy_width = std.math.min(new.width, old.width);
+        const copy_width = std.math.min(new.width, std.math.min(old.width, self.used_width));
         const copy_height = std.math.min(new.height, old.height);
 
         // Clear the rest of the new region
@@ -56,6 +61,12 @@ pub const ScrollingRegion = struct {
             // Entire framebuffer is in use
             self.used_height = new.height;
         }
+
+        // Pad at side if needed
+        if (copy_width < new.width)
+            new.fill(bg, copy_width, 0, new.width - copy_width, new.height, false);
+
+        self.used_width = copy_width;
 
         // Invalidate entire new target, we've drawn to all of it
         new.invalidateRect(0, 0, new.width, new.height);

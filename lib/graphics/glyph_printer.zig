@@ -29,8 +29,8 @@ pub fn GlyphPrinter(comptime max_width: usize, comptime glyph_height: usize) typ
         }
 
         pub fn feedLine(self: *@This(), into: ImageRegion, bg: Color) void {
+            const old_width = self.used_width;
             if (self.used_width < into.width) {
-                const old_width = self.used_width;
                 self.buffer(
                     into.width - self.used_width,
                     into.pixel_format,
@@ -43,7 +43,7 @@ pub fn GlyphPrinter(comptime max_width: usize, comptime glyph_height: usize) typ
                     false,
                 );
             }
-            self.scroller.putBottom(self.buffer(0, into.pixel_format), into);
+            self.scroller.putBottom(self.buffer(0, into.pixel_format), into, old_width);
             self.used_width = 0;
         }
 
