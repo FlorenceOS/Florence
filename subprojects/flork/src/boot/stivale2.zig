@@ -429,6 +429,12 @@ export fn stivale2Main(info_in: *Info) noreturn {
 
     context.apply();
 
+    // Use the write combining framebuffer
+    if (info.framebuffer) |fb| {
+        const ptr = os.platform.phys_ptr([*]u8).from_int(fb.addr).get_write_combining();
+        display.context.region.bytes = ptr[0 .. @as(usize, fb.height) * @as(usize, fb.pitch)];
+    }
+
     os.log("Doing vmm\n", .{});
 
     const heap_base = memory.paging.kernel_context.make_heap_base();
