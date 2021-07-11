@@ -261,7 +261,7 @@ pub fn registerController(addr: os.platform.pci.Addr) void {
     if (comptime (!config.drivers.gpu.virtio_gpu.enable))
         return;
 
-    const alloc = os.memory.vmm.backed(.Eternal);
+    const alloc = os.memory.pmm.phys_heap;
     const drv = alloc.create(Driver) catch {
         os.log("Virtio display controller: Allocation failure\n", .{});
         return;
