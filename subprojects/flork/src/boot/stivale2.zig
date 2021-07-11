@@ -8,6 +8,7 @@ const libalign = lib.util.libalign;
 const builtin = std.builtin;
 
 var display: os.drivers.output.single_mode_display.SingleModeDisplay = undefined;
+var display_buffer: lib.graphics.single_buffer.SingleBuffer = undefined;
 
 const MemmapEntry = packed struct {
     base: u64,
@@ -379,6 +380,7 @@ export fn stivale2Main(info_in: *Info) noreturn {
             null, // No invalidation needed for stivale2 framebuffer
         );
         drivers.output.vesa_log.use(&display.context.region);
+        os.log("Stivale2: Using non-buffered output\n", .{});
     } else {
         drivers.output.vga_log.register();
     }
@@ -410,6 +412,18 @@ export fn stivale2Main(info_in: *Info) noreturn {
     if (info.uart_status) |uart| {
         phys_high = std.math.max(phys_high, uart.uart_addr + 4);
         phys_high = std.math.max(phys_high, uart.uart_status + 4);
+    }
+
+    // Attempt to speed up log scrolling using a buffer
+    if (info.framebuffer) |_| {
+        blk: {
+            display_buffer.init(&display.context.region) catch |err| {
+                os.log("Stivale2: Error while allocating buffer: {}\n", .{err});
+                break :blk;
+            };
+            drivers.output.vesa_log.use(&display_buffer.buffered_region);
+            os.log("Stivale2: Using buffered output\n", .{});
+        }
     }
 
     const page_size = platform.paging.page_sizes[0];
