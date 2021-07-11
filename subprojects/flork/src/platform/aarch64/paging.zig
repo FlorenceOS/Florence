@@ -324,6 +324,18 @@ pub const PagingContext = struct {
         };
     }
 
+    pub fn make_userspace() !@This() {
+        var result = os.memory.paging.kernel_context;
+        result.br0 = try make_page_table();
+        errdefer result.deinit();
+
+        return result;
+    }
+
+    pub fn deinit(self: *@This()) void {
+        os.log("TODO: PagingContext deinit\n", .{});
+    }
+
     pub fn can_map_at_level(self: *const @This(), level: level_type) bool {
         return page_sizes[level] < 0x1000000000;
     }
