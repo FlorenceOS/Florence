@@ -98,7 +98,7 @@ pub fn nonbacked() *std.mem.Allocator {
 }
 
 export fn laihost_malloc(sz: usize) ?*c_void {
-    if (sz == 0) return os.kernel.lai.NULL;
+    if (sz == 0) return @intToPtr(*c_void, 0x1000);
     const mem = os.memory.vmm.backed(.Ephemeral).alloc(u8, sz) catch return os.kernel.lai.NULL;
     return @ptrCast(*c_void, mem.ptr);
 }
