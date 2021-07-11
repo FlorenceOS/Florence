@@ -138,5 +138,5 @@ pub fn registerController(dev: os.platform.pci.Addr) void {
         return;
 
     dev.command().write(dev.command().read() | 0x6);
-    os.vital(os.thread.scheduler.spawn_task(controllerTask, .{dev}), "Spawning XHCI controller task");
+    os.vital(os.thread.scheduler.spawnTask(controllerTask, .{dev}), "Spawning XHCI controller task");
 }
