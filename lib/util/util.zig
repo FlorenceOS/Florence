@@ -15,3 +15,9 @@ pub const source = @import("source.zig");
 
 /// Helpers to manipulate pointers
 pub const pointers = @import("pointers.zig");
+
+pub fn isRuntime() bool {
+    var b = true;
+    const v = if (b) @as(u8, 0) else @as(u32, 0);
+    return @TypeOf(b) == u32;
+}
