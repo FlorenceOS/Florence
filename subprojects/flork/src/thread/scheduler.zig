@@ -81,7 +81,7 @@ pub fn makeTask(func: anytype, args: anytype) !*os.thread.Task {
 /// Create and start a new task that calls a function with given arguments.
 pub fn spawnTask(func: anytype, args: anytype) !void {
     const task = try makeTask(func, args);
-    os.platform.smp.cpus[task.allocated_core_id].executable_tasks.enqueue(task);
+    task.enqueue();
 }
 
 /// Exit current task

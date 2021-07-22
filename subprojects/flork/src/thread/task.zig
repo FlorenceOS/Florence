@@ -68,4 +68,8 @@ pub const Task = struct {
             0,
         ) catch @panic("task free stack");
     }
+
+    pub fn enqueue(self: *@This()) void {
+        os.platform.smp.cpus[self.allocated_core_id].executable_tasks.enqueue(self);
+    }
 };
