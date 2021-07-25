@@ -16,7 +16,7 @@ var debug_info = std.dwarf.DwarfInfo{
 
 var inited_debug_info = false;
 
-var debug_allocator_bytes: [8 * 1024 * 1024]u8 = undefined;
+var debug_allocator_bytes: [16 * 1024 * 1024]u8 = undefined;
 var debug_allocator_state = std.heap.FixedBufferAllocator.init(debug_allocator_bytes[0..]);
 
 fn getSectionData(elf: [*]u8, shdr: []u8) []u8 {
