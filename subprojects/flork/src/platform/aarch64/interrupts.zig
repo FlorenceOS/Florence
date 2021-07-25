@@ -9,11 +9,7 @@ pub fn get_and_disable_interrupts() InterruptState {
     );
 
     // Set the flag
-    asm volatile ("MSR DAIFSET, 2"
-        :
-        :
-        : "memory"
-    );
+    asm volatile ("MSR DAIFSET, 2" ::: "memory");
 
     // Check if it was set
     return (daif >> 7) & 1 == 0;
@@ -22,18 +18,10 @@ pub fn get_and_disable_interrupts() InterruptState {
 pub fn set_interrupts(s: InterruptState) void {
     if (s) {
         // Enable interrupts
-        asm volatile ("MSR DAIFCLR, 2"
-            :
-            :
-            : "memory"
-        );
+        asm volatile ("MSR DAIFCLR, 2" ::: "memory");
     } else {
         // Disable interrupts
-        asm volatile ("MSR DAIFSET, 2"
-            :
-            :
-            : "memory"
-        );
+        asm volatile ("MSR DAIFSET, 2" ::: "memory");
     }
 }
 
@@ -71,7 +59,7 @@ pub const InterruptFrame = struct {
     x3: u64,
     x2: u64,
     sp: u64,
-    _: u64,
+    _: u64 = undefined,
     x1: u64,
     x0: u64,
 

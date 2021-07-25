@@ -44,6 +44,37 @@ pub fn wake(task: *os.thread.Task) void {
     os.platform.smp.cpus[task.allocated_core_id].executable_tasks.enqueue(task);
 }
 
+pub fn spawnUserspaceTask(task: *os.thread.Task, entry: u64, arg: u64, stack: u64) !void {
+    try task.allocStack();
+    errdefer task.freeStack();
+
+    var best_cpu_idx: usize = 0;
+    {
+        const state = balancer_lock.lock();
+        // TODO: maybe something more sophisticated?
+        for (os.platform.smp.cpus) |*cpu, i| {
+            if (cpu.tasks_count < os.platform.smp.cpus[best_cpu_idx].tasks_count) {
+                best_cpu_idx = i;
+            }
+        }
+        task.allocated_core_id = best_cpu_idx;
+        os.platform.smp.cpus[best_cpu_idx].tasks_count += 1;
+        balancer_lock.unlock(state);
+    }
+
+    os.log("Userspace task allocated to core {}\n", .{best_cpu_idx});
+
+    errdefer {
+        const state = balancer_lock.lock();
+        os.platform.smp.cpus[best_cpu_idx].tasks_count -= 1;
+        balancer_lock.unlock(state);
+    }
+
+    os.platform.thread.init_task_userspace(task, entry, arg, stack);
+
+    task.enqueue();
+}
+
 /// Create a new task that calls a function with given arguments.
 /// Uses heap, so don't create tasks in interrupt context
 pub fn makeTask(func: anytype, args: anytype) !*os.thread.Task {

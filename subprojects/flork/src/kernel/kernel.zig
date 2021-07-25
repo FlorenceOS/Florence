@@ -13,6 +13,9 @@ pub const panic = @import("panic.zig");
 /// vital() function
 pub const vital = @import("vital.zig");
 
+/// Userspace processes
+pub const process = @import("process.zig");
+
 /// Lightweight ACPI interpreter
 pub const lai = @cImport({
     @cInclude("lai/core.h");
@@ -32,6 +35,9 @@ pub fn kmain() noreturn {
 
     if (config.kernel.run_kepler_tests)
         os.vital(os.kepler.tests.run_tests(), "Kepler tests terminated with error");
+
+    var proc: process.Process = undefined;
+    os.vital(proc.init(), "init proc launch");
 
     os.thread.scheduler.exitTask();
 }

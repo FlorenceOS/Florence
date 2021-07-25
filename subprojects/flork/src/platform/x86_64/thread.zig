@@ -61,6 +61,44 @@ pub const CoreData = struct {
 
 const ephemeral = os.memory.vmm.backed(.Ephemeral);
 
+pub fn init_task_userspace(new_task: *os.thread.Task, entry: u64, arg: u64, stack: u64) void {
+    new_task.registers = .{
+        // For userspace
+        .rdi = arg,
+        .rip = entry,
+        .rsp = stack,
+        .eflags = 0x202, // IF | RES1
+
+        .es = gdt.selector.userdata64,
+        .ds = gdt.selector.userdata64,
+        .ss = gdt.selector.userdata64,
+
+        .cs = gdt.selector.usercode64,
+
+        .rax = 0,
+        .rcx = 0,
+        .rbx = 0,
+        .rdx = 0,
+        .rbp = 0,
+        .rsi = 0,
+
+        .r8 = 0,
+        .r9 = 0,
+        .r10 = 0,
+        .r11 = 0,
+        .r12 = 0,
+        .r13 = 0,
+        .r14 = 0,
+        .r15 = 0,
+
+        // For iret frame
+        .ec = undefined,
+        .intnum = undefined,
+    };
+
+    new_task.platform_data.syscall_stack = new_task.stack;
+}
+
 pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry) !void {
     const cpu = os.platform.thread.get_current_cpu();
 
