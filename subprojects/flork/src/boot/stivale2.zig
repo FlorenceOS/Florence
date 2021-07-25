@@ -207,6 +207,20 @@ const DtbTag = packed struct {
     }
 };
 
+const KernelFileTag = packed struct {
+    tag: Tag,
+    addr: u64,
+
+    pub fn format(
+        self: *const @This(),
+        fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        try writer.print("ELF at 0x{X}", .{ self.addr });
+    }
+};
+
 const ParsedInfo = struct {
     memmap: ?*MemmapTag = null,
     framebuffer: ?FramebufferTag = null,
@@ -215,6 +229,7 @@ const ParsedInfo = struct {
     dtb: ?DtbTag = null,
     uart: ?Mmio32UartTag = null,
     uart_status: ?Mmio32StatusUartTag = null,
+    kernel_file: ?KernelFileTag = null,
 
     pub fn valid(self: *const ParsedInfo) bool {
         if (self.memmap == null) return false;
@@ -236,6 +251,7 @@ const ParsedInfo = struct {
             \\  DTB: {}
             \\  UART: {}
             \\  UART with status: {}
+            \\  Kernel file: {}
             \\
             \\
         , .{
@@ -246,6 +262,7 @@ const ParsedInfo = struct {
             self.dtb,
             self.uart,
             self.uart_status,
+            self.kernel_file,
         });
     }
 };
@@ -344,6 +361,7 @@ export fn stivale2Main(info_in: *Info) noreturn {
             0xabb29bd49a2833fa => info.dtb = @ptrCast(*DtbTag, tag).*,
             0xb813f9b8dbc78797 => info.uart = @ptrCast(*Mmio32UartTag, tag).*,
             0xf77485dbfeb260f9 => info.uart_status = @ptrCast(*Mmio32StatusUartTag, tag).*,
+            0xe599d90c2975584a => info.kernel_file = @ptrCast(*KernelFileTag, tag).*,
             else => {
                 os.log("Unknown stivale2 tag identifier: 0x{X:0>16}\n", .{tag.?.identifier});
             },
@@ -402,6 +420,11 @@ export fn stivale2Main(info_in: *Info) noreturn {
 
     for (info.memmap.?.get()) |*ent| {
         consumePhysMem(ent);
+    }
+
+    if(info.kernel_file) |file| {
+        const pp = os.platform.phys_ptr([*]u8).from_int(file.addr);
+        os.kernel.debug.addDebugElf(pp.get_writeback());
     }
 
     var phys_high = getPhysLimit(info.memmap.?.get());
