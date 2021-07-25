@@ -146,8 +146,10 @@ pub fn dumpFrame(bp: usize, ip: usize) void {
 }
 
 pub fn dumpStackTrace(trace: *std.builtin.StackTrace) void {
-    for (trace.instruction_addresses[trace.index..]) |addr| {
-        printAddr(addr);
+    if (trace.index <= trace.instruction_addresses.len) {
+        for (trace.instruction_addresses[trace.index..]) |addr| {
+            printAddr(addr);
+        }
     }
 }
 
