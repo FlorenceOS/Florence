@@ -22,11 +22,10 @@ pub fn panic(message: []const u8, stack_trace: ?*StackTrace) noreturn {
     os.log("PANIC {}: CPU {}: {s}!\n", .{ panic_num, cpu_id, message });
 
     if (stack_trace) |trace| {
-        os.log("TODO: print stack trace.\nI bet this is very helpful. No problem.\n", .{});
         os.kernel.debug.dumpStackTrace(trace);
-    } else {
-        os.log("idfk I didn't get a stack trace.\n", .{});
     }
+
+    os.kernel.debug.dumpCurrentTrace();
 
     os.platform.hang();
 }

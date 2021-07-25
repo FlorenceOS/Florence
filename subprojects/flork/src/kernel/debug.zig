@@ -85,3 +85,10 @@ pub fn dumpStackTrace(trace: *std.builtin.StackTrace) void {
         printAddr(addr);
     }
 }
+
+pub fn dumpCurrentTrace() void {
+    var it = std.debug.StackIterator.init(@returnAddress(), @frameAddress());
+    while(it.next()) |addr| {
+        printAddr(addr);
+    }
+}
