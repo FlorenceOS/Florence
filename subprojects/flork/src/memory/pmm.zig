@@ -169,7 +169,8 @@ const PhysAllocator = struct {
 
 var phys_alloc = PhysAllocator{};
 var phys_gpa = std.heap.GeneralPurposeAllocator(.{
-    .thread_safe = false,
+    .thread_safe = true,
+    .MutexType = os.thread.Mutex,
 }){
     .backing_allocator = &phys_alloc.allocator,
 };
