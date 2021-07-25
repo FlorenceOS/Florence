@@ -45,7 +45,14 @@ fn allocImpl(ind: usize) error{OutOfMemory}!usize {
         return next;
     } else {
         const retval = free_roots[ind];
-        free_roots[ind] = os.platform.phys_ptr(*usize).from_int(retval).get_writeback().*;
+        const new_root = os.platform.phys_ptr(*usize).from_int(retval).get_writeback().*;
+
+        if (std.debug.runtime_safety and !lalign.isAligned(usize, pmm_sizes[ind], new_root)) {
+            os.log("New root: 0x{} at index {} is bad, referenced by 0x{X}!\n", .{ free_roots[ind], ind, retval });
+            @panic("Physical heap corrupted");
+        }
+
+        free_roots[ind] = new_root;
         return retval;
     }
 }
