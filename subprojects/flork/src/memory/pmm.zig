@@ -183,7 +183,6 @@ export fn laihost_malloc(sz: usize) ?*c_void {
 }
 
 export fn laihost_realloc(ptr: ?*c_void, newsize: usize, oldsize: usize) ?*c_void {
-    std.debug.assert((ptr == null) == (oldsize == 0));
     if (oldsize == 0) {
         return laihost_malloc(newsize);
     }
