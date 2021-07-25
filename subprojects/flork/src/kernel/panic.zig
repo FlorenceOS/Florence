@@ -3,18 +3,17 @@ const StackTrace = std.builtin.StackTrace;
 
 var panic_counter: usize = 0;
 
-pub fn breakpointPanic(message: ?[]const u8, stack_trace: ?*StackTrace) noreturn {
+pub fn breakpoint_panic(message: []const u8, stack_trace: ?*StackTrace) callconv(.Inline) noreturn {
     @breakpoint();
     unreachable;
 }
 
-pub fn panic(message_in: ?[]const u8, stack_trace: ?*StackTrace) noreturn {
+pub fn panic(message: []const u8, stack_trace: ?*StackTrace) noreturn {
     const panic_num = @atomicRmw(usize, &panic_counter, .Add, 1, .AcqRel) + 1;
 
     const cpu = os.platform.thread.get_current_cpu();
     cpu.panicked = true;
     const cpu_id = cpu.id();
-    const message: []const u8 = message_in orelse "no message";
 
     if (config.kernel.panic_once and panic_num != 1) {
         os.platform.hang();
