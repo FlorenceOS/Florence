@@ -91,7 +91,7 @@ pub fn allocPhys(size: usize) !usize {
 pub fn getAllocationSize(size: usize) usize {
     for (pmm_sizes) |psz, i| {
         if (size <= psz) {
-            return size;
+            return psz;
         }
     }
     @panic("getAllocationSize");
