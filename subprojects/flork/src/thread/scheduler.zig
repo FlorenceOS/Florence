@@ -22,7 +22,12 @@ pub fn wait() void {
 
 /// Terminate current task to never run it again
 pub fn leave() noreturn {
-    wait();
+    const leaveCallback = struct {
+        fn leaveCallback(frame: *os.platform.InterruptFrame, _: usize) void {
+            os.thread.preemption.awaitForTaskAndYield(frame);
+        }
+    }.leaveCallback;
+    os.platform.sched_call(leaveCallback, undefined);
     unreachable;
 }
 
