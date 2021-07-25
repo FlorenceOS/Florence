@@ -1,7 +1,7 @@
 usingnamespace @import("root").preamble;
 
 /// Allocator used to allocate memory for new tasks
-const task_alloc = os.memory.vmm.backed(.Ephemeral);
+const task_alloc = os.memory.pmm.phys_heap;
 
 /// Load balancer lock. Locked when scheduler finds the best CPU for the task
 /// or when task terminates

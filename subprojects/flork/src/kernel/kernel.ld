@@ -15,6 +15,7 @@ SECTIONS {
 
   . = 0xFFFFFFFF80100000;
 
+  __kernel_begin = .;
   __kernel_text_begin = .;
   .text . : {
     *(.text*)

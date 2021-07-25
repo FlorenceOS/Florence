@@ -3,7 +3,6 @@ usingnamespace @import("root").preamble;
 const Order = std.math.Order;
 
 const rb = lib.containers.rbtree;
-const sbrk = os.memory.vmm.sbrk;
 const Mutex = os.thread.Mutex;
 
 const AddrNode = rb.Node(rb_features);
@@ -108,8 +107,6 @@ pub const RangeAlloc = struct {
     by_size: SizeTree = SizeTree.init(.{}, {}),
 
     mutex: Mutex = .{},
-
-    backed: bool,
 
     fn dumpState(self: *@This()) void {
         if (!debug)
@@ -299,26 +296,7 @@ pub const RangeAlloc = struct {
             }
         }
 
-        // We found nothing, make a new one
-        if (debug) {
-            os.log("Existing range not found, creating a new one\n", .{});
-        }
-        const range = try self.makeRange(size);
-    
-        if (range.tryPlace(size, alignment, size_alignment)) |placement| {
-            return RangePlacement{
-                .range = range,
-                .placement = placement,
-            };
-        } else if (debug) {
-            os.log("Could not place sz = 0x{X}, align = {}, szalign = {} in new allocation {}\n", .{
-                size,
-                alignment,
-                size_alignment,
-                range,
-            },);
-        }
-
+        // We found nothing
         return error.OutOfMemory;
     }
 
@@ -329,38 +307,19 @@ pub const RangeAlloc = struct {
     }
 
     fn consumeNodeBytes(self: *@This()) !void {
-        const base = try sbrk(node_block_size);
-        const nodes = @ptrCast([*]Range, @alignCast(@alignOf(Range), base));
-        for (nodes[0 .. node_block_size / @sizeOf(Range)]) |*n| {
+        const nodes = try os.memory.pmm.phys_heap.alloc(Range, 0x1000/@sizeOf(Range));
+        for (nodes) |*n| {
             self.freeRange(n);
         }
     }
 
-    fn addRange(self: *@This(), in_range: Range) !*Range {
+    pub fn addRange(self: *@This(), in_range: Range) !*Range {
         const range = try self.allocRange();
         range.* = in_range;
 
         self.by_size.insert(range);
         self.by_addr.insert(range);
         return range;
-    }
-
-    fn makeRange(self: *@This(), minBytes: usize) !*Range {
-        const page_size = os.platform.paging.page_sizes[0];
-        const size = lib.util.libalign.alignUp(
-            usize,
-            page_size,
-            std.math.max(min_materialize_size, minBytes),
-        );
-        const result: Range = .{
-            .base = @ptrToInt(switch (self.backed) {
-                true => (try os.memory.vmm.sbrk(size)).ptr,
-                false => (try os.memory.vmm.sbrkNonbacked(size)).ptr,
-            }),
-            .size = size,
-        };
-
-        return self.addRange(result);
     }
 
     fn allocRange(self: *@This()) !*Range {

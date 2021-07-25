@@ -52,10 +52,6 @@ pub const kernel = .{
     // True if kernel should panic only once
     .panic_once = true,
 
-    // Use the debug allocator for the kernel heap
-    // Never reuse any virtual address, unmap on free
-    .heap_debug_allocator = false,
-
     // If true, runs kepler tests after system initialization
     .run_kepler_tests = true,
 
