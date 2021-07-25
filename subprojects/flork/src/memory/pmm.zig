@@ -197,6 +197,6 @@ export fn laihost_realloc(ptr: ?*c_void, newsize: usize, oldsize: usize) ?*c_voi
 }
 
 export fn laihost_free(ptr: ?*c_void, oldsize: usize) void {
-    if (ptr == null) return;
+    if (oldsize == 0 or ptr == null) return;
     phys_heap.free(@ptrCast([*]u8, ptr)[0..oldsize]);
 }
