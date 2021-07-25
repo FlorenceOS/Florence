@@ -138,7 +138,7 @@ const PhysAllocator = struct {
 
         const addr = @ptrToInt(old_mem.ptr);
         const base_vaddr = @ptrToInt(os.platform.phys_ptr([*]u8).from_int(0).get_writeback());
-        const paddr = base_vaddr - addr;
+        const paddr = addr - base_vaddr;
 
         if (new_size == 0) {
             freePhys(paddr, old_alloc);
