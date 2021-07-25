@@ -188,7 +188,7 @@ export fn laihost_realloc(ptr: ?*c_void, newsize: usize, oldsize: usize) ?*c_voi
     }
     if (newsize == 0) {
         laihost_free(ptr, oldsize);
-        return os.kernel.lai.NULL;
+        return @intToPtr(*c_void, 0x1000);
     }
     const ret = laihost_malloc(newsize);
     @memcpy(@ptrCast([*]u8, ret), @ptrCast([*]const u8, ptr), oldsize);
