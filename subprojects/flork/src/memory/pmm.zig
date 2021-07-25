@@ -104,7 +104,7 @@ pub fn freePhys(phys: usize, size: usize) void {
     for (reverse_sizes) |psz, ri| {
         const i = pmm_sizes.len - ri - 1;
 
-        if (size <= psz and lalign.isAligned(usize, psz, phys)) {
+        if (size == psz and lalign.isAligned(usize, psz, phys)) {
             return freeImpl(phys, i);
         }
     }
