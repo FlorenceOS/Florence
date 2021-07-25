@@ -72,10 +72,10 @@ pub fn dumpFrame(bp: usize, ip: usize) void {
 
     printAddr(ip);
 
-    //var it = std.debug.StackIterator.init(null, bp);
-    //while (it.next()) |addr| {
-    //    printAddr(ip);
-    //}
+    var it = std.debug.StackIterator.init(null, bp);
+    while (it.next()) |addr| {
+        printAddr(addr);
+    }
 }
 
 pub fn dumpStackTrace(trace: *std.builtin.StackTrace) void {
