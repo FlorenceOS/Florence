@@ -114,7 +114,7 @@ fn universal_x86_64_image(b: *Builder, image_path: []const u8, kernel_path: []co
     return b.addSystemCommand(image_params);
 }
 
-fn limine_target(b: *Builder, command: []const u8, desc: []const u8, image_path: []const u8, root_path: []const u8, dep: *std.build.LibExeObjStep) void {
+fn limine_target(b: *Builder, command: []const u8, desc: []const u8, image_path: []const u8, dep: *std.build.LibExeObjStep) void {
     assert(dep.target.cpu_arch.? == .x86_64);
 
     const command_step = b.step(command, desc);
@@ -154,7 +154,6 @@ pub fn build(b: *Builder) !void {
         "x86_64-stivale2",
         "Run x86_64 kernel with limine stivale2",
         b.fmt("{s}/stivale2.img", .{b.cache_root}),
-        "boot/stivale2_image",
         try flork.buildKernel(.{
             .builder = b,
             .arch = .x86_64,
