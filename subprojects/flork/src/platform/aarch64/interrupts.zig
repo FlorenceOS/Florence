@@ -79,6 +79,10 @@ pub const InterruptFrame = struct {
     pub fn trace_stack(self: *const @This()) void {
         os.kernel.debug.dumpFrame(self.x29, self.pc);
     }
+
+    pub fn syscallNumber(self: *const @This()) usize {
+        return self.x8;
+    }
 };
 
 comptime {
@@ -272,6 +276,18 @@ export fn interrupt_handler(frame: *InterruptFrame) void {
     const ec = (esr >> 26) & 0x3f;
     const iss = esr & 0x1ffffff;
 
+    const userspace_process = if ((frame.spsr & 0xF) == 0) os.kernel.process.currentProcess() else null;
+
+    const far = asm volatile ("MRS %[esr], FAR_EL1"
+        : [esr] "=r" (-> u64)
+    );
+
+    const wnr = (iss >> 6) & 1;
+    const dfsc = iss & 0x3f;
+
+    // Assume present == !translation fault
+    const present = (dfsc & 0b111100) != 0b000100;
+
     if (ec == 0b111100) {
         os.log("BRK instruction execution in AArch64 state\n", .{});
         os.platform.hang();
@@ -279,38 +295,38 @@ export fn interrupt_handler(frame: *InterruptFrame) void {
 
     switch (ec) {
         else => {
+            os.log("EC = 0b{b}\n", .{ec});
             frame.dump();
+            frame.trace_stack();
             @panic("Unknown EC!");
         },
         0b00000000 => {
             frame.dump();
+            frame.trace_stack();
             @panic("Unknown reason in EC!");
         },
-        0b00100101 => {
-            const far = asm volatile ("MRS %[esr], FAR_EL1"
-                : [esr] "=r" (-> u64)
-            );
-            const wnr = (iss >> 6) & 1;
-            const dfsc = iss & 0x3f;
-
-            // Assume present == !translation fault
-            const present = (dfsc & 0b111100) != 0b000100;
-
-            // addr: usize, present: bool, access: PageFaultAccess, frame: anytype
+        0b00100100 => { // Data abort from userspace
+            userspace_process.?.onPageFault(far, present, if (wnr == 1) .Write else .Read, frame);
+        },
+        0b00100101 => { // Data abort from kernel
             os.platform.page_fault(far, present, if (wnr == 1) .Write else .Read, frame);
         },
-        0b00100001 => {
-            // This could be an instruction fetch page fault if it's a prefetch abort
-            frame.dump();
-            @panic("Instruction fault without change in exception level");
+        0b00100000 => { // Instruction fault from userspace
+            userspace_process.?.onPageFault(far, false, .InstructionFetch, frame);
         },
-        0b00010101 => {
-            // SVC instruction execution in AArch64 state
-            // Figure out which call this is
-            switch (@truncate(u16, iss)) {
-                else => @panic("Unknown SVC"),
+        0b00100001 => { // Instruction fault from kernel
+            os.platform.page_fault(far, false, .InstructionFetch, frame);
+        },
+        0b00010101 => { // SVC instruction execution in AArch64 state
+            if (userspace_process) |p| {
+                p.handleSyscall(frame);
+            } else {
+                // Figure out which call this is
+                switch (@truncate(u16, iss)) {
+                    else => @panic("Unknown SVC"),
 
-                'S' => do_stack_call(frame),
+                    'S' => do_stack_call(frame),
+                }
             }
         },
     }

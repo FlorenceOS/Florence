@@ -71,7 +71,13 @@ fn page_fault_handler(frame: *InterruptFrame) void {
     );
     const page_fault_type = type_page_fault(frame.ec);
 
-    platform.page_fault(page_fault_addr, (frame.ec & 1) != 0, page_fault_type, frame);
+    const userspace_process = if ((frame.cs & 0x3) == 3) os.kernel.process.currentProcess() else null;
+
+    if (userspace_process) |p| {
+        p.onPageFault(page_fault_addr, (frame.ec & 1) != 0, page_fault_type, frame);
+    } else {
+        platform.page_fault(page_fault_addr, (frame.ec & 1) != 0, page_fault_type, frame);
+    }
 }
 
 fn unhandled_interrupt(frame: *InterruptFrame) void {
@@ -187,6 +193,10 @@ pub const InterruptFrame = packed struct {
 
     pub fn trace_stack(self: *const @This()) void {
         os.kernel.debug.dumpFrame(self.rbp, self.rip);
+    }
+
+    pub fn syscallNumber(self: *const @This()) usize {
+        return self.rax;
     }
 };
 
