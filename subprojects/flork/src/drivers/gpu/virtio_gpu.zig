@@ -17,7 +17,7 @@ const Driver = struct {
 
     fn invalidateRectFunc(region: *lib.graphics.image_region.ImageRegion, x: usize, y: usize, width: usize, height: usize) void {
         const self = @fieldParentPtr(Driver, "display_region", region);
-        self.updateRect(0, .{
+        self.updateRect(@ptrToInt(self.display_region.subregion(x, y, width, height).bytes.ptr) - @ptrToInt(self.display_region.bytes.ptr), .{
             .x = @intCast(u32, x),
             .y = @intCast(u32, y),
             .width = @intCast(u32, width),
