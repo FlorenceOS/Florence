@@ -79,10 +79,6 @@ pub const InterruptFrame = struct {
     pub fn trace_stack(self: *const @This()) void {
         os.kernel.debug.dumpFrame(self.x29, self.pc);
     }
-
-    pub fn syscallNumber(self: *const @This()) usize {
-        return self.x8;
-    }
 };
 
 comptime {

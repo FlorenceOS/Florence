@@ -10,7 +10,7 @@ const flork = @import("subprojects/flork/build.zig");
 fn qemu_run_aarch64_sabaton(b: *Builder, board_name: []const u8, desc: []const u8) !void {
     const sabaton_blob = try sabaton.build_blob(b, .aarch64, board_name, "boot/Sabaton/");
 
-    const kernel_step = flork.buildKernel(.{
+    const kernel_step = try flork.buildKernel(.{
         .builder = b, 
         .arch = .aarch64,
     });
@@ -155,8 +155,8 @@ pub fn build(b: *Builder) !void {
         "Run x86_64 kernel with limine stivale2",
         b.fmt("{s}/stivale2.img", .{b.cache_root}),
         "boot/stivale2_image",
-        flork.buildKernel(.{
-            .builder = b, 
+        try flork.buildKernel(.{
+            .builder = b,
             .arch = .x86_64,
         }),
     );

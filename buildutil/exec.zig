@@ -1,12 +1,54 @@
 const std = @import("std");
 
-const Arch = if(@hasField(std.builtin, "Arch")) std.builtin.Arch else std.Target.Cpu.Arch;
+const Arch = if (@hasField(std.builtin, "Arch")) std.builtin.Arch else std.Target.Cpu.Arch;
 
 pub const Context = enum {
     kernel,
     userlib,
     userspace,
 };
+
+pub const TransformFileCommandStep = struct {
+    step: std.build.Step,
+    output_path: []const u8,
+    fn run_command(s: *std.build.Step) !void {}
+};
+
+fn make_transform(b: *std.build.Builder, dep: *std.build.Step, command: [][]const u8, output_path: []const u8) !*TransformFileCommandStep {
+    const transform = try b.allocator.create(TransformFileCommandStep);
+
+    transform.output_path = output_path;
+    transform.step = std.build.Step.init(.custom, "", b.allocator, TransformFileCommandStep.run_command);
+
+    const command_step = b.addSystemCommand(command);
+
+    command_step.step.dependOn(dep);
+    transform.step.dependOn(&command_step.step);
+
+    return transform;
+}
+
+pub fn binaryBlobSection(b: *std.build.Builder, elf: *std.build.LibExeObjStep, section_name: []const u8) !*TransformFileCommandStep {
+    const elf_path = b.getInstallPath(elf.install_step.?.dest_dir, elf.out_filename);
+
+    const dumped_path = b.fmt("{s}.bin", .{elf_path});
+
+    const dump_step = try make_transform(
+        b,
+        &elf.install_step.?.step,
+        // zig fmt: off
+        &[_][]const u8{
+            "llvm-objcopy",
+                "-O", "binary",
+                "--only-section", section_name,
+                elf_path, dumped_path,
+        },
+        // zig fmt: on
+        dumped_path,
+    );
+
+    return dump_step;
+}
 
 fn makeSourceBlobStep(
     b: *std.build.Builder,

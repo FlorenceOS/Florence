@@ -16,6 +16,9 @@ pub const vital = @import("vital.zig");
 /// Userspace processes
 pub const process = @import("process.zig");
 
+/// Copernicus userspace library
+pub const copernicus = @import("copernicus.zig");
+
 /// Lightweight ACPI interpreter
 pub const lai = @cImport({
     @cInclude("lai/core.h");

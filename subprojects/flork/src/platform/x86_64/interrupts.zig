@@ -45,7 +45,8 @@ pub fn init_interrupts() void {
         add_handler(intnum, unhandled_interrupt, true, 0, 0);
     }
 
-    add_handler(0x0E, page_fault_handler, true, 3, 1);
+    add_handler(0x0E, page_fault_handler, true, 0, 1);
+    add_handler(0x80, userspace_syscall_handler, true, 3, 1);
     add_handler(ring_vector, ring_handler, true, 0, 1);
     add_handler(sched_call_vector, os.platform.thread.sched_call_impl_handler, true, 0, 2);
     add_handler(spurious_vector, spurious_handler, true, 0, 1);
@@ -55,6 +56,10 @@ fn spurious_handler(_: *InterruptFrame) void {}
 
 fn ring_handler(_: *InterruptFrame) void {
     apic.eoi();
+}
+
+fn userspace_syscall_handler(frame: *InterruptFrame) void {
+    os.kernel.process.currentProcess().handleSyscall(frame);
 }
 
 fn type_page_fault(error_code: usize) platform.PageFaultAccess {
@@ -193,10 +198,6 @@ pub const InterruptFrame = packed struct {
 
     pub fn trace_stack(self: *const @This()) void {
         os.kernel.debug.dumpFrame(self.rbp, self.rip);
-    }
-
-    pub fn syscallNumber(self: *const @This()) usize {
-        return self.rax;
     }
 };
 

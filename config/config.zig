@@ -61,6 +61,17 @@ pub const kernel = .{
     },
 };
 
+pub const copernicus = .{
+    // Build mode
+    .build_mode = .Debug,
+
+    // True if symbols should be stripped
+    .strip_symbols = false,
+
+    // True if source blob should be created
+    .build_source_blob = true,
+};
+
 pub const drivers = .{
     .block = .{
         .ahci = .{

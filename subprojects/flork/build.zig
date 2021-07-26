@@ -2,13 +2,15 @@ const std = @import("std");
 const exec = @import("../../buildutil/exec.zig");
 const config = @import("../../config/config.zig");
 
+const Copernicus = @import("../copernicus/build.zig");
+
 const Arch = if (@hasField(std.builtin, "Arch")) std.builtin.Arch else std.Target.Cpu.Arch;
 
 pub fn buildKernel(params: struct {
     builder: *std.build.Builder,
     arch: Arch,
     boot_proto: []const u8 = "stivale2",
-}) *std.build.LibExeObjStep {
+}) !*std.build.LibExeObjStep {
     const arch = params.arch;
     const proto = params.boot_proto;
 
@@ -37,6 +39,14 @@ pub fn buildKernel(params: struct {
         .mode = config.kernel.build_mode,
         .strip_symbols = config.kernel.strip_symbols,
     });
+
+    const copernicus = try Copernicus.buildCopernicus(.{
+        .builder = params.builder,
+        .arch = params.arch,
+    });
+
+    kernel.addBuildOption([]const u8, "copernicus_path", copernicus.output_path);
+    kernel.step.dependOn(&copernicus.step);
 
     kernel.addAssemblyFile(params.builder.fmt(flork_path ++ "src/boot/{s}_{s}.S", .{
         proto,
