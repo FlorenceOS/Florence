@@ -1,9 +1,6 @@
 [submodule "Sabaton"]
 	path = boot/Sabaton
 	url = https://github.com/N00byEdge/Sabaton.git
-[submodule "echfs"]
-	path = boot/echfs
-	url = https://github.com/echfs/echfs
 [submodule "src/extern/lai"]
 	path = subprojects/flork/src/extern/lai
 	url = https://github.com/managarm/lai.git
