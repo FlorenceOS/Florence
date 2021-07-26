@@ -112,15 +112,6 @@ const FramebufferTag = packed struct {
 const RsdpTag = packed struct {
     tag: Tag,
     rsdp: u64,
-
-    pub fn format(
-        self: *const @This(),
-        fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        try writer.print("0x{X}", .{self.rsdp});
-    }
 };
 
 const SMPTag = packed struct {
@@ -246,7 +237,7 @@ const ParsedInfo = struct {
             \\Parsed stivale2 tags:
             \\  MemmapTag: {}
             \\  FramebufferTag: {}
-            \\  RSDP: {}
+            \\  RSDP: 0x{X}
             \\  SMP: {}
             \\  DTB: {}
             \\  UART: {}
