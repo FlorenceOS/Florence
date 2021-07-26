@@ -208,7 +208,7 @@ const KernelFileTag = packed struct {
         options: std.fmt.FormatOptions,
         writer: anytype,
     ) !void {
-        try writer.print("ELF at 0x{X}", .{ self.addr });
+        try writer.print("ELF at 0x{X}", .{self.addr});
     }
 };
 
@@ -413,7 +413,7 @@ export fn stivale2Main(info_in: *Info) noreturn {
         consumePhysMem(ent);
     }
 
-    if(info.kernel_file) |file| {
+    if (info.kernel_file) |file| {
         const pp = os.platform.phys_ptr([*]u8).from_int(file.addr);
         os.kernel.debug.addDebugElf(pp.get_writeback());
     }
