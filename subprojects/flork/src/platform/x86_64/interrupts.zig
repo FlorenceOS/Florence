@@ -308,6 +308,7 @@ const rsp_stash_offset =
 const task_offset = @offsetOf(os.platform.smp.CoreData, "current_task");
 const kernel_stack_offset = @offsetOf(os.thread.Task, "stack");
 
+// zig fmt: off
 const syscall_handler_bytes = [0]u8{}
 // First make sure we get a proper stack pointer while
 // saving away all the userspace registers.
@@ -329,6 +330,7 @@ const syscall_handler_bytes = [0]u8{}
     ++ pushi8(0) // push 0                     // error code
     ++ pushi32(syscall_vector) // push 0x80                  // interrupt vector
 ;
+// zig fmt: on
 
 fn hex_chr(comptime value: u4) u8 {
     return "0123456789ABCDEF"[value];
