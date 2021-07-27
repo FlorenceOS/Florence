@@ -76,9 +76,12 @@ fn page_fault_handler(frame: *InterruptFrame) void {
     );
     const page_fault_type = type_page_fault(frame.ec);
 
-    const userspace = ((frame.cs & 0x3) == 3);
+    const userspace_cs = ((frame.cs & 0x3) == 3);
+    const userspace_page_fault = ((frame.ec & 0x4) != 0);
 
-    if (userspace) {
+    std.debug.assert(userspace_cs == userspace_page_fault);
+
+    if (userspace_cs) {
         os.kernel.process.currentProcess().?.onPageFault(page_fault_addr, (frame.ec & 1) != 0, page_fault_type, frame);
     } else {
         platform.page_fault(page_fault_addr, (frame.ec & 1) != 0, page_fault_type, frame);

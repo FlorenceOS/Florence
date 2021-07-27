@@ -1,7 +1,10 @@
 usingnamespace @import("root").preamble;
 
-pub const kernel_linux_compat = config.kernel.linux_binary_compat;
-pub const kernel_xnu_compat = config.kernel.xnu_binary_compat;
+pub const address_space = @import("process/address_space.zig");
+pub const memory_object = @import("process/memory_object.zig");
+
+const kernel_linux_compat = config.kernel.linux_binary_compat;
+const kernel_xnu_compat = config.kernel.xnu_binary_compat;
 
 const platform = os.platform;
 const copernicus = os.kernel.copernicus;
@@ -77,59 +80,34 @@ fn syscallArg(frame: *platform.InterruptFrame, num: usize) usize {
     }
 }
 
+var lazy_zeroes = memory_object.lazyZeroes(os.memory.paging.rw());
+
 pub const Process = struct {
     userspace_task: os.thread.Task,
     page_table: platform.paging.PagingContext,
-    addr_space_alloc: os.memory.range_alloc.RangeAlloc,
+    addr_space: address_space.AddrSpace,
 
     pub fn init(self: *@This()) !void {
         const userspace_base = 0x000400000;
 
-        const copernicus_base = copernicus.getBaseAddr();
-        const copernicus_blob = copernicus.getBlob();
-
-        self.addr_space_alloc = .{};
-        _ = try self.addr_space_alloc.addRange(.{
-            .base = userspace_base,
-            .size = copernicus_base - userspace_base,
-        });
+        try self.addr_space.init(userspace_base, 0xFFFFFFF000);
 
         self.page_table = try os.platform.paging.PagingContext.make_userspace();
         self.userspace_task.paging_context = &self.page_table;
         errdefer self.userspace_task.paging_context.deinit();
 
-        // This should probably just use some COW mapping of copernicus in the future
-        const copernicus_phys = try os.memory.pmm.allocPhys(copernicus_blob.len);
-        std.mem.copy(u8, os.platform.phys_ptr([*]u8).from_int(copernicus_phys).get_writeback()[0..copernicus_blob.len], copernicus_blob);
+        os.log("Mapping copernicus...\n", .{});
 
-        try os.memory.paging.mapPhys(.{
-            .context = &self.page_table,
-            .phys = copernicus_phys,
-            .virt = copernicus_base,
-            .size = copernicus_blob.len,
-            .perm = os.memory.paging.user(os.memory.paging.rwx()),
-            .memtype = .MemoryWriteBack,
-        });
+        const entry = try copernicus.map(&self.addr_space);
 
         const stack_size = 0x2000;
-
-        const stack_phys = try os.memory.pmm.allocPhys(stack_size);
-        std.mem.set(u8, os.platform.phys_ptr([*]u8).from_int(stack_phys).get_writeback()[0..stack_size], 0);
-
-        const stack_base = copernicus_base + copernicus_blob.len + 0x2000;
-
-        try os.memory.paging.mapPhys(.{
-            .context = &self.page_table,
-            .phys = stack_phys,
-            .virt = stack_base,
-            .size = stack_size,
-            .perm = os.memory.paging.user(os.memory.paging.rw()),
-            .memtype = .MemoryWriteBack,
-        });
+        const stack_base = try self.addr_space.allocateAnywhere(stack_size);
+        try self.addr_space.lazyMap(stack_base, stack_size, try lazy_zeroes.makeRegion());
+        const stack_top = stack_base + stack_size;
 
         self.userspace_task.process = self;
 
-        try os.thread.scheduler.spawnUserspaceTask(&self.userspace_task, copernicus_base, 0, stack_base + stack_size - 32);
+        try os.thread.scheduler.spawnUserspaceTask(&self.userspace_task, entry, 0, stack_top);
     }
 
     fn dequeue(frame: *platform.InterruptFrame) void {
@@ -146,10 +124,17 @@ pub const Process = struct {
     }
 
     pub fn onPageFault(self: *@This(), addr: usize, present: bool, fault_type: platform.PageFaultAccess, frame: *platform.InterruptFrame) void {
-        os.log("Page fault in userspace process: {} at 0x{X}\n", .{ fault_type, addr });
-        frame.dump();
-        frame.trace_stack();
-        dequeue(frame);
+        self.addr_space.pageFault(addr, present, fault_type) catch |err| {
+            const present_str: []const u8 = if (present) "present" else "non-present";
+            os.log("Page fault in userspace process: {s} {} at 0x{X}\n", .{ present_str, fault_type, addr });
+            os.log("Didn't handle the page fault: {}\n", .{err});
+            if (@errorReturnTrace()) |trace| {
+                os.kernel.debug.dumpStackTrace(trace);
+            }
+            frame.dump();
+            frame.trace_stack();
+            dequeue(frame);
+        };
     }
 
     fn linuxWrite(self: *@This(), frame: *platform.InterruptFrame) void {
