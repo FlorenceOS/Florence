@@ -82,6 +82,10 @@ const Range = struct {
     ) !void {
         try writer.print("[base: 0x{X} size: 0x{X}]", .{ self.base, self.size });
     }
+
+    fn contains(self: *const @This(), addr: usize) bool {
+        return addr >= self.base and addr < self.base + self.size;
+    }
 };
 
 const AddressComparator = struct {
@@ -96,22 +100,79 @@ const SizeComparator = struct {
     }
 };
 
-pub const RangeAlloc = struct {
-    range_node_head: ?*Range = null,
+pub const RangeAllocator = struct {
+    ra: RangeAlloc = .{},
+
     allocator: std.mem.Allocator = .{
         .allocFn = alloc,
         .resizeFn = resize,
     },
 
+    mutex: Mutex = .{},
+
+    fn alloc(
+        allocator: *std.mem.Allocator,
+        len: usize,
+        ptr_align: u29,
+        len_align: u29,
+        ret_addr: usize,
+    ) std.mem.Allocator.Error![]u8 {
+        const self = @fieldParentPtr(@This(), "allocator", allocator);
+        self.mutex.lock();
+        defer self.mutex.unlock();
+
+        return self.ra.allocateAnywhere(len, ptr_align, len_align) catch |err| {
+            switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+                else => {
+                    os.log("RangeAlloc returned error {} on allocateAnywhere", .{err});
+                    @panic("RangeAlloc error");
+                },
+            }
+        };
+    }
+
+    fn resize(
+        allocator: *std.mem.Allocator,
+        old_mem: []u8,
+        old_align: u29,
+        new_size: usize,
+        len_align: u29,
+        ret_addr: usize,
+    ) std.mem.Allocator.Error!usize {
+        const self = @fieldParentPtr(@This(), "allocator", allocator);
+        self.mutex.lock();
+        defer self.mutex.unlock();
+
+        if (new_size != 0) {
+            os.log("Todo: RangeAllocator.resize(): actually resize\n", .{});
+            @panic("");
+        }
+
+        // Free this address
+        const new_range = self.ra.giveRange(.{
+            .base = @ptrToInt(old_mem.ptr),
+            .size = old_mem.len,
+        }) catch |err| {
+            switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+                else => {
+                    os.log("Error while making new nodes for free(): {}\n", .{err});
+                    @panic("");
+                },
+            }
+        };
+
+        return 0;
+    }
+};
+
+pub const RangeAlloc = struct {
+    range_node_head: ?*Range = null,
     by_addr: AddrTree = AddrTree.init(.{}, {}),
     by_size: SizeTree = SizeTree.init(.{}, {}),
 
-    mutex: Mutex = .{},
-
     fn dumpState(self: *@This()) void {
-        if (!debug)
-            return;
-
         os.log("Dumping range_alloc state\n", .{});
 
         var range = self.by_addr.iterators.first();
@@ -120,26 +181,47 @@ pub const RangeAlloc = struct {
         }
     }
 
-    fn allocImpl(
+    pub fn allocateAnywhere(
         self: *@This(),
         len: usize,
-        ptr_align: u29,
-        len_align: u29,
-        ret_addr: usize,
+        ptr_align: usize,
+        len_align: usize,
     ) ![]u8 {
         if (debug) {
             os.log("Calling alloc(len=0x{X},pa=0x{X},la=0x{X})\n", .{ len, ptr_align, len_align });
             self.dumpState();
         }
 
-        const placement = try self.findPlacement(len, ptr_align, len_align);
+        const placement = try self.findPlacementAnywhere(len, ptr_align, len_align);
 
         const range = placement.range;
         const pmt = placement.placement;
 
-        // Return value
         const ret = @intToPtr([*]u8, range.base + pmt.offset)[0..len];
 
+        self.maintainTree(range, pmt);
+
+        return ret;
+    }
+
+    pub fn allocateAt(
+        self: *@This(),
+        addr: usize,
+        len: usize,
+    ) ![]u8 {
+        const placement = try self.findPlacementAt(addr, len);
+
+        const range = placement.range;
+        const pmt = placement.placement;
+
+        const ret = @intToPtr([*]u8, range.base + pmt.offset)[0..len];
+
+        self.maintainTree(range, pmt);
+
+        return ret;
+    }
+
+    fn maintainTree(self: *@This(), range: *Range, pmt: PlacementResult) void {
         // Node maintenance
         const has_data_before = pmt.offset != 0;
         const has_data_after = pmt.offset + pmt.effective_size < range.size;
@@ -194,67 +276,6 @@ pub const RangeAlloc = struct {
 
         if (debug)
             self.dumpState();
-
-        return ret;
-    }
-
-    fn alloc(
-        allocator: *std.mem.Allocator,
-        len: usize,
-        ptr_align: u29,
-        len_align: u29,
-        ret_addr: usize,
-    ) std.mem.Allocator.Error![]u8 {
-        const self = @fieldParentPtr(@This(), "allocator", allocator);
-        self.mutex.lock();
-        defer self.mutex.unlock();
-
-        return self.allocImpl(len, ptr_align, len_align, ret_addr) catch |err| {
-            switch (err) {
-                error.OutOfMemory => return error.OutOfMemory,
-                else => {
-                    os.log("Alloc returned error: {}", .{err});
-                    @panic("Alloc error");
-                },
-            }
-        };
-    }
-
-    fn resize(
-        allocator: *std.mem.Allocator,
-        old_mem: []u8,
-        old_align: u29,
-        new_size: usize,
-        len_align: u29,
-        ret_addr: usize,
-    ) std.mem.Allocator.Error!usize {
-        const self = @fieldParentPtr(@This(), "allocator", allocator);
-        self.mutex.lock();
-        defer self.mutex.unlock();
-
-        if (new_size != 0) {
-            os.log("Todo: RangeAlloc.resize(): actually resize\n", .{});
-            @panic("");
-        }
-
-        // Free this address
-        const new_range = self.addRange(.{
-            .base = @ptrToInt(old_mem.ptr),
-            .size = old_mem.len,
-        }) catch |err| {
-            switch (err) {
-                error.OutOfMemory => return error.OutOfMemory,
-                else => {
-                    os.log("Error while making new nodes for free(): {}\n", .{err});
-                    @panic("");
-                },
-            }
-        };
-
-        // Attempt to merge nodes
-        self.mergeRanges(new_range);
-
-        return 0;
     }
 
     fn locateAddressNode(self: *@This(), size_node: *Range) *Range {
@@ -266,7 +287,7 @@ pub const RangeAlloc = struct {
         @panic("");
     }
 
-    fn findPlacement(
+    fn findPlacementAnywhere(
         self: *@This(),
         size: usize,
         alignment: usize,
@@ -300,6 +321,38 @@ pub const RangeAlloc = struct {
         return error.OutOfMemory;
     }
 
+    fn findPlacementAt(
+        self: *@This(),
+        addr: usize,
+        size: usize,
+    ) !RangePlacement {
+        {
+            const addr_finder: struct {
+                addr: usize,
+
+                pub fn check(finder: *const @This(), range: *const Range) bool {
+                    return range.base + range.size >= finder.addr;
+                }
+            } = .{ .addr = addr };
+
+            var range = self.by_addr.lowerBound(@TypeOf(addr_finder), &addr_finder);
+
+            if (range) |r| {
+                if (r.contains(addr) and r.contains(addr + size - 1)) {
+                    return RangePlacement{
+                        .range = r,
+                        .placement = .{
+                            .offset = addr - r.base,
+                            .effective_size = size,
+                        },
+                    };
+                }
+            }
+        }
+
+        return error.OutOfMemory;
+    }
+
     fn freeRange(self: *@This(), node: *Range) void {
         const new_head = @ptrCast(*?*Range, node);
         new_head.* = self.range_node_head;
@@ -307,13 +360,18 @@ pub const RangeAlloc = struct {
     }
 
     fn consumeNodeBytes(self: *@This()) !void {
-        const nodes = try os.memory.pmm.phys_heap.alloc(Range, 0x1000/@sizeOf(Range));
+        const nodes = try os.memory.pmm.phys_heap.alloc(Range, 0x1000 / @sizeOf(Range));
         for (nodes) |*n| {
             self.freeRange(n);
         }
     }
 
-    pub fn addRange(self: *@This(), in_range: Range) !*Range {
+    pub fn giveRange(self: *@This(), in_range: Range) !void {
+        const range = try self.addRange(in_range);
+        self.mergeRanges(range);
+    }
+
+    fn addRange(self: *@This(), in_range: Range) !*Range {
         const range = try self.allocRange();
         range.* = in_range;
 

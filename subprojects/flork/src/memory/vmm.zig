@@ -1,17 +1,16 @@
 usingnamespace @import("root").preamble;
 
 const paging = os.memory.paging;
-const RangeAlloc = os.memory.range_alloc.RangeAlloc;
-const DebugAlloc = os.memory.debug_alloc.DebugAlloc;
+const RangeAllocator = os.memory.range_alloc.RangeAllocator;
 
 /// Range allocator for nonbacked memory
-pub var nonbacked_alloc = RangeAlloc{};
+pub var nonbacked_alloc = RangeAllocator{};
 
 extern const __kernel_begin: u8;
 
 pub fn init(phys_high: usize) !void {
     os.log("Initializing vmm with base 0x{X}\n", .{phys_high});
-    _ = try nonbacked_alloc.addRange(.{
+    try nonbacked_alloc.ra.giveRange(.{
         .base = phys_high,
         .size = @ptrToInt(&__kernel_begin) - phys_high,
     });
