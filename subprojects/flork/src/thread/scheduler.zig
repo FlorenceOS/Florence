@@ -45,42 +45,18 @@ pub fn wake(task: *os.thread.Task) void {
 }
 
 pub fn spawnUserspaceTask(task: *os.thread.Task, entry: u64, arg: u64, stack: u64) !void {
-    try task.allocStack();
-    errdefer task.freeStack();
-
-    var best_cpu_idx: usize = 0;
-    {
-        const state = balancer_lock.lock();
-        // TODO: maybe something more sophisticated?
-        for (os.platform.smp.cpus) |*cpu, i| {
-            if (cpu.tasks_count < os.platform.smp.cpus[best_cpu_idx].tasks_count) {
-                best_cpu_idx = i;
-            }
-        }
-        task.allocated_core_id = best_cpu_idx;
-        os.platform.smp.cpus[best_cpu_idx].tasks_count += 1;
-        balancer_lock.unlock(state);
-    }
-
-    os.log("Userspace task allocated to core {}\n", .{best_cpu_idx});
-
-    errdefer {
-        const state = balancer_lock.lock();
-        os.platform.smp.cpus[best_cpu_idx].tasks_count -= 1;
-        balancer_lock.unlock(state);
-    }
+    try initTask(task);
 
     os.platform.thread.init_task_userspace(task, entry, arg, stack);
 
     task.enqueue();
 }
 
-/// Create a new task that calls a function with given arguments.
-/// Uses heap, so don't create tasks in interrupt context
-pub fn makeTask(func: anytype, args: anytype) !*os.thread.Task {
-    const task = try task_alloc.create(os.thread.Task);
-    errdefer task_alloc.destroy(task);
-
+/// Initialize a task for usage, must call destroyTask to clean up
+/// You still have to initialize:
+///   * Paging context
+///   * Register state
+pub fn initTask(task: *os.thread.Task) !void {
     try task.allocStack();
     errdefer task.freeStack();
 
@@ -100,30 +76,35 @@ pub fn makeTask(func: anytype, args: anytype) !*os.thread.Task {
     }
 
     os.log("Task allocated to core {}\n", .{best_cpu_idx});
+}
 
-    errdefer {
-        const state = balancer_lock.lock();
-        os.platform.smp.cpus[best_cpu_idx].tasks_count -= 1;
-        balancer_lock.unlock(state);
-    }
+/// Creates a new task on the heap and calls initTask() on it
+pub fn createTask() !*os.thread.Task {
+    const task = try task_alloc.create(os.thread.Task);
+    errdefer task_alloc.destroy(task);
+
+    try initTask(task);
+
+    return task;
+}
+
+/// Create and start a new kernel task that calls a function with given arguments.
+/// Paging context is copied from the current one, task is automatically enqueued
+pub fn spawnTask(func: anytype, args: anytype) !void {
+    const task = try createTask();
+    errdefer destroyTask(task);
+
+    task.paging_context = os.platform.get_current_task().paging_context;
 
     // Initialize task in a way that it will execute func with args on the startup
     const entry = os.thread.NewTaskEntry.alloc(task, func, args);
     try os.platform.thread.init_task_call(task, entry);
-    return task;
-}
 
-/// Create and start a new task that calls a function with given arguments.
-pub fn spawnTask(func: anytype, args: anytype) !void {
-    const task = try makeTask(func, args);
-    task.paging_context = os.platform.get_current_task().paging_context;
     task.enqueue();
 }
 
-/// Exit current task
-/// TODO: Should be reimplemented with URM
-pub fn exitTask() noreturn {
-    const task = os.platform.thread.self_exited();
+/// Effectively destroy a task (cleanup after initTask() or createTask())
+pub fn destroyTask(task: ?*os.thread.Task) void {
     const id = if (task) |t| t.allocated_core_id else 0;
 
     const state = balancer_lock.lock();
@@ -133,6 +114,15 @@ pub fn exitTask() noreturn {
     if (task) |t| {
         task_alloc.destroy(t);
     }
+
+    // TODO: Delete stacks in such a way that we can return from the current interrupt
+    // in case it still is in use
+}
+
+/// Exit current task
+/// TODO: Should be reimplemented with URM
+pub fn exitTask() noreturn {
+    destroyTask(os.platform.thread.self_exited());
 
     leave();
 }
