@@ -96,8 +96,6 @@ pub const Process = struct {
         self.userspace_task.paging_context = &self.page_table;
         errdefer self.userspace_task.paging_context.deinit();
 
-        os.log("Mapping copernicus...\n", .{});
-
         const entry = try copernicus.map(&self.addr_space);
 
         const stack_size = 0x2000;
