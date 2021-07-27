@@ -84,7 +84,6 @@ pub fn makeTask(func: anytype, args: anytype) !*os.thread.Task {
     try task.allocStack();
     errdefer task.freeStack();
 
-    task.paging_context = os.platform.get_current_task().paging_context;
     // Find the best CPU for the task
     var best_cpu_idx: usize = 0;
     {
@@ -117,6 +116,7 @@ pub fn makeTask(func: anytype, args: anytype) !*os.thread.Task {
 /// Create and start a new task that calls a function with given arguments.
 pub fn spawnTask(func: anytype, args: anytype) !void {
     const task = try makeTask(func, args);
+    task.paging_context = os.platform.get_current_task().paging_context;
     task.enqueue();
 }
 
