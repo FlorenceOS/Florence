@@ -86,13 +86,13 @@ const Range = struct {
 
 const AddressComparator = struct {
     pub fn compare(self: *const @This(), left: *const Range, right: *const Range) bool {
-        return left.base < right.base;
+        return left.base >= right.base;
     }
 };
 
 const SizeComparator = struct {
     pub fn compare(self: *const @This(), left: *const Range, right: *const Range) bool {
-        return left.size < right.size;
+        return left.size >= right.size;
     }
 };
 
