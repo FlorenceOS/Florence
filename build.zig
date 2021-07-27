@@ -96,10 +96,10 @@ fn universal_x86_64_image(b: *Builder, image_path: []const u8, kernel_path: []co
     const image_params = &[_][]const u8{
         "/bin/sh", "-c",
         std.mem.concat(b.allocator, u8, &[_][]const u8{
-            "make -C boot/limine-bin install PREFIX=/usr/local/var/florence-limine && ",
+            "make -C boot/limine-bin && ",
             "mkdir -p ", image_dir, " && ",
             "install -vC ./boot/stivale2_image/limine.cfg ",
-              "/usr/local/var/florence-limine/share/limine/limine{.sys,-cd.bin,-eltorito-efi.bin} ",
+              "boot/limine-bin/limine{.sys,-cd.bin,-eltorito-efi.bin} ",
             image_dir, " &&",
             "cp ", kernel_path, " ", image_dir, "/flork.elf && ",
             "xorriso -as mkisofs -b limine-cd.bin ",
@@ -108,7 +108,7 @@ fn universal_x86_64_image(b: *Builder, image_path: []const u8, kernel_path: []co
                 "-efi-boot-part --efi-boot-image --protective-msdos-label ",
                 image_dir, " -o ", image_path,
             "&&",
-            "/usr/local/var/florence-limine/bin/limine-install ", image_path,
+            "boot/limine-bin/limine-install ", image_path,
         }) catch unreachable,
     };
     return b.addSystemCommand(image_params);
