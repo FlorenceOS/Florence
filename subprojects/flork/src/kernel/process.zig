@@ -151,7 +151,7 @@ pub const Process = struct {
     }
 
     fn linuxExit(self: *@This(), frame: *platform.InterruptFrame) void {
-        os.log("Userspace process exited.\n", .{});
+        os.log("Userspace process requested exit.\n", .{});
         dequeue(frame);
     }
 
