@@ -59,7 +59,7 @@ fn ring_handler(_: *InterruptFrame) void {
 }
 
 fn userspace_syscall_handler(frame: *InterruptFrame) void {
-    os.kernel.process.currentProcess().handleSyscall(frame);
+    os.kernel.process.currentProcess().?.handleSyscall(frame);
 }
 
 fn type_page_fault(error_code: usize) platform.PageFaultAccess {
@@ -76,10 +76,10 @@ fn page_fault_handler(frame: *InterruptFrame) void {
     );
     const page_fault_type = type_page_fault(frame.ec);
 
-    const userspace_process = if ((frame.cs & 0x3) == 3) os.kernel.process.currentProcess() else null;
+    const userspace = ((frame.cs & 0x3) == 3);
 
-    if (userspace_process) |p| {
-        p.onPageFault(page_fault_addr, (frame.ec & 1) != 0, page_fault_type, frame);
+    if (userspace) {
+        os.kernel.process.currentProcess().?.onPageFault(page_fault_addr, (frame.ec & 1) != 0, page_fault_type, frame);
     } else {
         platform.page_fault(page_fault_addr, (frame.ec & 1) != 0, page_fault_type, frame);
     }

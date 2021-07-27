@@ -13,8 +13,8 @@ const copernicus = os.kernel.copernicus;
 // We don't need windows binary compatibility as there is a kernel api dll
 // which can just do florence sycalls
 
-pub fn currentProcess() *Process {
-    return @fieldParentPtr(Process, "userspace_task", os.platform.get_current_task());
+pub fn currentProcess() ?*Process {
+    return os.platform.get_current_task().process;
 }
 
 fn resolveSyscall(frame: *platform.InterruptFrame) fn (*Process, *platform.InterruptFrame) void {
@@ -126,6 +126,8 @@ pub const Process = struct {
             .perm = os.memory.paging.user(os.memory.paging.rw()),
             .memtype = .MemoryWriteBack,
         });
+
+        self.userspace_task.process = self;
 
         try os.thread.scheduler.spawnUserspaceTask(&self.userspace_task, copernicus_base, 0, stack_base + stack_size - 32);
     }

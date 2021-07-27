@@ -26,6 +26,9 @@ pub const Task = struct {
     /// Top of the stack used by the task
     stack: usize = undefined,
 
+    /// The process context that the task currently is executing within
+    process: ?*os.kernel.process.Process = null,
+
     /// Allocate stack for the task. Used in scheduler makeTask routine
     pub fn allocStack(self: *@This()) !void {
         // Allocate non-backing virtual memory
