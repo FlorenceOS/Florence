@@ -9,12 +9,11 @@ pub const Spinlock = struct {
     /// Grabs lock and disables interrupts atomically.
     pub fn lock(self: *@This()) os.platform.InterruptState {
         const ticket = @atomicRmw(usize, &self.allocated, .Add, 1, .AcqRel);
+        const state = os.platform.get_and_disable_interrupts();
         while (true) {
-            const state = os.platform.get_and_disable_interrupts();
             if (@atomicLoad(usize, &self.serving, .Acquire) == ticket) {
                 return state;
             }
-            os.platform.set_interrupts(state);
             os.platform.spin_hint();
         }
     }
