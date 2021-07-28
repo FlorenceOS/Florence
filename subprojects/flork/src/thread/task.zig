@@ -18,7 +18,7 @@ pub const Task = struct {
     platform_data: os.platform.thread.TaskData = undefined,
 
     /// Hook for the task queue
-    atomic_queue_hook: atomic_queue.Node = undefined,
+    queue_hook: atomic_queue.Node = undefined,
 
     /// Virtual memory space task runs in
     paging_context: *os.platform.paging.PagingContext = undefined,

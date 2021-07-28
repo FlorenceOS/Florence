@@ -1,9 +1,8 @@
 usingnamespace @import("root").preamble;
 
-/// Node hook for the queue. Embedded inside queue element.
-pub const Node = struct {
-    next: ?*Node,
-};
+/// We are exporting Node from non-atomic queue module, since we want the same Node type to be used
+/// both for atomic and non-atomic queues
+pub const Node = lib.containers.queue.Node;
 
 /// Multi producer single consumer unbounded atomic queue.
 /// NOTE: Consumer is responsible for managing memory for nodes.
@@ -110,8 +109,8 @@ test "insertion tests" {
     queue.enqueue(&elems[0]);
     queue.enqueue(&elems[1]);
     queue.enqueue(&elems[2]);
-    std.testing.expect(queue.dequeue() == &elems[0]);
-    std.testing.expect(queue.dequeue() == &elems[1]);
-    std.testing.expect(queue.dequeue() == &elems[2]);
-    std.testing.expect(queue.dequeue() == null);
+    try std.testing.expect(queue.dequeue() == &elems[0]);
+    try std.testing.expect(queue.dequeue() == &elems[1]);
+    try std.testing.expect(queue.dequeue() == &elems[2]);
+    try std.testing.expect(queue.dequeue() == null);
 }

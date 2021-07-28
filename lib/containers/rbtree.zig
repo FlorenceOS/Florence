@@ -854,9 +854,7 @@ test "red black tree" {
         .enable_not_associatve_augment = false,
     };
 
-    const IntTreeNode = struct {
-        val: usize, hook: Node(features) = undefined
-    };
+    const IntTreeNode = struct { val: usize, hook: Node(features) = undefined };
 
     const IntComparator = struct {
         pub fn compare(

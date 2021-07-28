@@ -4,7 +4,7 @@ const atomic_queue = lib.containers.atomic_queue;
 /// Task queue is a generic helper for the queue of tasks (allows to enqueue/dequeue them)
 /// It does no locking (though it disables interrupts) for its operations
 pub const TaskQueue = struct {
-    queue: atomic_queue.MPSCUnboundedQueue(os.thread.Task, "atomic_queue_hook") = .{},
+    queue: atomic_queue.MPSCUnboundedQueue(os.thread.Task, "queue_hook") = .{},
     last_ack: usize = 0,
     last_triggered: usize = 0,
 
