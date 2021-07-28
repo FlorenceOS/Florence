@@ -8,19 +8,14 @@ pub const Spinlock = struct {
 
     /// Grabs lock and disables interrupts atomically.
     pub fn lock(self: *@This()) os.platform.InterruptState {
-        const ticket = @atomicRmw(usize, &self.allocated, .Add, 1, .AcqRel);
         const state = os.platform.get_and_disable_interrupts();
-        while (true) {
-            if (@atomicLoad(usize, &self.serving, .Acquire) == ticket) {
-                return state;
-            }
-            os.platform.spin_hint();
-        }
+        self.grab();
+        return state;
     }
 
     /// Grab lock without disabling interrupts
     pub fn grab(self: *@This()) void {
-        const ticket = @atomicRmw(usize, &self.allocated, .Add, 1, .AcqRel);
+        const ticket = @atomicRmw(usize, &self.allocated, .Add, 1, .Monotonic);
         while (true) {
             if (@atomicLoad(usize, &self.serving, .Acquire) == ticket) {
                 return;
@@ -31,7 +26,7 @@ pub const Spinlock = struct {
 
     /// Release lock without restoring interrupt state
     pub fn ungrab(self: *@This()) void {
-        _ = @atomicRmw(usize, &self.serving, .Add, 1, .AcqRel);
+        _ = @atomicRmw(usize, &self.serving, .Add, 1, .Release);
     }
 
     /// Releases lock while atomically restoring interrupt state
