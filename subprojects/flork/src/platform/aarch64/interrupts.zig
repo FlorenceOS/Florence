@@ -264,7 +264,7 @@ fn do_stack_call(frame: *InterruptFrame) void {
     fun(frame, ctx);
 }
 
-export fn interrupt_handler(frame: *InterruptFrame) void {
+export fn interrupt_handler(frame: *InterruptFrame) callconv(.C) void {
     const esr = asm volatile ("MRS %[esr], ESR_EL1"
         : [esr] "=r" (-> u64)
     );
