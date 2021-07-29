@@ -255,6 +255,7 @@ pub const PagingContext = struct {
         // Make sure MMU is enabled
         const sctlr: u64 = 0x100D;
 
+        // zig fmt: off
         const tcr: u64 = 0 | pszc.offset_bits() // T0SZ
             | pszc.offset_bits() << 16 // T1SZ
             | (1 << 8) // TTBR0 Inner WB RW-Allocate
@@ -269,6 +270,7 @@ pub const PagingContext = struct {
             | (1 << 56) // Fault on TTBR1 access from EL0
             | (0 << 55) // Don't fault on TTBR0 access from EL0
         ;
+        // zig fmt: on
 
         asm volatile (
         // First, make sure we're not
@@ -403,8 +405,8 @@ pub const PagingContext = struct {
             .underlying = @ptrCast(*MappingEncoding, enc),
             .perms = .{
                 .writable = !map.no_write.read(),
-                .executable = !map.no_execute.read(),
-                .userspace = !map.no_user.read(),
+                .executable = !map.uxn_or_xn.read(),
+                .userspace = map.user.read(),
             },
         };
     }
@@ -419,7 +421,7 @@ pub const PagingContext = struct {
             .underlying = @ptrCast(*TableEncoding, enc),
             .perms = .{
                 .writable = !tbl.no_write.read(),
-                .executable = !tbl.no_execute.read(),
+                .executable = !tbl.uxn_or_xn.read(),
                 .userspace = !tbl.no_user.read(),
             },
         };
@@ -438,8 +440,11 @@ pub const PagingContext = struct {
         tbl.nonsecure.write(false);
 
         tbl.no_write.write(!pte.perms.writable);
-        tbl.no_execute.write(!pte.perms.executable);
+        tbl.uxn_or_xn.write(!pte.perms.executable);
         tbl.no_user.write(!pte.perms.userspace);
+
+        // We don't want to ever execute something userspace, and it's res0 if user is 0
+        tbl.pxn.write(pte.perms.userspace);
 
         return tbl.raw;
     }
@@ -453,8 +458,11 @@ pub const PagingContext = struct {
         map.walk.write(pte.level == 0);
 
         map.no_write.write(!pte.perms.writable);
-        map.no_execute.write(!pte.perms.executable);
-        map.no_user.write(!pte.perms.userspace);
+        map.uxn_or_xn.write(!pte.perms.executable);
+        map.user.write(pte.perms.userspace);
+
+        // We don't want to ever execute something userspace, and it's res0 if user is 0
+        map.pxn.write(pte.perms.userspace);
 
         map.shareability.write(2);
 
@@ -506,11 +514,12 @@ const MappingEncoding = extern union {
     walk: bf.Boolean(u64, 1),
     attr_index: bf.Bitfield(u64, 2, 3),
     nonsecure: bf.Boolean(u64, 5),
-    no_user: bf.Boolean(u64, 6),
+    user: bf.Boolean(u64, 6),
     no_write: bf.Boolean(u64, 7),
     shareability: bf.Bitfield(u64, 8, 2),
     access: bf.Boolean(u64, 10),
-    no_execute: bf.Boolean(u64, 54),
+    pxn: bf.Boolean(u64, 53),
+    uxn_or_xn: bf.Boolean(u64, 54),
 };
 
 const TableEncoding = extern union {
@@ -518,7 +527,8 @@ const TableEncoding = extern union {
 
     present: bf.Boolean(u64, 0),
     walk: bf.Boolean(u64, 1),
-    no_execute: bf.Boolean(u64, 60),
+    pxn: bf.Boolean(u64, 59),
+    uxn_or_xn: bf.Boolean(u64, 60),
     no_user: bf.Boolean(u64, 61),
     no_write: bf.Boolean(u64, 62),
     nonsecure: bf.Boolean(u64, 63),
@@ -580,11 +590,13 @@ const TablePTE = struct {
 
     pub fn addPerms(self: *const @This(), perms: os.memory.paging.Perms) void {
         if (perms.executable)
-            self.underlying.?.no_execute.write(false);
+            self.underlying.?.uxn_or_xn.write(false);
         if (perms.writable)
             self.underlying.?.no_write.write(false);
         if (perms.userspace)
             self.underlying.?.no_user.write(false);
+        if (!perms.userspace and perms.executable)
+            self.underlying.?.pxn.write(false);
     }
 
     pub fn make_child_table(self: *const @This(), enc: *u64, perms: os.memory.paging.Perms) !TablePTE {
