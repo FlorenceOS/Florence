@@ -4,7 +4,6 @@ pub const thread = @import("thread/thread.zig");
 pub const platform = @import("platform/platform.zig");
 pub const drivers = @import("drivers/drivers.zig");
 pub const kernel = @import("kernel/kernel.zig");
-pub const kepler = @import("kepler/kepler.zig");
 
 /// OS module itself
 pub const log = kernel.logger.log;

@@ -36,9 +36,6 @@ pub const lai = @cImport({
 pub fn kmain() noreturn {
     os.log("Hello, kmain!\n", .{});
 
-    if (config.kernel.run_kepler_tests)
-        os.vital(os.kepler.tests.run_tests(), "Kepler tests terminated with error");
-
     var proc: process.Process = undefined;
     os.vital(proc.init(), "init proc launch");
 
