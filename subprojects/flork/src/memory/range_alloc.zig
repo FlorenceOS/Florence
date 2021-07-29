@@ -3,7 +3,6 @@ usingnamespace @import("root").preamble;
 const Order = std.math.Order;
 
 const rb = lib.containers.rbtree;
-const Mutex = os.thread.Mutex;
 
 const AddrNode = rb.Node(rb_features);
 const SizeNode = rb.Node(rb_features);
@@ -13,29 +12,11 @@ const SizeTree = rb.Tree(Range, "size_node", size_config);
 const PlacementResult = struct {
     effective_size: u64,
     offset: u64,
-
-    pub fn format(
-        self: *const @This(),
-        fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        try writer.print("size=0x{X}, offset=0x{X}", .{ self.effective_size, self.offset });
-    }
 };
 
 const RangePlacement = struct {
     range: *Range,
     placement: PlacementResult,
-
-    pub fn format(
-        self: *const @This(),
-        fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        try writer.print("Placement{{{}, within freenode {}}}", .{ self.placement, self.range });
-    }
 };
 
 const Range = struct {
@@ -74,15 +55,6 @@ const Range = struct {
         return null;
     }
 
-    pub fn format(
-        self: *const @This(),
-        fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        try writer.print("[base: 0x{X} size: 0x{X}]", .{ self.base, self.size });
-    }
-
     fn contains(self: *const @This(), addr: usize) bool {
         return addr >= self.base and addr < self.base + self.size;
     }
@@ -100,86 +72,82 @@ const SizeComparator = struct {
     }
 };
 
-pub const RangeAllocator = struct {
-    ra: RangeAlloc = .{},
+pub fn RangeAllocator(comptime LockType: type) type {
+    return struct {
+        ra: RangeAlloc,
 
-    allocator: std.mem.Allocator = .{
-        .allocFn = alloc,
-        .resizeFn = resize,
-    },
+        allocator: std.mem.Allocator = .{
+            .allocFn = alloc,
+            .resizeFn = resize,
+        },
 
-    mutex: Mutex = .{},
+        lock: LockType = .{},
 
-    fn alloc(
-        allocator: *std.mem.Allocator,
-        len: usize,
-        ptr_align: u29,
-        len_align: u29,
-        ret_addr: usize,
-    ) std.mem.Allocator.Error![]u8 {
-        const self = @fieldParentPtr(@This(), "allocator", allocator);
-        self.mutex.lock();
-        defer self.mutex.unlock();
-
-        return self.ra.allocateAnywhere(len, ptr_align, len_align) catch |err| {
-            switch (err) {
-                error.OutOfMemory => return error.OutOfMemory,
-                else => {
-                    os.log("RangeAlloc returned error {} on allocateAnywhere", .{err});
-                    @panic("RangeAlloc error");
+        pub fn init(backing_allocator: *std.mem.Allocator) @This() {
+            return .{
+                .ra = .{
+                    .backing_allocator = backing_allocator,
                 },
-            }
-        };
-    }
-
-    fn resize(
-        allocator: *std.mem.Allocator,
-        old_mem: []u8,
-        old_align: u29,
-        new_size: usize,
-        len_align: u29,
-        ret_addr: usize,
-    ) std.mem.Allocator.Error!usize {
-        const self = @fieldParentPtr(@This(), "allocator", allocator);
-        self.mutex.lock();
-        defer self.mutex.unlock();
-
-        if (new_size != 0) {
-            os.log("Todo: RangeAllocator.resize(): actually resize\n", .{});
-            @panic("");
+            };
         }
 
-        // Free this address
-        const new_range = self.ra.giveRange(.{
-            .base = @ptrToInt(old_mem.ptr),
-            .size = old_mem.len,
-        }) catch |err| {
-            switch (err) {
-                error.OutOfMemory => return error.OutOfMemory,
-                else => {
-                    os.log("Error while making new nodes for free(): {}\n", .{err});
-                    @panic("");
-                },
-            }
-        };
+        fn alloc(
+            allocator: *std.mem.Allocator,
+            len: usize,
+            ptr_align: u29,
+            len_align: u29,
+            ret_addr: usize,
+        ) std.mem.Allocator.Error![]u8 {
+            const self = @fieldParentPtr(@This(), "allocator", allocator);
+            self.lock.lock();
+            defer self.lock.unlock();
 
-        return 0;
-    }
-};
+            return self.ra.allocateAnywhere(len, ptr_align, len_align) catch |err| {
+                switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                    else => unreachable,
+                }
+            };
+        }
+
+        fn resize(
+            allocator: *std.mem.Allocator,
+            old_mem: []u8,
+            old_align: u29,
+            new_size: usize,
+            len_align: u29,
+            ret_addr: usize,
+        ) std.mem.Allocator.Error!usize {
+            const self = @fieldParentPtr(@This(), "allocator", allocator);
+            self.lock.lock();
+            defer self.lock.unlock();
+
+            if (new_size != 0) {
+                @panic("Todo: RangeAllocator.resize(): actually resize");
+            }
+
+            // Free this address
+            const new_range = self.ra.giveRange(.{
+                .base = @ptrToInt(old_mem.ptr),
+                .size = old_mem.len,
+            }) catch |err| {
+                switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                    else => unreachable,
+                }
+            };
+
+            return 0;
+        }
+    };
+}
 
 pub const RangeAlloc = struct {
     range_node_head: ?*Range = null,
     by_addr: AddrTree = AddrTree.init(.{}, {}),
     by_size: SizeTree = SizeTree.init(.{}, {}),
 
-    fn dumpState(self: *@This()) void {
-        os.log("Dumping range_alloc state\n", .{});
-
-        var range = self.by_addr.iterators.first();
-        while (range) |r| : (range = self.by_addr.iterators.next(r)) {
-            os.log("{}\n", .{r});
-        }
-    }
+    backing_allocator: *std.mem.Allocator,
 
     pub fn allocateAnywhere(
         self: *@This(),
@@ -187,11 +155,6 @@ pub const RangeAlloc = struct {
         ptr_align: usize,
         len_align: usize,
     ) ![]u8 {
-        if (debug) {
-            os.log("Calling alloc(len=0x{X},pa=0x{X},la=0x{X})\n", .{ len, ptr_align, len_align });
-            self.dumpState();
-        }
-
         const placement = try self.findPlacementAnywhere(len, ptr_align, len_align);
 
         const range = placement.range;
@@ -226,12 +189,7 @@ pub const RangeAlloc = struct {
         const has_data_before = pmt.offset != 0;
         const has_data_after = pmt.offset + pmt.effective_size < range.size;
 
-        if (debug)
-            os.log("Chose {}\n", .{placement});
-
         if (has_data_before and has_data_after) {
-            if (debug)
-                os.log("Has data before and after\n", .{});
             // Add the new range
             const new_range_offset = pmt.offset + pmt.effective_size;
             const new_range = self.addRange(.{
@@ -247,13 +205,9 @@ pub const RangeAlloc = struct {
         } else if (has_data_after or has_data_before) {
             // Reuse the single node
             if (has_data_before) {
-                if (debug)
-                    os.log("Has data left before\n", .{});
                 // Cool, only the size has changed, no reinsertion on the addr node
                 range.size = pmt.offset;
             } else {
-                if (debug)
-                    os.log("Has data left after\n", .{});
                 // Update addr node and reinsert
                 self.by_addr.remove(range);
                 range.size -= pmt.effective_size;
@@ -265,8 +219,6 @@ pub const RangeAlloc = struct {
             self.by_size.remove(range);
             self.by_size.insert(range);
         } else {
-            if (debug)
-                os.log("Removing the node\n", .{});
             // Remove the node entirely
             self.by_addr.remove(range);
             self.by_size.remove(range);
@@ -283,8 +235,7 @@ pub const RangeAlloc = struct {
         if (node) |n| {
             return @fieldParentPtr(Range, "node", n);
         }
-        os.log("Could not locate addr node for {}\n", .{size_node});
-        @panic("");
+        unreachable;
     }
 
     fn findPlacementAnywhere(
@@ -310,8 +261,6 @@ pub const RangeAlloc = struct {
                         .range = range,
                         .placement = placement,
                     };
-                } else if (debug) {
-                    os.log("Could not place into {}\n", .{range});
                 }
                 current_range = self.by_size.iterators.next(range);
             }
@@ -360,7 +309,8 @@ pub const RangeAlloc = struct {
     }
 
     fn consumeNodeBytes(self: *@This()) !void {
-        const nodes = try os.memory.pmm.phys_heap.alloc(Range, 0x1000 / @sizeOf(Range));
+        const nodes = try self.backing_allocator.alloc(Range, 0x1000 / @sizeOf(Range));
+        //const nodes = try os.memory.pmm.phys_heap.alloc(Range, 0x1000 / @sizeOf(Range));
         for (nodes) |*n| {
             self.freeRange(n);
         }
@@ -389,7 +339,7 @@ pub const RangeAlloc = struct {
             self.range_node_head = @ptrCast(*?*Range, head).*;
             return ret;
         }
-        @panic("No nodes!");
+        unreachable;
     }
 
     // Needs to be a node in the addr tree
@@ -426,10 +376,6 @@ pub const RangeAlloc = struct {
             return true;
         }
         return false;
-    }
-
-    fn init(self: *@This()) void {
-        self.mutex.init();
     }
 };
 

@@ -4,7 +4,7 @@ const paging = os.memory.paging;
 const RangeAllocator = os.memory.range_alloc.RangeAllocator;
 
 /// Range allocator for nonbacked memory
-pub var nonbacked_alloc = RangeAllocator{};
+pub var nonbacked_alloc = RangeAllocator(os.thread.Mutex).init(os.memory.pmm.phys_heap);
 
 extern const __kernel_begin: u8;
 

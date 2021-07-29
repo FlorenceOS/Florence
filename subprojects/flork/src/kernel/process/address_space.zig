@@ -94,7 +94,9 @@ fn pageSize() usize {
 }
 
 pub const AddrSpace = struct {
-    emptyRanges: os.memory.range_alloc.RangeAlloc = .{},
+    emptyRanges: os.memory.range_alloc.RangeAlloc = .{
+        .backing_allocator = os.memory.pmm.phys_heap,
+    },
     usedRanges: RbTree = RbTree.init(.{}, {}),
 
     pub fn init(self: *@This(), base: usize, end: usize) !void {
