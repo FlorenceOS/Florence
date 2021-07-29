@@ -9,4 +9,3 @@ pub const pmm = @import("pmm.zig");
 
 /// Memory allocators
 pub const range_alloc = @import("range_alloc.zig");
-pub const debug_alloc = @import("debug_alloc.zig");
