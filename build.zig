@@ -91,16 +91,17 @@ fn qemu_run_image_x86_64(b: *Builder, image_path: []const u8) *std.build.RunStep
 }
 
 fn universal_x86_64_image(b: *Builder, image_path: []const u8, kernel_path: []const u8) *std.build.RunStep {
-    const image_dir = b.fmt("./{s}/universal_image", .{b.cache_root});
+    const image_dir = b.fmt("./{s}/universal_image/", .{b.cache_root});
 
     const image_params = &[_][]const u8{
         "/bin/sh", "-c",
         std.mem.concat(b.allocator, u8, &[_][]const u8{
             "make -C boot/limine-bin && ",
             "mkdir -p ", image_dir, " && ",
-            "install -vC ./boot/stivale2_image/limine.cfg ",
-              "boot/limine-bin/limine{.sys,-cd.bin,-eltorito-efi.bin} ",
-            image_dir, " &&",
+            "cp boot/stivale2_image/limine.cfg ",
+              "boot/limine-bin/limine.sys ", "boot/limine-bin/limine-cd.bin ",
+              "boot/limine-bin/limine-eltorito-efi.bin ",
+            image_dir, " && ",
             "cp ", kernel_path, " ", image_dir, "/flork.elf && ",
             "xorriso -as mkisofs -b limine-cd.bin ",
                 "-no-emul-boot -boot-load-size 4 -boot-info-table ",
