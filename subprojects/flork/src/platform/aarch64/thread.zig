@@ -43,46 +43,51 @@ pub fn sched_call_impl(fun: usize, ctx: usize) void {
     );
 }
 
-pub fn init_task_userspace(new_task: *os.thread.Task, entry: u64, arg: u64, stack: u64) void {
-    new_task.registers = .{
-        .pc = entry,
-
-        .x0 = arg,
-        .x1 = 0,
-        .x2 = 0,
-        .x3 = 0,
-        .x4 = 0,
-        .x5 = 0,
-        .x6 = 0,
-        .x7 = 0,
-        .x8 = 0,
-        .x9 = 0,
-        .x10 = 0,
-        .x11 = 0,
-        .x12 = 0,
-        .x13 = 0,
-        .x14 = 0,
-        .x15 = 0,
-        .x16 = 0,
-        .x17 = 0,
-        .x18 = 0,
-        .x19 = 0,
-        .x20 = 0,
-        .x21 = 0,
-        .x22 = 0,
-        .x23 = 0,
-        .x24 = 0,
-        .x25 = 0,
-        .x26 = 0,
-        .x27 = 0,
-        .x28 = 0,
-        .x29 = 0,
-        .x30 = 0,
-        .x31 = 0,
-
-        .sp = stack,
-        .spsr = 0b0000, // EL0t / EL0 with SP0
-    };
+pub fn enter_userspace(entry: u64, arg: u64, stack: u64) noreturn {
+    asm volatile (
+        \\ MOV SP, %[stack]
+        \\ MSR ELR_EL1, %[entry]
+        \\ MOV X1, #0
+        \\ MSR SPSR_EL1, X1
+        \\
+        \\ MOV X2, #0
+        \\ MOV X3, #0
+        \\ MOV X4, #0
+        \\ MOV X5, #0
+        \\ MOV X6, #0
+        \\ MOV X7, #0
+        \\ MOV X8, #0
+        \\ MOV X9, #0
+        \\ MOV X10, #0
+        \\ MOV X11, #0
+        \\ MOV X12, #0
+        \\ MOV X13, #0
+        \\ MOV X14, #0
+        \\ MOV X15, #0
+        \\ MOV X16, #0
+        \\ MOV X17, #0
+        \\ MOV X18, #0
+        \\ MOV X19, #0
+        \\ MOV X20, #0
+        \\ MOV X21, #0
+        \\ MOV X22, #0
+        \\ MOV X23, #0
+        \\ MOV X24, #0
+        \\ MOV X25, #0
+        \\ MOV X26, #0
+        \\ MOV X27, #0
+        \\ MOV X28, #0
+        \\ MOV X29, #0
+        \\ MOV X30, #0
+        \\
+        \\ ERET
+        \\
+        :
+        : [arg] "{X0}" (arg),
+          [stack] "X" (stack),
+          [entry] "X" (entry)
+    );
+    unreachable;
 }
 
 pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry) !void {

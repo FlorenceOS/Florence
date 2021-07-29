@@ -61,42 +61,44 @@ pub const CoreData = struct {
 
 const ephemeral = os.memory.vmm.backed(.Ephemeral);
 
-pub fn init_task_userspace(new_task: *os.thread.Task, entry: u64, arg: u64, stack: u64) void {
-    new_task.registers = .{
-        // For userspace
-        .rdi = arg,
-        .rip = entry,
-        .rsp = stack,
-        .eflags = 0x202, // IF | RES1
-
-        .es = gdt.selector.userdata64,
-        .ds = gdt.selector.userdata64,
-        .ss = gdt.selector.userdata64,
-
-        .cs = gdt.selector.usercode64,
-
-        .rax = 0,
-        .rcx = 0,
-        .rbx = 0,
-        .rdx = 0,
-        .rbp = 0,
-        .rsi = 0,
-
-        .r8 = 0,
-        .r9 = 0,
-        .r10 = 0,
-        .r11 = 0,
-        .r12 = 0,
-        .r13 = 0,
-        .r14 = 0,
-        .r15 = 0,
-
-        // For iret frame
-        .ec = undefined,
-        .intnum = undefined,
-    };
-
-    new_task.platform_data.syscall_stack = new_task.stack;
+pub fn enter_userspace(entry: u64, arg: u64, stack: u64) noreturn {
+    asm volatile (
+        \\ push %[userdata64]
+        \\ push %[stack]
+        \\ push $0x202
+        \\ push %[usercode64]
+        \\ push %[entry]
+        \\
+        \\ mov %[userdata64], %%rax
+        \\ mov %%rax, %%es
+        \\ mov %%rax, %%ds
+        \\
+        \\ xor %%rsi, %%rsi
+        \\ xor %%rax, %%rax
+        \\ xor %%rdx, %%rdx
+        \\ xor %%rcx, %%rcx
+        \\ xor %%rbp, %%rbp
+        \\ xor %%rbx, %%rbx
+        \\
+        \\ xor %%r8, %%r8 
+        \\ xor %%r9, %%r9
+        \\ xor %%r10, %%r10
+        \\ xor %%r11, %%r11
+        \\ xor %%r12, %%r12
+        \\ xor %%r13, %%r13
+        \\ xor %%r14, %%r14
+        \\ xor %%r15, %%r15
+        \\
+        \\ iretq
+        \\
+        :
+        : [arg] "{rdi}" (arg),
+          [stack] "X" (stack),
+          [entry] "X" (entry),
+          [userdata64] "X" (gdt.selector.userdata64),
+          [usercode64] "X" (gdt.selector.usercode64)
+    );
+    unreachable;
 }
 
 pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry) !void {

@@ -44,14 +44,6 @@ pub fn wake(task: *os.thread.Task) void {
     os.platform.smp.cpus[task.allocated_core_id].executable_tasks.enqueue(task);
 }
 
-pub fn spawnUserspaceTask(task: *os.thread.Task, entry: u64, arg: u64, stack: u64) !void {
-    try initTask(task);
-
-    os.platform.thread.init_task_userspace(task, entry, arg, stack);
-
-    task.enqueue();
-}
-
 /// Initialize a task for usage, must call destroyTask to clean up
 /// You still have to initialize:
 ///   * Paging context

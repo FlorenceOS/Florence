@@ -83,18 +83,23 @@ fn syscallArg(frame: *platform.InterruptFrame, num: usize) usize {
 var lazy_zeroes = memory_object.lazyZeroes(os.memory.paging.rw());
 
 pub const Process = struct {
-    userspace_task: os.thread.Task,
     page_table: platform.paging.PagingContext,
     addr_space: address_space.AddrSpace,
 
     pub fn init(self: *@This()) !void {
+        try os.thread.scheduler.spawnTask(initProcessTask, .{self});
+    }
+
+    fn initProcessTask(self: *@This()) !void {
+        const task = os.platform.get_current_task();
+
         const userspace_base = 0x000400000;
 
         try self.addr_space.init(userspace_base, 0xFFFFFFF000);
 
         self.page_table = try os.platform.paging.PagingContext.make_userspace();
-        self.userspace_task.paging_context = &self.page_table;
-        errdefer self.userspace_task.paging_context.deinit();
+        task.paging_context = &self.page_table;
+        errdefer task.paging_context.deinit();
 
         const entry = try copernicus.map(&self.addr_space);
 
@@ -103,9 +108,10 @@ pub const Process = struct {
         try self.addr_space.lazyMap(stack_base, stack_size, try lazy_zeroes.makeRegion());
         const stack_top = stack_base + stack_size;
 
-        self.userspace_task.process = self;
+        task.process = self;
 
-        try os.thread.scheduler.spawnUserspaceTask(&self.userspace_task, entry, 0, stack_top);
+        self.page_table.apply();
+        os.platform.thread.enter_userspace(entry, 0, stack_top);
     }
 
     fn dequeue(frame: *platform.InterruptFrame) void {
@@ -114,7 +120,7 @@ pub const Process = struct {
     }
 
     pub fn deinit() void {
-        self.userspace_task.paging_context.deinit();
+        os.log("TODO: Process deinit\n", .{});
     }
 
     pub fn handleSyscall(self: *@This(), frame: *platform.InterruptFrame) void {
