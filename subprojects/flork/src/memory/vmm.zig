@@ -1,7 +1,7 @@
 usingnamespace @import("root").preamble;
 
 const paging = os.memory.paging;
-const RangeAllocator = os.memory.range_alloc.RangeAllocator;
+const RangeAllocator = lib.memory.range_alloc.RangeAllocator;
 
 /// Range allocator for nonbacked memory
 pub var nonbacked_alloc = RangeAllocator(os.thread.Mutex).init(os.memory.pmm.phys_heap);
