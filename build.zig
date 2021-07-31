@@ -82,6 +82,8 @@ fn qemu_run_image_x86_64(b: *Builder, image_path: []const u8) *std.build.RunStep
         "-no-shutdown",
         "-machine", "q35,accel=kvm:whpx:tcg",
         "-device", "qemu-xhci",
+        "-netdev", "user,id=mynet0",
+        "-device", "e1000,netdev=mynet0",
         "-smp", "8",
         //"-d", "int",
         //"-s", "-S",

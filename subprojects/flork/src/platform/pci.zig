@@ -155,7 +155,12 @@ fn function_scan(addr: Addr) void {
                     os.log("Unknown network controller!\n", .{});
                 },
                 0x00 => {
-                    os.log("Ethernet controller\n", .{});
+                    if (addr.vendor_id().read() == 0x8086 and addr.device_id().read() == 0x100E) {
+                        os.log("E1000 controller\n", .{});
+                        os.drivers.net.e1000.registerController(addr);
+                    } else {
+                        os.log("Unknown ethernet controller\n", .{});
+                    }
                 },
                 0x80 => {
                     os.log("Other network controller\n", .{});

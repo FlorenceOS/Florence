@@ -95,6 +95,12 @@ pub const drivers = .{
 
     .misc = .{},
 
+    .net = .{
+        .e1000 = .{
+            .enable = true,
+        },
+    },
+
     .output = .{
         .vesa_log = .{
             .enable = true,
