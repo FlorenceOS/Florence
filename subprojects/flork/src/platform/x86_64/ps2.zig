@@ -399,7 +399,7 @@ fn initKeyboard(irq: u8, device: Device) !bool {
         return false;
 
     kb_interrupt_vector = interrupts.allocate_vector();
-    interrupts.add_handler(kb_interrupt_vector, kbHandler, true, 3, 1);
+    interrupts.add_handler(kb_interrupt_vector, kbHandler, true, 0, 1);
     kb_interrupt_gsi = apic.route_irq(0, irq, kb_interrupt_vector);
 
     try finalizeDevice(device);
@@ -415,7 +415,7 @@ fn initMouse(irq: u8, device: Device) !bool {
         return false;
 
     mouse_interrupt_vector = interrupts.allocate_vector();
-    interrupts.add_handler(mouse_interrupt_vector, mouseHandler, true, 3, 1);
+    interrupts.add_handler(mouse_interrupt_vector, mouseHandler, true, 0, 1);
     mouse_interrupt_gsi = apic.route_irq(0, irq, mouse_interrupt_vector);
 
     try finalizeDevice(device);
