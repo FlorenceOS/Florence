@@ -62,6 +62,8 @@ pub fn platform_init() !void {
 
     set_interrupts(true);
 
+    @import("vmware.zig").init();
+
     try os.platform.pci.init_pci();
 }
 

@@ -34,6 +34,15 @@ pub const kernel = .{
             },
         },
 
+        // VMWARE integration for things like absolute cursor position.
+        // This is also implemented in other virtualization software
+        // like QEMU.
+        .vmware = .{
+            .enable = true,
+
+            .abscursor = true,
+        },
+
         // Port E9 debug logging
         .e9 = .{
             .enable = true,
