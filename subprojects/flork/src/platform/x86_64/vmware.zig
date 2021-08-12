@@ -118,13 +118,16 @@ fn abscurorInterruptHandler(frame: *os.platform.InterruptFrame) void {
             unreachable; // Mouse problem
         }
 
-        if (@truncate(u16, status) < 4) return;
+        const num_packets = @divTrunc(@truncate(u16, status), 4);
 
-        cmd.command = CMD_ABSPOINTER_DATA;
-        cmd.size = 4;
-        cmd.send();
+        var i: u16 = 0;
+        while(i < num_packets) : (i += 1) {
+            cmd.command = CMD_ABSPOINTER_DATA;
+            cmd.size = 4;
+            cmd.send();
 
-        os.log("VMWARE: Mouse data: {}\n", .{cmd});
+            os.log("VMWARE: Mouse data: {}\n", .{cmd});
+        }
     }
 
     eoi();
