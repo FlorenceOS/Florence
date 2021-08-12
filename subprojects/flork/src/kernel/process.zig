@@ -114,9 +114,10 @@ pub const Process = struct {
         os.platform.thread.enter_userspace(entry, 0, stack_top);
     }
 
-    fn dequeue(frame: *platform.InterruptFrame) void {
-        os.log("Dequeueing userspace task.\n", .{});
-        os.thread.preemption.awaitForTaskAndYield(frame);
+    fn exitProc(frame: *platform.InterruptFrame) void {
+        // TODO: Stop all tasks and do whatever else is needed
+        os.log("Exiting current userspace task.\n", .{});
+        os.thread.scheduler.exitTask();
     }
 
     pub fn deinit() void {
@@ -137,7 +138,7 @@ pub const Process = struct {
             }
             frame.dump();
             frame.trace_stack();
-            dequeue(frame);
+            exitProc(frame);
         };
     }
 
@@ -158,11 +159,11 @@ pub const Process = struct {
 
     fn linuxExit(self: *@This(), frame: *platform.InterruptFrame) void {
         os.log("Userspace process requested exit.\n", .{});
-        dequeue(frame);
+        exitProc(frame);
     }
 
     fn syscallUnknown(self: *@This(), frame: *platform.InterruptFrame) void {
         os.log("Process executed unknown syscall {}", .{syscallNumber(frame)});
-        dequeue(frame);
+        exitProc(frame);
     }
 };
