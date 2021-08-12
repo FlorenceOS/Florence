@@ -61,8 +61,13 @@ pub const kernel = .{
     // True if kernel should panic only once
     .panic_once = true,
 
-    // If true, runs kepler tests after system initialization
-    .run_kepler_tests = true,
+    // Kepler settings
+    .kepler = .{
+        // If true, runs kepler tests after system initialization
+        .run_tests = true,
+        // Number of messages that should be sent in the benchmark
+        .bench_msg_count = 10000000,
+    },
 
     .pci = .{
         // Toggle for PCI bus enumeration and device discovery
