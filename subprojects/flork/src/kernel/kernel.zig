@@ -36,6 +36,10 @@ pub const lai = @cImport({
 pub fn kmain() noreturn {
     os.log("Hello, kmain!\n", .{});
 
+    if (config.kernel.run_kepler_tests) {
+        os.kepler.tests.run();
+    }
+
     var proc: process.Process = undefined;
     os.vital(proc.init(), "init proc launch");
 
