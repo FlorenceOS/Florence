@@ -4,70 +4,89 @@ const ps2 = @import("ps2.zig");
 const ports = @import("ports.zig");
 const eoi = @import("apic.zig").eoi;
 
-fn do_op(self: *Command, comptime str: []const u8) void {
-    var magic = VMWARE_MAGIC;
-    var command = self.command;
-    var port = self.port;
-    var size = self.size;
-    var source = self.source;
-    var destination = self.destination;
+fn do_op(self: *const Command, port: u16, comptime str: []const u8) CommandResult {
+    var rax: u64 = undefined;
+    var rbx: u64 = undefined;
+    var rcx: u64 = undefined;
+    var rdx: u64 = undefined;
+    var rsi: u64 = undefined;
+    var rdi: u64 = undefined;
 
     // zig fmt: off
     asm volatile (str
-        : [_] "={eax}" (magic)
-        , [_] "={rbx}" (size)
-        , [_] "={cx}" (command)
-        , [_] "={dx}" (port)
-        , [_] "={rsi}" (source)
-        , [_] "={rdi}" (destination)
-        : [_] "{eax}" (magic)
-        , [_] "{rbx}" (size)
-        , [_] "{cx}" (command)
-        , [_] "{dx}" (port)
-        , [_] "{rsi}" (source)
-        , [_] "{rdi}" (destination)
+        : [_] "={rax}" (rax)
+        , [_] "={rbx}" (rbx)
+        , [_] "={rcx}" (rcx)
+        , [_] "={rdx}" (rdx)
+        , [_] "={rsi}" (rsi)
+        , [_] "={rdi}" (rdi)
+        // https://github.com/ziglang/zig/issues/8107
+        : [_] "{rax}" (@as(u64, VMWARE_MAGIC))
+        , [_] "{rbx}" (@as(u64, self.size))
+        , [_] "{rcx}" (@as(u64, self.command))
+        , [_] "{rdx}" (@as(u64, port))
+        , [_] "{rsi}" (@as(u64, self.source))
+        , [_] "{rdi}" (@as(u64, self.destination))
     );
     // zig fmt: on
 
-    self.magic = magic;
-    self.command = command;
-    self.port = port;
-    self.size = size;
-    self.source = source;
-    self.destination = destination;
+    return .{
+        .rax = rax,
+        .rbx = rbx,
+        .rcx = rcx,
+        .rdx = rdx,
+        .rsi = rsi,
+        .rdi = rdi,
+    };
+}
+
+fn send(cmd: Command) CommandResult {
+    return cmd.send();
+}
+
+fn send_hb(cmd: Command) CommandResult {
+    return cmd.send_hb();
+}
+
+fn get_hb(cmd: Command) CommandResult {
+    return cmd.get_hb();
 }
 
 const Command = struct {
-    magic: u32 = undefined,
     command: u16 = undefined,
-    port: u16 = undefined,
     size: usize = undefined,
     source: usize = undefined,
     destination: usize = undefined,
 
-    fn send(self: *@This()) void {
-        self.port = VMWARE_PORT;
-        do_op(self,
+    fn send(self: *const @This()) CommandResult {
+        return do_op(self, VMWARE_PORT,
             \\inl %%dx, %%eax
             \\
         );
     }
 
-    fn send_hb(self: *@This()) void {
-        self.port = VMWARE_PORTHB;
-        do_op(self,
+    fn send_hb(self: *const @This()) CommandResult {
+        return do_op(self, VMWARE_PORTHB,
             \\rep outsb
             \\
         );
     }
 
-    fn get_hb(self: *@This()) void {
-        self.port = VMWARE_PORTHB;
-        do_op(self,
+    fn get_hb(self: *const @This()) CommandResult {
+        return do_op(self, VMWARE_PORTHB,
             \\rep insb
             \\
         );
     }
+};
+
+const CommandResult = struct {
+    rax: u64,
+    rbx: u64,
+    rcx: u64,
+    rdx: u64,
+    rsi: u64,
+    rdi: u64,
 };
 
 const VMWARE_MAGIC: u32 = 0x564D5868;
@@ -85,12 +104,11 @@ const ABSPOINTER_RELATIVE: u32 = 0xF5;
 const ABSPOINTER_ABSOLUTE: u32 = 0x53424152;
 
 fn detect() bool {
-    var cmd = Command{
+    const reply = send(.{
         .command = CMD_GETVERSION,
-    };
-    cmd.send();
-    if (cmd.size != VMWARE_MAGIC) return false;
-    if (cmd.magic == 0xFFFFFFFF) return false;
+    });
+    if (@truncate(u32, reply.rbx) != VMWARE_MAGIC) return false;
+    if (@truncate(u32, reply.rax) == 0xFFFFFFFF) return false;
     return true;
 }
 
@@ -105,28 +123,25 @@ fn abscurorInterruptHandler(frame: *os.platform.InterruptFrame) void {
     if (counter == 3) {
         counter = 0;
 
-        var cmd = Command{
+        const status = send(.{
             .command = CMD_ABSPOINTER_STATUS,
             .size = 0,
-        };
+        });
 
-        cmd.send();
-
-        const status = cmd.magic;
-
-        if (status == 0xFFFF0000) {
+        if (@truncate(u32, status.rax) == 0xFFFF0000) {
             unreachable; // Mouse problem
         }
 
-        const num_packets = @divTrunc(@truncate(u16, status), 4);
+        const num_packets = @divTrunc(@truncate(u16, status.rax), 4);
 
         var i: u16 = 0;
         while(i < num_packets) : (i += 1) {
-            cmd.command = CMD_ABSPOINTER_DATA;
-            cmd.size = 4;
-            cmd.send();
+            const mouse_pkt = send(.{
+                .command = CMD_ABSPOINTER_DATA,
+                .size = 4,
+            });
 
-            os.log("VMWARE: Mouse data: {}\n", .{cmd});
+            os.log("VMWARE: Mouse data: {}\n", .{mouse_pkt});
         }
     }
 
@@ -153,21 +168,25 @@ pub fn init() void {
         const state = os.platform.get_and_disable_interrupts();
         defer os.platform.set_interrupts(state);
 
-        cmd.size = ABSPOINTER_ENABLE;
-        cmd.command = CMD_ABSPOINTER_COMMAND;
-        cmd.send();
+        _ = send(.{
+            .command = CMD_ABSPOINTER_COMMAND,
+            .size = ABSPOINTER_ENABLE,
+        });
 
-        cmd.size = 0;
-        cmd.command = CMD_ABSPOINTER_STATUS;
-        cmd.send();
+        _ = send(.{
+            .command = CMD_ABSPOINTER_STATUS,
+            .size = 0,
+        });
 
-        cmd.size = 1;
-        cmd.command = CMD_ABSPOINTER_DATA;
-        cmd.send();
+        _ = send(.{
+            .command = CMD_ABSPOINTER_DATA,
+            .size = 1,
+        });
 
-        cmd.size = ABSPOINTER_ABSOLUTE;
-        cmd.command = CMD_ABSPOINTER_COMMAND;
-        cmd.send();
+        _ = send(.{
+            .command = CMD_ABSPOINTER_COMMAND,
+            .size = ABSPOINTER_ABSOLUTE,
+        });
 
         @import("interrupts.zig").add_handler(ps2.mouse_interrupt_vector, abscurorInterruptHandler, true, 0, 1);
     }
