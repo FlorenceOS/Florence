@@ -20,6 +20,39 @@ pub fn wait() void {
     os.platform.sched_call(waitCallback, undefined);
 }
 
+/// Equivalent to wait(), but allows to run custom callback on sched_stack.
+/// If callback returns true, task should be suspended
+pub fn waitWithCallback(params: struct { 
+    callback: fn (*os.platform.InterruptFrame, usize) bool, 
+    ctx: usize = undefined,
+}) void {
+    const paramsAddr = @ptrToInt(&params);
+    const waitCallback = struct {
+        fn waitCallback(frame: *os.platform.InterruptFrame, ctx: usize) void {
+            const params = @intToPtr(*@TypeOf(params), ctx);
+
+            os.thread.preemption.saveCurrentState(frame);
+            if (!params.callback(params.ctx)) {
+                return;
+            }
+
+            os.thread.awaitForTaskAndYield(frame);
+        }
+    };
+}
+
+/// Sleep + release spinlock
+pub fn waitReleaseSpinlock(spinlock: *os.thread.Spinlock) void {
+    const callback = struct {
+        fn callback(frame: *os.platform.InterruptFrame, ctx: usize) bool {
+            const lock = @intToPtr(*os.thread.Spinlock, ctx);
+            lock.ungrab();
+            return true;
+        }
+    }.callback;
+    waitWithCallback(.{.callback = callback, .ctx = @ptrToInt(spinlock)});
+}
+
 /// Terminate current task to never run it again
 pub fn leave() noreturn {
     const leaveCallback = struct {
