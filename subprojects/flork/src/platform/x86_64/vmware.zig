@@ -94,32 +94,38 @@ fn detect() bool {
     return true;
 }
 
+var counter: usize = 0;
+
 fn abscurorInterruptHandler(frame: *os.platform.InterruptFrame) void {
     // Drop byte from ps2 buffer
+    counter += 1;
+
     _ = ports.inb(0x60);
-    //_ = ports.inb(0x60);
-    //_ = ports.inb(0x60);
 
-    var cmd = Command{
-        .command = CMD_ABSPOINTER_STATUS,
-        .size = 0,
-    };
+    if (counter == 3) {
+        counter = 0;
 
-    cmd.send();
+        var cmd = Command{
+            .command = CMD_ABSPOINTER_STATUS,
+            .size = 0,
+        };
 
-    const status = cmd.magic;
+        cmd.send();
 
-    if (status == 0xFFFF0000) {
-        unreachable; // Mouse problem
+        const status = cmd.magic;
+
+        if (status == 0xFFFF0000) {
+            unreachable; // Mouse problem
+        }
+
+        if (@truncate(u16, status) < 4) return;
+
+        cmd.command = CMD_ABSPOINTER_DATA;
+        cmd.size = 4;
+        cmd.send();
+
+        os.log("VMWARE: Mouse data: {}\n", .{cmd});
     }
-
-    if (@truncate(u16, status) < 4) return;
-
-    cmd.command = CMD_ABSPOINTER_DATA;
-    cmd.size = 4;
-    cmd.send();
-
-    os.log("VMWARE: Mouse data: {}\n", .{cmd});
 
     eoi();
 }
