@@ -36,7 +36,7 @@ pub const lai = @cImport({
 pub fn kmain() noreturn {
     os.log("Hello, kmain!\n", .{});
 
-    if (config.kernel.run_kepler_tests) {
+    if (config.kernel.kepler.run_tests) {
         os.kepler.tests.run();
     }
 

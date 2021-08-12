@@ -119,6 +119,7 @@ pub const Token = struct {
 
         self.owner.lock.grab();
         self.owner.available_quota += self.token_quota;
+        self.owner.lock.ungrab();
 
         self.lock.unlock(int_state);
         self.drop();
@@ -130,6 +131,7 @@ pub const Token = struct {
 
         const int_state = self.owner.lock.lock();
         defer self.owner.lock.unlock(int_state);
+
         if (self.owner.is_shut_down) {
             return error.MailboxUnreachable;
         }
@@ -148,7 +150,7 @@ pub const Token = struct {
     }
 };
 
-/// IPC mailbox. Allows to send and recieve IPC messages.
+/// IPC mailbox. Allows to recieve IPC messages.
 pub const Mailbox = struct {
     /// Message queue node
     const MsgQueueNode = struct {
@@ -265,10 +267,13 @@ pub const Mailbox = struct {
             const token = msg_buf.decodeTokenFromOpaque();
             const opaque_val = token.opaque_val;
 
-            token.drop();
             buf.data = msg_buf.data;
             buf.opaque_val = opaque_val;
+            self.free_queue.enqueue(incoming);
             self.lock.unlock(int_state);
+
+            token.freeSlot();
+            token.drop();
         } else {
             var sleep_node: TaskSleepQueueNode = .{
                 .task = os.platform.get_current_task(),

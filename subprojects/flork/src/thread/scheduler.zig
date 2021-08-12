@@ -26,19 +26,21 @@ pub fn waitWithCallback(params: struct {
     callback: fn (*os.platform.InterruptFrame, usize) bool, 
     ctx: usize = undefined,
 }) void {
+    const ParamsType = @TypeOf(params);
     const paramsAddr = @ptrToInt(&params);
     const waitCallback = struct {
         fn waitCallback(frame: *os.platform.InterruptFrame, ctx: usize) void {
-            const params = @intToPtr(*@TypeOf(params), ctx);
+            const passed = @intToPtr(*ParamsType, ctx);
 
             os.thread.preemption.saveCurrentState(frame);
-            if (!params.callback(params.ctx)) {
+            if (!passed.callback(frame, passed.ctx)) {
                 return;
             }
 
-            os.thread.awaitForTaskAndYield(frame);
+            os.thread.preemption.awaitForTaskAndYield(frame);
         }
-    };
+    }.waitCallback;
+    os.platform.sched_call(waitCallback, paramsAddr);
 }
 
 /// Sleep + release spinlock
@@ -99,8 +101,6 @@ pub fn initTask(task: *os.thread.Task) !void {
         os.platform.smp.cpus[best_cpu_idx].tasks_count += 1;
         balancer_lock.unlock(state);
     }
-
-    os.log("Task allocated to core {}\n", .{best_cpu_idx});
 }
 
 /// Creates a new task on the heap and calls initTask() on it
