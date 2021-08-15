@@ -123,13 +123,21 @@ fn abscurorInterruptHandler(frame: *os.platform.InterruptFrame) void {
         const num_packets = @divTrunc(@truncate(u16, status.rax), 4);
 
         var i: u16 = 0;
-        while(i < num_packets) : (i += 1) {
+        while (i < num_packets) : (i += 1) {
             const mouse_pkt = send(.{
                 .command = CMD_ABSPOINTER_DATA,
                 .size = 4,
             });
 
-            os.log("VMWARE: Mouse data: {}\n", .{mouse_pkt});
+            const buttons = @truncate(u16, mouse_pkt.rax);
+            const rmb = (buttons & 0x10) != 0;
+            const lmb = (buttons & 0x20) != 0;
+            const mmb = (buttons & 0x08) != 0;
+
+            const scaled_x = @truncate(u16, mouse_pkt.rbx);
+            const scaled_y = @truncate(u16, mouse_pkt.rcx);
+
+            const scroll = @bitCast(i2, @truncate(u2, mouse_pkt.rdx));
         }
     }
 
