@@ -41,15 +41,24 @@ fn do_op(self: *const Command, port: u16, comptime str: []const u8) CommandResul
 }
 
 fn send(cmd: Command) CommandResult {
-    return cmd.send();
+    return do_op(&cmd, VMWARE_PORT,
+        \\inl %%dx, %%eax
+        \\
+    );
 }
 
 fn send_hb(cmd: Command) CommandResult {
-    return cmd.send_hb();
+    return do_op(&cmd, VMWARE_PORTHB,
+        \\rep outsb
+        \\
+    );
 }
 
 fn get_hb(cmd: Command) CommandResult {
-    return cmd.get_hb();
+    return do_op(&cmd, VMWARE_PORTHB,
+        \\rep insb
+        \\
+    );
 }
 
 const Command = struct {
@@ -57,27 +66,6 @@ const Command = struct {
     size: usize = undefined,
     source: usize = undefined,
     destination: usize = undefined,
-
-    fn send(self: *const @This()) CommandResult {
-        return do_op(self, VMWARE_PORT,
-            \\inl %%dx, %%eax
-            \\
-        );
-    }
-
-    fn send_hb(self: *const @This()) CommandResult {
-        return do_op(self, VMWARE_PORTHB,
-            \\rep outsb
-            \\
-        );
-    }
-
-    fn get_hb(self: *const @This()) CommandResult {
-        return do_op(self, VMWARE_PORTHB,
-            \\rep insb
-            \\
-        );
-    }
 };
 
 const CommandResult = struct {
