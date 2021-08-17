@@ -128,6 +128,7 @@ pub fn sched_call_impl(fun: usize, ctx: usize) void {
         : [sched_call_vector] "i" (interrupts.sched_call_vector),
           [_] "{rdi}" (fun),
           [_] "{rsi}" (ctx)
+        : "memory"
     );
 }
 

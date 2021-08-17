@@ -40,6 +40,7 @@ pub fn sched_call_impl(fun: usize, ctx: usize) void {
         :
         : [_] "{X2}" (fun),
           [_] "{X1}" (ctx)
+        : "memory"
     );
 }
 
