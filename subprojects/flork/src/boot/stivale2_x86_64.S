@@ -2,13 +2,13 @@
 
 .global __bootstrap_stack_top
 
-.section .stivale2hdr, "a"
+.section .stivale2hdr, "aw"
 .8byte _start
 .8byte __bootstrap_stack_top
 .8byte 0
 .8byte framebuffer
 
-.section .rodata.stivale
+.section .rodata.stivale, "aw"
 .balign 8
 framebuffer:
 .8byte 0x3ecc1bc43d0f7971
@@ -31,7 +31,7 @@ lv5paging:
 .section .text
 .global _start
 _start:
-  lea rsp, __bootstrap_stack_top
+  lea rsp, [rip + __bootstrap_stack_top]
 
   push 0
   push 0

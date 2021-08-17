@@ -72,11 +72,13 @@ pub const Gdt = packed struct {
         // Use the code selector
         asm volatile (
             \\ push %[csel]
-            \\ push $1f
+            \\ lea 1f(%%rip), %%rax
+            \\ push %%rax
             \\ .byte 0x48, 0xCB // Far return
             \\ 1:
             :
             : [csel] "i" (@as(u16, selector.code64))
+            : "rax"
         );
     }
 };

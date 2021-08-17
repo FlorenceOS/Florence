@@ -255,6 +255,20 @@ export fn laihost_map(addr: usize, size: usize) ?*c_void {
 
 export fn laihost_unmap(ptr: *c_void, size: usize) void {}
 
+export fn laihost_handle_amldebug(ptr: *c_void) void {}
+
+export fn laihost_sleep(some_unit_of_time: u64) void {
+    @panic("laihost_sleep");
+}
+
+export fn laihost_sync_wait(state: *lai.lai_sync_state, value: u32, deadline: u64) void {
+    @panic("laihost_sync_wait");
+}
+
+export fn laihost_sync_wake(state: *lai.lai_sync_state) void {
+    @panic("laihost_sync_wake");
+}
+
 var has_lai_acpi = false;
 
 pub fn init_acpi() !void {

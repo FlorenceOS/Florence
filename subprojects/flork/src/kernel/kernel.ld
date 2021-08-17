@@ -10,8 +10,8 @@ PHDRS {
 
 SECTIONS {
   .stivalehdr  0 : { KEEP(*(.stivalehdr)) }:none
-  .stivale2hdr 0 : { KEEP(*(.stivale2hdr)) }
-  .rela.dyn    0 : { KEEP(*(.rela*)) }
+  .stivale2hdr : { KEEP(*(.stivale2hdr)) }
+  .rela.dyn    : { KEEP(*(.rela*)) }
 
   . = 0xFFFFFFFF80100000;
 
@@ -35,7 +35,6 @@ SECTIONS {
 
   __kernel_rodata_begin = .;
   .rodata . : {
-    KEEP(*(.rodata.stivale))
     *(.rodata*)
 
     /* https://github.com/ziglang/zig/issues/7962 */
@@ -65,8 +64,13 @@ SECTIONS {
 
   __kernel_data_begin = .;
   .data . : {
+    KEEP(*(.rodata.stivale))
     *(.data*)
   }:data
+
+  .dynamic . : {
+    KEEP(*(.dynamic*));
+  }
 
   . = ALIGN(16);
 

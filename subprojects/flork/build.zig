@@ -76,5 +76,14 @@ pub fn buildKernel(params: struct {
     kernel.addCSourceFile(laipath ++ "helpers/pm.c", laiflags);
     kernel.addCSourceFile(laipath ++ "helpers/resource.c", laiflags);
     kernel.addCSourceFile(laipath ++ "helpers/sci.c", laiflags);
+
+    switch (params.arch) {
+        .x86_64 => { // Worse boot protocol, have to do pic
+            kernel.pie = true;
+            kernel.force_pic = true;
+        },
+        else => {},
+    }
+
     return kernel;
 }
