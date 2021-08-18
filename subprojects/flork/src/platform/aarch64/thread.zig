@@ -85,8 +85,8 @@ pub fn enter_userspace(entry: u64, arg: u64, stack: u64) noreturn {
         \\
         :
         : [arg] "{X0}" (arg),
-          [stack] "X" (stack),
-          [entry] "X" (entry)
+          [stack] "r" (stack),
+          [entry] "r" (entry)
     );
     unreachable;
 }
