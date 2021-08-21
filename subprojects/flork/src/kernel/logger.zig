@@ -90,8 +90,8 @@ pub fn releaseLogLock(ll: LogLock) void {
 }
 
 pub fn log(comptime format: []const u8, args: anytype) void {
-    const l = getLogLock();
-    defer releaseLogLock(l);
+    const l = @call(.{ .modifier = .never_inline }, getLogLock, .{});
+    defer @call(.{ .modifier = .never_inline }, releaseLogLock, .{l});
 
     return logWithoutLocking(format, args);
 }
