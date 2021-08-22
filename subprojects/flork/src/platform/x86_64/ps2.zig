@@ -380,13 +380,17 @@ fn initKeyboard(irq: u8, device: Device) !bool {
     if (kb_interrupt_gsi) |_|
         return false;
 
-    _ = @asyncCall(std.mem.asBytes(&kb_parser_frame), {}, kbParser, .{});
-
     kb_interrupt_vector = interrupts.allocate_vector();
     interrupts.add_handler(kb_interrupt_vector, kbHandler, true, 0, 1);
     kb_interrupt_gsi = apic.route_irq(0, irq, kb_interrupt_vector);
 
     try finalizeDevice(device);
+
+    {
+        @setRuntimeSafety(false);
+        _ = @asyncCall(std.mem.asBytes(&kb_parser_frame), {}, kbParser, .{});
+    }
+    //kb_parser_frame = async kbParser();
 
     return true;
 }

@@ -34,6 +34,8 @@ pub const KeyboardState = struct {
             return;
         };
 
+        os.log("{}, {}\n", .{ t, location });
+
         switch (t) {
             .press => {
                 self.is_pressed.set(@enumToInt(location), true);

@@ -84,10 +84,13 @@ fn qemu_run_image_x86_64(b: *Builder, image_path: []const u8) *std.build.RunStep
         "-device", "qemu-xhci",
         "-netdev", "user,id=mynet0",
         "-device", "e1000,netdev=mynet0",
+        "-netdev", "user,id=mynet1",
+        "-device", "virtio-net,netdev=mynet1",
         "-smp", "8",
         //"-d", "int",
         //"-s", "-S",
         //"-trace", "ahci_*",
+        "-trace", "e1000*",
     };
     return b.addSystemCommand(run_params);
 }
