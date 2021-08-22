@@ -93,10 +93,10 @@ pub fn enter_userspace(entry: u64, arg: u64, stack: u64) noreturn {
         \\
         :
         : [arg] "{rdi}" (arg),
-          [stack] "X" (stack),
-          [entry] "X" (entry),
-          [userdata64] "X" (gdt.selector.userdata64),
-          [usercode64] "X" (gdt.selector.usercode64)
+          [stack] "r" (stack),
+          [entry] "r" (entry),
+          [userdata64] "i" (gdt.selector.userdata64),
+          [usercode64] "i" (gdt.selector.usercode64)
     );
     unreachable;
 }
