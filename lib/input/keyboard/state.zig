@@ -28,8 +28,12 @@ pub const KeyboardState = struct {
         return self.pressed(.left_ctrl) or self.pressed(.right_ctrl);
     }
 
-    pub fn event(self: *@This(), t: kb.event.EventType, location: kb.keys.Location) !void {
-        const input = try kb.layouts.getInput(self, location, self.layout);
+    pub fn event(self: *@This(), t: kb.event.EventType, location: kb.keys.Location) void {
+        const input = kb.layouts.getInput(self, location, self.layout) catch |err| {
+            os.log("Keyboard layout {} could not resolve key location {}\n", .{ self.layout, location });
+            return;
+        };
+
         switch (t) {
             .press => {
                 self.is_pressed.set(@enumToInt(location), true);

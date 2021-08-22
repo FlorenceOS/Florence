@@ -16,81 +16,63 @@ pub var kb_interrupt_gsi: ?u32 = null;
 pub var mouse_interrupt_vector: u8 = undefined;
 pub var mouse_interrupt_gsi: ?u32 = null;
 
-const scancode_extended = 0xE0;
-
-var keyboard_buffer_data: [8]u8 = undefined;
-var keyboard_buffer_elements: usize = 0;
-
-fn keyboardBuffer() []const u8 {
-    return keyboard_buffer_data[0..keyboard_buffer_elements];
-}
-
-fn standardKey(ext: Extendedness, keycode: u8) void {
-    defer keyboard_buffer_elements = 0;
-
-    const loc = keyLocation(ext, keycode & 0x7F) catch return;
-    kb_state.event(if (keycode & 0x80 != 0) .release else .press, loc) catch return;
-}
-
-fn finishSequence(offset: usize, seq: []const u8) bool {
-    const buf = keyboardBuffer()[offset..];
-
-    if (buf.len < seq.len)
-        return false;
-
-    if (std.mem.eql(u8, buf, seq)) {
-        keyboard_buffer_elements = 0;
-        return true;
-    }
-
-    os.log("PS2: Unexpected scancode sequence: {any}, expected {any}\n", .{ buf, seq });
-    @panic("PS2: Unexpected scancode sequence!");
-}
-
-fn kbEvent() void {
-    switch (keyboardBuffer()[0]) {
-        0xE1 => {
-            if (finishSequence(1, "\x1D\x45\xE1\x9D\xC5")) {
-                kb_state.event(.press, .pause_break) catch return;
-                // There is no event for releasing this key,
-                // so we just gotta pretend it's released instantly
-                kb_state.event(.release, .pause_break) catch return;
-            }
-        },
-        scancode_extended => {
-            if (keyboardBuffer().len < 2)
-                return;
-
-            switch (keyboardBuffer()[1]) {
-                0x2A => {
-                    if (finishSequence(2, &[_]u8{ scancode_extended, 0x37 })) {
-                        kb_state.event(.press, .print_screen) catch return;
-                    }
-                },
-                0xB7 => {
-                    if (finishSequence(2, &[_]u8{ scancode_extended, 0xAA })) {
-                        kb_state.event(.release, .print_screen) catch return;
-                    }
-                },
-                else => {
-                    standardKey(.Extended, keyboardBuffer()[1]);
-                },
-            }
-        },
-        else => {
-            standardKey(.NotExtended, keyboardBuffer()[0]);
-        },
-    }
+fn standardKey(ext: Extendedness, keycode: u8) !void {
+    const loc = try keyLocation(ext, keycode & 0x7F);
+    kb_state.event(if (keycode & 0x80 != 0) .release else .press, loc);
 }
 
 var kb_state: kb.state.KeyboardState = .{};
 
+fn awaitKeyboardByte() u8 {
+    suspend kb_parser_anyframe = @frame();
+    return last_kb_byte;
+}
+
+fn kbParser() noreturn {
+    while (true) {
+        switch (awaitKeyboardByte()) {
+            0xE0 => {
+                switch (awaitKeyboardByte()) {
+                    0x2A => {
+                        std.debug.assert(awaitKeyboardByte() == 0xE0);
+                        std.debug.assert(awaitKeyboardByte() == 0x37);
+                        kb_state.event(.press, .print_screen);
+                    },
+                    0xB7 => {
+                        std.debug.assert(awaitKeyboardByte() == 0xE0);
+                        std.debug.assert(awaitKeyboardByte() == 0xAA);
+                        kb_state.event(.release, .print_screen);
+                    },
+                    else => |scancode| {
+                        standardKey(.Extended, scancode) catch continue;
+                    },
+                }
+            },
+            0xE1 => { // Pause break sequence
+                std.debug.assert(awaitKeyboardByte() == 0x1D);
+                std.debug.assert(awaitKeyboardByte() == 0x45);
+                std.debug.assert(awaitKeyboardByte() == 0xE1);
+                std.debug.assert(awaitKeyboardByte() == 0x9D);
+                std.debug.assert(awaitKeyboardByte() == 0xC5);
+                kb_state.event(.press, .pause_break);
+                // There is no event for releasing this key,
+                // so we just gotta pretend it's released instantly
+                kb_state.event(.release, .pause_break);
+            },
+            else => |scancode| {
+                standardKey(.NotExtended, scancode) catch continue;
+            },
+        }
+    }
+}
+
+var last_kb_byte: u8 = undefined;
+var kb_parser_frame: @Frame(kbParser) = undefined;
+var kb_parser_anyframe: anyframe = undefined;
+
 fn kbHandler(_: *os.platform.InterruptFrame) void {
-    keyboard_buffer_data[keyboard_buffer_elements] = ports.inb(0x60);
-    keyboard_buffer_elements += 1;
-
-    kbEvent();
-
+    last_kb_byte = ports.inb(0x60);
+    resume kb_parser_anyframe;
     eoi();
 }
 
@@ -397,6 +379,8 @@ fn initKeyboard(irq: u8, device: Device) !bool {
 
     if (kb_interrupt_gsi) |_|
         return false;
+
+    _ = @asyncCall(std.mem.asBytes(&kb_parser_frame), {}, kbParser, .{});
 
     kb_interrupt_vector = interrupts.allocate_vector();
     interrupts.add_handler(kb_interrupt_vector, kbHandler, true, 0, 1);
