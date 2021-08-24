@@ -4,7 +4,9 @@ usingnamespace @import("root").preamble;
 pub const Notification = packed struct {
     /// Notification type
     pub const Kind = enum(usize) {
-        TokenUpdate = 0,
+        RPCIncoming = 0,
+        RPCReply = 1,
+        CalleeLost = 2,
     };
     /// Notification type
     kind: Kind,
@@ -81,7 +83,7 @@ pub const Mailbox = struct {
         const int_state = self.lock.lock();
         defer self.lock.unlock(int_state);
         if (self.is_shut_down) {
-            return error.MailboxShutdown;
+            return error.Shutdown;
         }
         if (self.quota == 0) {
             return error.QuotaExceeded;
@@ -98,11 +100,11 @@ pub const Mailbox = struct {
     }
 
     /// Enqueue notification
-    pub fn enqueue(self: *@This(), note: Notification) !void {
+    pub fn enqueue(self: *@This(), note: Notification) void {
         const int_state = self.lock.lock();
         defer self.lock.unlock(int_state);
         if (self.is_shut_down) {
-            return error.DestinationUnreachable;
+            return;
         }
         if (self.sleeping.dequeue()) |sleep_node| {
             sleep_node.is_shut_down = false;
@@ -120,7 +122,7 @@ pub const Mailbox = struct {
 
         if (self.is_shut_down) {
             self.lock.unlock(int_state);
-            return error.MailboxShutdown;
+            return error.Shutdown;
         }
 
         if (self.head == self.tail) {
@@ -130,7 +132,7 @@ pub const Mailbox = struct {
             defer os.platform.set_interrupts(int_state);
 
             if (sleep_node.is_shut_down) {
-                return error.MailboxShutdown;
+                return error.Shutdown;
             }
 
             return sleep_node.notification;
@@ -156,5 +158,55 @@ pub const Mailbox = struct {
         }
 
         self.drop();
+    }
+};
+
+/// NotificationRaiser object allows to raise notifications in a mailbox
+/// NotificationRaiser only uses one slot in mailbox ringbuffer
+pub const NotificationRaiser = struct {
+    /// Reference to the mailbox
+    mailbox: *Mailbox,
+    /// Number of the events raised
+    raised: usize = 0,
+    /// Number of the events acked
+    acked: usize = 0,
+    /// Notification template
+    template: Notification,
+
+    /// Create new notification raiser
+    pub fn init(mailbox: *Mailbox, template: Notification) !@This() {
+        try mailbox.reserveSlot();
+        return @This(){ .mailbox = mailbox.borrow(), .template = template };
+    }
+
+    /// Are all events acked?
+    fn events_acked(self: *const @This()) bool {
+        return self.raised == self.acked;
+    }
+
+    /// Raise notification
+    pub fn raise(self: *@This()) void {
+        if (self.events_acked()) {
+            self.mailbox.enqueue(self.template);
+        }
+        self.raised += 1;
+    }
+
+    /// Acknowledge notification
+    pub fn ack(self: *@This()) void {
+        if (self.events_acked()) {
+            // Nothing to ACK
+            return;
+        }
+        self.acked += 1;
+        if (!self.events_acked()) {
+            self.mailbox.enqueue(self.template);
+        }
+    }
+
+    /// Deinitialize notification raizer
+    pub fn deinit(self: *@This()) void {
+        self.mailbox.releaseSlot();
+        self.mailbox.drop();
     }
 };

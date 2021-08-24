@@ -66,7 +66,7 @@ pub const kernel = .{
         // If true, runs kepler tests after system initialization
         .run_tests = true,
         // Number of messages that should be sent in the benchmark
-        .bench_msg_count = 10000000,
+        .bench_msg_count = 50000,
     },
 
     .pci = .{

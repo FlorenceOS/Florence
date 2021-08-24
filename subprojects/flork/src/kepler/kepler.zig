@@ -1,6 +1,6 @@
 /// Notifications related code
 pub const notifications = @import("notifications.zig");
-/// IPC related code
-pub const ipc = @import("ipc.zig");
+/// RPC related code
+pub const rpc = @import("rpc.zig");
 /// Kepler tests
 pub const tests = @import("tests.zig");
