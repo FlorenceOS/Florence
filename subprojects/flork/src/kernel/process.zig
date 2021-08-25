@@ -3,18 +3,12 @@ usingnamespace @import("root").preamble;
 pub const address_space = @import("process/address_space.zig");
 pub const memory_object = @import("process/memory_object.zig");
 
-const kernel_linux_compat = config.kernel.linux_binary_compat;
-const kernel_xnu_compat = config.kernel.xnu_binary_compat;
-
 const platform = os.platform;
 const copernicus = os.kernel.copernicus;
 
 // Representation of a process in a kernel context
 // We can have binary compatibility for an operating system (syscall numbers, process state)
 // built into the kernel. If we do, this is where that is stored too.
-
-// We don't need windows binary compatibility as there is a kernel api dll
-// which can just do florence sycalls
 
 pub fn currentProcess() ?*Process {
     return os.platform.get_current_task().process;
@@ -71,8 +65,6 @@ fn syscallArg(frame: *platform.InterruptFrame, num: usize) usize {
                 3 => frame.x3,
                 4 => frame.x4,
                 5 => frame.x5,
-                6 => frame.x6,
-                7 => frame.x7,
                 else => unreachable,
             };
         },
