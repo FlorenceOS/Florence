@@ -38,6 +38,7 @@ pub const CoreData = struct {
     lapic_id: u32 = 0,
     mwait_supported: bool = false,
     wakeable: bool = false,
+    invlpg_counter: usize = 0,
 
     pub fn ring(self: *@This()) void {
         const current_cpu = os.platform.thread.get_current_cpu();
@@ -56,6 +57,16 @@ pub const CoreData = struct {
     pub fn wait(self: *@This()) void {
         asm volatile ("sti; hlt; cli");
         @atomicStore(bool, &self.wakeable, false, .Release);
+    }
+
+    pub fn invlpgIpi(self: *const @This()) void {
+        // Check the counter before the IPI
+        const counter = @atomicLoad(usize, &self.invlpg_counter, .Acquire);
+
+        apic.ipi(self.lapic_id, interrupts.invlpg_vector);
+
+        // Wait until the IPI is acknowledged
+        while (@atomicLoad(usize, &self.invlpg_counter, .Acquire) == counter) {}
     }
 };
 

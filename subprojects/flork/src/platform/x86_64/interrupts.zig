@@ -30,6 +30,7 @@ pub const ring_vector: u8 = 0x32;
 var last_vector: u8 = ring_vector;
 
 pub const syscall_vector: u8 = 0x80;
+pub const invlpg_vector: u8 = 0xFE;
 pub const spurious_vector: u8 = 0xFF;
 
 pub fn allocate_vector() u8 {
@@ -49,12 +50,20 @@ pub fn init_interrupts() void {
     add_handler(0x80, userspace_syscall_handler, true, 3, 1);
     add_handler(ring_vector, ring_handler, true, 0, 1);
     add_handler(sched_call_vector, os.platform.thread.sched_call_impl_handler, true, 0, 2);
+    add_handler(invlpg_vector, invlpg_handler, true, 0, 1);
     add_handler(spurious_vector, spurious_handler, true, 0, 1);
 }
 
 fn spurious_handler(_: *InterruptFrame) void {}
 
 fn ring_handler(_: *InterruptFrame) void {
+    apic.eoi();
+}
+
+fn invlpg_handler(_: *InterruptFrame) void {
+    const cr3 = @import("regs.zig").ControlRegister(usize, "cr3");
+    cr3.write(cr3.read());
+    _ = @atomicRmw(usize, &os.platform.thread.get_current_cpu().platform_data.invlpg_counter, .Add, 1, .AcqRel);
     apic.eoi();
 }
 
