@@ -328,7 +328,7 @@ pub const Callee = struct {
     }
 
     /// Drop reference to the callee
-    fn drop(self: *@This()) void {
+    pub fn drop(self: *@This()) void {
         if (@atomicRmw(usize, &self.refcount, .Sub, 1, .AcqRel) == 1) {
             self.raiser.deinit();
             self.term_raiser.deinit();
@@ -337,9 +337,15 @@ pub const Callee = struct {
         }
     }
 
+    /// Borrow owning reference
+    pub fn borrowOwning(self: *@This()) *@This() {
+        _ = @atomicRmw(usize, &self.refcount, .Add, 1, .AcqRel);
+        return self;
+    }
+
     /// Borrow reference to the callee from consumer
-    pub fn borrowFromConsumer(self: *@This()) *@This() {
-        @atomicRmw(usize, &self.consumer_refcount, .Add, 1, .AcqRel);
+    pub fn borrowConsumer(self: *@This()) *@This() {
+        _ = @atomicRmw(usize, &self.consumer_refcount, .Add, 1, .AcqRel);
         return self;
     }
 
@@ -445,8 +451,8 @@ pub const Callee = struct {
         self.is_shut_down = true;
         self.lock.unlock(int_state);
         var i: usize = 0;
-        while (i < self.recieved) : (i += 1) {
-            const list = &self.recieved[mod];
+        while (i < self.recieved.len) : (i += 1) {
+            const list = &self.recieved[i];
             while (list.pop()) |node| {
                 node.data.makeRPCNotHandledMsg();
                 node.data.caller.enqueueReply(node) catch {};

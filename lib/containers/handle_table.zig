@@ -112,41 +112,40 @@ pub fn LockedHandleTable(comptime T: type, comptime Lock: type) type {
         pub const Location = HandleTable(T).Location;
 
         /// Handle table itself
-        table: HandleTable(T) = undefined,
+        table: HandleTable(T),
         /// Protecting lock
         mutex: Lock = .{},
 
         /// Initialize LockedHandleTable
-        pub fn init(self: *@This(), allocator: *std.mem.Allocator) void {
-            self.table = HandleTable(T).init(allocator);
+        pub fn init(allocator: *std.mem.Allocator) @This() {
+            return .{ .table = HandleTable(T).init(allocator) };
         }
 
         /// Allocate a new cell for a new handle and
         /// leave the table locked
         /// NOTE: Don't forget to call unlock lol :^)
-        pub fn newCell(self: *@This()) !Location {
-            self.mutex.lock();
-            errdefer self.mutex.unlock();
+        pub fn newCellNolock(self: *@This()) !Location {
             return self.table.newCell();
         }
 
-        /// Free cell.
-        pub fn freeCell(self: *@This(), id: usize) !void {
-            self.mutex.lock();
-            defer self.mutex.unlock();
+        /// Free cell without holding the lock
+        pub fn freeCellNolock(self: *@This(), id: usize) !void {
             return self.table.freeCell(id);
         }
 
         /// Get cell data and leave the table locked
-        pub fn getData(self: *@This(), id: usize) !*T {
-            self.mutex.lock();
-            errdefer self.mutex.unlock();
+        pub fn getDataNolock(self: *@This(), id: usize) !*T {
             return self.table.getData(id);
         }
 
         /// Deinitialize the table
-        pub fn deinit(self: *@This(), comptime disposer_type: type, disposer: *disposer_type) void {
-            self.table.deinit(disposer_type, disposer);
+        pub fn deinit(self: *@This(), comptime DisposerType: type, disposer: *DisposerType) void {
+            self.table.deinit(DisposerType, disposer);
+        }
+
+        /// Lock the table
+        pub fn lock(self: *@This()) void {
+            self.mutex.lock();
         }
 
         /// Unlock the table

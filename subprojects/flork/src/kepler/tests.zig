@@ -2,9 +2,10 @@ usingnamespace @import("root").preamble;
 
 /// RPC test client
 fn rpcTestClient(
-    mailbox: *os.kepler.notifications.Mailbox,
-    caller: *os.kepler.rpc.Caller,
-    callee: *os.kepler.rpc.Callee,
+    entry: *os.kepler.entry.Entry,
+    hmailbox: usize,
+    hcaller: usize,
+    hcallee: usize,
     main_task: *os.thread.Task,
 ) !void {
     var i: usize = 0;
@@ -13,51 +14,49 @@ fn rpcTestClient(
         var msg = os.kepler.rpc.Message{};
         msg.opaque_val = 2 * i;
         // Initiate RPC call
-        try caller.sendRPCRequest(callee, &msg);
+        try entry.sysDoRemoteCall(hcaller, hcallee, &msg);
         // os.log("client: initiated RPC call #{}\n", .{i});
         // Wait for incoming notifications
-        const note = try mailbox.dequeue();
+        const note = try entry.sysGetNotification(hmailbox);
         // os.log("client: recieved notification for reply to RPC call #{}\n", .{i});
         std.debug.assert(note.kind == .RPCReply);
         std.debug.assert(note.opaque_val == 1);
         // Recieve reply
-        const recieved = try caller.getRPCResponse(&msg);
+        const recieved = try entry.sysGetRemoteCallReply(hcaller, &msg);
         std.debug.assert(msg.opaque_val == 2 * i);
         // os.log("client: reply recieved for RPC call #{}\n", .{i});
     }
     os.log("client: exiting loop\n", .{});
-    // Drop all refs
-    callee.dropBorrowed();
-    caller.shutdown();
-    mailbox.shutdown();
-    os.thread.scheduler.wake(main_task);
+    // Deinitialize user API entry
+    entry.deinit();
     os.log("client: finished\n", .{});
 }
 
 /// RPC test server
-fn rpcTestServer(mailbox: *os.kepler.notifications.Mailbox, callee: *os.kepler.rpc.Callee) !void {
+fn rpcTestServer(entry: *os.kepler.entry.Entry, hmailbox: usize, hcallee: usize) !void {
     var i: usize = 0;
     os.log("server: entering loop\n", .{});
     while (i < config.kernel.kepler.bench_msg_count) : (i += 1) {
         var msg: os.kepler.rpc.Message = undefined;
         // Wait for incoming notifications
-        const note = try mailbox.dequeue();
+        const note = try entry.sysGetNotification(hmailbox);
         // os.log("server: recieved notification for RPC call #{}\n", .{i});
         std.debug.assert(note.kind == .RPCIncoming);
         std.debug.assert(note.opaque_val == 2);
         // Accept incoming RPC call
-        try callee.acceptRPC(&msg);
+        try entry.sysAcceptRemoteCall(hcallee, &msg);
         // os.log("server: RPC call #{} accepted\n", .{i});
         // Send reply
-        try callee.replyToRPC(msg.opaque_val, &msg);
+        try entry.sysReturnRemoteCall(hcallee, msg.opaque_val, &msg);
         // os.log("server: returned RPC call #{}\n", .{i});
     }
     os.log("server: exiting loop\n", .{});
     // Wait for shutdown notification
-    const note = try mailbox.dequeue();
+    const note = try entry.sysGetNotification(hmailbox);
     std.debug.assert(note.kind == .CalleeLost);
     os.log("server: got shutdown note\n", .{});
-    mailbox.shutdown();
+    // Deinitialize user API entry
+    entry.deinit();
     os.log("server: finished\n", .{});
 }
 
@@ -65,17 +64,30 @@ fn rpcTestServer(mailbox: *os.kepler.notifications.Mailbox, callee: *os.kepler.r
 fn rpcTest() !void {
     // Get our hands on allocator
     const allocator = os.memory.pmm.phys_heap;
-    // Create mailboxes
-    const mailbox1 = try os.kepler.notifications.Mailbox.create(allocator, 1);
-    const mailbox2 = try os.kepler.notifications.Mailbox.create(allocator, 2);
-    // Create caller
-    const caller = try os.kepler.rpc.Caller.create(allocator, mailbox1, 1, 1);
-    // Create callee.
-    const callee = try os.kepler.rpc.Callee.create(allocator, mailbox2, 1024, 2);
+    // Create user API entries
+    var entry1 = try os.kepler.entry.Entry.init(allocator);
+    var entry2 = try os.kepler.entry.Entry.init(allocator);
+    os.log("User API entries initialized\n", .{});
+    // Create mailbox
+    const hmailbox1 = try entry1.sysCreateMailbox(1);
+    const hmailbox2 = try entry2.sysCreateMailbox(2);
+    os.log("Created mailboxes\n", .{});
+    // Create caller in first universe
+    const hcaller = try entry1.sysCreateCaller(hmailbox1, 1, 1);
+    os.log("Created caller\n", .{});
+    // Create callee pair in second universe
+    const callee_pair = try entry2.sysCreateCallee(hmailbox2, 1, 2);
+    const hcallee_owning = callee_pair.owning_handle;
+    os.log("Created callee\n", .{});
+    // Move consumer handle from one universe to the other
+    const callee_ref = try entry2.universe.takeAtNolock(callee_pair.consumer_handle);
+    const hcallee_borrowed = try entry1.universe.putNolock(callee_ref);
+    os.log("We did a little trolling with borrowed handle\n", .{});
     // Spawn tasks
     const current = os.platform.get_current_task();
-    try os.thread.scheduler.spawnTask(rpcTestClient, .{ mailbox1, caller, callee, current });
-    try os.thread.scheduler.spawnTask(rpcTestServer, .{ mailbox2, callee });
+    try os.thread.scheduler.spawnTask(rpcTestClient, .{ &entry1, hmailbox1, hcaller, hcallee_borrowed, current });
+    try os.thread.scheduler.spawnTask(rpcTestServer, .{ &entry2, hmailbox2, hcallee_owning });
+    os.log("Tasks created\n", .{});
     // Wait for test completition
     os.thread.scheduler.wait();
     os.log("RPC test done\n", .{});

@@ -180,13 +180,13 @@ pub const NotificationRaiser = struct {
     }
 
     /// Are all events acked?
-    fn events_acked(self: *const @This()) bool {
+    fn eventsAcked(self: *const @This()) bool {
         return self.raised == self.acked;
     }
 
     /// Raise notification
     pub fn raise(self: *@This()) void {
-        if (self.events_acked()) {
+        if (self.eventsAcked()) {
             self.mailbox.enqueue(self.template);
         }
         self.raised += 1;
@@ -194,12 +194,12 @@ pub const NotificationRaiser = struct {
 
     /// Acknowledge notification
     pub fn ack(self: *@This()) void {
-        if (self.events_acked()) {
+        if (self.eventsAcked()) {
             // Nothing to ACK
             return;
         }
         self.acked += 1;
-        if (!self.events_acked()) {
+        if (!self.eventsAcked()) {
             self.mailbox.enqueue(self.template);
         }
     }
