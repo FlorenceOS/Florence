@@ -487,6 +487,10 @@ pub const PagingContext = struct {
             : "memory"
         );
     }
+
+    pub fn invalidateOtherCPUs(self: *const @This(), virt: usize, size: usize) void {
+        os.log("idfk we should probably invalidate tlbs here on other cpus, but I think we've just been played for absolute fools\n", .{});
+    }
 };
 
 pub const MemoryType = enum {

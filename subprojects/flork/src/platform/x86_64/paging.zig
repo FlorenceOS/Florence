@@ -436,6 +436,15 @@ pub const PagingContext = struct {
             : "memory"
         );
     }
+
+    pub fn invalidateOtherCPUs(self: *const @This(), base: usize, size: usize) void {
+        const current_cpu = os.platform.thread.get_current_cpu();
+
+        for (os.platform.smp.cpus) |*cpu| {
+            if (cpu != current_cpu)
+                cpu.platform_data.invlpgIpi();
+        }
+    }
 };
 
 pub const MemoryType = extern enum {

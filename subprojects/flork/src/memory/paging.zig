@@ -183,10 +183,15 @@ fn unmapLoop(
     size: *usize,
     reclaim_pages: bool,
     context: Context,
-) void {
+) bool {
     const root = context.root_table(virt.*);
-    while (size.* != 0)
-        unmapIter(virt, size, reclaim_pages, root, context);
+    var any_invalidated = false;
+    while (size.* != 0) {
+        if (unmapIter(virt, size, reclaim_pages, root, context))
+            any_invalidated = true;
+    }
+
+    return any_invalidated;
 }
 
 fn unmapIter(
@@ -195,7 +200,9 @@ fn unmapIter(
     reclaim_pages: bool,
     table: anytype,
     context: Context,
-) void {
+) bool {
+    var any_invalidated = false;
+
     for (table.skip_to(virt.*)) |*child| {
         const dom = table.child_domain(virt.*);
 
@@ -203,12 +210,14 @@ fn unmapIter(
             .Empty => {
                 if (dom.len >= size.*) {
                     size.* = 0;
-                    return;
+                    return any_invalidated;
                 }
                 virt.* += dom.len;
                 size.* -= dom.len;
             },
-            .Table => |tbl| unmapIter(virt, size, reclaim_pages, tbl, context),
+            .Table => |tbl| if (unmapIter(virt, size, reclaim_pages, tbl, context)) {
+                any_invalidated = true;
+            },
             .Mapping => |mapping| {
                 if (dom.len > size.* or dom.ptr != virt.*)
                     @panic("No partial unmapping");
@@ -218,14 +227,17 @@ fn unmapIter(
 
                 child.* = context.encode_empty(mapping.level);
                 context.invalidate(virt.*);
+                any_invalidated = true;
 
                 virt.* += dom.len;
                 size.* -= dom.len;
             },
         }
         if (size.* == 0)
-            return;
+            return any_invalidated;
     }
+
+    return any_invalidated;
 }
 
 fn printImpl(root: *page_table, comptime level: usize) void {
@@ -305,7 +317,8 @@ pub fn unmap(args: struct {
     context: Context = &kernel_context,
 }) void {
     var argc = args;
-    unmapLoop(&argc.virt, &argc.size, argc.reclaim_pages, argc.context);
+    if (unmapLoop(&argc.virt, &argc.size, argc.reclaim_pages, argc.context))
+        args.context.invalidateOtherCPUs(args.virt, args.size);
 }
 
 pub fn rx() Perms {
