@@ -6,6 +6,8 @@ const pci = os.platform.pci;
 const libalign = lib.util.libalign;
 const range = lib.util.range;
 
+const log = lib.output.log.scoped(config.kernel.acpi).write;
+
 const RSDP = packed struct {
     signature: [8]u8,
     checksum: u8,
@@ -110,14 +112,14 @@ comptime {
 
 const lai = os.kernel.lai;
 
-var rsdp_phys: usize = 0;
+var rsdp_phys: ?os.platform.phys_ptr([*]u8) = null;
 var rsdp: *RSDP = undefined;
 
-pub fn register_rsdp(rsdp_in: usize) void {
+pub fn register_rsdp(rsdp_in: os.platform.phys_ptr([*]u8)) void {
     rsdp_phys = rsdp_in;
 }
 
-fn locate_rsdp() ?u64 {
+fn locate_rsdp() ?os.platform.phys_ptr([*]u8) {
     // @TODO
     return null;
 }
@@ -272,12 +274,19 @@ export fn laihost_sync_wake(state: *lai.lai_sync_state) void {
 var has_lai_acpi = false;
 
 pub fn init_acpi() !void {
-    if (rsdp_phys == 0)
-        rsdp_phys = locate_rsdp() orelse return;
+    if (rsdp_phys == null) {
+        log(.notice, "No RSDP registered... Looking for it ourselves", .{});
+        rsdp_phys = locate_rsdp() orelse {
+            log(.err, "Unable to locate RSDP ourselves", .{});
+            return;
+        };
+    }
 
-    rsdp = os.platform.phys_ptr(*RSDP).from_int(rsdp_phys).get_writeback();
+    log(.debug, "Using RSDP {} for acpi", .{rsdp_phys});
 
-    os.log("ACPI: Revision: {}\n", .{rsdp.revision});
+    rsdp = rsdp_phys.?.cast(*RSDP).get_writeback();
+
+    log(.debug, "Revision: {}", .{rsdp.revision});
 
     switch (rsdp.revision) {
         0 => parse_root_sdt(u32, rsdp.rsdt_addr),

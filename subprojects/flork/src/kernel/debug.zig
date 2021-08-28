@@ -114,8 +114,8 @@ fn printAddr(ip: usize) void {
 }
 
 fn printInfo(line_info: ?std.debug.LineInfo, ip: usize, symbol_name: ?[]const u8) void {
-    const lock = os.getLogLock();
-    defer os.releaseLogLock(lock);
+    //const lock = os.getLogLock();
+    //defer os.releaseLogLock(lock);
 
     os.log("0x{X}: ", .{ip});
 

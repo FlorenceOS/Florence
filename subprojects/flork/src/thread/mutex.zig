@@ -8,7 +8,7 @@ pub const Mutex = struct {
     sema: os.thread.Semaphore = os.thread.Semaphore.init(1),
 
     /// Wrapper for mutex std API
-    const Held = struct {
+    pub const Held = struct {
         mtx: *Mutex,
 
         /// Release mutex

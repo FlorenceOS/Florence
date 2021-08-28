@@ -86,7 +86,7 @@ const Parser = struct {
         return; // We really don't care for now
     }
 
-    pub fn format(self: *const Parser, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+    pub fn format(self: *const Parser, fmt: anytype) !void {
         try writer.print("Parser{{.data={X}, .offset={X}, limit={X}}}", .{ @ptrToInt(self.data.ptr), self.curr_offset, self.limit });
     }
 

@@ -119,8 +119,14 @@ pub fn phys_ptr(comptime ptr_type: type) type {
             };
         }
 
-        pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
-            try writer.print("phys 0x{X}", .{self.addr});
+        pub fn cast(self: *const @This(), comptime to_type: type) phys_ptr(to_type) {
+            return .{
+                .addr = self.addr,
+            };
+        }
+
+        pub fn format(self: *const @This(), fmt: anytype) void {
+            fmt("phys 0x{X}", .{self.addr});
         }
     };
 }

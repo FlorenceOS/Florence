@@ -10,6 +10,10 @@ const builtin = std.builtin;
 var display: os.drivers.output.single_mode_display.SingleModeDisplay = undefined;
 var display_buffer: lib.graphics.single_buffer.SingleBuffer = undefined;
 
+pub const putchar = os.kernel.logger.putch;
+
+const log = lib.output.log.scoped(config.kernel.stivale2).write;
+
 const MemmapEntry = packed struct {
     base: u64,
     length: u64,
@@ -18,11 +22,9 @@ const MemmapEntry = packed struct {
 
     pub fn format(
         self: *const MemmapEntry,
-        fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        try writer.print("Base: 0x{X}, length: 0x{X}, type=0x{X}", .{
+        fmt: anytype,
+    ) void {
+        fmt("Base: 0x{0X}, length: 0x{0X}, type=0x{0X}", .{
             self.base,
             self.length,
             self.kind,
@@ -34,13 +36,8 @@ const Tag = packed struct {
     identifier: u64,
     next: ?*Tag,
 
-    pub fn format(
-        self: *const @This(),
-        fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        try writer.print("Identifier: 0x{X:0>16}", .{self.identifier});
+    pub fn format(self: *const @This(), fmt: anytype) void {
+        @compileError("Cannot format stivale2 tags");
     }
 };
 
@@ -48,6 +45,18 @@ const Info = packed struct {
     bootloader_brand: [64]u8,
     bootloader_version: [64]u8,
     tags: ?*Tag,
+
+    pub fn format(self: *const @This(), fmt: anytype) void {
+        fmt(
+            \\Bootloader info:
+            \\    Bootloader brand: {s}
+            \\    Bootloader version: {s}
+            \\
+        , .{
+            @ptrCast([*:0]const u8, &self.bootloader_brand[0]),
+            @ptrCast([*:0]const u8, &self.bootloader_version[0]),
+        });
+    }
 };
 
 const MemmapTag = packed struct {
@@ -60,13 +69,11 @@ const MemmapTag = packed struct {
 
     pub fn format(
         self: *const @This(),
-        fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        try writer.print("{} entries:\n", .{self.entries});
+        fmt: anytype,
+    ) void {
+        fmt("{d} entries:\n", .{self.entries});
         for (self.get()) |ent| {
-            try writer.print("    {}\n", .{ent});
+            fmt("    {}\n", .{ent});
         }
     }
 };
@@ -77,11 +84,9 @@ const CmdLineTag = packed struct {
 
     pub fn format(
         self: *const @This(),
-        fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        try writer.print("Commandline: {s}", .{self.commandline});
+        fmt: anytype,
+    ) void {
+        fmt("Commandline: {s}", .{self.commandline});
     }
 };
 
@@ -95,11 +100,9 @@ const FramebufferTag = packed struct {
 
     pub fn format(
         self: *const @This(),
-        fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        try writer.print("0x{X}, {}x{}, bpp={}, pitch={}", .{
+        fmt: anytype,
+    ) void {
+        fmt("0x{X}, {d}x{d}, bpp={d}, pitch={d}", .{
             self.addr,
             self.width,
             self.height,
@@ -123,11 +126,9 @@ const SMPTag = packed struct {
 
     pub fn format(
         self: *const @This(),
-        fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        try writer.print("{} CPU(s): {}", .{ self.entries, self.get() });
+        fmt: anytype,
+    ) void {
+        fmt("{} CPU(s): {}", .{ self.entries, self.get() });
     }
 
     pub fn get(self: *const @This()) []CoreInfo {
@@ -149,11 +150,9 @@ const Mmio32UartTag = packed struct {
 
     pub fn format(
         self: *const @This(),
-        fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        try writer.print("0x{X}", .{self.uart_addr});
+        fmt: anytype,
+    ) void {
+        fmt("0x{X}", .{self.uart_addr});
     }
 };
 
@@ -166,11 +165,9 @@ const Mmio32StatusUartTag = packed struct {
 
     pub fn format(
         self: *const @This(),
-        fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        try writer.print("0x{X}, 0x{X}, (val & 0x{X}) == 0x{X}", .{
+        fmt: anytype,
+    ) void {
+        fmt("0x{X}, 0x{X}, (val & 0x{X}) == 0x{X}", .{
             self.uart_addr,
             self.uart_status,
             self.status_mask,
@@ -190,11 +187,9 @@ const DtbTag = packed struct {
 
     pub fn format(
         self: *const @This(),
-        fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        try writer.print("0x{X} bytes at 0x{X}", .{ self.size, @ptrToInt(self.addr) });
+        fmt: anytype,
+    ) void {
+        fmt("0x{X} bytes at 0x{X}", .{ self.size, @ptrToInt(self.addr) });
     }
 };
 
@@ -204,18 +199,16 @@ const KernelFileTag = packed struct {
 
     pub fn format(
         self: *const @This(),
-        fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        try writer.print("ELF at 0x{X}", .{self.addr});
+        fmt: anytype,
+    ) void {
+        fmt("ELF at 0x{X}", .{self.addr});
     }
 };
 
 const ParsedInfo = struct {
     memmap: ?*MemmapTag = null,
     framebuffer: ?FramebufferTag = null,
-    rsdp: ?u64 = null,
+    rsdp: ?platform.phys_ptr([*]u8) = null,
     smp: ?platform.phys_ptr(*SMPTag) = null,
     dtb: ?DtbTag = null,
     uart: ?Mmio32UartTag = null,
@@ -229,15 +222,13 @@ const ParsedInfo = struct {
 
     pub fn format(
         self: *const ParsedInfo,
-        fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
-    ) !void {
-        try writer.print(
-            \\Parsed stivale2 tags:
+        fmt: anytype,
+    ) void {
+        fmt(
+            \\Parsed tag dump:
             \\  MemmapTag: {}
             \\  FramebufferTag: {}
-            \\  RSDP: 0x{X}
+            \\  RSDP: {}
             \\  SMP: {}
             \\  DTB: {}
             \\  UART: {}
@@ -246,7 +237,7 @@ const ParsedInfo = struct {
             \\
             \\
         , .{
-            self.memmap,
+            self.memmap.?,
             self.framebuffer,
             self.rsdp,
             self.smp,
@@ -337,7 +328,7 @@ fn smpEntry(info_in: u64) callconv(.C) noreturn {
 export fn stivale2Main(info_in: *Info) noreturn {
     platform.platform_early_init();
 
-    os.log("Stivale2: Boot!\n", .{});
+    log(.info, "Entry point reached", .{});
 
     var info = ParsedInfo{};
 
@@ -347,15 +338,13 @@ export fn stivale2Main(info_in: *Info) noreturn {
             0x2187f79e8612de07 => info.memmap = @ptrCast(*MemmapTag, tag),
             0xe5e76a1b4597a781 => os.log("{s}\n", .{@ptrCast(*CmdLineTag, tag)}),
             0x506461d2950408fa => info.framebuffer = @ptrCast(*FramebufferTag, tag).*,
-            0x9e1786930a375e78 => info.rsdp = @ptrCast(*RsdpTag, tag).rsdp,
+            0x9e1786930a375e78 => info.rsdp = platform.phys_ptr([*]u8).from_int(@ptrCast(*RsdpTag, tag).rsdp),
             0x34d1d96339647025 => info.smp = platform.phys_ptr(*SMPTag).from_int(@ptrToInt(tag)),
             0xabb29bd49a2833fa => info.dtb = @ptrCast(*DtbTag, tag).*,
             0xb813f9b8dbc78797 => info.uart = @ptrCast(*Mmio32UartTag, tag).*,
             0xf77485dbfeb260f9 => info.uart_status = @ptrCast(*Mmio32StatusUartTag, tag).*,
             0xe599d90c2975584a => info.kernel_file = @ptrCast(*KernelFileTag, tag).*,
-            else => {
-                os.log("Unknown stivale2 tag identifier: 0x{X:0>16}\n", .{tag.?.identifier});
-            },
+            else => |ident| log(.warn, "Unknown struct tag identifier: 0x{0X}", .{ident}),
         }
     }
 
@@ -363,7 +352,7 @@ export fn stivale2Main(info_in: *Info) noreturn {
 
     if (info.uart) |uart| {
         drivers.output.mmio_serial.register_mmio32_serial(uart.uart_addr);
-        os.log("Stivale2: Registered UART\n", .{});
+        log(.info, "Registered UART", .{});
     }
 
     if (info.uart_status) |u| {
@@ -373,10 +362,10 @@ export fn stivale2Main(info_in: *Info) noreturn {
             u.status_mask,
             u.status_value,
         );
-        os.log("Stivale2: Registered status UART\n", .{});
+        log(.info, "Registered status UART", .{});
     }
 
-    os.log("Doing framebuffer\n", .{});
+    log(.debug, "Initializing framebuffer", .{});
 
     if (info.framebuffer) |fb| {
         const ptr = os.platform.phys_ptr([*]u8).from_int(fb.addr).get_writeback();
@@ -389,16 +378,14 @@ export fn stivale2Main(info_in: *Info) noreturn {
             null, // No invalidation needed for stivale2 framebuffer
         );
         drivers.output.vesa_log.use(&display.context.region);
-        os.log("Stivale2: Using non-buffered output\n", .{});
+        log(.debug, "Using non-buffered output", .{});
     } else {
         drivers.output.vga_log.register();
+        log(.debug, "Using VGA output", .{});
     }
 
-    os.log(
-        \\Bootloader: {s}
-        \\Bootloader version: {s}
-        \\{}
-    , .{ info_in.bootloader_brand, info_in.bootloader_version, info });
+    log(.info, "{}", .{info_in.*});
+    log(.info, "{}", .{info});
 
     if (!info.valid()) {
         @panic("Stivale2: Info not valid!\n");

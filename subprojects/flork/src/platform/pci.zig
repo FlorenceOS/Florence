@@ -4,9 +4,7 @@ const paging = os.memory.paging;
 
 const range = lib.util.range.range;
 
-pub const Handler = struct {
-    function: fn (*os.platform.InterruptFrame, u64) void, context: u64
-};
+pub const Handler = struct { function: fn (*os.platform.InterruptFrame, u64) void, context: u64 };
 
 var handlers: [0x100]Handler = undefined;
 
@@ -92,7 +90,7 @@ pub const Addr = struct {
         @panic("No pci module!");
     }
 
-    pub fn format(self: Addr, fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+    pub fn format(self: Addr, fmt: anytype) !void {
         try writer.print("[{x:0>2}:{x:0>2}:{x:0>1}]", .{ self.bus, self.device, self.function });
         try writer.print("{{{x:0>4}:{x:0>4}}} ", .{ self.vendor_id().read(), self.device_id().read() });
         try writer.print("({x:0>2}:{x:0>2}:{x:0>2})", .{ self.base_class().read(), self.sub_class().read(), self.prog_if().read() });
@@ -287,7 +285,7 @@ fn device_scan(bus: u8, device: u5) void {
 }
 
 fn bus_scan(bus: u8) void {
-    if(!config.kernel.pci.enable)
+    if (!config.kernel.pci.enable)
         return;
 
     // We can't scan this bus

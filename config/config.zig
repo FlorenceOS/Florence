@@ -73,6 +73,16 @@ pub const kernel = .{
         // Toggle for PCI bus enumeration and device discovery
         .enable = true,
     },
+
+    .stivale2 = .{
+        .log_tag = .Stivale2,
+        .log_filter = .debug,
+    },
+
+    .acpi = .{
+        .log_tag = .ACPI,
+        .log_filter = .info,
+    },
 };
 
 pub const copernicus = .{

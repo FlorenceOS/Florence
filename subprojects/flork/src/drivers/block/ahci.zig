@@ -154,9 +154,7 @@ const Abar = struct {
 
         pub fn format(
             self: *const @This(),
-            fmt: []const u8,
-            options: std.fmt.FormatOptions,
-            writer: anytype,
+            fmt: anytype,
         ) !void {
             try writer.print("{}.{}", .{ self.major.read(), self.minor_high.read() });
             if (self.minor_low.read() != 0) {
@@ -685,7 +683,7 @@ fn sataPortTask(port_type: SataPortType, port: *volatile Port) !void {
 
     // Read first disk sector
     port_state.finalizeIo(0, 0, 1, .read);
-    os.hexdump(port_state.mmio.buffer(0, 0)[0..port_state.sector_size]);
+    //os.hexdump(port_state.mmio.buffer(0, 0)[0..port_state.sector_size]);
 
     // Read first sector into buffer
     //port_state.doIOBytesRead(0, test_buf[0..512], 0);

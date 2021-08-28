@@ -229,9 +229,7 @@ const Controller = struct {
 
     pub fn format(
         self: *const @This(),
-        fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        writer: anytype,
+        fmt: anytype,
     ) !void {
         try writer.print(
             "Base MMIO address: 0x{X}, mac: {x:0>2}:{x:0>2}:{x:0>2}:{x:0>2}:{x:0>2}:{x:0>2}, eeprom: {}",
