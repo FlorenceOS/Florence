@@ -8,17 +8,32 @@ const printCharacter = @import("root").putchar;
 
 // zig fmt freaks out when it sees `noinline` for some reason(?)
 // zig fmt: off
-noinline fn printString(str: [*:0]const u8) void {
-    if (str[0] != 0) {
+noinline fn printSentinelString(str_c: [*:0]const u8) void {
+    var str = str_c;
+    while (str[0] != 0) : (str += 1) {
         printCharacter(str[0]);
-        return @call(.{ .modifier = .always_tail }, printString, .{str + 1});
     }
+}
+
+noinline fn printSliceString(str: []const u8) void {
+    for(str) |c| {
+        printCharacter(c);
+    }
+}
+
+const boolean_names = [2][*:0]const u8 {
+    "false",
+    "true",
+};
+
+noinline fn printBoolean(value: bool) void {
+    printSentinelString(boolean_names[@boolToInt(value)]);
 }
 
 const hex_chars: [*]const u8 = "0123456789ABCDEF";
 
-noinline fn printRuntimeValueAsZeroPaddedHex(val: hex_print_t) void {
-    comptime var i: u6 = hex_print_nibbles - 1;
+noinline fn printRuntimeValueAsZeroPaddedHex(val: anytype) void {
+    comptime var i: u6 = @sizeOf(@TypeOf(val))*2 - 1;
     inline while (true) : (i -= 1) {
         const v = @truncate(u4, val >> (4 * i));
 
@@ -29,13 +44,14 @@ noinline fn printRuntimeValueAsZeroPaddedHex(val: hex_print_t) void {
     }
 }
 
-fn comptimeValToZeroPaddedHexString(in_val: anytype) [hex_print_nibbles]u8 {
-    const val = @intCast(hex_print_t, in_val);
+fn comptimeValToZeroPaddedHexString(val: anytype) [@sizeOf(@TypeOf(val))*2:0]u8 {
+    const numNibbles = @sizeOf(@TypeOf(val))*2;
 
     var i: u6 = 0;
-    var result: [hex_print_nibbles]u8 = undefined;
-    while (i < hex_print_nibbles) : (i += 1) {
-        result[i] = hex_chars[@truncate(u4, val >> ((hex_print_nibbles - i - 1) * 4))];
+    var result: [numNibbles:0]u8 = undefined;
+    result[numNibbles] = 0;
+    while (i < numNibbles) : (i += 1) {
+        result[i] = hex_chars[@truncate(u4, val >> ((numNibbles - i - 1) * 4))];
     }
     return result;
 }
@@ -72,44 +88,48 @@ fn putComptimeStr(comptime str: [:0]const u8) callconv(.Inline) void {
         printCharacter(str[0]);
     }
     if (comptime (str.len > 1)) {
-        printString(str.ptr);
+        printSentinelString(str.ptr);
     }
 }
 
-noinline fn defaultFormatStruct(value: anytype) void {
-    const treat_as_type = switch(@typeInfo(@TypeOf(value.*))) {
-        .Pointer => @TypeOf(value.*.*),
-        else => @TypeOf(value.*),
-    };
-
-    switch(@typeInfo(treat_as_type)) {
-        .Struct => |info| {
-            const arg_fields = info.fields;
-            
-            comptime var current_fmt: [:0]const u8 = @typeName(@TypeOf(value.*)) ++ "{{ ";
-
-            inline for (arg_fields) |field, i| {
-                switch (@typeInfo(field.field_type)) {
-                    .Int => doFmtNoEndl(current_fmt ++ "." ++ field.name ++ " = {d}", .{@field(value.*, field.name)}),
-                    .Struct => doFmtNoEndl(current_fmt ++ "." ++ field.name ++ " = {}", .{@field(value.*, field.name)}),
-                    else => @compileError("No idea how to format this struct field type: '" ++ @typeName(field.field_type) ++ "' (while processing type '" ++ @typeName(treat_as_type) ++ "')!"),
-                }
-                current_fmt = if (i == current_fmt.len - 1) "" else ", ";
-            }
-
-            current_fmt = current_fmt ++ " }}";
-
-            doFmtNoEndl(current_fmt, .{});
-        },
-        .Optional => |opt| {
-            if(value.*) |v| {
-                doFmtNoEndl("{}", .{v});
+fn defaultFormatValue(value: anytype, comptime fmt_so_far: [:0]const u8) callconv(.Inline) void {
+    switch(@typeInfo(@TypeOf(value.*))) {
+        .Struct, .Enum, .Union => {
+            if (comptime @hasDecl(@TypeOf(value.*), "format")) {
+                putComptimeStr(fmt_so_far);
+                value.format(doFmtNoEndl);
             } else {
-                doFmtNoEndl("null", .{});
+                putComptimeStr(defaultFormatStruct(value, fmt_so_far));
             }
         },
-        else => @compileError("Bad type '" ++ @typeName(treat_as_type) ++ "' for struct fmt!"),
+        .Pointer => {
+            defaultFormatValue(value.*, fmt_so_far);
+        },
+        .Optional => {
+            putComptimeStr(fmt_so_far);
+            // Runtime if, flush before!
+            if(value.* != null) {
+                defaultFormatValue(&(value.*.?), "");
+            } else {
+                putComptimeStr("null");
+            }
+        },
+
+        else => @compileError("Type '" ++ @typeName(@TypeOf(value.*)) ++ "' not available for {}-formatting"),
     }
+}
+
+noinline fn defaultFormatStruct(value: anytype, comptime fmt_so_far: []const u8) [:0]const u8 {
+    const arg_fields = @typeInfo(@TypeOf(value.*)).fields;
+            
+    comptime var current_fmt: [:0]const u8 = fmt_so_far ++ @typeName(@TypeOf(value.*)) ++ "{{ ";
+
+    inline for (arg_fields) |field, i| {
+        const trailing = defaultFormatValue(&@field(value.*, field.name), current_fmt ++ "." ++ field.name ++ " = ");
+        current_fmt = trailing ++ if (i == current_fmt.len - 1) "" else ", ";
+    }
+
+    return current_fmt ++ " }}";
 }
 
 pub fn doFmtNoEndl(comptime fmt: []const u8, args: anytype) void {
@@ -122,107 +142,118 @@ pub fn doFmtNoEndl(comptime fmt: []const u8, args: anytype) void {
     @setEvalBranchQuota(9999999);
 
     inline while (fmt_idx < fmt.len) {
-        if (comptime formatMatches(fmt, fmt_idx, "{{")) {
-            current_str = current_str ++ [_]u8{'{'};
-            fmt_idx += 2;
-        } else if (comptime formatMatches(fmt, fmt_idx, "}}")) {
+        if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "}}")) {
             current_str = current_str ++ [_]u8{'}'};
             fmt_idx += 2;
-        } else if (comptime formatMatches(fmt, fmt_idx, "{0X}")) {
-            const value = @field(args, arg_fields[arg_idx].name);
-            if (arg_fields[arg_idx].is_comptime) {
-                current_str = current_str ++ comptime comptimeValToZeroPaddedHexString(value);
-            } else {
-                printString(current_str.ptr);
-                current_str = "";
-                printRuntimeValueAsZeroPaddedHex(value);
-            }
-            fmt_idx += 4;
-            arg_idx += 1;
-        } else if (comptime formatMatches(fmt, fmt_idx, "{X}")) {
-            const value = @field(args, arg_fields[arg_idx].name);
-            if (arg_fields[arg_idx].is_comptime) {
-                current_str = current_str ++ comptime comptimeValToString(value, 16);
-            } else {
-                printString(current_str.ptr);
-                current_str = "";
-                printRuntimeValue(value, 16);
-            }
-            fmt_idx += 3;
-            arg_idx += 1;
-        } else if (comptime formatMatches(fmt, fmt_idx, "{d}")) {
-            const value = @field(args, arg_fields[arg_idx].name);
-            if (arg_fields[arg_idx].is_comptime) {
-                current_str = current_str ++ comptime comptimeValToString(value, 10);
-            } else {
-                printString(current_str.ptr);
-                current_str = "";
-                printRuntimeValue(value, 10);
-            }
-            fmt_idx += 3;
-            arg_idx += 1;
-        } else if (comptime formatMatches(fmt, fmt_idx, "{e}")) {
-            const value = @field(args, arg_fields[arg_idx].name);
+        } else if(comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{")) {
+            if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{{")) {
+                current_str = current_str ++ [_]u8{'{'};
+                fmt_idx += 2;
+            } else if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{0X}")) {
+                const value = &@field(args, arg_fields[arg_idx].name);
+                if (arg_fields[arg_idx].is_comptime) {
+                    current_str = current_str ++ comptime comptimeValToZeroPaddedHexString(value.*);
+                } else {
+                    putComptimeStr(current_str);
+                    current_str = "";
+                    printRuntimeValueAsZeroPaddedHex(value.*);
+                }
+                fmt_idx += 4;
+                arg_idx += 1;
+            } else if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{X}")) {
+                const value = &@field(args, arg_fields[arg_idx].name);
+                if (arg_fields[arg_idx].is_comptime) {
+                    current_str = current_str ++ comptime comptimeValToString(value.*, 16);
+                } else {
+                    putComptimeStr(current_str);
+                    current_str = "";
+                    printRuntimeValue(value.*, 16);
+                }
+                fmt_idx += 3;
+                arg_idx += 1;
+            } else if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{d}")) {
+                const value = &@field(args, arg_fields[arg_idx].name);
+                if (arg_fields[arg_idx].is_comptime) {
+                    current_str = current_str ++ comptime comptimeValToString(value.*, 10);
+                } else {
+                    putComptimeStr(current_str);
+                    current_str = "";
+                    printRuntimeValue(value.*, 10);
+                }
+                fmt_idx += 3;
+                arg_idx += 1;
+            } else if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{e}")) {
+                const value = &@field(args, arg_fields[arg_idx].name);
 
-            switch (@typeInfo(@TypeOf(value))) {
-                .Enum => current_str = current_str ++ @typeName(@TypeOf(value)),
-                else => {},
-            }
-            current_str = current_str ++ ".";
+                switch (@typeInfo(@TypeOf(value.*))) {
+                    .Enum, .ErrorSet => current_str = current_str ++ @typeName(@TypeOf(value.*)),
+                    else => {},
+                }
+                current_str = current_str ++ ".";
 
-            if (arg_fields[arg_idx].is_comptime) {
-                current_str = current_str ++ comptime @tagName(value);
-            } else {
-                printString(current_str.ptr);
-                current_str = "";
-                printString(@tagName(value));
-            }
-            fmt_idx += 3;
-            arg_idx += 1;
-        } else if (comptime formatMatches(fmt, fmt_idx, "{s}")) {
-            const value = @field(args, arg_fields[arg_idx].name);
-            if (arg_fields[arg_idx].is_comptime) {
-                current_str = current_str ++ comptime value;
-            } else {
-                printString(current_str.ptr);
-                current_str = "";
-                // TODO: Different paths depending on the string type: [*:0]const u8, []const u8, ...
-                // For now we just assume [*:0]const u8
-                printString(value);
-            }
-            fmt_idx += 3;
-            arg_idx += 1;
-        } else if (comptime formatMatches(fmt, fmt_idx, "{c}")) {
-            const value = @field(args, arg_fields[arg_idx].name);
-            if (arg_fields[arg_idx].is_comptime) {
-                current_str = current_str ++ comptime [_]u8{value};
-            } else {
-                printString(current_str.ptr);
-                current_str = "";
-                printCharacter(value);
-            }
-            fmt_idx += 3;
-            arg_idx += 1;
-        } else if (comptime formatMatches(fmt, fmt_idx, "{}")) {
-            printString(current_str.ptr);
-            current_str = "";
-
-            const value = @field(args, arg_fields[arg_idx].name);
-            switch(@typeInfo(@TypeOf(value))) {
-                .Struct, .Enum, .Union => {
-                    if (comptime @hasDecl(@TypeOf(value), "format")) {
-                        @call(.{ .modifier = .never_inline }, value.format, .{doFmtNoEndl});
-                    } else {
-                        defaultFormatStruct(&value);
+                if (arg_fields[arg_idx].is_comptime) {
+                    switch(@typeInfo(@TypeOf(value.*))) {
+                        .Enum => current_str = current_str ++ comptime @tagName(value.*),
+                        .ErrorSet => current_str = current_str ++ comptime @errorName(value.*),
                     }
-                },
-                else => defaultFormatStruct(&value),
+                } else {
+                    putComptimeStr(current_str);
+                    current_str = "";
+                    switch(@typeInfo(@TypeOf(value.*))) {
+                        .Enum => printSentinelString(@tagName(value.*)),
+                        // switch to printSentinelString once we have in our compiler build https://github.com/ziglang/zig/pull/8636
+                        .ErrorSet => printSliceString(@errorName(value.*)),
+                        else => @compileError("Cannot format type '" ++ @typeName(@TypeOf(value.*)) ++ "' with {e}."),
+                    }
+                }
+                fmt_idx += 3;
+                arg_idx += 1;
+            } else if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{s}")) {
+                const value = &@field(args, arg_fields[arg_idx].name);
+                if (arg_fields[arg_idx].is_comptime) {
+                    current_str = current_str ++ comptime value.*;
+                } else {
+                    putComptimeStr(current_str);
+                    current_str = "";
+                    switch(@TypeOf(value.*)) {
+                        [*:0]u8, [*:0]const u8 => printSentinelString(value.*),
+                        [:0]u8, [:0]const u8 => printSentinelString(value.ptr),
+                        []u8, []const u8 => printSliceString(value.*),
+                        else => @compileError("Bad type for {s} formatting"),
+                    }
+                }
+                fmt_idx += 3;
+                arg_idx += 1;
+            } else if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{c}")) {
+                const value = &@field(args, arg_fields[arg_idx].name);
+                if (arg_fields[arg_idx].is_comptime) {
+                    current_str = current_str ++ comptime [_]u8{value.*};
+                } else {
+                    putComptimeStr(current_str);
+                    current_str = "";
+                    printCharacter(value.*);
+                }
+                fmt_idx += 3;
+                arg_idx += 1;
+            } else if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{b}")) {
+                const value = &@field(args, arg_fields[arg_idx].name);
+                if (arg_fields[arg_idx].is_comptime) {
+                    current_str = current_str ++ if(value.*) "true" else "false";
+                } else {
+                    putComptimeStr(current_str);
+                    current_str = "";
+                    printBoolean(value.*);
+                }
+                fmt_idx += 3;
+                arg_idx += 1;
+            } else if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{}")) {
+                defaultFormatValue(&@field(args, arg_fields[arg_idx].name), current_str);
+                current_str = "";
+                fmt_idx += 2;
+                arg_idx += 1;
+            } else {
+                @compileError("Unknown format specifier: '" ++ [_]u8{fmt[fmt_idx + 1]} ++ "'");
             }
-            
-            fmt_idx += 2;
-            arg_idx += 1;
-        } else if (comptime formatMatches(fmt, fmt_idx, "{")) {
-            @compileError("Unknown format specifier: '" ++ [_]u8{fmt[fmt_idx + 1]} ++ "'");
         } else {
             current_str = current_str ++ [_]u8{fmt[fmt_idx]};
             fmt_idx += 1;

@@ -235,7 +235,6 @@ const ParsedInfo = struct {
             \\  UART with status: {}
             \\  Kernel file: {}
             \\
-            \\
         , .{
             self.memmap.?,
             self.framebuffer,
@@ -251,7 +250,7 @@ const ParsedInfo = struct {
 
 fn consumePhysMem(ent: *const MemmapEntry) void {
     if (ent.kind == 1) {
-        os.log("Stivale: Consuming 0x{X} to 0x{X}\n", .{ ent.base, ent.base + ent.length });
+        log(.info, "Consuming 0x{0X} to 0x{0X}", .{ ent.base, ent.base + ent.length });
         os.memory.pmm.consume(ent.base, ent.length);
     }
 }
@@ -272,7 +271,7 @@ fn mapPhys(ent: *const MemmapEntry, context: *platform.paging.PagingContext) voi
     if (new_ent.length == 0)
         return;
 
-    os.log("Stivale: Mapping phys mem 0x{X} to 0x{X}\n", .{
+    log(.info, "Stivale: Mapping phys mem 0x{X} to 0x{X}\n", .{
         new_ent.base,
         new_ent.base + new_ent.length,
     });
@@ -336,7 +335,7 @@ export fn stivale2Main(info_in: *Info) noreturn {
     while (tag != null) : (tag = tag.?.next) {
         switch (tag.?.identifier) {
             0x2187f79e8612de07 => info.memmap = @ptrCast(*MemmapTag, tag),
-            0xe5e76a1b4597a781 => os.log("{s}\n", .{@ptrCast(*CmdLineTag, tag)}),
+            0xe5e76a1b4597a781 => log(.info, "{}", .{@ptrCast(*CmdLineTag, tag)}),
             0x506461d2950408fa => info.framebuffer = @ptrCast(*FramebufferTag, tag).*,
             0x9e1786930a375e78 => info.rsdp = platform.phys_ptr([*]u8).from_int(@ptrCast(*RsdpTag, tag).rsdp),
             0x34d1d96339647025 => info.smp = platform.phys_ptr(*SMPTag).from_int(@ptrToInt(tag)),
@@ -384,8 +383,8 @@ export fn stivale2Main(info_in: *Info) noreturn {
         log(.debug, "Using VGA output", .{});
     }
 
-    log(.info, "{}", .{info_in.*});
-    log(.info, "{}", .{info});
+    log(.notice, "{}", .{info_in.*});
+    log(.notice, "{}", .{info});
 
     if (!info.valid()) {
         @panic("Stivale2: Info not valid!\n");
@@ -393,7 +392,7 @@ export fn stivale2Main(info_in: *Info) noreturn {
 
     if (info.dtb) |dtb| {
         os.vital(platform.devicetree.parse_dt(dtb.slice()), "parsing devicetree blob");
-        os.log("Stivale2: Parsed devicetree blob!\n", .{});
+        log(.debug, "Stivale2: Parsed devicetree blob!\n", .{});
     }
 
     for (info.memmap.?.get()) |*ent| {
@@ -419,11 +418,11 @@ export fn stivale2Main(info_in: *Info) noreturn {
     if (info.framebuffer) |_| {
         blk: {
             display_buffer.init(&display.context.region) catch |err| {
-                os.log("Stivale2: Error while allocating buffer: {}\n", .{err});
+                log(.err, "Stivale2: Error while allocating buffer: {e}\n", .{err});
                 break :blk;
             };
             drivers.output.vesa_log.use(&display_buffer.buffered_region);
-            os.log("Stivale2: Using buffered output\n", .{});
+            log(.debug, "Stivale2: Using buffered output\n", .{});
         }
     }
 
@@ -450,17 +449,17 @@ export fn stivale2Main(info_in: *Info) noreturn {
         display.context.region.bytes = ptr[0 .. @as(usize, fb.height) * @as(usize, fb.pitch)];
     }
 
-    os.log("Doing vmm\n", .{});
+    log(.debug, "Doing vmm\n", .{});
 
     const heap_base = memory.paging.kernel_context.make_heap_base();
 
     os.vital(memory.vmm.init(heap_base), "initializing vmm");
 
-    os.log("Doing scheduler\n", .{});
+    log(.debug, "Doing scheduler\n", .{});
 
     os.thread.scheduler.init(&platform.thread.bsp_task);
 
-    os.log("Doing SMP\n", .{});
+    log(.debug, "Doing SMP\n", .{});
 
     if (info.smp) |smp| {
         var cpus = smp.get_writeback().get();
@@ -504,11 +503,11 @@ export fn stivale2Main(info_in: *Info) noreturn {
 
         // Free memory pool used for stacks. Unreachable for now
         memory.pmm.freePhys(stacks, bootstrap_stack_pool_sz);
-        os.log("All cores are ready for tasks!\n", .{});
+        log(.debug, "All cores are ready for tasks!\n", .{});
     }
 
     if (info.rsdp) |rsdp| {
-        os.log("Registering rsdp: 0x{X}!\n", .{rsdp});
+        log(.debug, "Registering rsdp: 0x{X}!\n", .{rsdp});
         platform.acpi.register_rsdp(rsdp);
     }
 

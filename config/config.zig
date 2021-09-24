@@ -75,13 +75,17 @@ pub const kernel = .{
     },
 
     .stivale2 = .{
-        .log_tag = .Stivale2,
-        .log_filter = .debug,
+        .log = .{
+            .prefix = "Stivale2",
+            .filter = .info,
+        },
     },
 
     .acpi = .{
-        .log_tag = .ACPI,
-        .log_filter = .info,
+        .log = .{
+            .prefix = "ACPI",
+            .filter = .info,
+        },
     },
 };
 
@@ -100,15 +104,30 @@ pub const drivers = .{
     .block = .{
         .ahci = .{
             .enable = true,
+
+            .log = .{
+                .prefix = "AHCI",
+                .filter = .info,
+            },
         },
         .nvme = .{
             .enable = true,
+
+            .log = .{
+                .prefix = "NVMe",
+                .filter = .info,
+            },
         },
     },
 
     .gpu = .{
         .virtio_gpu = .{
             .enable = true,
+
+            .log = .{
+                .prefix = "virtio-gpu",
+                .filter = .info,
+            },
 
             .default_resolution = .{
                 .width = 1280,
@@ -122,6 +141,11 @@ pub const drivers = .{
     .net = .{
         .e1000 = .{
             .enable = true,
+
+            .log = .{
+                .prefix = "E1000",
+                .filter = .info,
+            },
         },
     },
 
@@ -150,6 +174,11 @@ pub const drivers = .{
     .usb = .{
         .xhci = .{
             .enable = true,
+
+            .log = .{
+                .prefix = "XHCI",
+                .filter = .info,
+            },
         },
     },
 };

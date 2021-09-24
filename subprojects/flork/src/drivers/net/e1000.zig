@@ -1,5 +1,7 @@
 usingnamespace @import("root").preamble;
 
+const log = lib.output.log.scoped(config.drivers.net.e1000).write;
+
 const num_rx_desc = 32;
 const num_tx_desc = 8;
 
@@ -146,7 +148,7 @@ const Controller = struct {
             desc.status = 0;
         }
 
-        os.log("E1000: RX list prepared\n", .{});
+        log(.debug, "RX list prepared", .{});
 
         self.write(u32, .rx_descs_low, @truncate(u32, base_phys));
         self.write(u32, .rx_descs_high, @truncate(u32, base_phys >> 32));
@@ -178,7 +180,7 @@ const Controller = struct {
         );
         // zig fmt: on
 
-        os.log("E1000: RX set up\n", .{});
+        log(.debug, "RX set up", .{});
     }
 
     fn setupTX(self: *@This()) !void {
@@ -192,7 +194,7 @@ const Controller = struct {
             desc.status = (1 << 0); // TSTA_DD
         }
 
-        os.log("E1000: TX list prepared\n", .{});
+        log(.debug, "TX list prepared", .{});
 
         self.write(u32, .tx_descs_low, @truncate(u32, base_phys));
         self.write(u32, .tx_descs_high, @truncate(u32, base_phys >> 32));
@@ -212,7 +214,7 @@ const Controller = struct {
         );
         // zig fmt: on
 
-        os.log("E1000: TX set up\n", .{});
+        log(.debug, "TX set up", .{});
     }
 
     fn init(self: *@This(), dev: os.platform.pci.Addr) !void {
@@ -230,9 +232,9 @@ const Controller = struct {
     pub fn format(
         self: *const @This(),
         fmt: anytype,
-    ) !void {
-        try writer.print(
-            "Base MMIO address: 0x{X}, mac: {x:0>2}:{x:0>2}:{x:0>2}:{x:0>2}:{x:0>2}:{x:0>2}, eeprom: {}",
+    ) void {
+        fmt(
+            "Base MMIO address: 0x{X}, mac: {0X}:{0X}:{0X}:{0X}:{0X}:{0X}, eeprom: {b}",
             .{
                 self.base_addr,
                 self.mac[0],
@@ -250,15 +252,15 @@ const Controller = struct {
 fn controllerTask(dev: os.platform.pci.Addr) void {
     var c: Controller = undefined;
     c.init(dev) catch |err| {
-        os.log("E1000: Error while initializing: {}\n", .{err});
+        log(.crit, "Error while initializing: {e}", .{err});
         if (@errorReturnTrace()) |trace| {
             os.kernel.debug.dumpStackTrace(trace);
         } else {
-            os.log("No error trace.\n", .{});
+            log(.crit, "No error trace.", .{});
         }
     };
 
-    os.log("E1000: Inited controller: {}\n", .{c});
+    log(.info, "Inited controller: {}", .{c});
 }
 
 pub fn registerController(dev: os.platform.pci.Addr) void {
