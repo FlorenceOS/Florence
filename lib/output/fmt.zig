@@ -215,8 +215,8 @@ pub fn doFmtNoEndl(comptime fmt: []const u8, args: anytype) void {
                     putComptimeStr(current_str);
                     current_str = "";
                     switch(@typeInfo(@TypeOf(value.*))) {
-                        .Enum => printSentinelString(@tagName(value.*)),
                         // switch to printSentinelString once we have in our compiler build https://github.com/ziglang/zig/pull/8636
+                        .Enum => printSliceString(@tagName(value.*)),
                         .ErrorSet => printSliceString(@errorName(value.*)),
                         else => @compileError("Cannot format type '" ++ @typeName(@TypeOf(value.*)) ++ "' with {e}."),
                     }
