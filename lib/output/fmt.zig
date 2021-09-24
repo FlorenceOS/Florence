@@ -71,11 +71,6 @@ fn comptimeValToZeroPaddedHexString(val: anytype) [@sizeOf(@TypeOf(val))*2:0]u8 
     return result;
 }
 
-fn formatMatches(fmt: []const u8, idx: usize, to_match: []const u8) callconv(.Inline) bool {
-    const curr_fmt = fmt[idx..];
-    return std.mem.startsWith(u8, curr_fmt, to_match);
-}
-
 fn lengthOfIntAsString(num: anytype, comptime base: comptime_int) usize {
     if (num < base)
         return 1;
@@ -165,14 +160,14 @@ pub fn doFmtNoEndl(comptime fmt: []const u8, args: anytype) void {
     @setEvalBranchQuota(9999999);
 
     inline while (fmt_idx < fmt.len) {
-        if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "}}")) {
+        if (fmt[fmt_idx] == '}') { // }}
             current_str = current_str ++ [_]u8{'}'};
             fmt_idx += 2;
-        } else if(comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{")) {
-            if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{{")) {
+        } else if(fmt[fmt_idx] == '{') {
+            if (fmt[fmt_idx + 1] == '{') { // {{
                 current_str = current_str ++ [_]u8{'{'};
                 fmt_idx += 2;
-            } else if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{0X}")) {
+            } else if (fmt[fmt_idx + 1] == '0' and fmt[fmt_idx + 2] == 'X') {
                 const value = &@field(args, arg_fields[arg_idx].name);
                 if (arg_fields[arg_idx].is_comptime) {
                     current_str = current_str ++ comptime comptimeValToZeroPaddedHexString(value.*);
@@ -183,7 +178,7 @@ pub fn doFmtNoEndl(comptime fmt: []const u8, args: anytype) void {
                 }
                 fmt_idx += 4;
                 arg_idx += 1;
-            } else if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{X}")) {
+            } else if (fmt[fmt_idx + 1] == 'X') { // {X}
                 const value = &@field(args, arg_fields[arg_idx].name);
                 if (arg_fields[arg_idx].is_comptime) {
                     current_str = current_str ++ comptime comptimeValToString(value.*, 16);
@@ -194,7 +189,7 @@ pub fn doFmtNoEndl(comptime fmt: []const u8, args: anytype) void {
                 }
                 fmt_idx += 3;
                 arg_idx += 1;
-            } else if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{d}")) {
+            } else if (fmt[fmt_idx + 1] == 'd') { // {d}
                 const value = &@field(args, arg_fields[arg_idx].name);
                 if (arg_fields[arg_idx].is_comptime) {
                     current_str = current_str ++ comptime comptimeValToString(value.*, 10);
@@ -205,7 +200,7 @@ pub fn doFmtNoEndl(comptime fmt: []const u8, args: anytype) void {
                 }
                 fmt_idx += 3;
                 arg_idx += 1;
-            } else if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{e}")) {
+            } else if (fmt[fmt_idx + 1] == 'e') { // {e}
                 const value = &@field(args, arg_fields[arg_idx].name);
 
                 switch (@typeInfo(@TypeOf(value.*))) {
@@ -231,7 +226,7 @@ pub fn doFmtNoEndl(comptime fmt: []const u8, args: anytype) void {
                 }
                 fmt_idx += 3;
                 arg_idx += 1;
-            } else if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{s}")) {
+            } else if (fmt[fmt_idx + 1] == 's') { // {s}
                 const value = &@field(args, arg_fields[arg_idx].name);
                 if (arg_fields[arg_idx].is_comptime) {
                     current_str = current_str ++ comptime value.*;
@@ -247,7 +242,7 @@ pub fn doFmtNoEndl(comptime fmt: []const u8, args: anytype) void {
                 }
                 fmt_idx += 3;
                 arg_idx += 1;
-            } else if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{c}")) {
+            } else if (fmt[fmt_idx + 1] == 'c') { // {c}
                 const value = &@field(args, arg_fields[arg_idx].name);
                 if (arg_fields[arg_idx].is_comptime) {
                     current_str = current_str ++ comptime [_]u8{value.*};
@@ -258,7 +253,7 @@ pub fn doFmtNoEndl(comptime fmt: []const u8, args: anytype) void {
                 }
                 fmt_idx += 3;
                 arg_idx += 1;
-            } else if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{b}")) {
+            } else if (fmt[fmt_idx + 1] == 'b') { // {b}
                 const value = &@field(args, arg_fields[arg_idx].name);
                 if (arg_fields[arg_idx].is_comptime) {
                     current_str = current_str ++ if(value.*) "true" else "false";
@@ -269,14 +264,14 @@ pub fn doFmtNoEndl(comptime fmt: []const u8, args: anytype) void {
                 }
                 fmt_idx += 3;
                 arg_idx += 1;
-            } else if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{*}")) {
+            } else if (fmt[fmt_idx + 1] == '*') { // {*}
                 const value = &@field(args, arg_fields[arg_idx].name);
                 putComptimeStr(current_str);
                 current_str = "";
                 printPointer(value.*);
                 fmt_idx += 3;
                 arg_idx += 1;
-            } else if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{}")) {
+            } else if (fmt[fmt_idx + 1] == '}') { // {}
                 defaultFormatValue(&@field(args, arg_fields[arg_idx].name), current_str);
                 current_str = "";
                 fmt_idx += 2;
