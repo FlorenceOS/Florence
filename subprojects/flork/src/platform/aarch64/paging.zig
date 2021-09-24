@@ -1,4 +1,10 @@
 usingnamespace @import("root").preamble;
+
+const log = lib.output.log.scoped(.{
+    .prefix = "x86_64 Paging",
+    .filter = .info,
+}).write;
+
 const paging_common = @import("../paging.zig");
 
 pub var page_sizes: []const usize = undefined;
@@ -86,7 +92,7 @@ fn MAIRContext() type {
                 memory_writethrough_encoding => .MemoryWritethrough,
                 memory_write_back_encoding => .MemoryWriteBack,
                 else => {
-                    os.log("Index: {}, value = 0x{}\n", .{ idx, val });
+                    log(null, "Index: {d}, value = 0x{X}", .{ idx, val });
                     @panic("Unknown MAIR value!");
                 },
             };
@@ -335,7 +341,7 @@ pub const PagingContext = struct {
     }
 
     pub fn deinit(self: *@This()) void {
-        os.log("TODO: PagingContext deinit\n", .{});
+        log(.err, "TODO: PagingContext deinit", .{});
     }
 
     pub fn can_map_at_level(self: *const @This(), level: level_type) bool {
@@ -345,7 +351,7 @@ pub const PagingContext = struct {
     pub fn check_phys(self: *const @This(), phys: u64) void {
         if (comptime (std.debug.runtime_safety)) {
             if (phys > self.max_phys) {
-                os.log("Physaddr: 0x{X}\n", .{phys});
+                log(null, "Physaddr: 0x{X}", .{phys});
                 @panic("Physical address out of range");
             }
         }
@@ -489,7 +495,7 @@ pub const PagingContext = struct {
     }
 
     pub fn invalidateOtherCPUs(self: *const @This(), virt: usize, size: usize) void {
-        os.log("idfk we should probably invalidate tlbs here on other cpus, but I think we've just been played for absolute fools\n", .{});
+        log(.err, "idfk we should probably invalidate tlbs here on other cpus, but I think we've just been played for absolute fools", .{});
     }
 };
 

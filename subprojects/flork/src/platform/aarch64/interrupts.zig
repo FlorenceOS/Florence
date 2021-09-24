@@ -1,5 +1,10 @@
 usingnamespace @import("root").preamble;
 
+const log = lib.output.log.scoped(.{
+    .prefix = "Interrupts",
+    .filter = .info,
+}).write;
+
 pub const InterruptState = bool;
 
 pub fn get_and_disable_interrupts() InterruptState {
@@ -284,14 +289,17 @@ export fn interrupt_handler(frame: *InterruptFrame) callconv(.C) void {
     const present = (dfsc & 0b111100) != 0b000100;
 
     if (ec == 0b111100) {
-        os.log("BRK instruction execution in AArch64 state\n", .{});
+        log(null, "BRK instruction execution in AArch64 state\n", .{});
         os.platform.hang();
     }
 
     switch (ec) {
         else => {
-            os.log("EC = 0b{b}\n", .{ec});
-            log(null, "Frame dump:\n{}", .{frame});
+            log(null,
+                \\EC = 0x{X}
+                \\Frame dump:
+                \\{}
+            , .{ ec, frame });
             frame.trace_stack();
             @panic("Unknown EC!");
         },
