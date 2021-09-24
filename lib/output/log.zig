@@ -43,13 +43,13 @@ fn startImpl(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime
 
 fn contImpl(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype, _: if (enabled(tag)) Mutex.Held else void) callconv(.Inline) void {
     if (comptime enabled(tag, log_level)) {
-        fmt_lib.doFmtNoEndl(comptime taggedLogFmt(tag, log_level, fmt), args);
+        fmt_lib.doFmtNoEndl(fmt, args);
     }
 }
 
 fn finishImpl(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype, l: if (enabled(tag)) Mutex.Held else void) callconv(.Inline) void {
     if (comptime enabled(tag, log_level)) {
-        fmt_lib.doFmt(comptime taggedLogFmt(tag, log_level, fmt), args);
+        fmt_lib.doFmt(fmt, args);
         l.release();
     }
 }
