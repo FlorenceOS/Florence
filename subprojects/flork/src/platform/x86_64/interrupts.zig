@@ -6,7 +6,7 @@ const log = lib.output.log.scoped(.{
 }).write;
 
 const platform = os.platform;
-const range = lib.util.range.range;
+const range = lib.util.range;
 const scheduler = os.thread.scheduler;
 
 const idt = @import("idt.zig");
@@ -21,7 +21,16 @@ pub const InterruptState = bool;
 
 export var handlers: [256]InterruptHandler = [_]InterruptHandler{unhandled_interrupt} ** num_handlers;
 var itable: *[256]idt.IdtEntry = undefined;
-var raw_callbacks: [256](fn () callconv(.Naked) void) = undefined;
+
+fn generate_callbacks() [256]fn () callconv(.Naked) void {
+    var result: [256]fn () callconv(.Naked) void = undefined;
+    inline for (range.range(num_handlers)) |intnum| {
+        result[intnum] = comptime make_handler(intnum);
+    }
+    return result;
+}
+
+var raw_callbacks: [256](fn () callconv(.Naked) void) = generate_callbacks();
 
 /// Use ist=2 for scheduler calls and ist=1 for interrupts
 pub fn add_handler(idx: u8, f: InterruptHandler, interrupt: bool, priv_level: u2, ist: u3) void {
@@ -46,9 +55,8 @@ pub fn init_interrupts() void {
     pic.disable();
     itable = &idt.idt;
 
-    inline for (range(num_handlers)) |intnum| {
-        raw_callbacks[intnum] = make_handler(intnum);
-        add_handler(intnum, unhandled_interrupt, true, 0, 0);
+    for (range.rt_range(num_handlers)) |_, intnum| {
+        add_handler(@intCast(u8, intnum), unhandled_interrupt, true, 0, 0);
     }
 
     add_handler(0x0E, page_fault_handler, true, 0, 1);

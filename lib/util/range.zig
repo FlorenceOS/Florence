@@ -8,6 +8,10 @@ pub fn range(comptime num: usize) [num]comptime_int {
     return ret;
 }
 
+pub fn rt_range(num: usize) []u1 {
+    return @intToPtr([*]u1, 0x1000)[0..num];
+}
+
 pub fn rangeReverse(comptime num: usize) [num]comptime_int {
     var ret = [_]comptime_int{0} ** num;
     for (ret) |*v, ind| {
