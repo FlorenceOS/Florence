@@ -1,6 +1,9 @@
 usingnamespace @import("root").preamble;
 
-const log = lib.output.log.scoped(config.drivers.net.e1000).write;
+const log = lib.output.log.scoped(.{
+    .prefix = "E1000",
+    .filter = .info,
+}).write;
 
 const num_rx_desc = 32;
 const num_tx_desc = 8;

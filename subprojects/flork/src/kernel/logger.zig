@@ -71,6 +71,7 @@ pub fn putch(ch: u8) void {
 // }
 
 pub fn log(comptime format: []const u8, args: anytype) void {
+    @compileError("lmao");
     // const l = @call(.{ .modifier = .never_inline }, getLogLock, .{});
     // defer @call(.{ .modifier = .never_inline }, releaseLogLock, .{l});
 

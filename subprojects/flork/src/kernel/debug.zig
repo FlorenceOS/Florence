@@ -1,5 +1,10 @@
 usingnamespace @import("root").preamble;
 
+const log = lib.output.log.scoped(.{
+    .prefix = "Debug info",
+    .filter = .info,
+});
+
 pub const debug_allocator = &debug_allocator_state.allocator;
 
 extern var __kernel_begin: u8;
@@ -53,7 +58,7 @@ fn getSectionSlice(elf: [*]u8, section_name: []const u8) ![]u8 {
 
         if (std.mem.eql(u8, getSectionName(section_names, header) orelse continue, section_name)) {
             const ret = getSectionData(elf, header);
-            os.log("Found section {s}: {*}, {}\n", .{ section_name, ret.ptr, ret.len });
+            log.write(.info, "Found section {s}: {*}, {d}", .{ section_name, ret.ptr, ret.len });
             return ret;
         }
     }
@@ -76,17 +81,17 @@ pub fn addDebugElf(elf: [*]u8) void {
         @panic("Double debug info init!");
 
     attemptLoadDebug(elf) catch |err| {
-        os.log("Failed to load debug info: {}\n", .{err});
+        log.write(.crit, "Failed to load debug info: {e}", .{err});
         if (@errorReturnTrace()) |trace| {
             dumpStackTrace(trace);
         } else {
-            os.log("No error trace.\n", .{});
+            log.write(.crit, "No error trace.", .{});
         }
         return;
     };
 
     inited_debug_info = true;
-    os.log("Opened debug info!\n", .{});
+    log.write(.info, "Opened debug info!", .{});
 }
 
 fn printAddr(ip: usize) void {
@@ -98,12 +103,12 @@ fn printAddr(ip: usize) void {
 
     if (inited_debug_info) {
         var compile_unit = debug_info.findCompileUnit(ip) catch |err| {
-            os.log("Couldn't find the compile unit at {x}: {s}\n", .{ ip, @errorName(err) });
+            log.write(.warn, "Couldn't find the compile unit at 0x{X}: {s}", .{ ip, @errorName(err) });
             return;
         };
 
         var line_info = debug_info.getLineNumberInfo(compile_unit.*, ip) catch |err| {
-            os.log("Couldn't find the line info at {x}: {s}\n", .{ ip, @errorName(err) });
+            log.write(.warn, "Couldn't find the line info at 0x{X}: {s}", .{ ip, @errorName(err) });
             return;
         };
 
@@ -114,28 +119,23 @@ fn printAddr(ip: usize) void {
 }
 
 fn printInfo(line_info: ?std.debug.LineInfo, ip: usize, symbol_name: ?[]const u8) void {
-    //const lock = os.getLogLock();
-    //defer os.releaseLogLock(lock);
-
-    os.log("0x{X}: ", .{ip});
+    const l = log.start(null, "0x{X}: ", .{ip});
 
     if (line_info) |li| {
-        os.log("{s}:{}:{} ", .{ li.file_name, li.line, li.column });
+        log.cont(null, "{s}:{d}:{d} ", .{ li.file_name, li.line, li.column }, l);
     } else {
-        os.log("<No line info> ", .{});
+        log.cont(null, "<No line info> ", .{}, l);
     }
 
     if (symbol_name) |symname| {
-        os.log("{s}", .{symname});
+        log.finish(null, "{s}", .{symname}, l);
     } else {
-        os.log("<No symbol>", .{});
+        log.finish(null, "<No symbol>", .{}, l);
     }
-
-    os.log("\n", .{});
 }
 
 pub fn dumpFrame(bp: usize, ip: usize) void {
-    os.log("Dumping ip=0x{x}, bp=0x{x}\n", .{ ip, bp });
+    log.write(null, "Dumping ip=0x{X}, bp=0x{X}", .{ ip, bp });
 
     printAddr(ip);
 

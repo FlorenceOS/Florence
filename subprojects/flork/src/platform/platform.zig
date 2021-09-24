@@ -1,5 +1,10 @@
 usingnamespace @import("root").preamble;
 
+const log = lib.output.log.scoped(.{
+    .prefix = "Platform",
+    .filter = .info,
+}).write;
+
 // Submodules
 pub const acpi = @import("acpi.zig");
 pub const pci = @import("pci.zig");
@@ -66,13 +71,13 @@ pub fn page_fault(addr: usize, present: bool, access: PageFaultAccess, frame: an
         }
     }
 
-    os.log("Platform: Unhandled page fault on {s} at 0x{x}, present: {}\n", .{
-        @tagName(access),
+    log(null, "Platform: Unhandled page fault on {e} at 0x{X}, present: {b}", .{
+        access,
         addr,
         present,
     });
 
-    frame.dump();
+    log(null, "Frame dump:\n{}", .{frame});
     frame.trace_stack();
     @panic("Page fault");
 }

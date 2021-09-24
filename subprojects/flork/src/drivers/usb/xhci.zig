@@ -1,6 +1,9 @@
 usingnamespace @import("root").preamble;
 
-const log = lib.output.log.scoped(config.drivers.usb.xhci).write;
+const log = lib.output.log.scoped(.{
+    .prefix = "XHCI",
+    .filter = .info,
+}).write;
 
 const CapRegs = extern struct {
     capabilites_length: u8,

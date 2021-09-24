@@ -1,5 +1,10 @@
 usingnamespace @import("root").preamble;
 
+const log = lib.output.log.scoped(.{
+    .prefix = "x86_64 Paging",
+    .filter = .info,
+}).write;
+
 const regs = @import("regs.zig");
 const paging = @import("../paging.zig");
 
@@ -101,9 +106,9 @@ fn PATContext() type {
         pub fn make_default() ?@This() {
             const default = comptime init_from_pat_value(0
             // We set writeback as index 0 for our page tables
-                | write_back_encoding << 0
+            | write_back_encoding << 0
             // The order of the rest shouldn't matter
-                | write_combining_encoding << 8 | writethrough_encoding << 16 | uncacheable_encoding << 24);
+            | write_combining_encoding << 8 | writethrough_encoding << 16 | uncacheable_encoding << 24);
             return default;
         }
     };
@@ -235,7 +240,7 @@ pub const PagingContext = struct {
     }
 
     pub fn deinit(self: *@This()) void {
-        os.log("TODO: PagingContext deinit\n", .{});
+        log(.notice, "TODO: PagingContext deinit\n", .{});
     }
 
     pub fn can_map_at_level(self: *const @This(), level: LevelType) bool {
@@ -245,7 +250,7 @@ pub const PagingContext = struct {
     pub fn check_phys(self: *const @This(), phys: u64) void {
         if (comptime (std.debug.runtime_safety)) {
             if (phys > self.max_phys) {
-                os.log("Physaddr: 0x{X}\n", .{phys});
+                log(null, "Physaddr: 0x{X}", .{phys});
                 @panic("Physical address out of range");
             }
         }

@@ -1,5 +1,10 @@
 usingnamespace @import("root").preamble;
 
+const log = lib.output.log.scoped(.{
+    .prefix = "Kepler tests",
+    .filter = null,
+}).write;
+
 /// IPC test server thread
 pub fn ipcServerThread(mailbox: *os.kepler.ipc.Mailbox, test_task: *os.thread.Task) !void {
     var msg: os.kepler.ipc.Message = undefined;
@@ -7,7 +12,6 @@ pub fn ipcServerThread(mailbox: *os.kepler.ipc.Mailbox, test_task: *os.thread.Ta
     var i: usize = 0;
     while (i < config.kernel.kepler.bench_msg_count) : (i += 1) {
         mailbox.recieve(&msg);
-        //os.log("IPC: message recieved\n", .{});
     }
     // Signal to the main task thread
     os.thread.scheduler.wake(test_task);
@@ -24,7 +28,6 @@ pub fn ipcClientThread(token: *os.kepler.ipc.Token) !void {
                 os.thread.scheduler.yield();
                 continue;
             };
-            //os.log("IPC: message sent\n", .{});
             break;
         }
     }
@@ -34,25 +37,25 @@ pub fn ipcClientThread(token: *os.kepler.ipc.Token) !void {
 pub fn ipcTest() !void {
     // Create mailbox
     const mailbox = try os.kepler.ipc.Mailbox.create(os.memory.pmm.phys_heap, 1024);
-    os.log("Created mailbox!\n", .{});
+    log(.info, "Created mailbox!", .{});
 
     // Create token
     const token = try os.kepler.ipc.Token.create(os.memory.pmm.phys_heap, mailbox, 1024, 69);
-    os.log("Created token!\n", .{});
-    
+    log(.info, "Created token!", .{});
+
     // Start server thread
-    try os.thread.scheduler.spawnTask(ipcServerThread, .{mailbox, os.platform.get_current_task()});
+    try os.thread.scheduler.spawnTask(ipcServerThread, .{ mailbox, os.platform.get_current_task() });
 
     // Start client thread
     try os.thread.scheduler.spawnTask(ipcClientThread, .{token});
 
-    os.log("Finished spawning tasks\n", .{});
+    log(.info, "Finished spawning tasks", .{});
 
     os.thread.scheduler.wait();
     token.shutdown();
     mailbox.shutdown();
-    
-    os.log("IPC test done\n", .{});
+
+    log(.info, "IPC test done", .{});
 }
 
 /// Run tests

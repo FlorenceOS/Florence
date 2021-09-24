@@ -1,5 +1,10 @@
 usingnamespace @import("root").preamble;
 
+const log = lib.output.log.scoped(.{
+    .prefix = "Interrupts",
+    .filter = .info,
+}).write;
+
 const platform = os.platform;
 const range = lib.util.range.range;
 const scheduler = os.thread.scheduler;
@@ -98,8 +103,8 @@ fn page_fault_handler(frame: *InterruptFrame) void {
 }
 
 fn unhandled_interrupt(frame: *InterruptFrame) void {
-    os.log("Interrupts: Unhandled interrupt: {}!\n", .{frame.intnum});
-    frame.dump();
+    log(null, "Unhandled interrupt: 0x{X}!", .{frame.intnum});
+    log(null, "Frame dump:\n{}", .{frame});
     frame.trace_stack();
     os.platform.hang();
 }
@@ -199,13 +204,12 @@ pub const InterruptFrame = packed struct {
     rsp: u64,
     ss: u64,
 
-    pub fn dump(self: *const @This()) void {
-        os.log("FRAME DUMP:\n", .{});
-        os.log("RAX={x:0>16} RBX={x:0>16} RCX={x:0>16} RDX={x:0>16}\n", .{ self.rax, self.rbx, self.rcx, self.rdx });
-        os.log("RSI={x:0>16} RDI={x:0>16} RBP={x:0>16} RSP={x:0>16}\n", .{ self.rsi, self.rdi, self.rbp, self.rsp });
-        os.log("R8 ={x:0>16} R9 ={x:0>16} R10={x:0>16} R11={x:0>16}\n", .{ self.r8, self.r9, self.r10, self.r11 });
-        os.log("R12={x:0>16} R13={x:0>16} R14={x:0>16} R15={x:0>16}\n", .{ self.r12, self.r13, self.r14, self.r15 });
-        os.log("RIP={x:0>16} int={x:0>16} ec ={x:0>16}\n", .{ self.rip, self.intnum, self.ec });
+    pub fn format(self: *const @This(), fmt: anytype) void {
+        fmt("  RAX={0X} RBX={0X} RCX={0X} RDX={0X}\n", .{ self.rax, self.rbx, self.rcx, self.rdx });
+        fmt("  RSI={0X} RDI={0X} RBP={0X} RSP={0X}\n", .{ self.rsi, self.rdi, self.rbp, self.rsp });
+        fmt("  R8 ={0X} R9 ={0X} R10={0X} R11={0X}\n", .{ self.r8, self.r9, self.r10, self.r11 });
+        fmt("  R12={0X} R13={0X} R14={0X} R15={0X}\n", .{ self.r12, self.r13, self.r14, self.r15 });
+        fmt("  RIP={0X} int={0X} ec ={0X}", .{ self.rip, self.intnum, self.ec });
     }
 
     pub fn trace_stack(self: *const @This()) void {

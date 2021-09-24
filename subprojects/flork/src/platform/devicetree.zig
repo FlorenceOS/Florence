@@ -1,4 +1,10 @@
 usingnamespace @import("root").preamble;
+
+const log = lib.output.log.scoped(.{
+    .prefix = "Devicetree",
+    .filter = .info,
+}).write;
+
 const assert = std.debug.assert;
 
 var parsed_dt: bool = false;
@@ -59,8 +65,6 @@ const Parser = struct {
         self.curr_offset = off_dt_struct;
         self.node(0);
 
-        //os.log("DT has size {}\n", .{self.limit});
-
         // const off_dt_strings    = read(u32, dt_data[0x0C .. 0x10]);
         // const version           = read(u32, dt_data[0x14 .. 0x18]);
         // const last_comp_version = read(u32, dt_data[0x18 .. 0x1C]);
@@ -70,15 +74,15 @@ const Parser = struct {
     }
 
     fn parse_resrved_regions(self: *Parser) void {
-        os.log("Parsing reserved regions\n", .{});
+        log(.info, "Parsing reserved regions\n", .{});
         while (true) {
-            os.log("{}\n", .{self});
+            log(.info, "{}\n", .{self});
             const addr = self.read(u64);
             const size = self.read(u64);
             if (addr == 0 and size == 0)
                 continue;
 
-            os.log("TODO: Reserved: {x} with size {x}", .{ addr, size });
+            log(.info, "TODO: Reserved: {x} with size {x}", .{ addr, size });
         }
     }
 
@@ -87,7 +91,7 @@ const Parser = struct {
     }
 
     pub fn format(self: *const Parser, fmt: anytype) !void {
-        try writer.print("Parser{{.data={X}, .offset={X}, limit={X}}}", .{ @ptrToInt(self.data.ptr), self.curr_offset, self.limit });
+        fmt("Parser{{.data={*}, .offset={X}, limit={X}}}", .{ self.data.ptr, self.curr_offset, self.limit });
     }
 
     fn parse_node(self: *Parser) void {}

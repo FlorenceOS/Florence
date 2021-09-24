@@ -55,8 +55,6 @@ const MemoryObjectRegion = struct {
 
             const data_dest = phys_ptr.get_writeback()[0..pageSize()];
 
-            //os.log("Copying bytes {any}\n", .{source_data});
-
             std.mem.copy(u8, data_dest, source_data);
             if (source_data.len < pageSize()) {
                 std.mem.set(u8, data_dest[source_data.len..], 0);

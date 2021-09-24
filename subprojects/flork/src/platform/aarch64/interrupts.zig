@@ -63,17 +63,16 @@ pub const InterruptFrame = struct {
     x1: u64,
     x0: u64,
 
-    pub fn dump(self: *const @This()) void {
-        os.log("FRAME DUMP:\n", .{});
-        os.log("X0 ={x:0>16} X1 ={x:0>16} X2 ={x:0>16} X3 ={x:0>16}\n", .{ self.x0, self.x1, self.x2, self.x3 });
-        os.log("X4 ={x:0>16} X5 ={x:0>16} X6 ={x:0>16} X7 ={x:0>16}\n", .{ self.x4, self.x5, self.x6, self.x7 });
-        os.log("X8 ={x:0>16} X9 ={x:0>16} X10={x:0>16} X11={x:0>16}\n", .{ self.x8, self.x9, self.x10, self.x11 });
-        os.log("X12={x:0>16} X13={x:0>16} X14={x:0>16} X15={x:0>16}\n", .{ self.x12, self.x13, self.x14, self.x15 });
-        os.log("X16={x:0>16} X17={x:0>16} X18={x:0>16} X19={x:0>16}\n", .{ self.x16, self.x17, self.x18, self.x19 });
-        os.log("X20={x:0>16} X21={x:0>16} X22={x:0>16} X23={x:0>16}\n", .{ self.x20, self.x21, self.x22, self.x23 });
-        os.log("X24={x:0>16} X25={x:0>16} X26={x:0>16} X27={x:0>16}\n", .{ self.x24, self.x25, self.x26, self.x27 });
-        os.log("X28={x:0>16} X29={x:0>16} X30={x:0>16} X31={x:0>16}\n", .{ self.x28, self.x29, self.x30, self.x31 });
-        os.log("PC ={x:0>16} SP ={x:0>16} SPSR={x:0>16}\n", .{ self.pc, self.sp, self.spsr });
+    pub fn format(self: *const @This(), fmt: anytype) void {
+        fmt("  X0 ={0X} X1 ={0X} X2 ={0X} X3 ={0X}\n", .{ self.x0, self.x1, self.x2, self.x3 });
+        fmt("  X4 ={0X} X5 ={0X} X6 ={0X} X7 ={0X}\n", .{ self.x4, self.x5, self.x6, self.x7 });
+        fmt("  X8 ={0X} X9 ={0X} X10={0X} X11={0X}\n", .{ self.x8, self.x9, self.x10, self.x11 });
+        fmt("  X12={0X} X13={0X} X14={0X} X15={0X}\n", .{ self.x12, self.x13, self.x14, self.x15 });
+        fmt("  X16={0X} X17={0X} X18={0X} X19={0X}\n", .{ self.x16, self.x17, self.x18, self.x19 });
+        fmt("  X20={0X} X21={0X} X22={0X} X23={0X}\n", .{ self.x20, self.x21, self.x22, self.x23 });
+        fmt("  X24={0X} X25={0X} X26={0X} X27={0X}\n", .{ self.x24, self.x25, self.x26, self.x27 });
+        fmt("  X28={0X} X29={0X} X30={0X} X31={0X}\n", .{ self.x28, self.x29, self.x30, self.x31 });
+        fmt("  PC ={0X} SP ={0X} SPSR={0X}", .{ self.pc, self.sp, self.spsr });
     }
 
     pub fn trace_stack(self: *const @This()) void {
@@ -292,12 +291,12 @@ export fn interrupt_handler(frame: *InterruptFrame) callconv(.C) void {
     switch (ec) {
         else => {
             os.log("EC = 0b{b}\n", .{ec});
-            frame.dump();
+            log(null, "Frame dump:\n{}", .{frame});
             frame.trace_stack();
             @panic("Unknown EC!");
         },
         0b00000000 => {
-            frame.dump();
+            log(null, "Frame dump:\n{}", .{frame});
             frame.trace_stack();
             @panic("Unknown reason in EC!");
         },

@@ -1,6 +1,9 @@
 usingnamespace @import("root").preamble;
 
-const log = lib.output.log.scoped(config.drivers.block.ahci).write;
+const log = lib.output.log.scoped(.{
+    .prefix = "AHCI",
+    .filter = .info,
+}).write;
 
 const memory = os.memory;
 const thread = os.thread;

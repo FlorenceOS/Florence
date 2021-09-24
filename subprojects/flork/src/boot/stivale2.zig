@@ -1,6 +1,11 @@
 pub const preamble = @import("../preamble.zig");
 usingnamespace preamble;
 
+const log = lib.output.log.scoped(.{
+    .prefix = "Stivale2",
+    .filter = .info,
+}).write;
+
 const memory = os.memory;
 const platform = os.platform;
 const drivers = os.drivers;
@@ -11,8 +16,6 @@ var display: os.drivers.output.single_mode_display.SingleModeDisplay = undefined
 var display_buffer: lib.graphics.single_buffer.SingleBuffer = undefined;
 
 pub const putchar = os.kernel.logger.putch;
-
-const log = lib.output.log.scoped(config.kernel.stivale2).write;
 
 const MemmapEntry = packed struct {
     base: u64,
@@ -271,7 +274,7 @@ fn mapPhys(ent: *const MemmapEntry, context: *platform.paging.PagingContext) voi
     if (new_ent.length == 0)
         return;
 
-    log(.info, "Stivale: Mapping phys mem 0x{X} to 0x{X}\n", .{
+    log(.info, "Stivale: Mapping phys mem 0x{X} to 0x{X}", .{
         new_ent.base,
         new_ent.base + new_ent.length,
     });
@@ -387,12 +390,12 @@ export fn stivale2Main(info_in: *Info) noreturn {
     log(.notice, "{}", .{info});
 
     if (!info.valid()) {
-        @panic("Stivale2: Info not valid!\n");
+        @panic("Stivale2: Info not valid!");
     }
 
     if (info.dtb) |dtb| {
         os.vital(platform.devicetree.parse_dt(dtb.slice()), "parsing devicetree blob");
-        log(.debug, "Stivale2: Parsed devicetree blob!\n", .{});
+        log(.debug, "Stivale2: Parsed devicetree blob!", .{});
     }
 
     for (info.memmap.?.get()) |*ent| {
@@ -418,11 +421,11 @@ export fn stivale2Main(info_in: *Info) noreturn {
     if (info.framebuffer) |_| {
         blk: {
             display_buffer.init(&display.context.region) catch |err| {
-                log(.err, "Stivale2: Error while allocating buffer: {e}\n", .{err});
+                log(.err, "Stivale2: Error while allocating buffer: {e}", .{err});
                 break :blk;
             };
             drivers.output.vesa_log.use(&display_buffer.buffered_region);
-            log(.debug, "Stivale2: Using buffered output\n", .{});
+            log(.debug, "Stivale2: Using buffered output", .{});
         }
     }
 
@@ -449,17 +452,17 @@ export fn stivale2Main(info_in: *Info) noreturn {
         display.context.region.bytes = ptr[0 .. @as(usize, fb.height) * @as(usize, fb.pitch)];
     }
 
-    log(.debug, "Doing vmm\n", .{});
+    log(.debug, "Doing vmm", .{});
 
     const heap_base = memory.paging.kernel_context.make_heap_base();
 
     os.vital(memory.vmm.init(heap_base), "initializing vmm");
 
-    log(.debug, "Doing scheduler\n", .{});
+    log(.debug, "Doing scheduler", .{});
 
     os.thread.scheduler.init(&platform.thread.bsp_task);
 
-    log(.debug, "Doing SMP\n", .{});
+    log(.debug, "Doing SMP", .{});
 
     if (info.smp) |smp| {
         var cpus = smp.get_writeback().get();
@@ -503,11 +506,11 @@ export fn stivale2Main(info_in: *Info) noreturn {
 
         // Free memory pool used for stacks. Unreachable for now
         memory.pmm.freePhys(stacks, bootstrap_stack_pool_sz);
-        log(.debug, "All cores are ready for tasks!\n", .{});
+        log(.debug, "All cores are ready for tasks!", .{});
     }
 
     if (info.rsdp) |rsdp| {
-        log(.debug, "Registering rsdp: 0x{X}!\n", .{rsdp});
+        log(.debug, "Registering rsdp: {}!", .{rsdp});
         platform.acpi.register_rsdp(rsdp);
     }
 

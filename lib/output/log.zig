@@ -9,8 +9,11 @@ noinline fn getLock() Mutex.Held {
     return mutex.acquire();
 }
 
+const enable_all_logging = false;
+
 fn enabled(comptime tag: anytype, comptime log_level: ?std.log.Level) bool {
-    const filter: ?std.log.Level = tag.log.filter;
+    if (enable_all_logging) return true;
+    const filter: ?std.log.Level = tag.filter;
     if (filter) |f| {
         if (log_level) |l| {
             return @enumToInt(l) < @enumToInt(f);
@@ -25,8 +28,8 @@ fn held_t(comptime tag: anytype, comptime log_level: ?std.log.Level) type {
 
 fn taggedLogFmt(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime fmt: []const u8) []const u8 {
     if (log_level != null)
-        return "[" ++ tag.log.prefix ++ "]: " ++ @tagName(log_level.?) ++ ": " ++ fmt;
-    return "[" ++ tag.log.prefix ++ "]: " ++ fmt;
+        return "[" ++ tag.prefix ++ "]: " ++ @tagName(log_level.?) ++ ": " ++ fmt;
+    return "[" ++ tag.prefix ++ "]: " ++ fmt;
 }
 
 fn writeImpl(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype) callconv(.Inline) void {

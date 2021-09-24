@@ -242,7 +242,7 @@ pub fn doFmtNoEndl(comptime fmt: []const u8, args: anytype) void {
                         [*:0]u8, [*:0]const u8 => printSentinelString(value.*),
                         [:0]u8, [:0]const u8 => printSentinelString(value.ptr),
                         []u8, []const u8 => printSliceString(value.*),
-                        else => @compileError("Bad type for {s} formatting"),
+                        else => @compileError("Bad type " ++ @typeName(@TypeOf(value.*)) ++ " for {s} formatting"),
                     }
                 }
                 fmt_idx += 3;

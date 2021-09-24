@@ -1,4 +1,10 @@
 usingnamespace @import("root").preamble;
+
+const log = lib.output.log.scoped(.{
+    .prefix = "NewTaskEntry",
+    .filter = .info,
+}).write;
+
 const libalign = lib.util.libalign;
 
 /// Class that handles calling a function with any arguments on a new stack
@@ -26,7 +32,7 @@ pub const NewTaskEntry = struct {
             fn invoke(entry: *NewTaskEntry) noreturn {
                 const self = @fieldParentPtr(@This(), "entry", entry);
                 self.callWithErrorGuard() catch |err| {
-                    os.log("Task has finished with error {s}\n", .{@errorName(err)});
+                    log(null, "Task has finished with error {e}\n", .{err});
                 };
                 os.thread.scheduler.exitTask();
             }

@@ -1,5 +1,10 @@
 usingnamespace @import("root").preamble;
 
+const log = lib.output.log.scoped(.{
+    .prefix = "PCI",
+    .filter = .info,
+});
+
 const paging = os.memory.paging;
 
 const range = lib.util.range.range;
@@ -90,10 +95,10 @@ pub const Addr = struct {
         @panic("No pci module!");
     }
 
-    pub fn format(self: Addr, fmt: anytype) !void {
-        try writer.print("[{x:0>2}:{x:0>2}:{x:0>1}]", .{ self.bus, self.device, self.function });
-        try writer.print("{{{x:0>4}:{x:0>4}}} ", .{ self.vendor_id().read(), self.device_id().read() });
-        try writer.print("({x:0>2}:{x:0>2}:{x:0>2})", .{ self.base_class().read(), self.sub_class().read(), self.prog_if().read() });
+    pub fn format(self: Addr, fmt: anytype) void {
+        fmt("[{0X}:{0X}:{0X}]", .{ self.bus, self.device, self.function });
+        fmt("{{{0X}:{0X}}} ", .{ self.vendor_id().read(), self.device_id().read() });
+        fmt("({0X}:{0X}:{0X})", .{ self.base_class().read(), self.sub_class().read(), self.prog_if().read() });
     }
 };
 
@@ -112,35 +117,35 @@ fn function_scan(addr: Addr) void {
     if (addr.vendor_id().read() == 0xFFFF)
         return;
 
-    os.log("PCI: {} ", .{addr});
+    const l = log.start(.info, "{} ", .{addr});
 
     switch (addr.base_class().read()) {
         else => {
-            os.log("Unknown class!\n", .{});
+            log.finish(.info, "Unknown class!", .{}, l);
         },
         0x00 => {
             switch (addr.sub_class().read()) {
                 else => {
-                    os.log("Unknown unclassified device!\n", .{});
+                    log.finish(.info, "Unknown unclassified device!", .{}, l);
                 },
             }
         },
         0x01 => {
             switch (addr.sub_class().read()) {
                 else => {
-                    os.log("Unknown storage controller!\n", .{});
+                    log.finish(.info, "Unknown storage controller!", .{}, l);
                 },
                 0x06 => {
-                    os.log("AHCI controller\n", .{});
+                    log.finish(.info, "AHCI controller", .{}, l);
                     os.drivers.block.ahci.registerController(addr);
                 },
                 0x08 => {
                     switch (addr.prog_if().read()) {
                         else => {
-                            os.log("Unknown non-volatile memory controller!\n", .{});
+                            log.finish(.info, "Unknown non-volatile memory controller!", .{}, l);
                         },
                         0x02 => {
-                            os.log("NVMe controller\n", .{});
+                            log.finish(.info, "NVMe controller", .{}, l);
                             os.drivers.block.nvme.registerController(addr);
                         },
                     }
@@ -150,62 +155,62 @@ fn function_scan(addr: Addr) void {
         0x02 => {
             switch (addr.sub_class().read()) {
                 else => {
-                    os.log("Unknown network controller!\n", .{});
+                    log.finish(.info, "Unknown network controller!", .{}, l);
                 },
                 0x00 => {
                     if (addr.vendor_id().read() == 0x8086 and addr.device_id().read() == 0x100E) {
-                        os.log("E1000 controller\n", .{});
+                        log.finish(.info, "E1000 controller", .{}, l);
                         os.drivers.net.e1000.registerController(addr);
                     } else {
-                        os.log("Unknown ethernet controller\n", .{});
+                        log.finish(.info, "Unknown ethernet controller", .{}, l);
                     }
                 },
                 0x80 => {
-                    os.log("Other network controller\n", .{});
+                    log.finish(.info, "Other network controller", .{}, l);
                 },
             }
         },
         0x03 => {
             if (addr.vendor_id().read() == 0x1AF4 or addr.device_id().read() == 0x1050) {
-                os.log("Virtio display controller\n", .{});
+                log.finish(.info, "Virtio display controller", .{}, l);
                 os.drivers.gpu.virtio_gpu.registerController(addr);
             } else switch (addr.sub_class().read()) {
                 else => {
-                    os.log("Unknown display controller!\n", .{});
+                    log.finish(.info, "Unknown display controller!", .{}, l);
                 },
                 0x00 => {
-                    os.log("VGA compatible controller\n", .{});
+                    log.finish(.info, "VGA compatible controller", .{}, l);
                 },
             }
         },
         0x04 => {
             switch (addr.sub_class().read()) {
                 else => {
-                    os.log("Unknown multimedia controller!\n", .{});
+                    log.finish(.info, "Unknown multimedia controller!", .{}, l);
                 },
                 0x03 => {
-                    os.log("Audio device\n", .{});
+                    log.finish(.info, "Audio device", .{}, l);
                 },
             }
         },
         0x06 => {
             switch (addr.sub_class().read()) {
                 else => {
-                    os.log("Unknown bridge device!\n", .{});
+                    log.finish(.info, "Unknown bridge device!", .{}, l);
                 },
                 0x00 => {
-                    os.log("Host bridge\n", .{});
+                    log.finish(.info, "Host bridge", .{}, l);
                 },
                 0x01 => {
-                    os.log("ISA bridge\n", .{});
+                    log.finish(.info, "ISA bridge", .{}, l);
                 },
                 0x04 => {
-                    os.log("PCI-to-PCI bridge", .{});
+                    log.cont(.info, "PCI-to-PCI bridge", .{}, l);
                     if ((addr.header_type().read() & 0x7F) != 0x01) {
-                        os.log(": Not PCI-to-PCI bridge header type!\n", .{});
+                        log.finish(.info, ": Not PCI-to-PCI bridge header type!", .{}, l);
                     } else {
                         const secondary_bus = addr.secondary_bus().read();
-                        os.log(", recursively scanning bus {x:0>2}\n", .{secondary_bus});
+                        log.finish(.info, ", recursively scanning bus {0X}", .{secondary_bus}, l);
                         bus_scan(secondary_bus);
                     }
                 },
@@ -214,18 +219,18 @@ fn function_scan(addr: Addr) void {
         0x0c => {
             switch (addr.sub_class().read()) {
                 else => {
-                    os.log("Unknown serial bus controller!\n", .{});
+                    log.finish(.info, "Unknown serial bus controller!", .{}, l);
                 },
                 0x03 => {
                     switch (addr.prog_if().read()) {
                         else => {
-                            os.log("Unknown USB controller!\n", .{});
+                            log.finish(.info, "Unknown USB controller!", .{}, l);
                         },
                         0x20 => {
-                            os.log("USB2 EHCI controller\n", .{});
+                            log.finish(.info, "USB2 EHCI controller", .{}, l);
                         },
                         0x30 => {
-                            os.log("USB3 XHCI controller\n", .{});
+                            log.finish(.info, "USB3 XHCI controller", .{}, l);
                             os.drivers.usb.xhci.registerController(addr);
                         },
                     }

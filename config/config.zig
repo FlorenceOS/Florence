@@ -73,20 +73,6 @@ pub const kernel = .{
         // Toggle for PCI bus enumeration and device discovery
         .enable = true,
     },
-
-    .stivale2 = .{
-        .log = .{
-            .prefix = "Stivale2",
-            .filter = .info,
-        },
-    },
-
-    .acpi = .{
-        .log = .{
-            .prefix = "ACPI",
-            .filter = .info,
-        },
-    },
 };
 
 pub const copernicus = .{
@@ -104,30 +90,15 @@ pub const drivers = .{
     .block = .{
         .ahci = .{
             .enable = true,
-
-            .log = .{
-                .prefix = "AHCI",
-                .filter = .info,
-            },
         },
         .nvme = .{
             .enable = true,
-
-            .log = .{
-                .prefix = "NVMe",
-                .filter = .info,
-            },
         },
     },
 
     .gpu = .{
         .virtio_gpu = .{
             .enable = true,
-
-            .log = .{
-                .prefix = "virtio-gpu",
-                .filter = .info,
-            },
 
             .default_resolution = .{
                 .width = 1280,
@@ -141,11 +112,6 @@ pub const drivers = .{
     .net = .{
         .e1000 = .{
             .enable = true,
-
-            .log = .{
-                .prefix = "E1000",
-                .filter = .info,
-            },
         },
     },
 
@@ -174,11 +140,6 @@ pub const drivers = .{
     .usb = .{
         .xhci = .{
             .enable = true,
-
-            .log = .{
-                .prefix = "XHCI",
-                .filter = .info,
-            },
         },
     },
 };

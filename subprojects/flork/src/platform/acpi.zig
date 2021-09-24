@@ -1,12 +1,15 @@
 usingnamespace @import("root").preamble;
 
+const log = lib.output.log.scoped(.{
+    .prefix = "ACPI",
+    .filter = .info,
+}).write;
+
 const paging = os.memory.paging;
 const pci = os.platform.pci;
 
 const libalign = lib.util.libalign;
 const range = lib.util.range;
-
-const log = lib.output.log.scoped(config.kernel.acpi).write;
 
 const RSDP = packed struct {
     signature: [8]u8,
@@ -133,7 +136,7 @@ fn parse_MCFG(sdt: []u8) void {
 
         while (true) {
             pci.register_mmio(lo_bus, addr) catch |err| {
-                os.log("ACPI: Unable to register PCI mmio: {}\n", .{@errorName(err)});
+                log(.err, "ACPI: Unable to register PCI mmio: {e}", .{@errorName(err)});
             };
 
             if (lo_bus == hi_bus)
@@ -171,15 +174,13 @@ fn parse_sdt(addr: usize) void {
         signature_value("APIC") => {
             switch (os.platform.arch) {
                 .x86_64 => @import("x86_64/apic.zig").handle_madt(sdt),
-                else => os.log("ACPI: MADT found on unsupported architecture!\n", .{}),
+                else => log(.notice, "ACPI: MADT found on unsupported architecture!", .{}),
             }
         },
         signature_value("MCFG") => {
             parse_MCFG(sdt);
         },
-        else => {
-            os.log("ACPI: Unknown SDT: '{s}' with size {} bytes\n", .{ sdt[0..4], sdt.len });
-        },
+        else => log(.warn, "ACPI: Unknown SDT: '{s}' with size {d} bytes", .{ @as([]u8, sdt[0..4]), sdt.len }),
     }
 }
 
@@ -194,14 +195,11 @@ fn parse_root_sdt(comptime T: type, addr: usize) void {
 }
 
 export fn laihost_log(kind: c_int, str: [*:0]const u8) void {
-    os.log("[{s}]: {s}\n", .{
-        switch (kind) {
-            lai.LAI_WARN_LOG => @as([]const u8, "LAI WARN"),
-            lai.LAI_DEBUG_LOG => @as([]const u8, "LAI DEBUG"),
-            else => @as([]const u8, "LAI UNK"),
-        },
-        str,
-    });
+    switch (kind) {
+        lai.LAI_WARN_LOG => log(.warn, "LAI: {s}", .{str}),
+        lai.LAI_DEBUG_LOG => log(.debug, "LAI: {s}", .{str}),
+        else => log(null, "UNK: LAI {s}", .{str}),
+    }
 }
 
 fn impl_laihost_scan_table(addr: usize, name: *const [4]u8, index: *c_int) ?*c_void {
@@ -247,7 +245,7 @@ export fn laihost_scan(name: *const [4]u8, index: c_int) ?*c_void {
 
 export fn laihost_panic(err: [*:0]const u8) noreturn {
     has_lai_acpi = false;
-    os.log("[LAI PANIC]: {s}\n", .{err});
+    log(.emerg, "LAI: {s}", .{err});
     @panic("LAI PANIC");
 }
 
@@ -286,7 +284,7 @@ pub fn init_acpi() !void {
 
     rsdp = rsdp_phys.?.cast(*RSDP).get_writeback();
 
-    log(.debug, "Revision: {}", .{rsdp.revision});
+    log(.debug, "Revision: {d}", .{rsdp.revision});
 
     switch (rsdp.revision) {
         0 => parse_root_sdt(u32, rsdp.rsdt_addr),
