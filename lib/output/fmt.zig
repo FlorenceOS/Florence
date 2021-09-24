@@ -213,6 +213,7 @@ pub fn doFmtNoEndl(comptime fmt: []const u8, args: anytype) void {
                     switch(@typeInfo(@TypeOf(value.*))) {
                         .Enum => current_str = current_str ++ comptime @tagName(value.*),
                         .ErrorSet => current_str = current_str ++ comptime @errorName(value.*),
+                        else => @compileError("Cannot format type '" ++ @typeName(@TypeOf(value.*)) ++ "' with {e}."),
                     }
                 } else {
                     putComptimeStr(current_str);
