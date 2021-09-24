@@ -40,7 +40,7 @@ var vga_log: ProtectedPutchar(os.drivers.output.vga_log.putch) = .{};
 //     }
 // }
 
-pub fn putch(ch: u8) void {
+pub noinline fn putch(ch: u8) void {
     if (ch == 0)
         return;
 
