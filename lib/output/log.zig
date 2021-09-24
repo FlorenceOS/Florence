@@ -19,6 +19,10 @@ fn enabled(comptime tag: anytype, comptime log_level: ?std.log.Level) bool {
     return true;
 }
 
+fn held_t(comptime tag: anytype, comptime log_level: ?std.log.Level) type {
+    return if (enabled(tag, log_level)) Mutex.Held else void;
+}
+
 fn taggedLogFmt(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime fmt: []const u8) []const u8 {
     if (log_level != null)
         return "[" ++ tag.log.prefix ++ "]: " ++ @tagName(log_level.?) ++ ": " ++ fmt;
@@ -33,7 +37,7 @@ fn writeImpl(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime
     }
 }
 
-fn startImpl(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype) callconv(.Inline) if (enabled(tag)) Mutex.Held else void {
+fn startImpl(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype) callconv(.Inline) held_t(tag, log_level) {
     if (comptime enabled(tag, log_level)) {
         const l = getLock();
         fmt_lib.doFmtNoEndl(comptime taggedLogFmt(tag, log_level, fmt), args);
@@ -41,13 +45,13 @@ fn startImpl(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime
     }
 }
 
-fn contImpl(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype, _: if (enabled(tag)) Mutex.Held else void) callconv(.Inline) void {
+fn contImpl(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype, _: held_t(tag, log_level)) callconv(.Inline) void {
     if (comptime enabled(tag, log_level)) {
         fmt_lib.doFmtNoEndl(fmt, args);
     }
 }
 
-fn finishImpl(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype, l: if (enabled(tag)) Mutex.Held else void) callconv(.Inline) void {
+fn finishImpl(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype, l: held_t(tag, log_level)) callconv(.Inline) void {
     if (comptime enabled(tag, log_level)) {
         fmt_lib.doFmt(fmt, args);
         l.release();
@@ -63,19 +67,19 @@ pub fn scoped(comptime tag: anytype) type {
         }.f;
 
         pub const start = struct {
-            pub fn f(comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype) callconv(.Inline) if (enabled(tag, .emerg)) Mutex.Held else void {
+            pub fn f(comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype) callconv(.Inline) held_t(tag, log_level) {
                 return startImpl(tag, log_level, fmt, args);
             }
         }.f;
 
         pub const cont = struct {
-            pub fn f(comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype, m: if (enabled(tag, .emerg)) Mutex.Held else void) callconv(.Inline) void {
+            pub fn f(comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype, m: held_t(tag, log_level)) callconv(.Inline) void {
                 return contImpl(tag, log_level, fmt, args, m);
             }
         }.f;
 
         pub const finish = struct {
-            pub fn f(comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype, m: if (enabled(tag, .emerg)) Mutex.Held else void) callconv(.Inline) void {
+            pub fn f(comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype, m: held_t(tag, log_level)) callconv(.Inline) void {
                 return finishImpl(tag, log_level, fmt, args, m);
             }
         }.f;
