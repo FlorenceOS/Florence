@@ -5,16 +5,16 @@ const log = lib.output.log.scoped(.{
     .filter = .info,
 }).write;
 
+const msr = @import("aarch64.zig").msr;
+
 pub const InterruptState = bool;
 
 pub fn get_and_disable_interrupts() InterruptState {
     // Get interrupt mask flag
-    var daif = asm volatile ("MRS %[daif_val], DAIF"
-        : [daif_val] "=r" (-> u64)
-    );
+    var daif = msr(u64, "DAIF").read();
 
     // Set the flag
-    asm volatile ("MSR DAIFSET, 2" ::: "memory");
+    msr(u64, "DAIFSET").write(2);
 
     // Check if it was set
     return (daif >> 7) & 1 == 0;
@@ -23,10 +23,10 @@ pub fn get_and_disable_interrupts() InterruptState {
 pub fn set_interrupts(s: InterruptState) void {
     if (s) {
         // Enable interrupts
-        asm volatile ("MSR DAIFCLR, 2" ::: "memory");
+        msr(u64, "DAIFCLR").write(2);
     } else {
         // Disable interrupts
-        asm volatile ("MSR DAIFSET, 2" ::: "memory");
+        msr(u64, "DAIFSET").write(2);
     }
 }
 

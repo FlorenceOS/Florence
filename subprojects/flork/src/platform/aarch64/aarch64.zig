@@ -26,7 +26,7 @@ pub fn msr(comptime T: type, comptime name: []const u8) type {
         pub fn write(val: T) void {
             asm volatile ("MSR " ++ name ++ ", %[in]"
                 :
-                : [in] "r" (val)
+                : [in] "X" (val)
             );
         }
     };
@@ -78,10 +78,7 @@ pub fn await_interrupt() void {
         \\ MSR DAIFCLR, 0x2
         \\ WFI
         \\ MSR DAIFSET, 0x2
-        :
-        :
-        : "memory"
-    );
+        ::: "memory");
 }
 
 pub fn prepare_paging() !void {}
