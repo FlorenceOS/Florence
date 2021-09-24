@@ -41,8 +41,14 @@ noinline fn printBoolean(value: bool) void {
 
 const hex_chars: [*]const u8 = "0123456789ABCDEF";
 
-noinline fn printRuntimeValueAsZeroPaddedHex(val: anytype) void {
-    comptime var i: u6 = @sizeOf(@TypeOf(val))*2 - 1;
+noinline fn printRuntimeValueAsZeroPaddedHex(val_in: anytype) void {
+    // Make it large enough for hex printing
+    const val = if(@bitSizeOf(@TypeOf(val_in)) < 4)
+        @as(u4, val_in)
+    else
+        val_in;
+
+    comptime var i: u6 = @divFloor(@bitSizeOf(@TypeOf(val)) + 3, 4) - 1;
     inline while (true) : (i -= 1) {
         const v = @truncate(u4, val >> (4 * i));
 
