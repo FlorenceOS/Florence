@@ -337,15 +337,15 @@ export fn stivale2Main(info_in: *Info) noreturn {
     var tag = info_in.tags;
     while (tag != null) : (tag = tag.?.next) {
         switch (tag.?.identifier) {
-            0x2187f79e8612de07 => info.memmap = @ptrCast(*MemmapTag, tag),
-            0xe5e76a1b4597a781 => log(.info, "{}", .{@ptrCast(*CmdLineTag, tag)}),
-            0x506461d2950408fa => info.framebuffer = @ptrCast(*FramebufferTag, tag).*,
-            0x9e1786930a375e78 => info.rsdp = platform.phys_ptr([*]u8).from_int(@ptrCast(*RsdpTag, tag).rsdp),
-            0x34d1d96339647025 => info.smp = platform.phys_ptr(*SMPTag).from_int(@ptrToInt(tag)),
-            0xabb29bd49a2833fa => info.dtb = @ptrCast(*DtbTag, tag).*,
-            0xb813f9b8dbc78797 => info.uart = @ptrCast(*Mmio32UartTag, tag).*,
-            0xf77485dbfeb260f9 => info.uart_status = @ptrCast(*Mmio32StatusUartTag, tag).*,
-            0xe599d90c2975584a => info.kernel_file = @ptrCast(*KernelFileTag, tag).*,
+            0x2187F79E8612DE07 => info.memmap = @ptrCast(*MemmapTag, tag),
+            0xE5E76A1B4597A781 => log(.info, "{}", .{@ptrCast(*CmdLineTag, tag)}),
+            0x506461D2950408FA => info.framebuffer = @ptrCast(*FramebufferTag, tag).*,
+            0x9E1786930A375E78 => info.rsdp = platform.phys_ptr([*]u8).from_int(@ptrCast(*RsdpTag, tag).rsdp),
+            0x34D1D96339647025 => info.smp = platform.phys_ptr(*SMPTag).from_int(@ptrToInt(tag)),
+            0xABB29BD49A2833FA => info.dtb = @ptrCast(*DtbTag, tag).*,
+            0xB813F9B8DBC78797 => info.uart = @ptrCast(*Mmio32UartTag, tag).*,
+            0xF77485DBFEB260F9 => info.uart_status = @ptrCast(*Mmio32StatusUartTag, tag).*,
+            0xE599D90C2975584A => info.kernel_file = @ptrCast(*KernelFileTag, tag).*,
             0x566A7BED888E1407 => {}, // epoch
             0x274BD246C62BF7D1 => {}, // smbios
             0x4B6FE466AADE04CE => {}, // modules
