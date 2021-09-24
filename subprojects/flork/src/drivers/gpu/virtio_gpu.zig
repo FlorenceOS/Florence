@@ -1,5 +1,10 @@
 usingnamespace @import("root").preamble;
 
+const log = lib.output.log.scoped(.{
+    .prefix = "virtio-gpu",
+    .filter = .info,
+}).write;
+
 const virtio_pci = os.drivers.misc.virtio_pci;
 
 /// virtio-gpu driver instance
@@ -263,12 +268,12 @@ pub fn registerController(addr: os.platform.pci.Addr) void {
 
     const alloc = os.memory.pmm.phys_heap;
     const drv = alloc.create(Driver) catch {
-        os.log("Virtio display controller: Allocation failure\n", .{});
+        log(.crit, "Virtio display controller: Allocation failure", .{});
         return;
     };
     errdefer alloc.destroy(drv);
     drv.* = Driver.init(addr) catch {
-        os.log("Virtio display controller: Init has failed!\n", .{});
+        log(.crit, "Virtio display controller: Init has failed!", .{});
         return;
     };
     errdefer drv.deinit();

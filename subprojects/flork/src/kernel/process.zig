@@ -1,5 +1,10 @@
 usingnamespace @import("root").preamble;
 
+const log = lib.output.log.scoped(.{
+    .prefix = "Process",
+    .filter = .info,
+}).write;
+
 pub const address_space = @import("process/address_space.zig");
 pub const memory_object = @import("process/memory_object.zig");
 
@@ -108,12 +113,12 @@ pub const Process = struct {
 
     fn exitProc(frame: *platform.InterruptFrame) void {
         // TODO: Stop all tasks and do whatever else is needed
-        os.log("Exiting current userspace task.\n", .{});
+        log(.info, "Exiting current userspace task.", .{});
         os.thread.scheduler.exitTask();
     }
 
     pub fn deinit() void {
-        os.log("TODO: Process deinit\n", .{});
+        log(.warn, "TODO: Process deinit", .{});
     }
 
     pub fn handleSyscall(self: *@This(), frame: *platform.InterruptFrame) void {
@@ -123,12 +128,12 @@ pub const Process = struct {
     pub fn onPageFault(self: *@This(), addr: usize, present: bool, fault_type: platform.PageFaultAccess, frame: *platform.InterruptFrame) void {
         self.addr_space.pageFault(addr, present, fault_type) catch |err| {
             const present_str: []const u8 = if (present) "present" else "non-present";
-            os.log("Page fault in userspace process: {s} {} at 0x{X}\n", .{ present_str, fault_type, addr });
-            os.log("Didn't handle the page fault: {}\n", .{err});
+            log(null, "Page fault in userspace process: {s} {e} at 0x{X}", .{ present_str, fault_type, addr });
+            log(null, "Didn't handle the page fault: {e}", .{err});
             if (@errorReturnTrace()) |trace| {
                 os.kernel.debug.dumpStackTrace(trace);
             }
-            frame.dump();
+            log(null, "Frame dump:\n{}", .{frame});
             frame.trace_stack();
             exitProc(frame);
         };
@@ -140,22 +145,25 @@ pub const Process = struct {
             1, 2 => {
                 const str_ptr = @intToPtr([*]const u8, syscallArg(frame, 1));
                 const str_len = syscallArg(frame, 2);
-                const ends_with_endl = str_ptr[str_len - 1] == '\n';
-                os.log("USERSPACE LOG: {s}{s}", .{ str_ptr[0..str_len], if (ends_with_endl) @as([]const u8, "") else "\n" });
+                if (str_len > 0) {
+                    const ends_with_endl = str_ptr[str_len - 1] == '\n';
+                    const str: []const u8 = if (ends_with_endl) str_ptr[0 .. str_len - 1] else str_ptr[0..str_len];
+                    log(null, "USERSPACE LOG: {s}", .{str});
+                }
             },
             else => {
-                os.log("linuxWrite to bad fd {}\n", .{fd});
+                log(.warn, "linuxWrite to bad fd {d}", .{fd});
             },
         }
     }
 
     fn linuxExit(self: *@This(), frame: *platform.InterruptFrame) void {
-        os.log("Userspace process requested exit.\n", .{});
+        log(.info, "Userspace process requested exit.", .{});
         exitProc(frame);
     }
 
     fn syscallUnknown(self: *@This(), frame: *platform.InterruptFrame) void {
-        os.log("Process executed unknown syscall {}", .{syscallNumber(frame)});
+        log(.warn, "Process executed unknown syscall {d}", .{syscallNumber(frame)});
         exitProc(frame);
     }
 };

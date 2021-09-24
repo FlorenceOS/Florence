@@ -1,5 +1,10 @@
 usingnamespace @import("root").preamble;
 
+const log = lib.output.log.scoped(.{
+    .prefix = "APIC",
+    .filter = .info,
+}).write;
+
 const regs = @import("regs.zig");
 const builtin = @import("builtin");
 const interrupts = @import("interrupts.zig");
@@ -149,14 +154,14 @@ fn gsi_to_ioapic(gsi: u32) u8 {
                 return @intCast(u8, idx);
         }
     }
-    os.log("GSI: {}\n", .{gsi});
+    log(null, "GSI: {d}", .{gsi});
     @panic("Can't find ioapic for gsi!");
 }
 
 var ioapics = [1]?IOAPIC{null} ** config.kernel.x86_64.max_ioapics;
 
 pub fn handle_madt(madt: []u8) void {
-    os.log("APIC: Got MADT (size={x})\n", .{madt.len});
+    log(.debug, "Got MADT (size={X})", .{madt.len});
 
     var offset: u64 = 0x2C;
     while (offset + 2 <= madt.len) {
@@ -194,27 +199,27 @@ pub fn handle_madt(madt: []u8) void {
             },
             0x03 => {
                 std.debug.assert(size >= 8);
-                os.log("APIC: TODO: NMI source\n", .{});
+                log(.warn, "TODO: NMI source", .{});
             },
             0x04 => {
                 std.debug.assert(size >= 6);
-                os.log("APIC: TODO: LAPIC Non-maskable interrupt\n", .{});
+                log(.warn, "TODO: LAPIC Non-maskable interrupt", .{});
             },
             0x05 => {
                 std.debug.assert(size >= 12);
-                os.log("APIC: TODO: LAPIC addr override\n", .{});
+                log(.warn, "TODO: LAPIC addr override", .{});
             },
             0x06 => {
                 std.debug.assert(size >= 16);
-                os.log("APIC: TODO: I/O SAPIC\n", .{});
+                log(.warn, "TODO: I/O SAPIC", .{});
             },
             0x07 => {
                 std.debug.assert(size >= 17);
-                os.log("APIC: TODO: Local SAPIC\n", .{});
+                log(.warn, "TODO: Local SAPIC", .{});
             },
             0x08 => {
                 std.debug.assert(size >= 16);
-                os.log("APIC: TODO: Platform interrupt sources\n", .{});
+                log(.warn, "TODO: Platform interrupt sources", .{});
             },
             0x09 => {
                 const flags = std.mem.readIntNative(u32, data[8..12]);
@@ -224,10 +229,10 @@ pub fn handle_madt(madt: []u8) void {
             },
             0x0A => {
                 std.debug.assert(size >= 12);
-                os.log("APIC: TODO: LX2APIC NMI\n", .{});
+                log(.warn, "TODO: LX2APIC NMI", .{});
             },
             else => {
-                os.log("APIC: Unknown MADT entry: 0x{X}\n", .{kind});
+                log(.err, "Unknown MADT entry: 0x{X}", .{kind});
             },
         }
 

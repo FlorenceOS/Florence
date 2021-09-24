@@ -1,5 +1,10 @@
 usingnamespace @import("root").preamble;
 
+const log = lib.output.log.scoped(.{
+    .prefix = "PS2",
+    .filter = .info,
+}).write;
+
 const apic = @import("apic.zig");
 const ports = @import("ports.zig");
 const eoi = @import("apic.zig").eoi;
@@ -43,8 +48,9 @@ fn finishSequence(offset: usize, seq: []const u8) bool {
         return true;
     }
 
-    os.log("PS2: Unexpected scancode sequence: {any}, expected {any}\n", .{ buf, seq });
-    @panic("PS2: Unexpected scancode sequence!");
+    // We don't have array printing yet...
+    //log(.emerg, "Unexpected scancode sequence: {arr}, expected {arr}", .{ buf, seq });
+    @panic("Unexpected scancode sequence!");
 }
 
 fn kbEvent() void {
@@ -187,7 +193,7 @@ fn keyLocation(ext: Extendedness, scancode: u8) !kb.keys.Location {
                 0x58 => .f12,
 
                 else => {
-                    os.log("PS2: Unhandled scancode 0x{X}\n", .{scancode});
+                    log(.err, "Unhandled scancode 0x{X}", .{scancode});
                     return error.UnknownScancode;
                 },
             };
@@ -220,7 +226,7 @@ fn keyLocation(ext: Extendedness, scancode: u8) !kb.keys.Location {
                 0x5D => .option_key,
 
                 else => {
-                    os.log("PS2: Unhandled extended scancode 0x{X}\n", .{scancode});
+                    log(.err, "Unhandled extended scancode 0x{X}", .{scancode});
                     return error.UnknownScancode;
                 },
             };
@@ -265,7 +271,7 @@ fn write(port: u16, value: u8) !void {
         }
     }
 
-    os.log("PS2: Timeout while writing to port 0x{X}!\n", .{port});
+    log(.warn, "Timeout while writing to port 0x{X}!", .{port});
     return error.Timeout;
 }
 
@@ -277,7 +283,7 @@ fn read() !u8 {
         }
     }
 
-    os.log("PS2: Timeout while reading!\n", .{});
+    log(.warn, "Timeout while reading!", .{});
     return error.Timeout;
 }
 
@@ -337,7 +343,7 @@ fn sendCommand(device: Device, command: u8) !void {
         awaitAck() catch |err| {
             switch (err) {
                 error.Resend => {
-                    os.log("PS2: Device requested command resend\n", .{});
+                    log(.debug, "Device requested command resend", .{});
                     continue;
                 },
                 else => return err,
@@ -352,11 +358,11 @@ fn sendCommand(device: Device, command: u8) !void {
 fn portTest() !bool {
     switch (try read()) {
         0x00 => return true, // Success
-        0x01 => os.log("PS2: Port test failed: Clock line stuck low\n", .{}),
-        0x02 => os.log("PS2: Port test failed: Clock line stuck high\n", .{}),
-        0x03 => os.log("PS2: Port test failed: Data line stuck low\n", .{}),
-        0x04 => os.log("PS2: Port test failed: Data line stuck high\n", .{}),
-        else => |result| os.log("PS2: Port test failed: Unknown reason (0x{X})\n", .{result}),
+        0x01 => log(.err, "Port test failed: Clock line stuck low", .{}),
+        0x02 => log(.err, "Port test failed: Clock line stuck high", .{}),
+        0x03 => log(.err, "Port test failed: Data line stuck low", .{}),
+        0x04 => log(.err, "Port test failed: Data line stuck high", .{}),
+        else => |result| log(.err, "Port test failed: Unknown reason (0x{X})", .{result}),
     }
 
     return false;
@@ -365,7 +371,7 @@ fn portTest() !bool {
 fn awaitAck() !void {
     while (true) {
         const v = read() catch |err| {
-            os.log("PS2: ACK read failed: {}!\n", .{err});
+            log(.err, "ACK read failed: {e}!", .{err});
             return err;
         };
 
@@ -376,18 +382,18 @@ fn awaitAck() !void {
             // Resend
             0xFE => return error.Resend,
 
-            else => os.log("PS2: Got a different value: 0x{X}\n", .{v}),
+            else => log(.err, "Got a different value: 0x{X}", .{v}),
         }
     }
 }
 
 fn finalizeDevice(device: Device) !void {
-    os.log("PS2: Enabling interrupts\n", .{});
+    log(.debug, "Enabling interrupts", .{});
     var shift: u1 = 0;
     if (device == .secondary) shift = 1;
     try writeConfigByte((@as(u2, 1) << shift) | try getConfigByte());
 
-    os.log("PS2: Enabling scanning\n", .{});
+    log(.debug, "Enabling scanning", .{});
     try sendCommand(device, 0xF4);
 }
 
@@ -424,23 +430,23 @@ fn initMouse(irq: u8, device: Device) !bool {
 }
 
 fn initDevice(irq: u8, device: Device) !bool {
-    os.log("PS2: Resetting device\n", .{});
+    log(.debug, "Resetting device", .{});
     try sendCommand(device, 0xFF);
     if (0xAA != try read()) {
-        os.log("PS2: Device reset failed\n", .{});
+        log(.err, "Device reset failed", .{});
         return error.DeviceResetFailed;
     }
 
-    os.log("PS2: Disabling scanning on device\n", .{});
+    log(.debug, "Disabling scanning on device", .{});
     try sendCommand(device, 0xF5);
 
-    os.log("PS2: Identifying device\n", .{});
+    log(.debug, "Identifying device", .{});
     try sendCommand(device, 0xF2);
 
     const first = read() catch |err| {
         switch (err) {
             error.Timeout => {
-                os.log("PS2: No identity byte, assuming keyboard\n", .{});
+                log(.notice, "No identity byte, assuming keyboard", .{});
                 return initKeyboard(irq, device);
             },
             else => return err,
@@ -449,34 +455,34 @@ fn initDevice(irq: u8, device: Device) !bool {
 
     switch (first) {
         0x00 => {
-            os.log("PS2: Standard mouse\n", .{});
+            log(.info, "PS2: Standard mouse", .{});
             return initMouse(irq, device);
         },
         0x03 => {
-            os.log("PS2: Scrollwheel mouse\n", .{});
+            log(.info, "Scrollwheel mouse", .{});
             return initMouse(irq, device);
         },
         0x04 => {
-            os.log("PS2: 5-button mouse\n", .{});
+            log(.info, "5-button mouse", .{});
             return initMouse(irq, device);
         },
         0xAB => {
             switch (try read()) {
                 0x41, 0xC1 => {
-                    os.log("PS2: MF2 keyboard with translation\n", .{});
+                    log(.info, "MF2 keyboard with translation", .{});
                     return initKeyboard(irq, device);
                 },
                 0x83 => {
-                    os.log("PS2: MF2 keyboard\n", .{});
+                    log(.info, "MF2 keyboard", .{});
                     return initKeyboard(irq, device);
                 },
                 else => |wtf| {
-                    os.log("PS2: Identify: Unknown byte after 0xAB: 0x{X}\n", .{wtf});
+                    log(.warn, "Identify: Unknown byte after 0xAB: 0x{X}", .{wtf});
                 },
             }
         },
         else => {
-            os.log("PS2: Identify: Unknown first byte: 0x{X}\n", .{first});
+            log(.warn, "Identify: Unknown first byte: 0x{X}", .{first});
         },
     }
 
@@ -487,18 +493,18 @@ pub fn initController() !void {
     if (comptime (!(config.kernel.x86_64.ps2.mouse.enable or config.kernel.x86_64.ps2.keyboard.enable)))
         return;
 
-    os.log("PS2: Disabling primary port\n", .{});
+    log(.debug, "Disabling primary port", .{});
     try disablePrimaryPort();
 
-    os.log("PS2: Disabling secondary port\n", .{});
+    log(.debug, "Disabling secondary port", .{});
     try disableSecondaryPort();
 
-    os.log("PS2: Draining buffer\n", .{});
+    log(.debug, "Draining buffer", .{});
 
     // Drain buffer
     _ = ports.inb(0x60);
 
-    os.log("PS2: Setting up controller\n", .{});
+    log(.debug, "Setting up controller", .{});
 
     // Disable interrupts, enable translation
     const init_config_byte = (1 << 6) | (~@as(u8, 3) & try getConfigByte());
@@ -506,11 +512,11 @@ pub fn initController() !void {
     try writeConfigByte(init_config_byte);
 
     if (!try controllerSelfTest()) {
-        os.log("PS2: Controller self-test failed!\n", .{});
+        log(.warn, "Controller self-test failed!", .{});
         return error.FailedSelfTest;
     }
 
-    os.log("PS2: Controller self-test succeeded\n", .{});
+    log(.debug, "Controller self-test succeeded", .{});
 
     // Sometimes the config value gets reset by the self-test, so we set it again
     try writeConfigByte(init_config_byte);
@@ -524,42 +530,42 @@ pub fn initController() !void {
         dual_channel = ((1 << 5) & try getConfigByte()) == 0;
         try disableSecondaryPort();
         if (!dual_channel) {
-            os.log("PS2: Not dual channel, determined late\n", .{});
+            log(.debug, "Not dual channel, determined late", .{});
         }
     } else {
-        os.log("PS2: Not dual channel, determined early\n", .{});
+        log(.debug, "Not dual channel, determined early", .{});
     }
 
-    os.log("PS2: Detecting active ports, dual_channel = {}\n", .{dual_channel});
+    log(.info, "Detecting active ports, dual_channel = {b}", .{dual_channel});
 
     try enablePrimaryPort();
 
     if (testPrimaryPort() catch false) {
-        os.log("PS2: Initializing primary port\n", .{});
+        log(.debug, "Initializing primary port", .{});
         try enablePrimaryPort();
         if (!(initDevice(1, .primary) catch false)) {
             try disablePrimaryPort();
-            os.log("PS2: Primary device init failed, disabled port\n", .{});
+            log(.warn, "Primary device init failed, disabled port", .{});
         }
     }
 
     if (dual_channel and testSecondaryPort() catch false) {
-        os.log("PS2: Initializing secondary port\n", .{});
+        log(.debug, "Initializing secondary port", .{});
         try enableSecondaryPort();
         if (!(initDevice(12, .secondary) catch false)) {
             try disableSecondaryPort();
-            os.log("PS2: Secondary device init failed, disabled port\n", .{});
+            log(.warn, "Secondary device init failed, disabled port", .{});
         }
     }
 }
 
 pub fn init() void {
     initController() catch |err| {
-        os.log("PS2: Error while initializing: {}\n", .{err});
+        log(.crit, "Error while initializing: {e}", .{err});
         if (@errorReturnTrace()) |trace| {
             os.kernel.debug.dumpStackTrace(trace);
         } else {
-            os.log("No error trace.\n", .{});
+            log(.crit, "No error trace.", .{});
         }
     };
 }

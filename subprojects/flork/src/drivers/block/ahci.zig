@@ -1,5 +1,10 @@
 usingnamespace @import("root").preamble;
 
+const log = lib.output.log.scoped(.{
+    .prefix = "AHCI",
+    .filter = .info,
+}).write;
+
 const memory = os.memory;
 const thread = os.thread;
 const platform = os.platform;
@@ -48,7 +53,7 @@ const Port = packed struct {
     }
 
     pub fn startCommandEngine(self: *volatile @This()) void {
-        os.log("AHCI: Starting command engine for port at 0x{X}\n", .{@ptrToInt(self)});
+        log(.debug, "Starting command engine for port at 0x{X}", .{@ptrToInt(self)});
 
         self.waitRdy();
 
@@ -66,7 +71,7 @@ const Port = packed struct {
     }
 
     pub fn stopCommandEngine(self: *volatile @This()) void {
-        os.log("AHCI: Stopping command engine for port at 0x{X}\n", .{@ptrToInt(self)});
+        log(.debug, "Stopping command engine for port at 0x{X}", .{@ptrToInt(self)});
         self.command_status.start.write(false);
 
         while (self.command_status.command_list_running.read()) {
@@ -88,7 +93,7 @@ const Port = packed struct {
     }
 
     pub fn issueCommands(self: *volatile @This(), slot_bits: u32) void {
-        os.log("AHCI: Sending {} command(s) to port 0x{X}\n", .{
+        log(.debug, "Sending {d} command(s) to port 0x{X}", .{
             @popCount(u32, slot_bits),
             @ptrToInt(self),
         });
@@ -154,13 +159,11 @@ const Abar = struct {
 
         pub fn format(
             self: *const @This(),
-            fmt: []const u8,
-            options: std.fmt.FormatOptions,
-            writer: anytype,
-        ) !void {
-            try writer.print("{}.{}", .{ self.major.read(), self.minor_high.read() });
+            fmt: anytype,
+        ) void {
+            fmt("{d}.{d}", .{ self.major.read(), self.minor_high.read() });
             if (self.minor_low.read() != 0) {
-                try writer.print(".{}", .{self.minor_low.read()});
+                fmt(".{d}", .{self.minor_low.read()});
             }
         }
 
@@ -416,7 +419,7 @@ const PortState = struct {
     }
 
     fn identify(self: *@This()) !void {
-        //os.log("AHCI: Identifying drive...\n", .{});
+        log(.debug, "Identifying drive...", .{});
         const identify_fis = self.mmio.makeH2D(0);
 
         identify_fis.command = self.identifyCommand();
@@ -450,7 +453,7 @@ const PortState = struct {
             return error.NoSectors;
         }
 
-        os.log("AHCI: Disk has 0x{X} sectors of size {}\n", .{
+        log(.info, "Disk has 0x{X} sectors of size {d}", .{
             self.num_sectors,
             self.sector_size,
         });
@@ -587,7 +590,7 @@ const PortState = struct {
         // Now we're sector aligned, we can do the transfer sector by sector
         // TODO: make this faster, doing multiple sectors at a time
         while (buffer.len > self.sector_size) {
-            os.log("Doing entire sector {}\n", .{first_sector});
+            log(.debug, "Doing entire sector {}", .{first_sector});
 
             large_callback(self, command_slot, buffer, first_sector);
 
@@ -599,7 +602,7 @@ const PortState = struct {
         if (buffer.len == 0)
             return;
 
-        os.log("Doing last partial sector {}\n", .{first_sector});
+        log(.debug, "Doing last partial sector {}", .{first_sector});
         // Last sector, partial
         small_callback(self, command_slot, buffer, first_sector, 0);
     }
@@ -639,16 +642,16 @@ fn read_u64(mmio: anytype) u64 {
 fn claim_controller(abar: *volatile Abar) void {
     {
         const version = abar.version;
-        os.log("AHCI: Version: {}\n", .{version});
+        log(.info, "Version: {}", .{version});
 
         if (version.major.read() < 1 or version.minor_high.read() < 2) {
-            os.log("AHCI: Handoff not supported (version)\n", .{});
+            log(.debug, "Handoff not supported (version)", .{});
             return;
         }
     }
 
     if (abar.hba_capabilities_extended & 1 == 0) {
-        os.log("AHCI: Handoff not supported (capabilities)\n", .{});
+        log(.debug, "Handoff not supported (capabilities)", .{});
         return;
     }
 
@@ -656,7 +659,7 @@ fn claim_controller(abar: *volatile Abar) void {
         thread.scheduler.yield();
     }
 
-    os.log("AHCI: Got handoff!\n", .{});
+    log(.debug, "Got handoff!", .{});
 }
 
 fn command(port: *volatile Port, slot: u5) void {}
@@ -673,7 +676,7 @@ fn sataPortTask(port_type: SataPortType, port: *volatile Port) !void {
         else => return,
     }
 
-    os.log("AHCI: {s} task started for port at 0x{X}\n", .{ @tagName(port_type), @ptrToInt(port) });
+    log(.debug, "{s} task started for port at 0x{X}", .{ @tagName(port_type), @ptrToInt(port) });
 
     var port_state = try PortState.init(port);
 
@@ -685,7 +688,7 @@ fn sataPortTask(port_type: SataPortType, port: *volatile Port) !void {
 
     // Read first disk sector
     port_state.finalizeIo(0, 0, 1, .read);
-    os.hexdump(port_state.mmio.buffer(0, 0)[0..port_state.sector_size]);
+    //os.hexdump(port_state.mmio.buffer(0, 0)[0..port_state.sector_size]);
 
     // Read first sector into buffer
     //port_state.doIOBytesRead(0, test_buf[0..512], 0);
@@ -695,7 +698,7 @@ fn sataPortTask(port_type: SataPortType, port: *volatile Port) !void {
 fn controllerTask(abar: *volatile Abar) !void {
     claim_controller(abar);
 
-    os.log("AHCI: Claimed controller.\n", .{});
+    log(.debug, "Claimed controller.", .{});
 
     const ports_implemented = abar.ports_implemented;
 
@@ -713,7 +716,7 @@ fn controllerTask(abar: *volatile Abar) !void {
                     continue;
 
                 if (com_status != 3) {
-                    os.log("AHCI: Warning: Unknown port com_status: {}\n", .{com_status});
+                    log(.warn, "Unknown port com_status: {X}", .{com_status});
                     continue;
                 }
             }
@@ -722,7 +725,7 @@ fn controllerTask(abar: *volatile Abar) !void {
                 const ipm_status = (sata_status >> 8) & 0xF;
 
                 if (ipm_status != 1) {
-                    os.log("AHCI: Warning: Device sleeping: {}\n", .{ipm_status});
+                    log(.warn, "Device sleeping: {X}", .{ipm_status});
                     continue;
                 }
             }
@@ -732,12 +735,12 @@ fn controllerTask(abar: *volatile Abar) !void {
             0x00000101 => try thread.scheduler.spawnTask(sataPortTask, .{ .ata, port }),
             //0xEB140101 => try thread.scheduler.spawnTask(sataPortTask, .{.atapi, port}),
             0xC33C0101, 0x96690101 => {
-                os.log("AHCI: Known TODO port signature: 0x{X}\n", .{port.signature});
+                log(.notice, "Known TODO port signature: 0x{X}", .{port.signature});
                 //thread.scheduler.spawnTask(sataPortTask, .{.semb,   port})
                 //thread.scheduler.spawnTask(sataPortTask, .{.pm,     port})
             },
             else => {
-                os.log("AHCI: Unknown port signature: 0x{X}\n", .{port.signature});
+                log(.warn, "Unknown port signature: 0x{X}", .{port.signature});
                 return;
             },
         }
@@ -757,16 +760,16 @@ pub fn registerController(addr: platform.pci.Addr) void {
     const cap = abar.hba_capabilities;
 
     if ((cap & (1 << 31)) == 0) {
-        os.log("AHCI: Controller is 32 bit only, ignoring.\n", .{});
+        log(.crit, "Controller is 32 bit only, ignoring.", .{});
         return;
     }
 
     if (abar.global_hba_control & (1 << 31) == 0) {
-        os.log("AHCI: AE not set!\n", .{});
+        log(.crit, "AE not set!", .{});
         return;
     }
 
     thread.scheduler.spawnTask(controllerTask, .{abar}) catch |err| {
-        os.log("AHCI: Failed to make controller task: {s}\n", .{@errorName(err)});
+        log(.crit, "Failed to make controller task: {s}", .{@errorName(err)});
     };
 }

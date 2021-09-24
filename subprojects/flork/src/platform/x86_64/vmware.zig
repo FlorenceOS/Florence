@@ -1,5 +1,10 @@
 usingnamespace @import("root").preamble;
 
+const log = lib.output.log.scoped(.{
+    .prefix = "VMWARE",
+    .filter = .info,
+}).write;
+
 const ps2 = @import("ps2.zig");
 const ports = @import("ports.zig");
 const eoi = @import("apic.zig").eoi;
@@ -149,10 +154,10 @@ pub fn init() void {
         return;
 
     if (!detect()) {
-        os.log("VMWARE: Not detected\n", .{});
+        log(.info, "Not detected", .{});
         return;
     }
-    os.log("VMWARE: Detected\n", .{});
+    log(.info, "Detected", .{});
 
     var cmd = Command{};
 
@@ -160,7 +165,7 @@ pub fn init() void {
         if (comptime (!config.kernel.x86_64.ps2.mouse.enable))
             @compileError("PS/2 mouse has to be enabled for vmware cursor support");
 
-        os.log("VMWARE: Enabling abscursor...\n", .{});
+        log(.info, "Enabling abscursor...", .{});
         const state = os.platform.get_and_disable_interrupts();
         defer os.platform.set_interrupts(state);
 

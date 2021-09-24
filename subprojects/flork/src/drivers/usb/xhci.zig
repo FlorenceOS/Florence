@@ -1,5 +1,10 @@
 usingnamespace @import("root").preamble;
 
+const log = lib.output.log.scoped(.{
+    .prefix = "XHCI",
+    .filter = .info,
+}).write;
+
 const CapRegs = extern struct {
     capabilites_length: u8,
     _res_01: u8,
@@ -94,10 +99,10 @@ const Controller = extern struct {
                 const os_sem = @intToPtr(*volatile u8, @ptrToInt(ext) + 3);
 
                 if (bios_sem.* != 0) {
-                    os.log("XHCI: Controller is BIOS owned.\n", .{});
+                    log(.debug, "XHCI: Controller is BIOS owned.", .{});
                     os_sem.* = 1;
                     while (bios_sem.* != 0) os.thread.scheduler.yield();
-                    os.log("XHCI: Controller stolen from BIOS.\n", .{});
+                    log(.debug, "XHCI: Controller stolen from BIOS.", .{});
                 }
             }
 
@@ -114,23 +119,23 @@ fn controllerTask(dev: os.platform.pci.Addr) !void {
     controller.claim();
 
     const usb3 = dev.read(u32, 0xDC);
-    os.log("XHCI: Switching usb3 ports: 0x{X}\n", .{usb3});
+    log(.debug, "XHCI: Switching usb3 ports: 0x{X}", .{usb3});
     dev.write(u32, 0xD8, usb3);
 
     const usb2 = dev.read(u32, 0xD4);
-    os.log("XHCI: Switching usb2 ports: 0x{X}\n", .{usb2});
+    log(.debug, "XHCI: Switching usb2 ports: 0x{X}", .{usb2});
     dev.write(u32, 0xD0, usb2);
 
     // Shut controller down
     controller.op_regs.usbcmd |= 1 << 1;
     while ((controller.op_regs.usbcmd & (1 << 1)) != 0) os.thread.scheduler.yield();
     while ((controller.op_regs.usbsts & (1 << 0)) == 0) os.thread.scheduler.yield();
-    os.log("XHCI: Controller halted.\n", .{});
+    log(.debug, "XHCI: Controller halted.", .{});
 
     controller.op_regs.config = 44;
     controller.context_size = if ((controller.cap_regs.hcc_params_1 & 0b10) != 0) 64 else 32;
 
-    os.log("XHCI: context size: {}\n", .{controller.context_size});
+    log(.debug, "XHCI: context size: {d}", .{controller.context_size});
 }
 
 pub fn registerController(dev: os.platform.pci.Addr) void {

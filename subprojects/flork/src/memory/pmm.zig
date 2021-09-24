@@ -1,5 +1,10 @@
 usingnamespace @import("root").preamble;
 
+const log = lib.output.log.scoped(.{
+    .prefix = "PMM",
+    .filter = .info,
+}).write;
+
 const assert = std.debug.assert;
 const platform = os.platform;
 const lalign = lib.util.libalign;
@@ -48,7 +53,7 @@ fn allocImpl(ind: usize) error{OutOfMemory}!usize {
         const new_root = os.platform.phys_ptr(*usize).from_int(retval).get_writeback().*;
 
         if (std.debug.runtime_safety and !lalign.isAligned(usize, pmm_sizes[ind], new_root)) {
-            os.log("New root: 0x{} at index {} is bad, referenced by 0x{X}!\n", .{ free_roots[ind], ind, retval });
+            log(null, "New root: 0x{X} at index {d} is bad, referenced by 0x{X}!", .{ free_roots[ind], ind, retval });
             @panic("Physical heap corrupted");
         }
 
@@ -129,7 +134,7 @@ const PhysAllocator = struct {
             switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
                 else => {
-                    os.log("PMM allocator: {}\n", .{err});
+                    log(null, "PMM allocator: {e}", .{err});
                     @panic("PMM allocator allocation error");
                 },
             }

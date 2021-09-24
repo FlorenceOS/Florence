@@ -1,5 +1,10 @@
 usingnamespace @import("root").preamble;
 
+const log = lib.output.log.scoped(.{
+    .prefix = "Serial",
+    .filter = .info,
+}).write;
+
 const platform = os.platform;
 const ports = @import("ports.zig");
 
@@ -49,7 +54,7 @@ pub fn port(comptime port_num: usize) type {
             // Don't enable any serial ports on x86 for now
             //inited[port_num - 1] = true;
 
-            os.log("Using x86 serial port #{}.\n", .{port_num});
+            log(.debug, "Using x86 serial port #{d}", .{port_num});
         }
 
         pub fn read_ready() bool {

@@ -1,7 +1,6 @@
 usingnamespace @import("root").preamble;
 
 const platform = os.platform;
-const log = os.log;
 const libalign = lib.util.libalign;
 const range = lib.util.range.range;
 const rangeReverse = lib.util.range.rangeReverse;
@@ -240,34 +239,34 @@ fn unmapIter(
     return any_invalidated;
 }
 
-fn printImpl(root: *page_table, comptime level: usize) void {
-    var offset: u32 = 0;
-    var had_any: bool = false;
-    while (offset < platform.paging.page_sizes[0]) : (offset += 8) {
-        const ent = @intToPtr(*page_table_entry, @ptrToInt(root) + offset);
-        if (ent.is_present(level)) {
-            had_any = true;
-            var cnt = paging_levels - level - 1;
-            while (cnt != 0) {
-                log(" ", .{});
-                cnt -= 1;
-            }
-            log("Index {x:0>3}: {}\n", .{ offset / 8, ent });
-            if (level != 0) {
-                if (ent.is_table(level))
-                    printImpl(ent.get_table(level) catch unreachable, level - 1);
-            }
-        }
-    }
-    if (!had_any) {
-        var cnt = paging_levels - level - 1;
-        while (cnt != 0) {
-            log(" ", .{});
-            cnt -= 1;
-        }
-        log("Empty table\n", .{});
-    }
-}
+// fn printImpl(root: *page_table, comptime level: usize) void {
+//     var offset: u32 = 0;
+//     var had_any: bool = false;
+//     while (offset < platform.paging.page_sizes[0]) : (offset += 8) {
+//         const ent = @intToPtr(*page_table_entry, @ptrToInt(root) + offset);
+//         if (ent.is_present(level)) {
+//             had_any = true;
+//             var cnt = paging_levels - level - 1;
+//             while (cnt != 0) {
+//                 log(" ", .{});
+//                 cnt -= 1;
+//             }
+//             log("Index {x:0>3}: {}\n", .{ offset / 8, ent });
+//             if (level != 0) {
+//                 if (ent.is_table(level))
+//                     printImpl(ent.get_table(level) catch unreachable, level - 1);
+//             }
+//         }
+//     }
+//     if (!had_any) {
+//         var cnt = paging_levels - level - 1;
+//         while (cnt != 0) {
+//             log(" ", .{});
+//             cnt -= 1;
+//         }
+//         log("Empty table\n", .{});
+//     }
+// }
 
 pub fn init() void {
     os.platform.paging.PagingContext.read_current();
@@ -417,13 +416,13 @@ pub fn translateVirt(args: struct {
     return translateVirtImpl(args.virt, root, args.context);
 }
 
-pub fn printPaging(root: *platform.PagingRoot) void {
-    log("Paging: {x}\n", .{root});
-    for (platform.root_tables(root)) |table| {
-        log("Dumping page tables from root {x}\n", .{table});
-        printImpl(table, paging_levels - 1);
-    }
-}
+// pub fn printPaging(root: *platform.PagingRoot) void {
+//     log("Paging: {x}\n", .{root});
+//     for (platform.root_tables(root)) |table| {
+//         log("Dumping page tables from root {x}\n", .{table});
+//         printImpl(table, paging_levels - 1);
+//     }
+// }
 
 pub fn switchToContext(context: Context) void {
     const state = os.platform.get_and_disable_interrupts();

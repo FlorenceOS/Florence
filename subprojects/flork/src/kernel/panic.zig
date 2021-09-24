@@ -3,6 +3,11 @@ const StackTrace = std.builtin.StackTrace;
 
 var panic_counter: usize = 0;
 
+const log = lib.output.log.scoped(.{
+    .prefix = "PANIC",
+    .filter = null,
+}).write;
+
 pub fn breakpoint_panic(message: []const u8, stack_trace: ?*StackTrace) callconv(.Inline) noreturn {
     @breakpoint();
     unreachable;
@@ -19,14 +24,16 @@ pub fn panic(message: []const u8, stack_trace: ?*StackTrace) noreturn {
         os.platform.hang();
     }
 
-    os.log("PANIC {}: CPU {}: {s}!\n", .{ panic_num, cpu_id, message });
+    log(null, "Panic# {d}: CPU {d}: {s}!", .{ panic_num, cpu_id, message });
 
-    os.log("Error trace: \n", .{});
+    log(null, "Error trace:", .{});
     if (stack_trace) |trace| {
         os.kernel.debug.dumpStackTrace(trace);
+    } else {
+        log(null, "None", .{});
     }
 
-    os.log("Current stack trace: \n", .{});
+    log(null, "Current stack trace:", .{});
     os.kernel.debug.dumpCurrentTrace();
 
     os.platform.hang();

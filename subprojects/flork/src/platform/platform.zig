@@ -1,5 +1,10 @@
 usingnamespace @import("root").preamble;
 
+const log = lib.output.log.scoped(.{
+    .prefix = "Platform",
+    .filter = .info,
+}).write;
+
 // Submodules
 pub const acpi = @import("acpi.zig");
 pub const pci = @import("pci.zig");
@@ -66,13 +71,13 @@ pub fn page_fault(addr: usize, present: bool, access: PageFaultAccess, frame: an
         }
     }
 
-    os.log("Platform: Unhandled page fault on {s} at 0x{x}, present: {}\n", .{
-        @tagName(access),
+    log(null, "Platform: Unhandled page fault on {e} at 0x{X}, present: {b}", .{
+        access,
         addr,
         present,
     });
 
-    frame.dump();
+    log(null, "Frame dump:\n{}", .{frame});
     frame.trace_stack();
     @panic("Page fault");
 }
@@ -119,8 +124,14 @@ pub fn phys_ptr(comptime ptr_type: type) type {
             };
         }
 
-        pub fn format(self: *const @This(), fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
-            try writer.print("phys 0x{X}", .{self.addr});
+        pub fn cast(self: *const @This(), comptime to_type: type) phys_ptr(to_type) {
+            return .{
+                .addr = self.addr,
+            };
+        }
+
+        pub fn format(self: *const @This(), fmt: anytype) void {
+            fmt("phys 0x{X}", .{self.addr});
         }
     };
 }
