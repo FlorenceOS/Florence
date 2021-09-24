@@ -21,6 +21,15 @@ noinline fn printSliceString(str: []const u8) void {
     }
 }
 
+noinline fn printPointerInt(ptr: usize) void {
+    printSentinelString("0x");
+    printRuntimeValueAsZeroPaddedHex(ptr);
+}
+
+fn printPointer(ptr: anytype) callconv(.Inline) void {
+    printPointerInt(@ptrToInt(ptr));
+}
+
 const boolean_names = [2][*:0]const u8 {
     "false",
     "true",
@@ -244,6 +253,13 @@ pub fn doFmtNoEndl(comptime fmt: []const u8, args: anytype) void {
                     current_str = "";
                     printBoolean(value.*);
                 }
+                fmt_idx += 3;
+                arg_idx += 1;
+            } else if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{*}")) {
+                const value = &@field(args, arg_fields[arg_idx].name);
+                putComptimeStr(current_str);
+                current_str = "";
+                printPointer(value.*);
                 fmt_idx += 3;
                 arg_idx += 1;
             } else if (comptime std.mem.startsWith(u8, fmt[fmt_idx..], "{}")) {
