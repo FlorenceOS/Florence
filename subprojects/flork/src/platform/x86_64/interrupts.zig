@@ -14,6 +14,7 @@ const gdt = @import("gdt.zig");
 const pic = @import("pic.zig");
 const apic = @import("apic.zig");
 const thread = @import("thread.zig");
+const regs = @import("regs.zig");
 
 pub const num_handlers = 0x100;
 pub const InterruptHandler = fn (*InterruptFrame) void;
@@ -74,7 +75,7 @@ fn ring_handler(_: *InterruptFrame) void {
 }
 
 fn invlpg_handler(_: *InterruptFrame) void {
-    const cr3 = @import("regs.zig").ControlRegister(usize, "cr3");
+    const cr3 = regs.ControlRegister(usize, "cr3");
     cr3.write(cr3.read());
     _ = @atomicRmw(usize, &os.platform.thread.get_current_cpu().platform_data.invlpg_counter, .Add, 1, .AcqRel);
     apic.eoi();
@@ -93,9 +94,7 @@ fn type_page_fault(error_code: usize) platform.PageFaultAccess {
 }
 
 fn page_fault_handler(frame: *InterruptFrame) void {
-    const page_fault_addr = asm ("mov %%cr2, %[addr]"
-        : [addr] "=r" (-> usize)
-    );
+    const page_fault_addr = regs.ControlRegister(usize, "cr2").read();
     const page_fault_type = type_page_fault(frame.ec);
 
     const userspace_cs = ((frame.cs & 0x3) == 3);
