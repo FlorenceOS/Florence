@@ -346,6 +346,11 @@ export fn stivale2Main(info_in: *Info) noreturn {
             0xb813f9b8dbc78797 => info.uart = @ptrCast(*Mmio32UartTag, tag).*,
             0xf77485dbfeb260f9 => info.uart_status = @ptrCast(*Mmio32StatusUartTag, tag).*,
             0xe599d90c2975584a => info.kernel_file = @ptrCast(*KernelFileTag, tag).*,
+            0x566A7BED888E1407 => {}, // epoch
+            0x274BD246C62BF7D1 => {}, // smbios
+            0x4B6FE466AADE04CE => {}, // modules
+            0x359D837855E3858C => {}, // firmware
+            0xEE80847D01506C57 => {}, // kernel slide
             else => |ident| log(.warn, "Unknown struct tag identifier: 0x{0X}", .{ident}),
         }
     }
