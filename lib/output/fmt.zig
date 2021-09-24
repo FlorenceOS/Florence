@@ -109,12 +109,20 @@ fn putComptimeStr(comptime str: [:0]const u8) callconv(.Inline) void {
 
 fn defaultFormatValue(value: anytype, comptime fmt_so_far: [:0]const u8) callconv(.Inline) void {
     switch(@typeInfo(@TypeOf(value.*))) {
-        .Struct, .Enum, .Union => {
+        .Struct => {
             if (comptime @hasDecl(@TypeOf(value.*), "format")) {
                 putComptimeStr(fmt_so_far);
                 value.format(doFmtNoEndl);
             } else {
                 putComptimeStr(defaultFormatStruct(value, fmt_so_far));
+            }
+        },
+        .Enum, .Union => {
+            if (comptime @hasDecl(@TypeOf(value.*), "format")) {
+                putComptimeStr(fmt_so_far);
+                value.format(doFmtNoEndl);
+            } else {
+                @compileError("Cannot format '" ++ @typeName(@TypeOf(value.*)) ++ "' yet");
             }
         },
         .Pointer => {
@@ -135,7 +143,7 @@ fn defaultFormatValue(value: anytype, comptime fmt_so_far: [:0]const u8) callcon
 }
 
 noinline fn defaultFormatStruct(value: anytype, comptime fmt_so_far: []const u8) [:0]const u8 {
-    const arg_fields = @typeInfo(@TypeOf(value.*)).fields;
+    const arg_fields = @typeInfo(@TypeOf(value.*)).Struct.fields;
             
     comptime var current_fmt: [:0]const u8 = fmt_so_far ++ @typeName(@TypeOf(value.*)) ++ "{{ ";
 
