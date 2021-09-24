@@ -165,13 +165,9 @@ const ConfHdr = packed struct {
     _: u32 = 0,
 };
 
-const ResourceCreate2D = packed struct {
-    hdr: ConfHdr, resid: u32, format: u32, width: u32, height: u32
-};
+const ResourceCreate2D = packed struct { hdr: ConfHdr, resid: u32, format: u32, width: u32, height: u32 };
 
-const ResourceAttachBacking = packed struct {
-    hdr: ConfHdr, resid: u32, entrynum: u32
-};
+const ResourceAttachBacking = packed struct { hdr: ConfHdr, resid: u32, entrynum: u32 };
 
 const ResourceAttachBackingEntry = packed struct {
     addr: u64,
@@ -179,9 +175,7 @@ const ResourceAttachBackingEntry = packed struct {
     _: u32 = 0,
 };
 
-const Rect = packed struct {
-    x: u32, y: u32, width: u32, height: u32
-};
+const Rect = packed struct { x: u32, y: u32, width: u32, height: u32 };
 
 const SetScanout = packed struct {
     hdr: ConfHdr,
@@ -190,13 +184,9 @@ const SetScanout = packed struct {
     resid: u32,
 };
 
-const TransferHost2D = packed struct {
-    hdr: ConfHdr, rect: Rect, offset: u64, resid: u32, _: u32 = 0
-};
+const TransferHost2D = packed struct { hdr: ConfHdr, rect: Rect, offset: u64, resid: u32, _: u32 = 0 };
 
-const ResourceFlush = packed struct {
-    hdr: ConfHdr, rect: Rect, resid: u32, _: u32 = 0
-};
+const ResourceFlush = packed struct { hdr: ConfHdr, rect: Rect, resid: u32, _: u32 = 0 };
 
 // Feature bits
 const virtio_feature_version_1 = 32;
