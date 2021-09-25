@@ -104,9 +104,10 @@ pub fn initTask(task: *os.thread.Task) !void {
 }
 
 /// Creates a new task on the heap and calls initTask() on it
-pub fn createTask() !*os.thread.Task {
+pub fn createTask(name: []const u8) !*os.thread.Task {
     const task = try task_alloc.create(os.thread.Task);
     errdefer task_alloc.destroy(task);
+    task.name = name;
 
     try initTask(task);
 
@@ -115,8 +116,8 @@ pub fn createTask() !*os.thread.Task {
 
 /// Create and start a new kernel task that calls a function with given arguments.
 /// Paging context is copied from the current one, task is automatically enqueued
-pub fn spawnTask(func: anytype, args: anytype) !void {
-    const task = try createTask();
+pub fn spawnTask(name: []const u8, func: anytype, args: anytype) !void {
+    const task = try createTask(name);
     errdefer destroyTask(task);
 
     task.paging_context = os.platform.get_current_task().paging_context;

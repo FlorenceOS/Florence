@@ -39,7 +39,7 @@ pub fn kmain() noreturn {
     }
 
     var proc: process.Process = undefined;
-    os.vital(proc.init(), "init proc launch");
+    os.vital(proc.init("init"), "init proc launch");
 
     os.thread.scheduler.exitTask();
 }

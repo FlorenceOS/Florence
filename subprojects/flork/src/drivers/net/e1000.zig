@@ -271,5 +271,5 @@ pub fn registerController(dev: os.platform.pci.Addr) void {
         return;
 
     dev.command().write(dev.command().read() | 0x6);
-    os.vital(os.thread.scheduler.spawnTask(controllerTask, .{dev}), "Spawning e1000 controller task");
+    os.vital(os.thread.scheduler.spawnTask("E1000 controller task", controllerTask, .{dev}), "Spawning e1000 controller task");
 }

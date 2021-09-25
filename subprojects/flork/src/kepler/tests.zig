@@ -44,10 +44,10 @@ pub fn ipcTest() !void {
     log(.info, "Created token!", .{});
 
     // Start server thread
-    try os.thread.scheduler.spawnTask(ipcServerThread, .{ mailbox, os.platform.get_current_task() });
+    try os.thread.scheduler.spawnTask("IPC test server", ipcServerThread, .{ mailbox, os.platform.get_current_task() });
 
     // Start client thread
-    try os.thread.scheduler.spawnTask(ipcClientThread, .{token});
+    try os.thread.scheduler.spawnTask("IPC test client", ipcClientThread, .{token});
 
     log(.info, "Finished spawning tasks", .{});
 

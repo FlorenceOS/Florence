@@ -732,7 +732,7 @@ fn controllerTask(abar: *volatile Abar) !void {
         }
 
         switch (port.signature) {
-            0x00000101 => try thread.scheduler.spawnTask(sataPortTask, .{ .ata, port }),
+            0x00000101 => try thread.scheduler.spawnTask("SATA port task", sataPortTask, .{ .ata, port }),
             //0xEB140101 => try thread.scheduler.spawnTask(sataPortTask, .{.atapi, port}),
             0xC33C0101, 0x96690101 => {
                 log(.notice, "Known TODO port signature: 0x{X}", .{port.signature});
@@ -769,7 +769,7 @@ pub fn registerController(addr: platform.pci.Addr) void {
         return;
     }
 
-    thread.scheduler.spawnTask(controllerTask, .{abar}) catch |err| {
+    thread.scheduler.spawnTask("AHCI controller task", controllerTask, .{abar}) catch |err| {
         log(.crit, "Failed to make controller task: {s}", .{@errorName(err)});
     };
 }

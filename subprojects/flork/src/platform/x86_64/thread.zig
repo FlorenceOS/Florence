@@ -12,7 +12,9 @@ pub const task_stack_size = 0x10000;
 pub const stack_guard_size = 0x1000;
 pub const ap_init_stack_size = 0x10000;
 
-pub var bsp_task: os.thread.Task = .{};
+pub var bsp_task: os.thread.Task = .{
+    .name = "BSP task",
+};
 
 pub const kernel_gs_base = regs.MSR(u64, 0xC0000102);
 

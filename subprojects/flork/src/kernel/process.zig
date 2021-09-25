@@ -83,12 +83,14 @@ pub const Process = struct {
     page_table: platform.paging.PagingContext,
     addr_space: address_space.AddrSpace,
 
-    pub fn init(self: *@This()) !void {
-        try os.thread.scheduler.spawnTask(initProcessTask, .{self});
+    pub fn init(self: *@This(), name: []const u8) !void {
+        try os.thread.scheduler.spawnTask("Userspace task", initProcessTask, .{ self, name });
     }
 
-    fn initProcessTask(self: *@This()) !void {
+    fn initProcessTask(self: *@This(), name: []const u8) !void {
         const task = os.platform.get_current_task();
+
+        task.secondary_name = name;
 
         const userspace_base = 0x000400000;
 

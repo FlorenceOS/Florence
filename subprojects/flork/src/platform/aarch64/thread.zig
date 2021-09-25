@@ -1,6 +1,8 @@
 usingnamespace @import("root").preamble;
 
-pub var bsp_task: os.thread.Task = .{};
+pub var bsp_task: os.thread.Task = .{
+    .name = "BSP task",
+};
 
 const TPIDR_EL1 = os.platform.msr(*os.platform.smp.CoreData, "TPIDR_EL1");
 
