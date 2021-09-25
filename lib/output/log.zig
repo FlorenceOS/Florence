@@ -28,8 +28,8 @@ fn held_t(comptime tag: anytype, comptime log_level: ?std.log.Level) type {
 
 fn taggedLogFmt(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime fmt: []const u8) []const u8 {
     if (log_level != null)
-        return "[" ++ tag.prefix ++ "]: " ++ @tagName(log_level.?) ++ ": " ++ fmt;
-    return "[" ++ tag.prefix ++ "]: " ++ fmt;
+        return "[" ++ tag.prefix ++ "] " ++ @tagName(log_level.?) ++ ": " ++ fmt;
+    return "[" ++ tag.prefix ++ "] " ++ fmt;
 }
 
 fn writeImpl(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype) callconv(.Inline) void {
