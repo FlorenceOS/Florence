@@ -212,11 +212,12 @@ pub const InterruptFrame = packed struct {
     ss: u64,
 
     pub fn format(self: *const @This(), fmt: anytype) void {
-        fmt("  RAX={0X} RBX={0X} RCX={0X} RDX={0X}\n", .{ self.rax, self.rbx, self.rcx, self.rdx });
-        fmt("  RSI={0X} RDI={0X} RBP={0X} RSP={0X}\n", .{ self.rsi, self.rdi, self.rbp, self.rsp });
-        fmt("  R8 ={0X} R9 ={0X} R10={0X} R11={0X}\n", .{ self.r8, self.r9, self.r10, self.r11 });
-        fmt("  R12={0X} R13={0X} R14={0X} R15={0X}\n", .{ self.r12, self.r13, self.r14, self.r15 });
-        fmt("  RIP={0X} int={0X} ec ={0X}", .{ self.rip, self.intnum, self.ec });
+        fmt("  rax={0X} rbx={0X} rcx={0X} rdx={0X}\n", .{ self.rax, self.rbx, self.rcx, self.rdx });
+        fmt("  rsi={0X} rdi={0X} rbp={0X} rsp={0X}\n", .{ self.rsi, self.rdi, self.rbp, self.rsp });
+        fmt("  r8 ={0X} r9 ={0X} r10={0X} r11={0X}\n", .{ self.r8, self.r9, self.r10, self.r11 });
+        fmt("  r12={0X} r13={0X} r14={0X} r15={0X}\n", .{ self.r12, self.r13, self.r14, self.r15 });
+        fmt("  rip={0X} int={0X} ec ={0X} cs ={0X}\n", .{ self.rip, self.intnum, self.ec, self.cs });
+        fmt("  ds ={0X} es ={0X} flg={0X}", .{ self.ds, self.es, self.eflags });
     }
 
     pub fn trace_stack(self: *const @This()) void {
