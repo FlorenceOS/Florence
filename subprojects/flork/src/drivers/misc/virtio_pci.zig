@@ -43,7 +43,7 @@ pub const DescIter = struct {
 pub const Driver = struct {
     /// Find PCI BARs and initialize device
     pub fn init(a: pci.Addr, reqFeatures: u64, optFeatures: u64) !Driver {
-        var drv: Driver = detectBars(a);
+        var drv: Driver = initPCI(a);
         drv.cfg.device_status = 0; // reset
         drv.cfg.device_status |= virtio_acknowledge; // guest acknowledged device
         drv.cfg.device_status |= virtio_driver; // driver has been loaded
@@ -135,13 +135,35 @@ pub const Driver = struct {
         drv.cfg.guest_feature = f;
     }
 
+    pub fn addIRQ(drv: *Driver, queue: u16, fun: anytype, ctx: anytype) void {
+        const vec = os.platform.irq_with_ctx(@ptrToInt(fun), @ptrToInt(ctx));
+        const addr = 0xFEE00000; // TODO: this routes using the lapic on core 0
+        drv.msix_table[drv.msix_table_idx] = .{ .addr = addr, .data = vec };
+
+        const old = drv.cfg.queue_select;
+        drv.cfg.queue_select = queue;
+        drv.cfg.queue_msix_vector = drv.msix_table_idx;
+        drv.cfg.queue_select = old;
+
+        drv.msix_table_idx += 1;
+    }
+
+
     /// Detect BARs and capabilities and set up the cfg/notify/isr/dev structures
-    fn detectBars(a: pci.Addr) Driver {
+    fn initPCI(a: pci.Addr) Driver {
         var drv: Driver = undefined;
+        a.command().write(a.command().read() | 0b110); // enable bus master and memory space
+        switch (pci.msi_enable(a)) {
+            .msix => |*m| {
+                drv.msix_table = m.table;
+                drv.msix_table_size = m.size;
+                drv.msix_table_idx = 0;
+            },
+            else => @panic("Virtio without MSI-X should not be available")
+        }
         var cap = a.cap();
         while (cap.off != 0) {
-            const vndr = cap.vndr();
-            if (vndr == 0x09) {
+            if (cap.id() == 0x09) {
                 const cfg_typ = cap.read(u8, virtio_pci_cap_cfg_type);
                 const bar = cap.read(u8, virtio_pci_cap_bar);
                 const off = cap.read(u32, virtio_pci_cap_offset);
@@ -150,14 +172,14 @@ pub const Driver = struct {
                 const phy = a.barinfo(bar).phy + off;
                 switch (cfg_typ) {
                     virtio_pci_cap_common_cfg => {
-                        const CommonCfgPtr = os.platform.phys_ptr(*volatile CommonCfg);
-                        drv.cfg = CommonCfgPtr.from_int(phy).get_uncached();
+                        const commonCfgPtr = os.platform.phys_ptr(*volatile CommonCfg);
+                        drv.cfg = commonCfgPtr.from_int(phy).get_uncached();
                     },
                     virtio_pci_cap_notify_cfg => {
                         // virtio_pci_notify_cap_mult is a byte offset, each field is u16
                         drv.notify_mul = cap.read(u32, virtio_pci_notify_cap_mult) / 2;
-                        const NotifyPtr = os.platform.phys_ptr([*]volatile u16);
-                        drv.notify = NotifyPtr.from_int(phy).get_uncached();
+                        const notifyPtr = os.platform.phys_ptr([*]volatile u16);
+                        drv.notify = notifyPtr.from_int(phy).get_uncached();
                     },
                     virtio_pci_cap_jsr_cfg => {
                         drv.isr = os.platform.phys_ptr(*volatile u32).from_int(phy).get_uncached();
@@ -179,6 +201,7 @@ pub const Driver = struct {
         drv.cfg.queue_select = i;
         const size = drv.cfg.queue_size;
         if (size == 0) return;
+        drv.cfg.queue_msix_vector = 0;
         const desc_siz: u32 = @sizeOf(VirtqDesc) * size;
         const avail_siz: u32 = @sizeOf(VirtqAvail) + 2 + 2 * size;
         const used_siz: u32 = @sizeOf(VirtqUsed) + 2 + @sizeOf(VirtqUsedItem) * size;
@@ -221,6 +244,11 @@ pub const Driver = struct {
     isr: *volatile u32,
     dev: [*]volatile u8,
     queues: [16]VirtQueue = undefined,
+
+    msix_table: [*]volatile pci.MsixTableEntry,
+    msix_table_size: u32,
+
+    msix_table_idx: u16 = 0,
 };
 
 pub const Descriptor = u16; // descriptor id

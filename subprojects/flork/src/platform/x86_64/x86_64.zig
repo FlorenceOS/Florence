@@ -19,6 +19,7 @@ pub const InterruptFrame = interrupts.InterruptFrame;
 pub const InterruptState = interrupts.InterruptState;
 
 pub const irq_eoi = apic.eoi;
+pub const irq_with_ctx = interrupts.irq_with_ctx;
 
 fn setup_syscall_instr() void {
     if (comptime !config.kernel.x86_64.allow_syscall_instr)

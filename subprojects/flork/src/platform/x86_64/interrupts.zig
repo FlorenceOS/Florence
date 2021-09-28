@@ -48,8 +48,26 @@ pub const syscall_vector: u8 = 0x80;
 pub const invlpg_vector: u8 = 0xFE;
 pub const spurious_vector: u8 = 0xFF;
 
+// TODO: this function **will** cause a mess once it reaches 0x80
 pub fn allocate_vector() u8 {
     return @atomicRmw(u8, &last_vector, .Add, 1, .AcqRel) + 1;
+}
+
+var irq_fns: [256]usize = undefined;
+var irq_ctxs: [256]usize = undefined;
+
+fn irq_handler(frame: *InterruptFrame) void {
+    const fptr = @intToPtr(*fn (usize) void, irq_fns[frame.intnum]);
+    (fptr.*)(irq_ctxs[frame.intnum]);
+    apic.eoi();
+}
+
+pub fn irq_with_ctx(fun: usize, ctx: usize) u8 {
+    const vec = allocate_vector();
+    irq_fns[vec] = fun;
+    irq_ctxs[vec] = ctx;
+    add_handler(vec, irq_handler, true, 0, 1);
+    return vec;
 }
 
 pub fn init_interrupts() void {

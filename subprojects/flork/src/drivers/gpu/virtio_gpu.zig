@@ -17,6 +17,7 @@ const Driver = struct {
     pub fn init(pciaddr: os.platform.pci.Addr) !Driver {
         var v = try virtio_pci.Driver.init(pciaddr, 0, 0);
         var d: Driver = .{ .transport = v };
+        d.transport.addIRQ(0, &interrupt, &d);
         return d;
     }
 
@@ -293,9 +294,5 @@ pub fn registerController(addr: os.platform.pci.Addr) void {
     os.drivers.output.vesa_log.use(&drv.display_region);
 }
 
-/// General callback on an interrupt, context is a pointer to a Driver structure
-pub fn interrupt(frame: *os.platform.InterruptFrame, context: u64) void {
-    var driver = @intToPtr(*Driver, context);
-    driver.transport.acknowledge();
-    driver.transport.process(0, process, driver);
+pub fn interrupt(drv: *Driver) void {
 }

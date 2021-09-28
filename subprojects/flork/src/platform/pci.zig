@@ -19,7 +19,7 @@ pub const Cap = struct {
     pub fn next(self: *Cap) void {
         self.off = self.addr.read(u8, self.off + 0x01);
     }
-    pub fn vndr(self: *const Cap) u8 {
+    pub fn id(self: *const Cap) u8 {
         return self.addr.read(u8, self.off + 0x00);
     }
     pub fn read(self: *const Cap, comptime T: type, off: regoff) T {
@@ -102,6 +102,41 @@ pub const Addr = struct {
     }
 };
 
+pub const MsixTableEntry = packed struct {
+    addr: u64,
+    data: u32,
+    control: u32 = 0,
+};
+
+pub const MsiInfo = union(enum) { // TODO: add MSI
+    none,
+    msix: struct {
+        table: [*]volatile MsixTableEntry,
+        size: u32,
+    }
+};
+
+pub fn msi_enable(a: Addr) MsiInfo {
+    var cap = a.cap();
+    var m: MsiInfo = .none;
+    while (cap.off != 0) {
+        if (cap.id() == 0x11) {
+            const t = cap.read(u32, 0x4);
+            const tableOff = t & (~@as(u32, 0b111));
+            const tableBir = @truncate(u8, t & 0b111);
+            a.command().write(a.command().read() | 0x400); // disable intx
+            cap.write(u16, 0x2, 0x8000 | (cap.read(u16, 0x2) & (~@as(u16, 0x4000)))); // enable msi-x, unmask
+            m = .{ .msix = .{
+                .table = os.platform.phys_ptr([*]volatile MsixTableEntry).from_int(a.barinfo(tableBir).phy + tableOff).get_uncached(),
+                .size = (cap.read(u16, 0x2) & 0x7FF) + 1,
+            }};
+            break;
+        }
+        cap.next();
+    }
+    return m;
+}
+
 pub const regoff = u8;
 
 fn mmio(addr: Addr, offset: regoff) [*]volatile u8 {
@@ -162,7 +197,7 @@ fn function_scan(addr: Addr) void {
                         log.finish(.info, "E1000 controller", .{}, l);
                         os.drivers.net.e1000.registerController(addr);
                     } else {
-                        log.finish(.info, "Unknown ethernet controller", .{}, l);
+                        log.finish(.info, "Unknown Ethernet controller", .{}, l);
                     }
                 },
                 0x80 => {
@@ -171,7 +206,7 @@ fn function_scan(addr: Addr) void {
             }
         },
         0x03 => {
-            if (addr.vendor_id().read() == 0x1AF4 or addr.device_id().read() == 0x1050) {
+            if (addr.vendor_id().read() == 0x1AF4 and addr.device_id().read() == 0x1050) {
                 log.finish(.info, "Virtio display controller", .{}, l);
                 os.drivers.gpu.virtio_gpu.registerController(addr);
             } else switch (addr.sub_class().read()) {
