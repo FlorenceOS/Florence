@@ -148,7 +148,6 @@ pub const Driver = struct {
         drv.msix_table_idx += 1;
     }
 
-
     /// Detect BARs and capabilities and set up the cfg/notify/isr/dev structures
     fn initPCI(a: pci.Addr) Driver {
         var drv: Driver = undefined;
@@ -159,7 +158,7 @@ pub const Driver = struct {
                 drv.msix_table_size = m.size;
                 drv.msix_table_idx = 0;
             },
-            else => @panic("Virtio without MSI-X should not be available")
+            else => @panic("Virtio without MSI-X should not be available"),
         }
         var cap = a.cap();
         while (cap.off != 0) {
@@ -310,7 +309,7 @@ const CommonCfg = packed struct {
     device_feature: u32,
     guest_feature_select: u32,
     guest_feature: u32,
-    msix_config: u16,
+    config_msix_vector: u16,
     num_queues: u16,
     device_status: u8,
     config_generation: u8,

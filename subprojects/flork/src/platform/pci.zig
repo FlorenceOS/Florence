@@ -194,8 +194,11 @@ fn function_scan(addr: Addr) void {
                 },
                 0x00 => {
                     if (addr.vendor_id().read() == 0x8086 and addr.device_id().read() == 0x100E) {
-                        log.finish(.info, "E1000 controller", .{}, l);
+                        log.finish(.info, "E1000 Ethernet controller", .{}, l);
                         os.drivers.net.e1000.registerController(addr);
+                    } else if (addr.vendor_id().read() == 0x1AF4 and addr.device_id().read() == 0x1000) {
+                        log.finish(.info, "Virtio Ethernet controller", .{}, l);
+                        os.drivers.net.virtio.registerController(addr);
                     } else {
                         log.finish(.info, "Unknown Ethernet controller", .{}, l);
                     }

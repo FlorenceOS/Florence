@@ -13,7 +13,7 @@ pub fn registerController(addr: os.platform.pci.Addr) void {
 
     addr.command().write(addr.command().read() | 0x6);
 
-    os.thread.scheduler.spawnTask(controllerTask, .{addr}) catch |err| {
+    os.thread.scheduler.spawnTask("NVMe controller task", controllerTask, .{addr}) catch |err| {
         log(.crit, "Failed to make controller task: {s}", .{@errorName(err)});
     };
 }
