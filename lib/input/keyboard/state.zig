@@ -38,5 +38,8 @@ pub const KeyboardState = struct {
                 self.is_pressed.set(@enumToInt(location), false);
             },
         }
+        // TODO: Send `input` and `location` to listeners
+        _ = location;
+        _ = input;
     }
 };
