@@ -168,7 +168,7 @@ pub const RangeAlloc = struct {
 
         const ret = @intToPtr([*]u8, range.base + pmt.offset)[0..len];
 
-        self.maintainTree(range, pmt);
+        try self.maintainTree(range, pmt);
 
         return ret;
     }
@@ -185,12 +185,12 @@ pub const RangeAlloc = struct {
 
         const ret = @intToPtr([*]u8, range.base + pmt.offset)[0..len];
 
-        self.maintainTree(range, pmt);
+        try self.maintainTree(range, pmt);
 
         return ret;
     }
 
-    fn maintainTree(self: *@This(), range: *Range, pmt: PlacementResult) void {
+    fn maintainTree(self: *@This(), range: *Range, pmt: PlacementResult) !void {
         // Node maintenance
         const has_data_before = pmt.offset != 0;
         const has_data_after = pmt.offset + pmt.effective_size < range.size;
@@ -198,7 +198,7 @@ pub const RangeAlloc = struct {
         if (has_data_before and has_data_after) {
             // Add the new range
             const new_range_offset = pmt.offset + pmt.effective_size;
-            _ = self.addRange(.{
+            _ = try self.addRange(.{
                 .base = range.base + new_range_offset,
                 .size = range.size - new_range_offset,
             });
