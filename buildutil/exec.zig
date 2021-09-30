@@ -11,7 +11,9 @@ pub const Context = enum {
 pub const TransformFileCommandStep = struct {
     step: std.build.Step,
     output_path: []const u8,
-    fn run_command(s: *std.build.Step) !void {}
+    fn run_command(s: *std.build.Step) !void {
+        _ = s;
+    }
 };
 
 fn make_transform(b: *std.build.Builder, dep: *std.build.Step, command: [][]const u8, output_path: []const u8) !*TransformFileCommandStep {
