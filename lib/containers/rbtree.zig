@@ -862,6 +862,7 @@ test "red black tree" {
             left: *const IntTreeNode,
             right: *const IntTreeNode,
         ) bool {
+            _ = self;
             return left.val >= right.val;
         }
     };
