@@ -50,7 +50,7 @@ const DynamicBitset = struct {
         self.data[idx / 8] &= ~(@as(u8, 1) << @intCast(u3, idx % 8));
     }
 
-    pub fn isSet(self: *const @This(), idx: is_setusize) bool {
+    pub fn isSet(self: *const @This(), idx: usize) bool {
         std.debug.assert(idx < self.len);
         return (self.data[idx / 8] >> @intCast(u3, idx % 8)) == 1;
     }
@@ -58,21 +58,22 @@ const DynamicBitset = struct {
 
 test "bitset" {
     var bs: Bitset(8) = .{};
-    std.testing.expect(!bs.isSet(0));
+    try std.testing.expect(!bs.isSet(0));
     bs.set(0);
-    std.testing.expect(bs.isSet(0));
+    try std.testing.expect(bs.isSet(0));
     bs.unset(0);
-    std.testing.expect(!bs.isSet(0));
+    try std.testing.expect(!bs.isSet(0));
 }
 
 test "dynamic bitset" {
     var mem: [2]u8 = undefined;
     var bs = DynamicBitset.init(16, &mem);
-    std.testing.expect(!bs.isSet(0));
+    try std.testing.expect(!bs.isSet(0));
     bs.set(0);
-    std.testing.expect(bs.isSet(0));
+    try std.testing.expect(bs.isSet(0));
     bs.set(13);
     bs.unset(0);
-    std.testing.expect(!bs.isSet(0));
-    std.testing.expect(bs.isSet(13));
+    try std.testing.expect(!bs.isSet(0));
+    try std.testing.expect(bs.isSet(13));
 }
+
