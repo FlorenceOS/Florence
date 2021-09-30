@@ -5,22 +5,22 @@ pub fn Bitset(num_bits: usize) type {
 
     return struct {
         pub fn set(self: *@This(), idx: usize) void {
-            data[idx / 8] |= (@as(u8, 1) << @intCast(u3, idx % 8));
+            self.data[idx / 8] |= (@as(u8, 1) << @intCast(u3, idx % 8));
         }
 
         pub fn unset(self: *@This(), idx: usize) void {
-            data[idx / 8] &= ~(@as(u8, 1) << @intCast(u3, idx % 8));
+            self.data[idx / 8] &= ~(@as(u8, 1) << @intCast(u3, idx % 8));
         }
 
         pub fn isSet(self: *const @This(), idx: usize) bool {
-            return (data[idx / 8] >> @intCast(u3, idx % 8)) == 1;
+            return (self.data[idx / 8] >> @intCast(u3, idx % 8)) == 1;
         }
 
-        pub fn size(self: *const @This()) usize {
+        pub fn size(_: *const @This()) usize {
             return num_bits;
         }
 
-        var data = [_]u8{0} ** num_bytes;
+        data: [num_bytes]u8 = [_]u8{0} ** num_bytes,
     };
 }
 
