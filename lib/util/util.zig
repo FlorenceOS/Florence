@@ -19,5 +19,5 @@ pub const pointers = @import("pointers.zig");
 pub fn isRuntime() bool {
     var b = true;
     const v = if (b) @as(u8, 0) else @as(u32, 0);
-    return @TypeOf(b) == u32;
+    return @TypeOf(v) == u32;
 }
