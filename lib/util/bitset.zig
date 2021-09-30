@@ -1,7 +1,7 @@
-usingnamespace @import("root").preamble;
+const std = @import("std");
 
 pub fn Bitset(num_bits: usize) type {
-    const num_bytes = libalign.alignUp(usize, 8, num_bits) / 8;
+    const num_bytes = @divTrunc(num_bits + 7, 8);
 
     return struct {
         pub fn set(self: *@This(), idx: usize) void {
@@ -28,12 +28,12 @@ const DynamicBitset = struct {
     len: usize,
     data: [*]u8,
 
-    pub fn sizeNeeded(len: usize) usize {
-        return libalign.alignUp(usize, 8, len) / 8;
+    pub fn bytesNeeded(len: usize) usize {
+        return @divTrunc(len + 7, 8);
     }
 
     pub fn init(len: usize, data: []u8) DynamicBitset {
-        std.debug.assert(data.len >= DynamicBitset.sizeNeeded(len));
+        std.debug.assert(data.len >= DynamicBitset.bytesNeeded(len));
         for (data) |*cell| {
             cell.* = 0;
         }
