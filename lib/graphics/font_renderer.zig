@@ -12,7 +12,7 @@ pub fn renderBitmapFont(
 
     var byte_pos: usize = 0;
 
-    for (result) |*c, i| {
+    for (result) |*c| {
         const region = c.regionMutable();
 
         region.fill(background_color, 0, 0, region.width, region.height, false);
@@ -23,7 +23,6 @@ pub fn renderBitmapFont(
             byte_pos += 1;
         }) {
             var x: usize = 0;
-            var bit: usize = 0;
 
             while (x < f.width) : ({
                 x += 1;
@@ -40,7 +39,6 @@ pub fn renderBitmapFont(
 }
 
 fn numChars(comptime f: anytype) usize {
-    const num_bytes = f.data.len;
     const bytes_per_line = @divFloor(f.width + 7, 8);
     const bytes_per_char = bytes_per_line * f.height;
     return @divExact(f.data.len, bytes_per_char);
