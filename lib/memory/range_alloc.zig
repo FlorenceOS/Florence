@@ -62,12 +62,14 @@ const Range = struct {
 
 const AddressComparator = struct {
     pub fn compare(self: *const @This(), left: *const Range, right: *const Range) bool {
+        _ = self;
         return left.base >= right.base;
     }
 };
 
 const SizeComparator = struct {
     pub fn compare(self: *const @This(), left: *const Range, right: *const Range) bool {
+        _ = self;
         return left.size >= right.size;
     }
 };
@@ -98,6 +100,7 @@ pub fn RangeAllocator(comptime LockType: type) type {
             len_align: u29,
             ret_addr: usize,
         ) std.mem.Allocator.Error![]u8 {
+            _ = ret_addr;
             const self = @fieldParentPtr(@This(), "allocator", allocator);
             self.lock.lock();
             defer self.lock.unlock();
@@ -118,6 +121,9 @@ pub fn RangeAllocator(comptime LockType: type) type {
             len_align: u29,
             ret_addr: usize,
         ) std.mem.Allocator.Error!usize {
+            _ = ret_addr;
+            _ = len_align;
+            _ = old_align;
             const self = @fieldParentPtr(@This(), "allocator", allocator);
             self.lock.lock();
             defer self.lock.unlock();
@@ -127,7 +133,7 @@ pub fn RangeAllocator(comptime LockType: type) type {
             }
 
             // Free this address
-            const new_range = self.ra.giveRange(.{
+            _ = self.ra.giveRange(.{
                 .base = @ptrToInt(old_mem.ptr),
                 .size = old_mem.len,
             }) catch |err| {
@@ -192,7 +198,7 @@ pub const RangeAlloc = struct {
         if (has_data_before and has_data_after) {
             // Add the new range
             const new_range_offset = pmt.offset + pmt.effective_size;
-            const new_range = self.addRange(.{
+            _ = self.addRange(.{
                 .base = range.base + new_range_offset,
                 .size = range.size - new_range_offset,
             });
@@ -371,6 +377,7 @@ pub const RangeAlloc = struct {
     }
 
     fn tryMerge(self: *@This(), low: *Range, high: *const Range) bool {
+        _ = self;
         if (low.base + low.size == high.base) {
             low.size += high.size;
             return true;
