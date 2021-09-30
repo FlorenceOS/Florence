@@ -79,7 +79,7 @@ pub fn Tree(comptime T: type, comptime member_name: []const u8, comptime cfg: Co
             @compileError("Augment callback should define \"augment\" function");
         }
         const expected_augment_callback_type = fn (*const augment_callback, *T) bool;
-        if (!(@TypeOf(augment_callback.augment) == expected_cmp_type)) {
+        if (!(@TypeOf(augment_callback.augment) == expected_augment_callback_type)) {
             @compileError("Invalid type of \"augment\" function");
         }
     }
