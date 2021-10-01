@@ -1,7 +1,7 @@
 usingnamespace @import("root").preamble;
 
 const log = lib.output.log.scoped(.{
-    .prefix = "VMM",
+    .prefix = "memory/vmm",
     .filter = .info,
 }).write;
 

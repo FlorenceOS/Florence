@@ -2,7 +2,7 @@ pub const preamble = @import("../preamble.zig");
 usingnamespace preamble;
 
 const log = lib.output.log.scoped(.{
-    .prefix = "Stivale2",
+    .prefix = "boot/stivale2",
     .filter = .info,
 }).write;
 

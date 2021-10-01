@@ -1,7 +1,7 @@
 usingnamespace @import("root").preamble;
 
 const log = lib.output.log.scoped(.{
-    .prefix = "Kepler tests",
+    .prefix = "kepler/tests",
     .filter = null,
 }).write;
 

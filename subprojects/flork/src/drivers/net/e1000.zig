@@ -1,7 +1,7 @@
 usingnamespace @import("root").preamble;
 
 const log = lib.output.log.scoped(.{
-    .prefix = "E1000",
+    .prefix = "net/e1000",
     .filter = .info,
 }).write;
 

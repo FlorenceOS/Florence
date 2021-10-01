@@ -1,8 +1,8 @@
 usingnamespace @import("root").preamble;
 
 const log = lib.output.log.scoped(.{
-    .prefix = "NVMe",
     .filter = .info,
+    .prefix = "block/nvme",
 }).write;
 
 fn controllerTask(addr: os.platform.pci.Addr) void {}

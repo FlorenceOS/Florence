@@ -1,7 +1,7 @@
 usingnamespace @import("root").preamble;
 
 const log = lib.output.log.scoped(.{
-    .prefix = "Serial",
+    .prefix = "x86_64/serial",
     .filter = .info,
 }).write;
 

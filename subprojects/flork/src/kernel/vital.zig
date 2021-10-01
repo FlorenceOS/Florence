@@ -1,7 +1,7 @@
 usingnamespace @import("root").preamble;
 
 const log = lib.output.log.scoped(.{
-    .prefix = "VITAL FAIL",
+    .prefix = "kernel/vital",
     .filter = null,
 }).write;
 

@@ -1,7 +1,7 @@
 usingnamespace @import("root").preamble;
 
 const log = lib.output.log.scoped(.{
-    .prefix = "PS2",
+    .prefix = "x86_64/ps2",
     .filter = .info,
 }).write;
 
