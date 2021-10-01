@@ -4,6 +4,9 @@ pub const bitfields = @import("bitfields.zig");
 /// Bitsets library
 pub const bitset = @import("bitset.zig");
 
+/// Callback library
+pub const callback = @import("callback.zig");
+
 /// Alignment library
 pub const libalign = @import("libalign.zig");
 
