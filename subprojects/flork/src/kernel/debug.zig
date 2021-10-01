@@ -1,7 +1,7 @@
 usingnamespace @import("root").preamble;
 
 const log = lib.output.log.scoped(.{
-    .prefix = "Debug info",
+    .prefix = "kernel/debug",
     .filter = .info,
 });
 

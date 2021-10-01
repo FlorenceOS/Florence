@@ -4,7 +4,7 @@ const StackTrace = std.builtin.StackTrace;
 var panic_counter: usize = 0;
 
 const log = lib.output.log.scoped(.{
-    .prefix = "PANIC",
+    .prefix = "kernel/panic",
     .filter = null,
 }).write;
 

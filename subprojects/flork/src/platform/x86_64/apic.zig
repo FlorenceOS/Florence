@@ -1,7 +1,7 @@
 usingnamespace @import("root").preamble;
 
 const log = lib.output.log.scoped(.{
-    .prefix = "APIC",
+    .prefix = "x86_64/apic",
     .filter = .info,
 }).write;
 

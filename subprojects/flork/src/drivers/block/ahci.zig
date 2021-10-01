@@ -1,7 +1,7 @@
 usingnamespace @import("root").preamble;
 
 const log = lib.output.log.scoped(.{
-    .prefix = "AHCI",
+    .prefix = "block/ahci",
     .filter = .info,
 }).write;
 

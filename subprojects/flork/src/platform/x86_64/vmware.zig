@@ -1,7 +1,7 @@
 usingnamespace @import("root").preamble;
 
 const log = lib.output.log.scoped(.{
-    .prefix = "VMWARE",
+    .prefix = "x86_64/vmware",
     .filter = .info,
 }).write;
 

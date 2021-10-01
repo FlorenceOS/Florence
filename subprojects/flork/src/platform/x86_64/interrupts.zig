@@ -1,7 +1,7 @@
 usingnamespace @import("root").preamble;
 
 const log = lib.output.log.scoped(.{
-    .prefix = "Interrupts",
+    .prefix = "x86_64/interrupts",
     .filter = .info,
 }).write;
 

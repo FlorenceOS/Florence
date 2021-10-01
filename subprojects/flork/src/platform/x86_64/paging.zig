@@ -1,7 +1,7 @@
 usingnamespace @import("root").preamble;
 
 const log = lib.output.log.scoped(.{
-    .prefix = "x86_64 Paging",
+    .prefix = "x86_64/paging",
     .filter = .info,
 }).write;
 
