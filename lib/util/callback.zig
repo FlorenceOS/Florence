@@ -105,9 +105,8 @@ pub fn inlineAllocatedCallback(
         const ReturnType = CallbackType.CallbackReturnType;
         const ArgType = CallbackType.CallbackArgType;
         // zig fmt: off
-        if(true
-            and CallType != fn(*@TypeOf(thing_to_callback), ArgType) ReturnType
-            and CallType != fn(*const @TypeOf(thing_to_callback), ArgType) ReturnType
+        if(CallType != fn(*@TypeOf(thing_to_callback), ArgType) ReturnType and
+           CallType != fn(*const @TypeOf(thing_to_callback), ArgType) ReturnType
         // zig fmt: on
         ) {
             @compileError("Bad call function signature on " ++ @typeName(@TypeOf(thing_to_callback)) ++ "!");
@@ -121,9 +120,8 @@ pub fn inlineAllocatedCallback(
         if (comptime (@hasDecl(@TypeOf(thing_to_callback), "deinit"))) {
             const DeinitType = @TypeOf(@TypeOf(thing_to_callback).deinit);
             // zig fmt: off
-            if(true
-                and DeinitType != fn(*@TypeOf(thing_to_callback)) void
-                and DeinitType != fn(*const @TypeOf(thing_to_callback)) void
+            if(DeinitType != fn(*@TypeOf(thing_to_callback)) void and
+               DeinitType != fn(*const @TypeOf(thing_to_callback)) void
             // zig fmt: on
             ) {
                 @compileError("Bad deinit function signature on " ++ @typeName(@TypeOf(thing_to_callback)) ++ "!");
