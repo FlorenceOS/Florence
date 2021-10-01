@@ -13,8 +13,8 @@ pub fn Callback(
 
         pub const callback_inline_capacity = inline_capacity;
         pub const callback_deinitable = deinitable;
-        pub const callback_return_type = ReturnType;
-        pub const callback_arg_type = ArgType;
+        pub const CallbackReturnType = ReturnType;
+        pub const CallbackArgType = ArgType;
 
         pub fn call(self: *const @This(), arg: ArgType) callconv(.Inline) ReturnType {
             return self.callFn(self.context(), arg);
@@ -33,13 +33,13 @@ pub fn Callback(
 }
 
 fn heapAllocatedCallback(
-    comptime callback_type: type,
+    comptime CallbackType: type,
     thing_to_callback: anytype,
     allocator: *std.mem.Allocator,
-) !callback_type {
-    const callback_inline_capacity = callback_type.callback_inline_capacity;
-    const CallbackReturnType = callback_type.callback_return_type;
-    const CallbackArgType = callback_type.callback_return_type;
+) !CallbackType {
+    const callback_inline_capacity = CallbackType.callback_inline_capacity;
+    const CallbackReturnType = CallbackType.CallbackReturnType;
+    const CallbackArgType = CallbackType.CallbackArgType;
 
     // What can we fit in the inline storage?
     if (callback_inline_capacity < @sizeOf(usize)) {
@@ -53,7 +53,7 @@ fn heapAllocatedCallback(
         value: @TypeOf(thing_to_callback),
     };
 
-    return inlineAllocatedCallback(callback_type, try struct {
+    return inlineAllocatedCallback(CallbackType, try struct {
         heap_block: *HeapAllocBlock,
         inline_allocator: if (allocator_inline) *std.mem.Allocator else void,
 
@@ -86,15 +86,15 @@ fn heapAllocatedCallback(
 }
 
 pub fn inlineAllocatedCallback(
-    comptime callback_type: type,
+    comptime CallbackType: type,
     thing_to_callback: anytype,
-) callback_type {
-    if (@sizeOf(@TypeOf(thing_to_callback)) > callback_type.callback_inline_capacity) {
+) CallbackType {
+    if (@sizeOf(@TypeOf(thing_to_callback)) > CallbackType.callback_inline_capacity) {
         @compileError("Cannot fit this object in the inline capacity!");
     }
 
     // WARNING: TYPE PUNNING AHEAD
-    var result: callback_type = undefined;
+    var result: CallbackType = undefined;
     std.mem.copy(u8, result.inline_data[0..], std.mem.asBytes(&thing_to_callback));
 
     if (!@hasDecl(@TypeOf(thing_to_callback), "call"))
@@ -102,8 +102,8 @@ pub fn inlineAllocatedCallback(
 
     if (comptime (@hasDecl(@TypeOf(thing_to_callback), "call"))) {
         const CallType = @TypeOf(@TypeOf(thing_to_callback).call);
-        const ReturnType = callback_type.callback_return_type;
-        const ArgType = callback_type.callback_arg_type;
+        const ReturnType = CallbackType.CallbackReturnType;
+        const ArgType = CallbackType.CallbackArgType;
         // zig fmt: off
         if(true
             and CallType != fn(*@TypeOf(thing_to_callback), ArgType) ReturnType
@@ -117,7 +117,7 @@ pub fn inlineAllocatedCallback(
         @compileError("Missing call function on " ++ @typeName(@TypeOf(thing_to_callback)) ++ "! Are you missing `pub`?");
     }
 
-    if (comptime (callback_type.callback_deinitable)) {
+    if (comptime (CallbackType.callback_deinitable)) {
         if (comptime (@hasDecl(@TypeOf(thing_to_callback), "deinit"))) {
             const DeinitType = @TypeOf(@TypeOf(thing_to_callback).deinit);
             // zig fmt: off
@@ -140,12 +140,12 @@ pub fn inlineAllocatedCallback(
 }
 
 pub fn possiblyHeapAllocatedCallback(
-    comptime callback_type: type,
+    comptime CallbackType: type,
     thing_to_callback: anytype,
     allocator: *std.mem.Allocator,
-) !callback_type {
-    if (comptime (callback_type.callback_inline_capacity) < @sizeOf(@TypeOf(thing_to_callback))) {
-        return heapAllocatedCallback(callback_type, thing_to_callback, allocator);
+) !CallbackType {
+    if (comptime (CallbackType.callback_inline_capacity) < @sizeOf(@TypeOf(thing_to_callback))) {
+        return heapAllocatedCallback(CallbackType, thing_to_callback, allocator);
     }
-    return inlineAllocatedCallback(callback_type, thing_to_callback);
+    return inlineAllocatedCallback(CallbackType, thing_to_callback);
 }
