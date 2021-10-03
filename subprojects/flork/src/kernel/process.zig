@@ -150,7 +150,10 @@ pub const Process = struct {
                 if (str_len > 0) {
                     const ends_with_endl = str_ptr[str_len - 1] == '\n';
                     const str: []const u8 = if (ends_with_endl) str_ptr[0 .. str_len - 1] else str_ptr[0..str_len];
-                    log(null, "USERSPACE LOG: {s}", .{str});
+                    log(null, "{s}: {s}", .{
+                        os.platform.get_current_task().secondary_name.?,
+                        str,
+                    });
                 }
             },
             else => {
