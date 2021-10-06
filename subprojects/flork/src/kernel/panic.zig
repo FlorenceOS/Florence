@@ -24,7 +24,7 @@ pub fn panic(message: []const u8, stack_trace: ?*StackTrace) noreturn {
         os.platform.hang();
     }
 
-    log(null, "Panic# {d}: CPU {d}: {s}!", .{ panic_num, cpu_id, message });
+    log(null, "Panic #{d}: CPU {d}: {s}!", .{ panic_num, cpu_id, message });
     log(null, "Currently executing task: {s}", .{os.platform.get_current_task().name});
     if (os.platform.get_current_task().secondary_name) |n| {
         log(null, "Task secondary name: {s}", .{n});
