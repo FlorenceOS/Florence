@@ -59,7 +59,7 @@ pub fn encode(addr: u64, ist: u3, gate_type: u4, storage: u1, priv_level: u2, pr
         .addr_low = @truncate(u16, addr),
         .addr_mid = @truncate(u16, addr >> 16),
         .addr_high = @truncate(u32, addr >> 32),
-        .selector = gdt.selector.code64 | priv_level,
+        .selector = gdt.selector.code64,
         .ist = ist,
         .gate_type = gate_type,
         .storage = storage,
