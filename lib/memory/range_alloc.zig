@@ -1,9 +1,7 @@
-usingnamespace @import("root").preamble;
+const std = @import("std");
+const rb = @import("rbtree");
 
 const Order = std.math.Order;
-
-const rb = lib.containers.rbtree;
-
 const AddrNode = rb.Node(rb_features);
 const SizeNode = rb.Node(rb_features);
 const AddrTree = rb.Tree(Range, "addr_node", addr_config);

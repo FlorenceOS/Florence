@@ -3,12 +3,12 @@ const StackTrace = std.builtin.StackTrace;
 
 var panic_counter: usize = 0;
 
-const log = lib.output.log.scoped(.{
+const log = @import("lib").output.log.scoped(.{
     .prefix = "kernel/panic",
     .filter = null,
 }).write;
 
-pub fn breakpoint_panic(message: []const u8, stack_trace: ?*StackTrace) callconv(.Inline) noreturn {
+pub inline fn breakpoint_panic(message: []const u8, stack_trace: ?*StackTrace) noreturn {
     @breakpoint();
     unreachable;
 }

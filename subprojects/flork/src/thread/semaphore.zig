@@ -1,5 +1,7 @@
 usingnamespace @import("root").preamble;
 
+const queue = @import("lib").containers.queue;
+
 /// Semaphore waiting queue node
 const WaitingNode = struct {
     /// Number of resources thread is waiting for
@@ -7,7 +9,7 @@ const WaitingNode = struct {
     /// Task waiting to be waken up
     task: *os.thread.Task = undefined,
     /// Queue hook
-    queue_hook: lib.containers.queue.Node = undefined,
+    queue_hook: queue.Node = undefined,
 };
 
 /// Semaphore is lock that should be used for synchronizing operations that may take too long and/or
@@ -15,7 +17,7 @@ const WaitingNode = struct {
 /// in locked section). Unlike Mutex, it can be also used to grant access to more than one resource
 pub const Semaphore = struct {
     /// Atomic queue of waiting tasks
-    queue: lib.containers.queue.Queue(WaitingNode, "queue_hook") = .{},
+    queue: queue.Queue(WaitingNode, "queue_hook") = .{},
     /// Spinlock used to prevent more than one thread from accessing mutex data
     spinlock: os.thread.Spinlock = .{},
     /// Number of resources available
@@ -66,6 +68,8 @@ pub const Semaphore = struct {
 
     // Acquire `count` resources or panic. Don't call from interrupt context!
     pub fn acquire(self: *@This(), count: usize) void {
-        self.try_acquire(count) catch { unreachable; };
+        self.try_acquire(count) catch {
+            unreachable;
+        };
     }
 };

@@ -1,6 +1,6 @@
 usingnamespace @import("root").preamble;
 
-const graphics = lib.graphics;
+const graphics = @import("lib").graphics;
 const output = os.drivers.output;
 
 pub const SingleModeDisplay = struct {

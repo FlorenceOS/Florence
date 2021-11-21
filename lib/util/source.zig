@@ -1,6 +1,5 @@
-usingnamespace @import("root").preamble;
-
-const tar = lib.format.tar;
+const std = @import("std");
+const tar = @import("tar");
 
 fn getSourceBlob() ?[]const u8 {
     if (@import("build_options").source_blob_path) |path| {

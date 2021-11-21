@@ -1,6 +1,6 @@
 usingnamespace @import("root").preamble;
 
-const log = lib.output.log.scoped(.{
+const log = @import("lib").output.log.scoped(.{
     .prefix = "net/e1000",
     .filter = .info,
 }).write;

@@ -1,4 +1,4 @@
-usingnamespace @import("root").preamble;
+const std = @import("std");
 
 pub fn range(comptime num: usize) [num]comptime_int {
     var ret = [_]comptime_int{0} ** num;

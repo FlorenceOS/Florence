@@ -1,5 +1,8 @@
 usingnamespace @import("root").preamble;
 
+const lib = @import("lib");
+const queue = lib.containers.queue;
+
 /// IPC message
 pub const Message = packed struct {
     /// Opaque value
@@ -155,13 +158,13 @@ pub const Mailbox = struct {
     /// Message queue node
     const MsgQueueNode = struct {
         /// Queue node
-        hook: lib.containers.queue.Node = .{},
+        hook: queue.Node = .{},
     };
 
     /// Thread sleep queue node
     const TaskSleepQueueNode = struct {
         /// Queue node
-        hook: lib.containers.queue.Node = .{},
+        hook: queue.Node = .{},
         /// Pointer to the recieve buffer
         recv_buf: *Message,
         /// Pointer to the sleeping task
@@ -177,11 +180,11 @@ pub const Mailbox = struct {
     /// Message queue nodes
     msg_queue_nodes: []MsgQueueNode,
     /// Free buffers queue
-    free_queue: lib.containers.queue.Queue(MsgQueueNode, "hook") = .{},
+    free_queue: queue.Queue(MsgQueueNode, "hook") = .{},
     /// Pending messages queue
-    pending_queue: lib.containers.queue.Queue(MsgQueueNode, "hook") = .{},
+    pending_queue: queue.Queue(MsgQueueNode, "hook") = .{},
     /// Sleep queue
-    sleep_queue: lib.containers.queue.Queue(TaskSleepQueueNode, "hook") = .{},
+    sleep_queue: queue.Queue(TaskSleepQueueNode, "hook") = .{},
     /// Allocator used to allocate the token
     allocator: *std.mem.Allocator,
     /// True if mailbox was shut down

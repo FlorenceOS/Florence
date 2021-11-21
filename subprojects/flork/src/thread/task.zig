@@ -1,5 +1,6 @@
 usingnamespace @import("root").preamble;
-const atomic_queue = lib.containers.atomic_queue;
+
+const atomic_queue = @import("lib").containers.atomic_queue;
 
 const guard_size = os.platform.thread.stack_guard_size;
 const map_size = os.platform.thread.task_stack_size;

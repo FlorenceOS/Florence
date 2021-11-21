@@ -1,4 +1,4 @@
-usingnamespace @import("root").preamble;
+const std = @import("std");
 
 /// Features that should be enabled in the code for the red black tree
 pub const Features = struct {

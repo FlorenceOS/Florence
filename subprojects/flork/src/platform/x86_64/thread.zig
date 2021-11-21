@@ -1,5 +1,7 @@
 usingnamespace @import("root").preamble;
 
+const lib = @import("lib");
+
 const gdt = @import("gdt.zig");
 const regs = @import("regs.zig");
 const interrupts = @import("interrupts.zig");

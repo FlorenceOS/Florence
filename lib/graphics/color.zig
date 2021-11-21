@@ -1,6 +1,4 @@
-usingnamespace @import("root").preamble;
-
-const PixelFormat = lib.graphics.pixel_format.PixelFormat;
+const PixelFormat = @import("pixel_format").PixelFormat;
 
 pub const Color = struct {
     blue: u8,

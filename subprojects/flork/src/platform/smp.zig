@@ -27,7 +27,7 @@ pub const CoreData = struct {
     sched_stack: usize,
 
     pub fn id(self: *@This()) usize {
-        return lib.util.pointers.getIndex(self, cpus);
+        return @import("lib").util.pointers.getIndex(self, cpus);
     }
 
     fn bootstrap_stack(size: usize) usize {

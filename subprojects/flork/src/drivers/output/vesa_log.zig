@@ -1,19 +1,21 @@
 usingnamespace @import("root").preamble;
 
+const graphics = @import("lib").graphics;
+
 const font = config.drivers.output.vesa_log.font;
 const bg = config.drivers.output.vesa_log.background;
 
-const rendered_font = comptime lib.graphics.font_renderer.renderBitmapFont(
+const rendered_font = comptime graphics.font_renderer.renderBitmapFont(
     font,
     bg,
     config.drivers.output.vesa_log.foreground,
     .rgb,
 );
 
-var printer: lib.graphics.glyph_printer.GlyphPrinter(4096, font.height) = undefined;
-pub var drawTarget: ?*lib.graphics.image_region.ImageRegion = null;
+var printer: graphics.glyph_printer.GlyphPrinter(4096, font.height) = undefined;
+pub var drawTarget: ?*graphics.image_region.ImageRegion = null;
 
-pub fn use(region: *lib.graphics.image_region.ImageRegion) void {
+pub fn use(region: *graphics.image_region.ImageRegion) void {
     if (comptime !config.drivers.output.vesa_log.enable)
         return;
 

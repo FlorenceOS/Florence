@@ -1,6 +1,8 @@
 pub const preamble = @import("../preamble.zig");
 usingnamespace preamble;
 
+const lib = @import("lib");
+
 const log = lib.output.log.scoped(.{
     .prefix = "boot/stivale2",
     .filter = .info,
@@ -425,7 +427,10 @@ export fn stivale2Main(info_in: *Info) noreturn {
     // Attempt to speed up log scrolling using a buffer
     if (info.framebuffer) |_| {
         blk: {
-            display_buffer.init(&display.context.region) catch |err| {
+            display_buffer.init(
+                os.memory.pmm.phys_heap,
+                &display.context.region,
+            ) catch |err| {
                 log(.err, "Stivale2: Error while allocating buffer: {e}", .{err});
                 break :blk;
             };

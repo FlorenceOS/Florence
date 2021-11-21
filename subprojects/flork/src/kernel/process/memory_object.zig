@@ -1,5 +1,7 @@
 usingnamespace @import("root").preamble;
 
+const lib = @import("lib");
+
 const heap = os.memory.pmm.phys_heap;
 const platform = os.platform;
 const PagingContext = platform.paging.PagingContext;

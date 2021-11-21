@@ -1,5 +1,7 @@
 usingnamespace @import("root").preamble;
 
+const lib = @import("lib");
+
 const log = lib.output.log.scoped(.{
     .prefix = "gpu/virtio",
     .filter = .info,
