@@ -1,7 +1,8 @@
-usingnamespace @import("root").preamble;
+const std = @import("std");
+const libalign = @import("libalign");
 
-const PixelFormat = lib.graphics.pixel_format.PixelFormat;
-const Color = lib.graphics.color.Color;
+const PixelFormat = @import("pixel_format").PixelFormat;
+const Color = @import("color").Color;
 
 pub const InvalidateRectFunc = fn (r: *ImageRegion, x: usize, y: usize, width: usize, height: usize) void;
 
@@ -151,13 +152,13 @@ pub const ImageRegion = struct {
         // Can we memset (all bytes equal) when filing?
         if (c.memsetAsFmt(fmt)) |byte_value| {
             if (x == 0 and width == target.width and target.full_width) {
-                lib.util.libalign.alignedFill(u32, target.startingAt(0, y)[0 .. height * target.pitch], byte_value);
+                libalign.alignedFill(u32, target.startingAt(0, y)[0 .. height * target.pitch], byte_value);
             } else {
                 var curr_y: usize = 0;
                 var target_lines = target.startingAt(x, y);
                 while (true) {
                     const line = target_lines[0 .. width * comptime fmt.bytesPerPixel()];
-                    lib.util.libalign.alignedFill(u32, line, byte_value);
+                    libalign.alignedFill(u32, line, byte_value);
 
                     curr_y += 1;
 
@@ -177,7 +178,7 @@ pub const ImageRegion = struct {
                 var curr_x: usize = 0;
                 var target_pixels = target_lines;
                 while (true) {
-                    lib.util.libalign.alignedCopy(u8, target_pixels, pixel_bytes[0..]);
+                    libalign.alignedCopy(u8, target_pixels, pixel_bytes[0..]);
 
                     curr_x += 1;
 
@@ -222,14 +223,15 @@ pub const ImageRegion = struct {
         if (comptime target_fmt.canWriteMany(source_fmt)) {
             // Can we copy the entire thing in one memcpy?
             if (source.pitch == target.pitch and source.full_width and target.full_width) {
-                lib.util.libalign.alignedCopy(u32, target.startingAt(x, y), source.bytes);
+                const num_bytes = source.pitch * source.height;
+                libalign.alignedCopy(u32, target.startingAt(x, y), source.bytes);
             } else {
                 const num_bytes = source.width * comptime source_fmt.bytesPerPixel();
                 var source_bytes = source.bytes;
                 var target_bytes = target.startingAt(x, y);
                 var source_y: usize = 0;
                 while (true) {
-                    lib.util.libalign.alignedCopy(u32, target_bytes, source_bytes[0..num_bytes]);
+                    libalign.alignedCopy(u32, target_bytes, source_bytes[0..num_bytes]);
 
                     source_y += 1;
 
@@ -256,9 +258,9 @@ pub const ImageRegion = struct {
                         const source_bytes = source_fmt.meaningfulBytesPerPixel();
                         const target_bytes = target_fmt.meaningfulBytesPerPixel();
                         const bytes_to_copy = std.math.min(source_bytes, target_bytes);
-                        lib.util.libalign.alignedCopy(u32, target_pixels, source_pixels[0..comptime bytes_to_copy]);
+                        libalign.alignedCopy(u32, target_pixels, source_pixels[0..comptime bytes_to_copy]);
                     } else {
-                        lib.graphics.color.Color.readAsFmt(
+                        Color.readAsFmt(
                             source_fmt,
                             source_pixels,
                         ).writeAsFmt(

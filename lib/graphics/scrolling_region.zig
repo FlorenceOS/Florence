@@ -1,7 +1,7 @@
-usingnamespace @import("root").preamble;
+const std = @import("std");
 
-const ImageRegion = lib.graphics.image_region.ImageRegion;
-const Color = lib.graphics.color.Color;
+const ImageRegion = @import("image_region").ImageRegion;
+const Color = @import("color").Color;
 
 pub const ScrollingRegion = struct {
     used_height: usize = 0,

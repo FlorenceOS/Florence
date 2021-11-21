@@ -1,5 +1,3 @@
-usingnamespace @import("root").preamble;
-
 pub const PixelFormat = enum {
     rgb, // 24 bpp rgb
     rgba, // 32 bpp with alpha

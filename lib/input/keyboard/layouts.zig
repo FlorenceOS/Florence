@@ -1,6 +1,4 @@
-usingnamespace @import("root").preamble;
-
-const kb = lib.input.keyboard;
+const kb = @import("keyboard.zig");
 
 pub const KeyboardLayout = enum {
     en_US_QWERTY,

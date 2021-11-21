@@ -1,5 +1,7 @@
 usingnamespace @import("root").preamble;
 
+const lib = @import("lib");
+
 pub const VideoOutputContext = struct {
     displays: []DisplayContext,
 };

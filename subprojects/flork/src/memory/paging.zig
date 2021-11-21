@@ -1,5 +1,7 @@
 usingnamespace @import("root").preamble;
 
+const lib = @import("lib");
+
 const platform = os.platform;
 const libalign = lib.util.libalign;
 const range = lib.util.range.range;

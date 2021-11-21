@@ -1,10 +1,12 @@
-usingnamespace @import("root").preamble;
+const Color = @import("color").Color;
+const PixelFormat = @import("pixel_format").PixelFormat;
+const ImageRegion = @import("image_region").ImageRegion;
 
 pub fn renderBitmapFont(
     comptime f: anytype,
-    background_color: lib.graphics.color.Color,
-    foreground_color: lib.graphics.color.Color,
-    comptime pixel_format: lib.graphics.pixel_format.PixelFormat,
+    background_color: Color,
+    foreground_color: Color,
+    comptime pixel_format: PixelFormat,
 ) renderedFontType(f, pixel_format) {
     var result: renderedFontType(f, pixel_format) = undefined;
 
@@ -39,6 +41,7 @@ pub fn renderBitmapFont(
 }
 
 fn numChars(comptime f: anytype) usize {
+    const num_bytes = f.data.len;
     const bytes_per_line = @divFloor(f.width + 7, 8);
     const bytes_per_char = bytes_per_line * f.height;
     return @divExact(f.data.len, bytes_per_char);
@@ -46,7 +49,7 @@ fn numChars(comptime f: anytype) usize {
 
 fn renderedFontType(
     comptime f: anytype,
-    comptime pixel_format: lib.graphics.pixel_format.PixelFormat,
+    comptime pixel_format: PixelFormat,
 ) type {
     return [numChars(f)]RenderedChar(f.width, f.height, pixel_format);
 }
@@ -54,12 +57,12 @@ fn renderedFontType(
 fn RenderedChar(
     comptime width: usize,
     comptime height: usize,
-    comptime pixel_format: lib.graphics.pixel_format.PixelFormat,
+    comptime pixel_format: PixelFormat,
 ) type {
     return struct {
         data: [width * height * pixel_format.bytesPerPixel()]u8,
 
-        pub fn regionMutable(self: *@This()) lib.graphics.image_region.ImageRegion {
+        pub fn regionMutable(self: *@This()) ImageRegion {
             return .{
                 .width = width,
                 .height = height,
@@ -70,7 +73,7 @@ fn RenderedChar(
             };
         }
 
-        pub fn region(self: *const @This()) lib.graphics.image_region.ImageRegion {
+        pub fn region(self: *const @This()) ImageRegion {
             return .{
                 .width = width,
                 .height = height,

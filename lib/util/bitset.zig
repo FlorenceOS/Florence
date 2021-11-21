@@ -76,4 +76,3 @@ test "dynamic bitset" {
     try std.testing.expect(!bs.isSet(0));
     try std.testing.expect(bs.isSet(13));
 }
-

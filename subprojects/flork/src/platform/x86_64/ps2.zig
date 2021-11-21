@@ -1,5 +1,7 @@
 usingnamespace @import("root").preamble;
 
+const lib = @import("lib");
+
 const log = lib.output.log.scoped(.{
     .prefix = "x86_64/ps2",
     .filter = .info,
@@ -89,7 +91,9 @@ fn kbEvent() void {
     }
 }
 
-var kb_state: kb.state.KeyboardState = .{};
+var kb_state: kb.state.KeyboardState = .{
+    .layout = config.keyboard_layout,
+};
 
 fn kbHandler(_: *os.platform.InterruptFrame) void {
     keyboard_buffer_data[keyboard_buffer_elements] = ports.inb(0x60);

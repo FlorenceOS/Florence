@@ -1,4 +1,4 @@
-usingnamespace @import("root").preamble;
+const std = @import("std");
 
 pub fn alignDown(comptime t: type, alignment: t, value: t) t {
     return value - (value % alignment);
@@ -12,10 +12,16 @@ pub fn isAligned(comptime t: type, alignment: t, value: t) bool {
     return alignDown(t, alignment, value) == value;
 }
 
+fn isRuntime() bool {
+    var b = true;
+    const v = if (b) @as(u8, 0) else @as(u32, 0);
+    return @TypeOf(b) == u32;
+}
+
 fn sliceAlignCast(comptime t: type, slice: anytype) !(if (std.meta.trait.isConstPtr(@TypeOf(slice.ptr))) []const t else []t) {
     const alignment = @alignOf(t);
-    const ptr_type = comptime if (std.meta.trait.isConstPtr(@TypeOf(slice.ptr))) [*]const t else [*]t;
-    if (lib.util.isRuntime() // we can't detect alignment of pointer values at comptime, not that it matters anyways
+    comptime const ptr_type = if (std.meta.trait.isConstPtr(@TypeOf(slice.ptr))) [*]const t else [*]t;
+    if (isRuntime() // we can't detect alignment of pointer values at comptime, not that it matters anyways
     and isAligned(usize, alignment, @ptrToInt(slice.ptr)) // base ptr aligned
     and isAligned(usize, alignment, slice.len)) { // length aligned
         return @ptrCast(

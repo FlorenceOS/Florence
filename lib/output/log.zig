@@ -1,8 +1,7 @@
-usingnamespace @import("root").preamble;
+const libfmt = @import("fmt");
+const std = @import("std");
 
-const fmt_lib = @import("fmt.zig");
-
-const Mutex = os.thread.Mutex;
+const Mutex = @import("root").os.thread.Mutex;
 
 var mutex = Mutex{};
 noinline fn getLock() Mutex.Held {
@@ -32,31 +31,31 @@ fn taggedLogFmt(comptime tag: anytype, comptime log_level: ?std.log.Level, compt
     return "[" ++ tag.prefix ++ "] " ++ fmt;
 }
 
-fn writeImpl(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype) callconv(.Inline) void {
+inline fn writeImpl(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype) void {
     if (comptime enabled(tag, log_level)) {
         const l = getLock();
         defer l.release();
-        fmt_lib.doFmt(comptime taggedLogFmt(tag, log_level, fmt), args);
+        libfmt.doFmt(comptime taggedLogFmt(tag, log_level, fmt), args);
     }
 }
 
-fn startImpl(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype) callconv(.Inline) held_t(tag, log_level) {
+inline fn startImpl(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype) held_t(tag, log_level) {
     if (comptime enabled(tag, log_level)) {
         const l = getLock();
-        fmt_lib.doFmtNoEndl(comptime taggedLogFmt(tag, log_level, fmt), args);
+        libfmt.doFmtNoEndl(comptime taggedLogFmt(tag, log_level, fmt), args);
         return l;
     }
 }
 
-fn contImpl(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype, _: held_t(tag, log_level)) callconv(.Inline) void {
+inline fn contImpl(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype, _: held_t(tag, log_level)) void {
     if (comptime enabled(tag, log_level)) {
-        fmt_lib.doFmtNoEndl(fmt, args);
+        libfmt.doFmtNoEndl(fmt, args);
     }
 }
 
-fn finishImpl(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype, l: held_t(tag, log_level)) callconv(.Inline) void {
+inline fn finishImpl(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype, l: held_t(tag, log_level)) void {
     if (comptime enabled(tag, log_level)) {
-        fmt_lib.doFmt(fmt, args);
+        libfmt.doFmt(fmt, args);
         l.release();
     }
 }
@@ -64,25 +63,25 @@ fn finishImpl(comptime tag: anytype, comptime log_level: ?std.log.Level, comptim
 pub fn scoped(comptime tag: anytype) type {
     return struct {
         pub const write = struct {
-            pub fn f(comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype) callconv(.Inline) void {
+            pub inline fn f(comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype) void {
                 writeImpl(tag, log_level, fmt, args);
             }
         }.f;
 
         pub const start = struct {
-            pub fn f(comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype) callconv(.Inline) held_t(tag, log_level) {
+            pub inline fn f(comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype) held_t(tag, log_level) {
                 return startImpl(tag, log_level, fmt, args);
             }
         }.f;
 
         pub const cont = struct {
-            pub fn f(comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype, m: held_t(tag, log_level)) callconv(.Inline) void {
+            pub inline fn f(comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype, m: held_t(tag, log_level)) void {
                 return contImpl(tag, log_level, fmt, args, m);
             }
         }.f;
 
         pub const finish = struct {
-            pub fn f(comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype, m: held_t(tag, log_level)) callconv(.Inline) void {
+            pub inline fn f(comptime log_level: ?std.log.Level, comptime fmt: []const u8, args: anytype, m: held_t(tag, log_level)) void {
                 return finishImpl(tag, log_level, fmt, args, m);
             }
         }.f;

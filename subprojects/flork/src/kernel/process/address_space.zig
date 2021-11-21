@@ -1,5 +1,7 @@
 usingnamespace @import("root").preamble;
 
+const lib = @import("lib");
+
 const rb = lib.containers.rbtree;
 const platform = os.platform;
 const PagingContext = platform.paging.PagingContext;

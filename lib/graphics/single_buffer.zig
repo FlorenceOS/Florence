@@ -1,6 +1,5 @@
-usingnamespace @import("root").preamble;
-
-const ImageRegion = lib.graphics.image_region.ImageRegion;
+const std = @import("std");
+const ImageRegion = @import("image_region").ImageRegion;
 
 // Buffer for a region. Useful when you want to read from your buffer, without having to do expensive mmio.
 pub const SingleBuffer = struct {
@@ -12,10 +11,10 @@ pub const SingleBuffer = struct {
         self.backing_region.drawImageSameFmt(self.buffered_region.subregion(x, y, width, height), x, y, true);
     }
 
-    pub fn init(self: *@This(), backing: *ImageRegion) !void {
+    pub fn init(self: *@This(), allocator: *std.mem.Allocator, backing: *ImageRegion) !void {
         self.* = .{
             .buffered_region = .{
-                .bytes = try os.memory.pmm.phys_heap.alloc(u8, backing.height * backing.pitch),
+                .bytes = try allocator.alloc(u8, backing.height * backing.pitch),
                 .height = backing.height,
                 .pitch = backing.pitch,
                 .width = backing.width,

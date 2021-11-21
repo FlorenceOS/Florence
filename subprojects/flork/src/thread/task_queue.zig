@@ -1,5 +1,5 @@
 usingnamespace @import("root").preamble;
-const atomic_queue = lib.containers.atomic_queue;
+const atomic_queue = @import("lib").containers.atomic_queue;
 
 /// Task queue is a generic helper for the queue of tasks (allows to enqueue/dequeue them)
 /// It does no locking (though it disables interrupts) for its operations

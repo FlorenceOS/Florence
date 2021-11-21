@@ -1,8 +1,6 @@
-usingnamespace @import("root").preamble;
-
 /// We are exporting Node from non-atomic queue module, since we want the same Node type to be used
 /// both for atomic and non-atomic queues
-pub const Node = lib.containers.queue.Node;
+pub const Node = @import("queue").Node;
 
 /// Multi producer single consumer unbounded atomic queue.
 /// NOTE: Consumer is responsible for managing memory for nodes.

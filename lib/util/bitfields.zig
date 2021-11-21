@@ -1,4 +1,4 @@
-usingnamespace @import("root").preamble;
+const std = @import("std");
 
 fn PtrCastPreserveCV(comptime T: type, comptime PtrToT: type, comptime NewT: type) type {
     return switch (PtrToT) {
