@@ -1,5 +1,7 @@
 usingnamespace @import("root").preamble;
 
+const config = @import("config");
+
 const graphics = @import("lib").graphics;
 
 const font = config.drivers.output.vesa_log.font;

@@ -1,6 +1,7 @@
 usingnamespace @import("root").preamble;
 
 const lib = @import("lib");
+const config = @import("config");
 
 const log = lib.output.log.scoped(.{
     .prefix = "gpu/virtio",

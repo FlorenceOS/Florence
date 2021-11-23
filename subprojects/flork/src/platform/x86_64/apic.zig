@@ -1,6 +1,8 @@
 usingnamespace @import("root").preamble;
 
 const std = @import("std");
+const config = @import("config");
+
 const log = @import("lib").output.log.scoped(.{
     .prefix = "x86_64/apic",
     .filter = .info,

@@ -2,6 +2,7 @@ usingnamespace @import("root").preamble;
 
 const std = @import("std");
 const lib = @import("lib");
+const config = @import("config");
 
 const log = lib.output.log.scoped(.{
     .prefix = "platform/pci",

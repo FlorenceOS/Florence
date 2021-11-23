@@ -1,5 +1,7 @@
 usingnamespace @import("root").preamble;
 
+const config = @import("config");
+
 const interrupts = @import("interrupts.zig");
 const idt = @import("idt.zig");
 const gdt = @import("gdt.zig");

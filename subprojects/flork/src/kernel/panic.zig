@@ -20,7 +20,7 @@ pub fn panic(message: []const u8, stack_trace: ?*StackTrace) noreturn {
     cpu.panicked = true;
     const cpu_id = cpu.id();
 
-    if (config.kernel.panic_once and panic_num != 1) {
+    if (@import("config").kernel.panic_once and panic_num != 1) {
         os.platform.hang();
     }
 

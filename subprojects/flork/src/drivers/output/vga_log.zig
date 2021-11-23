@@ -1,5 +1,7 @@
 usingnamespace @import("root").preamble;
 
+const config = @import("config");
+
 const Framebuffer = struct {
     x_pos: u64 = 0,
     y_pos: u64 = 0,

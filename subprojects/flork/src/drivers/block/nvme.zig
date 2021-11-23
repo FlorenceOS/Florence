@@ -1,5 +1,7 @@
 usingnamespace @import("root").preamble;
 
+const config = @import("config");
+
 const log = @import("lib").output.log.scoped(.{
     .filter = .info,
     .prefix = "block/nvme",
