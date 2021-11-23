@@ -1,5 +1,7 @@
 usingnamespace @import("root").preamble;
 
+const std = @import("std");
+
 const build_options = @import("build_options");
 const copernicus_data = @embedFile(build_options.copernicus_path);
 const process = os.kernel.process;

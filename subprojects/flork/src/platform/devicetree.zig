@@ -1,5 +1,7 @@
 usingnamespace @import("root").preamble;
 
+const std = @import("std");
+
 const log = lib.output.log.scoped(.{
     .prefix = "platform/devicetree",
     .filter = .info,

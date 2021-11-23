@@ -1,5 +1,5 @@
 usingnamespace @import("root").preamble;
-const StackTrace = std.builtin.StackTrace;
+const StackTrace = @import("std").builtin.StackTrace;
 
 var panic_counter: usize = 0;
 

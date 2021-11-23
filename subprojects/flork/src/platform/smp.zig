@@ -1,5 +1,7 @@
 usingnamespace @import("root").preamble;
 
+const std = @import("std");
+
 const CoreID = os.platform.CoreID;
 
 /// Maximum number of supported CPUs

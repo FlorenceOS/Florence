@@ -1,5 +1,7 @@
 usingnamespace @import("root").preamble;
 
+const std = @import("std");
+
 const atomic_queue = @import("lib").containers.atomic_queue;
 
 const guard_size = os.platform.thread.stack_guard_size;

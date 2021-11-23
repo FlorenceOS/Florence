@@ -1,5 +1,6 @@
 usingnamespace @import("root").preamble;
 
+const std = @import("std");
 const lib = @import("lib");
 
 const heap = os.memory.pmm.phys_heap;

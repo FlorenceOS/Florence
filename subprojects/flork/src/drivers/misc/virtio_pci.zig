@@ -1,6 +1,6 @@
 usingnamespace @import("root").preamble;
 
-const libalign = lib.libalign;
+const std = @import("std");
 const allocator = os.memory.vmm.backed(.Ephemeral);
 const pmm = os.memory.pmm;
 const paging = os.memory.paging;

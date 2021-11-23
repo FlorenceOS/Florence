@@ -1,6 +1,7 @@
 pub const preamble = @import("../preamble.zig");
 usingnamespace preamble;
 
+const std = @import("std");
 const lib = @import("lib");
 
 const log = lib.output.log.scoped(.{

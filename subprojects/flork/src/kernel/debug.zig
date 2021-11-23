@@ -1,5 +1,6 @@
 usingnamespace @import("root").preamble;
 
+const std = @import("std");
 const log = @import("lib").output.log.scoped(.{
     .prefix = "kernel/debug",
     .filter = .info,

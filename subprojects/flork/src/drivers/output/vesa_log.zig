@@ -39,7 +39,7 @@ fn isPrintable(c: u8) bool {
 }
 
 comptime {
-    std.debug.assert(isPrintable('?'));
+    @import("std").debug.assert(isPrintable('?'));
 }
 
 pub fn putch(ch: u8) void {
