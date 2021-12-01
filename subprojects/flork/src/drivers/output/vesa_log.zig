@@ -4,7 +4,9 @@ const config = @import("config");
 
 const graphics = @import("lib").graphics;
 
-const font = config.drivers.output.vesa_log.font;
+const assets = @import("assets");
+
+const font = @field(assets.fonts, @tagName(config.drivers.output.vesa_log.font));
 const bg = config.drivers.output.vesa_log.background;
 
 const rendered_font = comptime graphics.font_renderer.renderBitmapFont(

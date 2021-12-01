@@ -146,6 +146,7 @@ pub fn makeExec(params: struct {
 
     exec.addPackage(@import("../lib/build.zig").pkg);
     exec.addPackagePath("config", "./config/config.zig");
+    exec.addPackagePath("assets", "./assets/assets.zig");
 
     exec.setMainPkgPath(".");
     exec.setOutputDir(params.builder.cache_root);

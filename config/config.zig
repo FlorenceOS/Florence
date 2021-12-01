@@ -1,5 +1,3 @@
-usingnamespace @import("../preamble.zig");
-
 pub const kernel = .{
     // Build mode
     .build_mode = .ReleaseSafe,
@@ -119,7 +117,7 @@ pub const drivers = .{
         .vesa_log = .{
             .enable = true,
 
-            .font = assets.fonts.fixed_6x13,
+            .font = .fixed_6x13,
             .background = .{
                 .red = 0x20,
                 .green = 0x20,
