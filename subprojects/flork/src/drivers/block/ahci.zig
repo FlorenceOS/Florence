@@ -133,7 +133,7 @@ const Port = packed struct {
     }
 
     pub fn buffer(self: *volatile @This(), slot: u5, prd_idx: usize) []u8 {
-        const prd_ptr = self.getPrd(slot, 0);
+        const prd_ptr = self.getPrd(slot, prd_idx);
         const buf_addr = read_u64(&prd_ptr.data_base_addr);
         const buf_size = @as(usize, prd_ptr.sizem1) + 1;
         return os.platform.phys_slice(u8).init(buf_addr, buf_size).to_slice_writeback();
