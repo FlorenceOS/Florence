@@ -15,7 +15,7 @@ pub fn isAligned(comptime t: type, alignment: t, value: t) bool {
 fn isRuntime() bool {
     var b = true;
     const v = if (b) @as(u8, 0) else @as(u32, 0);
-    return @TypeOf(b) == u32;
+    return @TypeOf(v) == u32;
 }
 
 fn sliceAlignCast(comptime t: type, slice: anytype) !(if (std.meta.trait.isConstPtr(@TypeOf(slice.ptr))) []const t else []t) {
