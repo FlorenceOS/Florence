@@ -1,4 +1,4 @@
-usingnamespace @import("root").preamble;
+const os = @import("root").os;
 
 pub const IA32_EFER = MSR(u64, 0xC0000080);
 pub const IA32_STAR = MSR(u64, 0xC0000081);

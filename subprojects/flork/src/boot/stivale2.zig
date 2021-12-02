@@ -1,6 +1,4 @@
-pub const preamble = @import("../preamble.zig");
-usingnamespace preamble;
-
+pub const os = @import("../os.zig");
 const std = @import("std");
 const lib = @import("lib");
 

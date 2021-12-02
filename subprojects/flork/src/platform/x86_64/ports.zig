@@ -1,4 +1,4 @@
-usingnamespace @import("root").preamble;
+const os = @import("root").os;
 
 pub fn out(comptime T: type, port: u16, value: T) void {
     switch (T) {

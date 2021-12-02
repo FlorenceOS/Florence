@@ -1,5 +1,4 @@
-usingnamespace @import("root").preamble;
-
+const os = @import("root").os;
 const reg_ptr = os.platform.phys_ptr(*volatile u32);
 
 var mmio32_serial: ?reg_ptr = null;

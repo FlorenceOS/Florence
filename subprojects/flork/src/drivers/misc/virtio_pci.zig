@@ -1,5 +1,4 @@
-usingnamespace @import("root").preamble;
-
+const os = @import("root").os;
 const std = @import("std");
 const allocator = os.memory.vmm.backed(.Ephemeral);
 const pmm = os.memory.pmm;

@@ -1,5 +1,4 @@
-usingnamespace @import("root").preamble;
-
+const os = @import("root").os;
 const graphics = @import("lib").graphics;
 const output = os.drivers.output;
 

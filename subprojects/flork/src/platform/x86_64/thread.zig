@@ -1,5 +1,4 @@
-usingnamespace @import("root").preamble;
-
+const os = @import("root").os;
 const lib = @import("lib");
 
 const gdt = @import("gdt.zig");

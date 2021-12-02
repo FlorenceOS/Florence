@@ -1,4 +1,4 @@
-usingnamespace @import("root").preamble;
+const os = @import("root").os;
 
 const log = @import("lib").output.log.scoped(.{
     .prefix = "x86_64/serial",

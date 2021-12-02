@@ -1,4 +1,4 @@
-usingnamespace @import("root").preamble;
+const os = @import("root").os;
 const StackTrace = @import("std").builtin.StackTrace;
 
 var panic_counter: usize = 0;

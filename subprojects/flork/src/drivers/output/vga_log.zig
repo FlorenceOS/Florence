@@ -1,5 +1,4 @@
-usingnamespace @import("root").preamble;
-
+const os = @import("root").os;
 const config = @import("config");
 
 const Framebuffer = struct {

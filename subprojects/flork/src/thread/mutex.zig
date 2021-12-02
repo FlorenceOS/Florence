@@ -1,4 +1,4 @@
-usingnamespace @import("root").preamble;
+const os = @import("root").os;
 
 /// Mutex is lock that should be used for synchronizing operations that may take too long and/or
 /// can't be run in interrupt disabled context (e.g. you need to use it if you allocate memory

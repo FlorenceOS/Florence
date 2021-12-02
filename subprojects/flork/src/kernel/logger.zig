@@ -1,4 +1,4 @@
-usingnamespace @import("root").preamble;
+const os = @import("root").os;
 
 fn ProtectedPutchar(comptime putch_func: anytype) type {
     return struct {

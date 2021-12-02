@@ -1,5 +1,4 @@
-usingnamespace @import("root").preamble;
-
+const os = @import("root").os;
 const std = @import("std");
 const lib = @import("lib");
 const queue = lib.containers.queue;

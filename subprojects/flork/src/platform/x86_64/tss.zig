@@ -1,4 +1,4 @@
-usingnamespace @import("root").preamble;
+const os = @import("root").os;
 
 pub const Tss = packed struct {
     _1: u32 = 0,

@@ -1,5 +1,4 @@
-usingnamespace @import("root").preamble;
-
+const os = @import("root").os;
 /// Allocator used to allocate memory for new tasks
 const task_alloc = os.memory.pmm.phys_heap;
 
