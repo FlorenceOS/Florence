@@ -1,4 +1,4 @@
-usingnamespace @import("root").preamble;
+const os = @import("root").os;
 
 pub var bsp_task: os.thread.Task = .{
     .name = "BSP task",

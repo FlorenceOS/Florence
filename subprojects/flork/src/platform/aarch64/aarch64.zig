@@ -1,4 +1,4 @@
-usingnamespace @import("root").preamble;
+const os = @import("root").os;
 
 pub const paging = @import("paging.zig");
 pub const thread = @import("thread.zig");

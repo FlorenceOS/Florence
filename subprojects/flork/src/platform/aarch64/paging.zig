@@ -1,4 +1,4 @@
-usingnamespace @import("root").preamble;
+const os = @import("root").os;
 
 const log = lib.output.log.scoped(.{
     .prefix = "aarch64/paging",

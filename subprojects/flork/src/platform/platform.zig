@@ -1,5 +1,4 @@
-usingnamespace @import("root").preamble;
-
+const os = @import("root").os;
 const std = @import("std");
 const lib = @import("lib");
 
@@ -17,11 +16,12 @@ pub const smp = @import("smp.zig");
 // Anything else comes from this platform specific file
 pub const arch = if (@hasField(std.builtin, "arch")) std.builtin.arch else std.Target.current.cpu.arch;
 pub const endian = if (@hasField(std.builtin, "endian")) std.builtin.endian else arch.endian();
-usingnamespace @import(switch (arch) {
-    .aarch64 => "aarch64/aarch64.zig",
-    .x86_64 => "x86_64/x86_64.zig",
+const platform = switch (arch) {
+    .aarch64 => @import("aarch64/aarch64.zig"),
+    .x86_64 => @import("x86_64/x86_64.zig"),
     else => unreachable,
-});
+};
+usingnamespace platform;
 
 const assert = @import("std").debug.assert;
 
@@ -86,18 +86,18 @@ pub fn page_fault(addr: usize, present: bool, access: PageFaultAccess, frame: an
 }
 
 pub fn hang() noreturn {
-    _ = get_and_disable_interrupts();
+    _ = platform.get_and_disable_interrupts();
     while (true) {
-        await_interrupt();
+        platform.await_interrupt();
     }
 }
 
 pub fn set_current_task(task_ptr: *os.thread.Task) void {
-    thread.get_current_cpu().current_task = task_ptr;
+    platform.thread.get_current_cpu().current_task = task_ptr;
 }
 
 pub fn get_current_task() *os.thread.Task {
-    return thread.get_current_cpu().current_task;
+    return platform.thread.get_current_cpu().current_task;
 }
 
 pub const virt_slice = struct {

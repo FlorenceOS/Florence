@@ -42,7 +42,7 @@ fn qemu_run_aarch64_sabaton(b: *Builder, board_name: []const u8, desc: []const u
 fn qemu_run_riscv_sabaton(b: *Builder, board_name: []const u8, desc: []const u8, dep: *std.build.LibExeObjStep) void {
     const command_step = b.step(board_name, desc);
 
-    const kernel_path = b.getInstallPath(kernel_stepdep.install_step.?.dest_dir, dep.out_filename);
+    const kernel_path = b.getInstallPath(dep.install_step.?.dest_dir, dep.out_filename);
 
     const params = &[_][]const u8{
         "qemu-system-riscv64",
