@@ -248,6 +248,7 @@ const IA32_APIC_BASE = @import("regs.zig").MSR(u64, 0x0000001B);
 const LAPIC_ID = 0x20 / 4;
 const ICR_LOW = 0x300 / 4;
 const ICR_HIGH = 0x310 / 4;
+const LVT_TIMER = 0x320 / 4;
 const TIMER_MODE_PERIODIC = 1 << 17;
 const TIMER_DIV = 0x3E0 / 4;
 const TIMER_INITCNT = 0x380 / 4;
