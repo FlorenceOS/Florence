@@ -1,4 +1,6 @@
 const os = @import("root").os;
+const std = @import("std");
+
 const arch = std.builtin.arch;
 
 /// Debugging helpers
