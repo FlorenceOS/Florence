@@ -4,8 +4,6 @@
 
 Matrix: `#florence:matrix.org`
 
-Due to zig issues we've forked it with hotfixes for Florence and Sabaton that are available [here](https://github.com/FlorenceOS/zig). You can also get a prebuilt x86_64 linux compiler from [here](https://transfer.sh/get/1Pxcn84/zig-linux-x86_64-0.9.0-dev.185-e125ead2b.zip)
-
 Florence OS is aimed at developers and service providers more than your average user. This isn't for your new facebook machine, but it should be configurable to be just that.
 It's just a runtime for your applications can have access to only the things you provide them, providing true separation where needed.
 
