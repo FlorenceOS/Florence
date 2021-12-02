@@ -27,11 +27,8 @@ pub fn init(phys_high: usize) !void {
 pub fn allocNonbacked(len: usize, ptr_align: usize, len_align: usize) !usize {
     mtx.lock();
     defer mtx.unlock();
-    return try nonbacked.allocateAnywhere(
-        len,
-        ptr_align,
-        len_align,
-    );
+
+    return nonbacked.allocateAnywhere(len, ptr_align, len_align);
 }
 
 pub fn freeNonbacked(virt: usize, len: usize) !void {
