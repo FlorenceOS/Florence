@@ -13,7 +13,6 @@ const RangeAlloc = lib.memory.range_alloc.RangeAlloc;
 var mtx: os.thread.Mutex = .{};
 
 /// Range allocator for nonbacked memory
-//pub var nonbacked_alloc = RangeAllocator().init(os.memory.pmm.physHeap());
 var nonbacked = RangeAlloc{
     .backing_allocator = os.memory.pmm.physHeap(),
 };
