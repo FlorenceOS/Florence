@@ -166,13 +166,13 @@ pub const RangeAlloc = struct {
         len: usize,
         ptr_align: usize,
         len_align: usize,
-    ) ![]u8 {
+    ) !usize {
         const placement = try self.findPlacementAnywhere(len, ptr_align, len_align);
 
         const range = placement.range;
         const pmt = placement.placement;
 
-        const ret = @intToPtr([*]u8, range.base + pmt.offset)[0..len];
+        const ret = range.base;
 
         try self.maintainTree(range, pmt);
 
@@ -183,17 +183,13 @@ pub const RangeAlloc = struct {
         self: *@This(),
         addr: usize,
         len: usize,
-    ) ![]u8 {
+    ) !void {
         const placement = try self.findPlacementAt(addr, len);
 
         const range = placement.range;
         const pmt = placement.placement;
 
-        const ret = @intToPtr([*]u8, range.base + pmt.offset)[0..len];
-
         try self.maintainTree(range, pmt);
-
-        return ret;
     }
 
     fn maintainTree(self: *@This(), range: *Range, pmt: PlacementResult) !void {
@@ -328,8 +324,11 @@ pub const RangeAlloc = struct {
         }
     }
 
-    pub fn giveRange(self: *@This(), in_range: Range) !void {
-        const range = try self.addRange(in_range);
+    pub fn giveRange(self: *@This(), base: usize, size: usize) !void {
+        const range = try self.addRange(.{
+            .base = base,
+            .size = size,
+        });
         self.mergeRanges(range);
     }
 

@@ -22,28 +22,22 @@ extern const __kernel_begin: u8;
 
 pub fn init(phys_high: usize) !void {
     log(.debug, "Initializing vmm with base 0x{X}", .{phys_high});
-    try nonbacked.giveRange(.{
-        .base = phys_high,
-        .size = @ptrToInt(&__kernel_begin) - phys_high,
-    });
+    try nonbacked.giveRange(phys_high, @ptrToInt(&__kernel_begin) - phys_high);
 }
 
 pub fn allocNonbacked(len: usize, ptr_align: usize, len_align: usize) !usize {
     mtx.lock();
     defer mtx.unlock();
-    return @ptrToInt((try nonbacked.allocateAnywhere(
+    return try nonbacked.allocateAnywhere(
         len,
         ptr_align,
         len_align,
-    )).ptr);
+    );
 }
 
 pub fn freeNonbacked(virt: usize, len: usize) !void {
     mtx.lock();
     defer mtx.unlock();
 
-    try nonbacked.giveRange(.{
-        .base = virt,
-        .size = len,
-    });
+    try nonbacked.giveRange(virt, len);
 }

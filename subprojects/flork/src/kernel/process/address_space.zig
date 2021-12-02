@@ -102,10 +102,7 @@ pub const AddrSpace = struct {
 
     pub fn init(self: *@This(), base: usize, end: usize) !void {
         self.* = .{};
-        try self.emptyRanges.giveRange(.{
-            .base = base,
-            .size = end - base,
-        });
+        try self.emptyRanges.giveRange(base, end - base);
     }
 
     pub fn deinit(_: *@This()) !void {
@@ -127,9 +124,7 @@ pub const AddrSpace = struct {
     pub fn allocateAnywhere(self: *@This(), size_in: usize) !usize {
         const size = lib.util.libalign.alignUp(usize, pageSize(), size_in);
 
-        const r = try self.emptyRanges.allocateAnywhere(size, pageSize(), pageSize());
-
-        return @ptrToInt(r.ptr);
+        return self.emptyRanges.allocateAnywhere(size, pageSize(), pageSize());
     }
 
     pub fn findRangeAt(self: *@This(), addr: usize) ?*MemoryRegion {
