@@ -36,10 +36,10 @@ pub const CoreData = struct {
         const guard_size = os.platform.thread.stack_guard_size;
         const total_size = guard_size + size;
         // Allocate non-backing virtual memory
-        const virt = @ptrToInt(os.vital(
-            os.memory.vmm.nonbacked_alloc.ra.allocateAnywhere(total_size, 1, 1),
+        const virt = os.vital(
+            os.memory.vmm.allocNonbacked(total_size, 1, 1),
             "bootstrap stack valloc",
-        ).ptr);
+        );
         // Map pages
         os.vital(os.memory.paging.map(.{
             .virt = virt + guard_size,

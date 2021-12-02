@@ -7,7 +7,7 @@ const atomic_queue = @import("lib").containers.atomic_queue;
 const guard_size = os.platform.thread.stack_guard_size;
 const map_size = os.platform.thread.task_stack_size;
 const total_size = guard_size + map_size;
-const nonbacked = &os.memory.vmm.nonbacked_alloc.ra;
+const vmm = os.memory.vmm;
 
 /// Separate execution unit
 pub const Task = struct {
@@ -41,12 +41,12 @@ pub const Task = struct {
     /// Allocate stack for the task. Used in scheduler makeTask routine
     pub fn allocStack(self: *@This()) !void {
         // Allocate non-backing virtual memory
-        const slice = (try nonbacked.allocateAnywhere(total_size, 1, 1));
-        const virt = @ptrToInt(slice.ptr);
-        errdefer nonbacked.giveRange(.{
-            .base = virt,
-            .size = total_size,
-        }) catch @panic("allocStack errdefer fail");
+        const virt = try vmm.allocNonbacked(total_size, 1, 1);
+        errdefer {
+            vmm.freeNonbacked(virt, total_size) catch {
+                @panic("allocStack errdefer fail");
+            };
+        }
         // Map pages
         try os.memory.paging.map(.{
             .virt = virt + guard_size,
@@ -67,14 +67,7 @@ pub const Task = struct {
             .reclaim_pages = true,
         });
         // Free nonbacked memory
-        _ = nonbacked.resizeFn(
-            nonbacked,
-            @intToPtr([*]u8, virt)[0..total_size],
-            1,
-            0,
-            1,
-            0,
-        ) catch @panic("task free stack");
+        vmm.freeNonbacked(virt, total_size) catch @panic("task free stack");
     }
 
     pub fn enqueue(self: *@This()) void {
