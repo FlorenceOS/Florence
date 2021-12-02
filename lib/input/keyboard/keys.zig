@@ -325,22 +325,22 @@ pub const Input = enum {
 };
 
 pub const wasd_directional = .{
-    .up = KeyLocation.line1_2,
-    .left = KeyLocation.line2_1,
-    .down = KeyLocation.line2_2,
-    .right = KeyLocation.line2_3,
+    .up = Location.line1_2,
+    .left = Location.line2_1,
+    .down = Location.line2_2,
+    .right = Location.line2_3,
 };
 
 pub const arrow_directional = .{
-    .up = KeyLocation.arrow_up,
-    .left = KeyLocation.arrow_left,
-    .down = KeyLocation.arrow_down,
-    .right = KeyLocation.arrow_right,
+    .up = Location.arrow_up,
+    .left = Location.arrow_left,
+    .down = Location.arrow_down,
+    .right = Location.arrow_right,
 };
 
 pub const numpad_directional = .{
-    .up = KeyLocation.numpad8,
-    .left = KeyLocation.numpad4,
-    .down = KeyLocation.numpad2,
-    .right = KeyLocation.numpad6,
+    .up = Location.numpad8,
+    .left = Location.numpad4,
+    .down = Location.numpad2,
+    .right = Location.numpad6,
 };
