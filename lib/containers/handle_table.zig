@@ -1,3 +1,5 @@
+const std = @import("std");
+
 /// HandleTable is the class for table of generic handles
 /// It manages a map from integers to handles (type T)
 /// TODO: Add more methods like dup2 and reserve
