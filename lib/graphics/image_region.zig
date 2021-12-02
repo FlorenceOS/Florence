@@ -115,7 +115,7 @@ pub const ImageRegion = struct {
         if (y > self.height) unreachable;
         if (fmt != self.pixel_format) unreachable;
 
-        return readAsFmt(fmt, startingAt(x, y));
+        return Color.readAsFmt(fmt, startingAt(x, y));
     }
 
     pub fn fill(
