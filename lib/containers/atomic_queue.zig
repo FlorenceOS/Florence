@@ -2,6 +2,8 @@
 /// both for atomic and non-atomic queues
 pub const Node = @import("queue").Node;
 
+const std = @import("std");
+
 /// Multi producer single consumer unbounded atomic queue.
 /// NOTE: Consumer is responsible for managing memory for nodes.
 pub fn MPSCUnboundedQueue(comptime T: type, comptime member_name: []const u8) type {
