@@ -7,7 +7,7 @@ const FileIterator = struct {
     remaining_blob: []const u8,
 
     pub fn next(self: *@This()) void {
-        self.* = make_next(self.remaining_blob);
+        self.* = makeNext(self.remaining_blob);
     }
 };
 
@@ -25,10 +25,10 @@ fn getFileSize(blob: []const u8) usize {
     return std.fmt.parseUnsigned(usize, blob[124..135], 8) catch unreachable;
 }
 
-fn makeNext(blob: []const u8) file_iterator {
+fn makeNext(blob: []const u8) FileIterator {
     if (blob.len < 0x400 or std.mem.eql(u8, blob[0x101..0x106], &[_]u8{0} ** 5)) {
         const empty_arr = [_]u8{};
-        return file_iterator{
+        return .{
             .has_file = false,
             .file_contents = empty_arr[0..],
             .file_name = empty_arr[0..],
@@ -39,7 +39,7 @@ fn makeNext(blob: []const u8) file_iterator {
     const size = getFileSize(blob);
     const size_round_up = ((size + 0x1FF) / 0x200) * 0x200;
 
-    return file_iterator{
+    return .{
         .has_file = true,
         .file_contents = blob[0x200 .. 0x200 + size],
         .file_name = getFileName(blob),
@@ -47,6 +47,6 @@ fn makeNext(blob: []const u8) file_iterator {
     };
 }
 
-pub fn iterate(tar_blob: []const u8) !FileIsterator {
-    return maxeNext(tar_blob);
+pub fn iterate(tar_blob: []const u8) !FileIterator {
+    return makeNext(tar_blob);
 }
