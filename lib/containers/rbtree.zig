@@ -206,7 +206,7 @@ pub fn Tree(comptime T: type, comptime member_name: []const u8, comptime cfg: Co
         /// Call augment callback on a single node
         fn updateParentAugment(node: *NodeType) bool {
             if (cfg.augment_callback) |_| {
-                return self.augment_callback.augment(refToNode(node));
+                return node.augment_callback.augment(refToNode(node));
             }
             return false;
         }
