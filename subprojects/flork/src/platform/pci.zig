@@ -244,6 +244,7 @@ fn function_scan(addr: Addr) void {
 }
 
 fn laihost_addr(seg: u16, bus: u8, slot: u8, fun: u8) Addr {
+    _ = seg; // TODO
     return .{
         .bus = bus,
         .device = @intCast(u5, slot),

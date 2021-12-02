@@ -2,10 +2,15 @@ const std = @import("std");
 
 const kb = @import("keyboard.zig");
 
-pub const KeyboardState = struct {
-    const pressedState = std.PackedIntArray(bool, @typeInfo(kb.keys.Location).Enum.fields.len);
+const PressedState = std.PackedIntArray(bool, @typeInfo(kb.keys.Location).Enum.fields.len);
 
-    is_pressed: pressedState = std.mem.zeroInit(pressedState, .{}),
+fn pressedStateInit() PressedState {
+    @setEvalBranchQuota(99999999);
+    return PressedState.initAllTo(false);
+}
+
+pub const KeyboardState = struct {
+    is_pressed: PressedState = pressedStateInit(),
     layout: kb.layouts.KeyboardLayout,
 
     pub fn pressed(self: *const @This(), location: kb.keys.Location) bool {

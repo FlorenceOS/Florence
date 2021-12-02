@@ -5,8 +5,6 @@ const log = @import("lib").output.log.scoped(.{
     .filter = .info,
 });
 
-pub const debug_allocator = &debug_allocator_state.allocator;
-
 extern var __kernel_begin: u8;
 extern var __kernel_end: u8;
 
@@ -22,7 +20,7 @@ var debug_info = std.dwarf.DwarfInfo{
 var inited_debug_info = false;
 
 var debug_allocator_bytes: [16 * 1024 * 1024]u8 = undefined;
-var debug_allocator_state = std.heap.FixedBufferAllocator.init(debug_allocator_bytes[0..]);
+var debug_allocator = std.heap.FixedBufferAllocator.init(debug_allocator_bytes[0..]);
 
 fn getSectionData(elf: [*]u8, shdr: []u8) []u8 {
     const offset = @intCast(usize, std.mem.readIntLittle(u64, shdr[24..][0..8]));
@@ -73,7 +71,7 @@ fn attemptLoadDebug(elf: [*]u8) !void {
     debug_info.debug_line = try getSectionSlice(elf, ".debug_line");
     debug_info.debug_ranges = try getSectionSlice(elf, ".debug_ranges");
 
-    try std.dwarf.openDwarfDebugInfo(&debug_info, debug_allocator);
+    try std.dwarf.openDwarfDebugInfo(&debug_info, debug_allocator.allocator());
 }
 
 pub fn addDebugElf(elf: [*]u8) void {
@@ -81,11 +79,11 @@ pub fn addDebugElf(elf: [*]u8) void {
         @panic("Double debug info init!");
 
     attemptLoadDebug(elf) catch |err| {
-        log.write(.crit, "Failed to load debug info: {e}", .{err});
+        log.write(.err, "Failed to load debug info: {e}", .{err});
         if (@errorReturnTrace()) |trace| {
             dumpStackTrace(trace);
         } else {
-            log.write(.crit, "No error trace.", .{});
+            log.write(.err, "No error trace.", .{});
         }
         return;
     };

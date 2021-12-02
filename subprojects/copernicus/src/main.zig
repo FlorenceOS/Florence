@@ -1,7 +1,7 @@
 const std = @import("std");
 
 fn logStr(str: []const u8) void {
-    switch (std.Target.current.cpu.arch) {
+    switch (@import("builtin").target.cpu.arch) {
         .x86_64 => {
             // zig fmt: off
             asm volatile(
@@ -33,7 +33,7 @@ fn logStr(str: []const u8) void {
 }
 
 fn exit(exit_code: u64) noreturn {
-    switch (std.Target.current.cpu.arch) {
+    switch (@import("builtin").target.cpu.arch) {
         .x86_64 => {
             // zig fmt: off
             asm volatile(

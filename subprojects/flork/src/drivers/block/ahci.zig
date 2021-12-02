@@ -665,14 +665,6 @@ fn claim_controller(abar: *volatile Abar) void {
     log(.debug, "Got handoff!", .{});
 }
 
-fn command(port: *volatile Port, slot: u5) void {}
-
-fn commandWithBuffer(port: *volatile Port, slot: u5, buf: usize, bufsize: usize) void {
-    const header = &port.getCommandHeaders()[slot];
-    //const oldbuf = header.;
-    //const oldsize = ;
-}
-
 fn sataPortTask(port_type: SataPortType, port: *volatile Port) !void {
     switch (port_type) {
         .ata, .atapi => {},
@@ -738,7 +730,7 @@ fn controllerTask(abar: *volatile Abar) !void {
             0x00000101 => try thread.scheduler.spawnTask("SATA port task", sataPortTask, .{ .ata, port }),
             //0xEB140101 => try thread.scheduler.spawnTask(sataPortTask, .{.atapi, port}),
             0xC33C0101, 0x96690101 => {
-                log(.notice, "Known TODO port signature: 0x{X}", .{port.signature});
+                log(.info, "Known TODO port signature: 0x{X}", .{port.signature});
                 //thread.scheduler.spawnTask(sataPortTask, .{.semb,   port})
                 //thread.scheduler.spawnTask(sataPortTask, .{.pm,     port})
             },
@@ -763,16 +755,16 @@ pub fn registerController(addr: platform.pci.Addr) void {
     const cap = abar.hba_capabilities;
 
     if ((cap & (1 << 31)) == 0) {
-        log(.crit, "Controller is 32 bit only, ignoring.", .{});
+        log(.err, "Controller is 32 bit only, ignoring.", .{});
         return;
     }
 
     if (abar.global_hba_control & (1 << 31) == 0) {
-        log(.crit, "AE not set!", .{});
+        log(.err, "AE not set!", .{});
         return;
     }
 
     thread.scheduler.spawnTask("AHCI controller task", controllerTask, .{abar}) catch |err| {
-        log(.crit, "Failed to make controller task: {s}", .{@errorName(err)});
+        log(.err, "Failed to make controller task: {s}", .{@errorName(err)});
     };
 }

@@ -52,5 +52,7 @@ pub const SingleModeDisplay = struct {
         mode: *const output.video.DisplayMode,
     ) void {
         // Lmao just ignore
+        _ = ctx;
+        _ = mode;
     }
 };

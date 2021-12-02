@@ -1,6 +1,4 @@
 const os = @import("root").os;
-/// Allocator used to allocate memory for new tasks
-const task_alloc = os.memory.pmm.phys_heap;
 
 /// Load balancer lock. Locked when scheduler finds the best CPU for the task
 /// or when task terminates
@@ -45,7 +43,7 @@ pub fn waitWithCallback(params: struct {
 /// Sleep + release spinlock
 pub fn waitReleaseSpinlock(spinlock: *os.thread.Spinlock) void {
     const callback = struct {
-        fn callback(frame: *os.platform.InterruptFrame, ctx: usize) bool {
+        fn callback(_: *os.platform.InterruptFrame, ctx: usize) bool {
             const lock = @intToPtr(*os.thread.Spinlock, ctx);
             lock.ungrab();
             return true;
@@ -104,8 +102,8 @@ pub fn initTask(task: *os.thread.Task) !void {
 
 /// Creates a new task on the heap and calls initTask() on it
 pub fn createTask(name: []const u8) !*os.thread.Task {
-    const task = try task_alloc.create(os.thread.Task);
-    errdefer task_alloc.destroy(task);
+    const task = try os.memory.pmm.physHeap().create(os.thread.Task);
+    errdefer os.memory.pmm.physHeap().destroy(task);
     task.name = name;
 
     try initTask(task);
@@ -137,7 +135,7 @@ pub fn destroyTask(task: ?*os.thread.Task) void {
     balancer_lock.unlock(state);
 
     if (task) |t| {
-        task_alloc.destroy(t);
+        os.memory.pmm.physHeap().destroy(t);
     }
 
     // TODO: Delete stacks in such a way that we can return from the current interrupt

@@ -241,11 +241,11 @@ pub const PagingContext = struct {
         return result;
     }
 
-    pub fn deinit(self: *@This()) void {
-        log(.notice, "TODO: PagingContext deinit\n", .{});
+    pub fn deinit(_: *@This()) void {
+        log(.warn, "TODO: PagingContext deinit\n", .{});
     }
 
-    pub fn can_map_at_level(self: *const @This(), level: LevelType) bool {
+    pub fn can_map_at_level(_: *const @This(), level: LevelType) bool {
         return level < @as(LevelType, 2) + @boolToInt(gigapage_allowed);
     }
 
@@ -279,6 +279,7 @@ pub const PagingContext = struct {
     }
 
     pub fn root_table(self: *@This(), virt: u64) TablePTE {
+        _ = virt;
         return .{
             .phys = self.cr3_val,
             .curr_level = if (self.level5paging) 5 else 4,
@@ -360,10 +361,12 @@ pub const PagingContext = struct {
     }
 
     pub fn encode_empty(self: *const @This(), level: LevelType) EncodedPTE {
+        _ = self;
+        _ = level;
         return 0;
     }
 
-    pub fn encode_table(self: *const @This(), pte: TablePTE) !EncodedPTE {
+    pub fn encode_table(_: *const @This(), pte: TablePTE) !EncodedPTE {
         var tbl = TableEncoding{ .raw = pte.phys };
 
         tbl.writable.write(pte.perms.writable);
@@ -428,14 +431,14 @@ pub const PagingContext = struct {
         return map.raw;
     }
 
-    pub fn domain(self: *const @This(), level: LevelType, virtaddr: u64) os.platform.virt_slice {
+    pub fn domain(_: *const @This(), level: LevelType, virtaddr: u64) os.platform.virt_slice {
         return .{
             .ptr = virtaddr & ~(page_sizes[level] - 1),
             .len = page_sizes[level],
         };
     }
 
-    pub fn invalidate(self: *const @This(), virt: u64) void {
+    pub fn invalidate(_: *const @This(), virt: u64) void {
         asm volatile (
             \\invlpg (%[virt])
             :
@@ -444,7 +447,9 @@ pub const PagingContext = struct {
         );
     }
 
-    pub fn invalidateOtherCPUs(self: *const @This(), base: usize, size: usize) void {
+    pub fn invalidateOtherCPUs(_: *const @This(), base: usize, size: usize) void {
+        _ = base;
+        _ = size;
         const current_cpu = os.platform.thread.get_current_cpu();
 
         for (os.platform.smp.cpus) |*cpu| {
@@ -454,13 +459,12 @@ pub const PagingContext = struct {
     }
 };
 
-pub const MemoryType = extern enum {
+pub const MemoryType = enum {
     // x86 doesn't differentiate between device and normal memory (?)
-    DeviceUncacheable = 0,
-    MemoryUncacheable = 0,
-    DeviceWriteCombining = 1,
-    MemoryWritethrough = 2,
-    MemoryWriteBack = 3,
+    DeviceUncacheable,
+    DeviceWriteCombining,
+    MemoryWritethrough,
+    MemoryWriteBack,
 };
 
 const phys_bitmask = 0x7ffffffffffff000;

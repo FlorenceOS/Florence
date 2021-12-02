@@ -39,11 +39,11 @@ pub const Token = struct {
     /// Token opaque value
     opaque_val: usize,
     /// Allocator used to allocate the token
-    allocator: *std.mem.Allocator,
+    allocator: std.mem.Allocator,
 
     /// Create token
     pub fn create(
-        allocator: *std.mem.Allocator,
+        allocator: std.mem.Allocator,
         owner: *Mailbox,
         quota: usize,
         opaque_val: usize,
@@ -186,14 +186,14 @@ pub const Mailbox = struct {
     /// Sleep queue
     sleep_queue: queue.Queue(TaskSleepQueueNode, "hook") = .{},
     /// Allocator used to allocate the token
-    allocator: *std.mem.Allocator,
+    allocator: std.mem.Allocator,
     /// True if mailbox was shut down
     is_shut_down: bool = false,
     /// Available quota for new token creation
     available_quota: usize,
 
     /// Create new mailbox
-    pub fn create(allocator: *std.mem.Allocator, quota: usize) !*@This() {
+    pub fn create(allocator: std.mem.Allocator, quota: usize) !*@This() {
         const result = try allocator.create(@This());
         errdefer allocator.destroy(result);
 

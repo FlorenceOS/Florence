@@ -45,7 +45,11 @@ pub fn buildKernel(params: struct {
         .arch = params.arch,
     });
 
-    kernel.addBuildOption([]const u8, "copernicus_path", copernicus.output_path);
+    var copernicus_options = params.builder.addOptions();
+    copernicus_options.addOption([]const u8, "blob_path", copernicus.output_path);
+
+    kernel.addOptions("copernicus_options", copernicus_options);
+
     kernel.step.dependOn(&copernicus.step);
 
     kernel.addAssemblyFile(params.builder.fmt(flork_path ++ "src/boot/{s}_{s}.S", .{

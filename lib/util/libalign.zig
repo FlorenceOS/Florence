@@ -20,7 +20,7 @@ fn isRuntime() bool {
 
 fn sliceAlignCast(comptime t: type, slice: anytype) !(if (std.meta.trait.isConstPtr(@TypeOf(slice.ptr))) []const t else []t) {
     const alignment = @alignOf(t);
-    comptime const ptr_type = if (std.meta.trait.isConstPtr(@TypeOf(slice.ptr))) [*]const t else [*]t;
+    const ptr_type = comptime if (std.meta.trait.isConstPtr(@TypeOf(slice.ptr))) [*]const t else [*]t;
     if (isRuntime() // we can't detect alignment of pointer values at comptime, not that it matters anyways
     and isAligned(usize, alignment, @ptrToInt(slice.ptr)) // base ptr aligned
     and isAligned(usize, alignment, slice.len)) { // length aligned

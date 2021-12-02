@@ -116,8 +116,6 @@ pub fn enter_userspace(entry: u64, arg: u64, stack: u64) noreturn {
 }
 
 pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry) !void {
-    const cpu = os.platform.thread.get_current_cpu();
-
     new_task.registers.eflags = regs.eflags();
     new_task.registers.rdi = @ptrToInt(entry);
     new_task.registers.rsp = lib.util.libalign.alignDown(usize, 16, @ptrToInt(entry));

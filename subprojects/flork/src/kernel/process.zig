@@ -114,6 +114,7 @@ pub const Process = struct {
     }
 
     fn exitProc(frame: *platform.InterruptFrame) void {
+        _ = frame;
         // TODO: Stop all tasks and do whatever else is needed
         log(.info, "Exiting current userspace task.", .{});
         os.thread.scheduler.exitTask();
@@ -141,7 +142,7 @@ pub const Process = struct {
         };
     }
 
-    fn linuxWrite(self: *@This(), frame: *platform.InterruptFrame) void {
+    fn linuxWrite(_: *@This(), frame: *platform.InterruptFrame) void {
         const fd = syscallArg(frame, 0);
         switch (fd) {
             1, 2 => {
@@ -163,11 +164,13 @@ pub const Process = struct {
     }
 
     fn linuxExit(self: *@This(), frame: *platform.InterruptFrame) void {
+        _ = self;
         log(.info, "Userspace process requested exit.", .{});
         exitProc(frame);
     }
 
     fn syscallUnknown(self: *@This(), frame: *platform.InterruptFrame) void {
+        _ = self;
         log(.warn, "Process executed unknown syscall {d}", .{syscallNumber(frame)});
         exitProc(frame);
     }

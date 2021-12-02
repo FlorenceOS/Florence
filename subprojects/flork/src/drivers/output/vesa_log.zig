@@ -8,7 +8,7 @@ const assets = @import("assets");
 const font = @field(assets.fonts, @tagName(config.drivers.output.vesa_log.font));
 const bg = config.drivers.output.vesa_log.background;
 
-const rendered_font = comptime graphics.font_renderer.renderBitmapFont(
+const rendered_font = graphics.font_renderer.renderBitmapFont(
     font,
     bg,
     config.drivers.output.vesa_log.foreground,

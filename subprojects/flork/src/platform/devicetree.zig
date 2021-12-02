@@ -1,5 +1,6 @@
 const os = @import("root").os;
 const std = @import("std");
+const lib = @import("lib");
 
 const log = lib.output.log.scoped(.{
     .prefix = "platform/devicetree",
@@ -59,6 +60,7 @@ const Parser = struct {
 
         const off_dt_struct = readBig(u32, self.data[0x08..0x0C]);
         const off_mem_rsvmap = readBig(u32, self.data[0x10..0x14]);
+        _ = off_mem_rsvmap;
 
         //self.curr_offset = off_mem_rsvmap;
         //self.parse_resrved_regions();
@@ -88,6 +90,8 @@ const Parser = struct {
     }
 
     fn node(self: *Parser, depth: usize) void {
+        _ = self;
+        _ = depth;
         return; // We really don't care for now
     }
 
@@ -95,5 +99,5 @@ const Parser = struct {
         fmt("Parser{{.data={*}, .offset={X}, limit={X}}}", .{ self.data.ptr, self.curr_offset, self.limit });
     }
 
-    fn parse_node(self: *Parser) void {}
+    fn parse_node(_: *Parser) void {}
 };

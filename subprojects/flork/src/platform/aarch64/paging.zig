@@ -1,4 +1,6 @@
 const os = @import("root").os;
+const lib = @import("lib");
+const std = @import("std");
 
 const log = lib.output.log.scoped(.{
     .prefix = "aarch64/paging",
@@ -340,11 +342,11 @@ pub const PagingContext = struct {
         return result;
     }
 
-    pub fn deinit(self: *@This()) void {
+    pub fn deinit(_: *@This()) void {
         log(.err, "TODO: PagingContext deinit", .{});
     }
 
-    pub fn can_map_at_level(self: *const @This(), level: level_type) bool {
+    pub fn can_map_at_level(_: *const @This(), level: level_type) bool {
         return page_sizes[level] < 0x1000000000;
     }
 
@@ -434,10 +436,12 @@ pub const PagingContext = struct {
     }
 
     pub fn encode_empty(self: *const @This(), level: level_type) EncodedPTE {
+        _ = self;
+        _ = level;
         return 0;
     }
 
-    pub fn encode_table(self: *const @This(), pte: TablePTE) !EncodedPTE {
+    pub fn encode_table(_: *const @This(), pte: TablePTE) !EncodedPTE {
         var tbl = TableEncoding{ .raw = pte.phys };
 
         tbl.present.write(true);
@@ -478,14 +482,14 @@ pub const PagingContext = struct {
         return map.raw;
     }
 
-    pub fn domain(self: *const @This(), level: level_type, virtaddr: u64) os.platform.virt_slice {
+    pub fn domain(_: *const @This(), level: level_type, virtaddr: u64) os.platform.virt_slice {
         return .{
             .ptr = virtaddr & ~(page_sizes[level] - 1),
             .len = page_sizes[level],
         };
     }
 
-    pub fn invalidate(self: *const @This(), virt: u64) void {
+    pub fn invalidate(_: *const @This(), virt: u64) void {
         asm volatile (
             \\TLBI VAE1, %[virt]
             :
@@ -495,6 +499,9 @@ pub const PagingContext = struct {
     }
 
     pub fn invalidateOtherCPUs(self: *const @This(), virt: usize, size: usize) void {
+        _ = self;
+        _ = virt;
+        _ = size;
         log(.err, "idfk we should probably invalidate tlbs here on other cpus, but I think we've just been played for absolute fools", .{});
     }
 };

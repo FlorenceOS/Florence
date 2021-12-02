@@ -76,14 +76,9 @@ pub fn RangeAllocator(comptime LockType: type) type {
     return struct {
         ra: RangeAlloc,
 
-        allocator: std.mem.Allocator = .{
-            .allocFn = alloc,
-            .resizeFn = resize,
-        },
-
         lock: LockType = .{},
 
-        pub fn init(backing_allocator: *std.mem.Allocator) @This() {
+        pub fn init(backing_allocator: std.mem.Allocator) @This() {
             return .{
                 .ra = .{
                     .backing_allocator = backing_allocator,
@@ -91,15 +86,18 @@ pub fn RangeAllocator(comptime LockType: type) type {
             };
         }
 
-        fn alloc(
-            allocator: *std.mem.Allocator,
+        pub fn allocator(self: *@This()) std.mem.Allocator {
+            return std.mem.Allocator.init(self, alloc, resize, free);
+        }
+
+        pub fn alloc(
+            self: *@This(),
             len: usize,
             ptr_align: u29,
             len_align: u29,
             ret_addr: usize,
         ) std.mem.Allocator.Error![]u8 {
             _ = ret_addr;
-            const self = @fieldParentPtr(@This(), "allocator", allocator);
             self.lock.lock();
             defer self.lock.unlock();
 
@@ -111,24 +109,36 @@ pub fn RangeAllocator(comptime LockType: type) type {
             };
         }
 
-        fn resize(
-            allocator: *std.mem.Allocator,
+        pub fn resize(
+            self: *@This(),
             old_mem: []u8,
             old_align: u29,
             new_size: usize,
             len_align: u29,
             ret_addr: usize,
-        ) std.mem.Allocator.Error!usize {
-            _ = ret_addr;
-            _ = len_align;
+        ) ?usize {
+            _ = self;
+            _ = old_mem;
             _ = old_align;
-            const self = @fieldParentPtr(@This(), "allocator", allocator);
+            _ = new_size;
+            _ = len_align;
+            _ = ret_addr;
+            // self.lock.lock();
+            // defer self.lock.unlock();
+
+            @panic("Todo: RangeAllocator.resize(): actually resize");
+        }
+
+        pub fn free(
+            self: *@This(),
+            old_mem: []u8,
+            old_align: u29,
+            ret_addr: usize,
+        ) void {
+            _ = ret_addr;
+            _ = old_align;
             self.lock.lock();
             defer self.lock.unlock();
-
-            if (new_size != 0) {
-                @panic("Todo: RangeAllocator.resize(): actually resize");
-            }
 
             // Free this address
             _ = self.ra.giveRange(.{
@@ -140,8 +150,6 @@ pub fn RangeAllocator(comptime LockType: type) type {
                     else => unreachable,
                 }
             };
-
-            return 0;
         }
     };
 }
@@ -151,7 +159,7 @@ pub const RangeAlloc = struct {
     by_addr: AddrTree = AddrTree.init(.{}, {}),
     by_size: SizeTree = SizeTree.init(.{}, {}),
 
-    backing_allocator: *std.mem.Allocator,
+    backing_allocator: std.mem.Allocator,
 
     pub fn allocateAnywhere(
         self: *@This(),

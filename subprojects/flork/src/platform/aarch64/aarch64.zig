@@ -11,11 +11,10 @@ pub const set_interrupts = interrupts.set_interrupts;
 const interrupts = @import("interrupts.zig");
 
 const pmm = os.memory.pmm;
-const bf = lib.lib.bitfields;
-
-const assert = std.debug.assert;
 
 pub fn msr(comptime T: type, comptime name: []const u8) type {
+    // https://github.com/ziglang/zig/issues/10262
+    _ = name;
     return struct {
         pub fn read() T {
             return asm volatile ("MRS %[out], " ++ name
@@ -60,7 +59,7 @@ pub fn clock() usize {
     );
 }
 
-pub fn debugputch(val: u8) void {}
+pub fn debugputch(_: u8) void {}
 
 pub fn bsp_pre_scheduler_init() void {
     const cpu = os.platform.thread.get_current_cpu();

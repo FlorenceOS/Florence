@@ -151,21 +151,24 @@ pub fn makeExec(params: struct {
     exec.setMainPkgPath(".");
     exec.setOutputDir(params.builder.cache_root);
 
+    var source_blob_options = params.builder.addOptions();
     if (params.source_blob) |blob| {
         const cache_root = params.builder.cache_root;
         const source_blob_path = params.builder.fmt("{s}/{s}.tar", .{
             cache_root,
             blob.source_blob_name,
         });
-        exec.addBuildOption(?[]const u8, "source_blob_path", source_blob_path);
+        source_blob_options.addOption(?[]const u8, "source_blob_path", source_blob_path);
         exec.step.dependOn(&makeSourceBlobStep(
             params.builder,
             source_blob_path,
             blob.global_source_path,
         ).step);
     } else {
-        exec.addBuildOption(?[]const u8, "source_blob_path", null);
+        source_blob_options.addOption(?[]const u8, "source_blob_path", null);
     }
+
+    exec.addOptions("source_blob_options", source_blob_options);
 
     exec.install();
     return exec;

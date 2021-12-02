@@ -19,6 +19,9 @@ fn do_op(self: *const Command, port: u16, comptime str: []const u8) CommandResul
     var rsi: u64 = undefined;
     var rdi: u64 = undefined;
 
+    // https://github.com/ziglang/zig/issues/10262
+    _ = str;
+
     // zig fmt: off
     asm volatile (str
         : [_] "={rax}" (rax)
@@ -109,10 +112,10 @@ fn detect() bool {
 
 var counter: usize = 0;
 
-fn abscurorInterruptHandler(frame: *os.platform.InterruptFrame) void {
-    // Drop byte from ps2 buffer
+fn abscurorInterruptHandler(_: *os.platform.InterruptFrame) void {
     counter += 1;
 
+    // Drop byte from ps2 buffer
     _ = ports.inb(0x60);
 
     if (counter == 3) {
@@ -145,6 +148,16 @@ fn abscurorInterruptHandler(frame: *os.platform.InterruptFrame) void {
             const scaled_y = @truncate(u16, mouse_pkt.rcx);
 
             const scroll = @bitCast(i2, @truncate(u2, mouse_pkt.rdx));
+
+            // TODO: Use
+            _ = rmb;
+            _ = lmb;
+            _ = mmb;
+ 
+            _ = scaled_x;
+            _ = scaled_y;
+
+            _ = scroll;
         }
     }
 
@@ -160,8 +173,6 @@ pub fn init() void {
         return;
     }
     log(.info, "Detected", .{});
-
-    var cmd = Command{};
 
     if (comptime config.kernel.x86_64.vmware.abscursor) {
         if (comptime (!config.kernel.x86_64.ps2.mouse.enable))

@@ -2,7 +2,6 @@ const os = @import("root").os;
 const std = @import("std");
 const lib = @import("lib");
 
-const heap = os.memory.pmm.phys_heap;
 const platform = os.platform;
 const PagingContext = platform.paging.PagingContext;
 
@@ -33,6 +32,8 @@ const MemoryObjectRegion = struct {
         page_table: *PagingContext,
     ) address_space.PageFaultError!void {
         const self = @fieldParentPtr(@This(), "region", region);
+
+        _ = fault_type;
 
         // If this was an access fault, and not a non-present entry, don't handle it
         if (present)
@@ -83,8 +84,8 @@ const MemoryObjectRegion = struct {
 
     fn dup(region: *address_space.MemoryRegion) !*address_space.MemoryRegion {
         const self = @fieldParentPtr(@This(), "region", region);
-        const new = try heap.create(@This());
-        errdefer heap.destroy(new);
+        const new = try os.memory.pmm.physHeap().create(@This());
+        errdefer os.memory.pmm.physHeap().destroy(new);
 
         self.memobj.addRef();
         errdefer {
@@ -107,8 +108,8 @@ pub const MemoryObject = struct {
     page_perms: os.memory.paging.Perms,
 
     pub fn makeRegion(self: *@This()) !*address_space.MemoryRegion {
-        const region = try heap.create(MemoryObjectRegion);
-        errdefer heap.destroy(region);
+        const region = try os.memory.pmm.physHeap().create(MemoryObjectRegion);
+        errdefer os.memory.pmm.physHeap().destroy(region);
 
         region.* = .{
             .memobj = self,
@@ -162,6 +163,8 @@ const LazyZeroRegion = struct {
     ) address_space.PageFaultError!void {
         const self = @fieldParentPtr(@This(), "region", region);
 
+        _ = fault_type;
+
         // If this was an access fault, and not a non-present entry, don't handle it
         if (present)
             return error.RangeRefusedHandling;
@@ -199,8 +202,8 @@ const LazyZeroRegion = struct {
 
     fn dup(region: *address_space.MemoryRegion) !*address_space.MemoryRegion {
         const self = @fieldParentPtr(@This(), "region", region);
-        const new = try heap.create(@This());
-        errdefer heap.destroy(new);
+        const new = try os.memory.pmm.physHeap().create(@This());
+        errdefer os.memory.pmm.physHeap().destroy(new);
 
         self.memobj.addRef();
         errdefer {
@@ -221,8 +224,8 @@ const LazyZeroes = struct {
     page_perms: os.memory.paging.Perms,
 
     pub fn makeRegion(self: *@This()) !*address_space.MemoryRegion {
-        const region = try heap.create(LazyZeroRegion);
-        errdefer heap.destroy(region);
+        const region = try os.memory.pmm.physHeap().create(LazyZeroRegion);
+        errdefer os.memory.pmm.physHeap().destroy(region);
         region.* = .{ .page_perms = self.page_perms };
         return &region.region;
     }

@@ -1,4 +1,5 @@
 const os = @import("root").os;
+const lib = @import("lib");
 
 pub var bsp_task: os.thread.Task = .{
     .name = "BSP task",
@@ -7,13 +8,13 @@ pub var bsp_task: os.thread.Task = .{
 const TPIDR_EL1 = os.platform.msr(*os.platform.smp.CoreData, "TPIDR_EL1");
 
 pub const CoreData = struct {
-    pub fn start_monitoring(self: *@This()) void {}
+    pub fn start_monitoring(_: *@This()) void {}
 
-    pub fn wait(self: *@This()) void {
+    pub fn wait(_: *@This()) void {
         os.platform.spin_hint();
     }
 
-    pub fn ring(self: *@This()) void {}
+    pub fn ring(_: *@This()) void {}
 };
 
 pub const sched_stack_size = 0x10000;
@@ -31,9 +32,7 @@ pub fn set_current_cpu(ptr: *os.platform.smp.CoreData) void {
 }
 
 pub const TaskData = struct {
-    pub fn loadState(self: *@This()) void {
-        const cpu = os.platform.thread.get_current_cpu();
-    }
+    pub fn loadState(_: *@This()) void {}
 };
 
 pub fn sched_call_impl(fun: usize, ctx: usize) void {
@@ -94,8 +93,6 @@ pub fn enter_userspace(entry: u64, arg: u64, stack: u64) noreturn {
 }
 
 pub fn init_task_call(new_task: *os.thread.Task, entry: *os.thread.NewTaskEntry) !void {
-    const cpu = os.platform.thread.get_current_cpu();
-
     new_task.registers.pc = @ptrToInt(entry.function);
     new_task.registers.x0 = @ptrToInt(entry);
     new_task.registers.sp = lib.util.libalign.alignDown(usize, 16, @ptrToInt(entry));

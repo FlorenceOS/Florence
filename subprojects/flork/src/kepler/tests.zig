@@ -37,11 +37,11 @@ pub fn ipcClientThread(token: *os.kepler.ipc.Token) !void {
 /// IPC test
 pub fn ipcTest() !void {
     // Create mailbox
-    const mailbox = try os.kepler.ipc.Mailbox.create(os.memory.pmm.phys_heap, 1024);
+    const mailbox = try os.kepler.ipc.Mailbox.create(os.memory.pmm.physHeap(), 1024);
     log(.info, "Created mailbox!", .{});
 
     // Create token
-    const token = try os.kepler.ipc.Token.create(os.memory.pmm.phys_heap, mailbox, 1024, 69);
+    const token = try os.kepler.ipc.Token.create(os.memory.pmm.physHeap(), mailbox, 1024, 69);
     log(.info, "Created token!", .{});
 
     // Start server thread

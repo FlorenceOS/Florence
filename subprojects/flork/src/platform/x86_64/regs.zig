@@ -67,6 +67,8 @@ pub fn MSR(comptime T: type, comptime msr_num: u32) type {
 }
 
 pub fn ControlRegister(comptime T: type, comptime name: []const u8) type {
+    // https://github.com/ziglang/zig/issues/10262
+    _ = name;
     return struct {
         pub fn read() T {
             return asm volatile ("mov %%" ++ name ++ ", %[out]"

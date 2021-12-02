@@ -104,6 +104,9 @@ fn mapImplWithRollback(args: struct {
 }
 
 fn is_aligned(virt: usize, phys: ?*usize, level: anytype, context: Context) bool {
+    // @TODO: Check against the page size of the context
+    _ = context;
+
     if (!libalign.isAligned(usize, os.platform.paging.page_sizes[level], virt))
         return false;
 
@@ -122,8 +125,6 @@ fn mapImpl(
     memtype: platform.paging.MemoryType,
     context: Context,
 ) MapError!void {
-    var curr = table;
-
     const children = table.skip_to(virt.*);
 
     for (children) |*child| {
@@ -141,7 +142,7 @@ fn mapImpl(
 
                 // Should we map at the current level?
                 if (dom.ptr == virt.* and dom.len <= size.* and context.can_map_at_level(table.level() - 1) and is_aligned(virt.*, phys, table.level() - 1, context)) {
-                    const m = try table.make_child_mapping(child, if (phys) |p| p.* else null, perm, memtype);
+                    _ = try table.make_child_mapping(child, if (phys) |p| p.* else null, perm, memtype);
                     const step = dom.len;
                     if (step >= size.*) {
                         size.* = 0;

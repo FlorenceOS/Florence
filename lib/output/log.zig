@@ -26,8 +26,8 @@ fn held_t(comptime tag: anytype, comptime log_level: ?std.log.Level) type {
 }
 
 fn taggedLogFmt(comptime tag: anytype, comptime log_level: ?std.log.Level, comptime fmt: []const u8) []const u8 {
-    if (log_level != null)
-        return "[" ++ tag.prefix ++ "] " ++ @tagName(log_level.?) ++ ": " ++ fmt;
+    if (log_level) |ll|
+        return "[" ++ tag.prefix ++ "] " ++ ll.asText() ++ ": " ++ fmt;
     return "[" ++ tag.prefix ++ "] " ++ fmt;
 }
 

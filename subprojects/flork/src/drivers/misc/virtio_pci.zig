@@ -25,7 +25,7 @@ pub const DescIter = struct {
         iter.curr = iter.next;
         iter.next = if ((flags & vring_desc_flag_next) != 0) iter.drv.descr(iter.i) else 0xFFFF;
         assert(len <= 0x1000);
-        const addr = paging.translateVirt(.{ .virt = @ptrToInt(a) }) catch |err| {
+        const addr = paging.translateVirt(.{ .virt = @ptrToInt(a) }) catch {
             @panic("virtio-pci: can't get the physical address");
         };
         iter.drv.queues[iter.i].desc[iter.curr] = .{
@@ -106,7 +106,7 @@ pub const Driver = struct {
     /// Acknowledge virtio interrupt
     pub fn acknowledge(drv: *@This()) void {
         // Doesn't look very robust, but it works. Definitively look here if something break
-        var result = drv.isr.*;
+        _ = drv.isr.*;
     }
 
     /// Allocate a descriptor
@@ -145,6 +145,7 @@ pub const Driver = struct {
                 const bar = cap.read(u8, virtio_pci_cap_bar);
                 const off = cap.read(u32, virtio_pci_cap_offset);
                 const len = cap.read(u32, virtio_pci_cap_length);
+                _ = len;
 
                 const phy = a.barinfo(bar).phy + off;
                 switch (cfg_typ) {

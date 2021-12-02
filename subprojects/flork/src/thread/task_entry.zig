@@ -17,8 +17,8 @@ pub const NewTaskEntry = struct {
     function: fn (*NewTaskEntry) noreturn,
 
     pub fn alloc(task: *os.thread.Task, func: anytype, args: anytype) *NewTaskEntry {
-        comptime const Args = @TypeOf(args);
-        comptime const Func = @TypeOf(func);
+        const Args = @TypeOf(args);
+        const Func = @TypeOf(func);
 
         // Method: specify subtype with specific types of func and args
         const Wrapper = struct {

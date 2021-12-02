@@ -9,6 +9,8 @@ const log = @import("lib").output.log.scoped(.{
 }).write;
 
 pub inline fn breakpoint_panic(message: []const u8, stack_trace: ?*StackTrace) noreturn {
+    _ = message;
+    _ = stack_trace;
     @breakpoint();
     unreachable;
 }

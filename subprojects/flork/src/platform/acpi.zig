@@ -38,7 +38,7 @@ const SDTHeader = packed struct {
 };
 
 const GenericAddrStructure = packed struct {
-    addrspace: u8,
+    addr_space: u8,
     bit_width: u8,
     bit_offset: u8,
     access_size: u8,
@@ -176,7 +176,7 @@ fn parse_sdt(addr: usize) void {
         signature_value("APIC") => {
             switch (os.platform.arch) {
                 .x86_64 => @import("x86_64/apic.zig").handle_madt(sdt),
-                else => log(.notice, "ACPI: MADT found on unsupported architecture!", .{}),
+                else => log(.info, "ACPI: MADT found on unsupported architecture!", .{}),
             }
         },
         signature_value("MCFG") => {
@@ -247,27 +247,36 @@ export fn laihost_scan(name: *const [4]u8, index: c_int) ?*c_void {
 
 export fn laihost_panic(err: [*:0]const u8) noreturn {
     has_lai_acpi = false;
-    log(.emerg, "LAI: {s}", .{err});
+    log(.err, "LAI: {s}", .{err});
     @panic("LAI PANIC");
 }
 
 export fn laihost_map(addr: usize, size: usize) ?*c_void {
+    _ = size;
     return os.platform.phys_ptr(*c_void).from_int(addr).get_uncached();
 }
 
-export fn laihost_unmap(ptr: *c_void, size: usize) void {}
+export fn laihost_unmap(ptr: *c_void, size: usize) void {
+    _ = ptr;
+    _ = size;
+}
 
-export fn laihost_handle_amldebug(ptr: *c_void) void {}
+export fn laihost_handle_amldebug(_: *c_void) void {}
 
 export fn laihost_sleep(some_unit_of_time: u64) void {
+    _ = some_unit_of_time;
     @panic("laihost_sleep");
 }
 
 export fn laihost_sync_wait(state: *lai.lai_sync_state, value: u32, deadline: u64) void {
+    _ = state;
+    _ = value;
+    _ = deadline;
     @panic("laihost_sync_wait");
 }
 
 export fn laihost_sync_wake(state: *lai.lai_sync_state) void {
+    _ = state;
     @panic("laihost_sync_wake");
 }
 
@@ -275,7 +284,7 @@ var has_lai_acpi = false;
 
 pub fn init_acpi() !void {
     if (rsdp_phys == null) {
-        log(.notice, "No RSDP registered... Looking for it ourselves", .{});
+        log(.info, "No RSDP registered... Looking for it ourselves", .{});
         rsdp_phys = locate_rsdp() orelse {
             log(.err, "Unable to locate RSDP ourselves", .{});
             return;

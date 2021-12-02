@@ -246,6 +246,8 @@ fn updater(
     ctx: usize,
 ) void {
     var self = @intToPtr(*Driver, ctx);
+    _ = bb;
+    _ = pitch;
     self.updateRect(self.pitch * yoff_src, .{
         .x = 0,
         .y = @truncate(u32, yoff_dest),
@@ -258,14 +260,13 @@ pub fn registerController(addr: os.platform.pci.Addr) void {
     if (comptime (!config.drivers.gpu.virtio_gpu.enable))
         return;
 
-    const alloc = os.memory.pmm.phys_heap;
-    const drv = alloc.create(Driver) catch {
-        log(.crit, "Virtio display controller: Allocation failure", .{});
+    const drv = os.memory.pmm.physHeap().create(Driver) catch {
+        log(.err, "Virtio display controller: Allocation failure", .{});
         return;
     };
-    errdefer alloc.destroy(drv);
+    errdefer os.memory.pmm.physHeap().destroy(drv);
     drv.* = Driver.init(addr) catch {
-        log(.crit, "Virtio display controller: Init has failed!", .{});
+        log(.err, "Virtio display controller: Init has failed!", .{});
         return;
     };
     errdefer drv.deinit();
@@ -296,7 +297,7 @@ pub fn registerController(addr: os.platform.pci.Addr) void {
 }
 
 /// General callback on an interrupt, context is a pointer to a Driver structure
-pub fn interrupt(frame: *os.platform.InterruptFrame, context: u64) void {
+pub fn interrupt(_: *os.platform.InterruptFrame, context: u64) void {
     var driver = @intToPtr(*Driver, context);
     driver.transport.acknowledge();
     driver.transport.process(0, process, driver);

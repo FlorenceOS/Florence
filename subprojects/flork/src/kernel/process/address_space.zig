@@ -18,7 +18,7 @@ const addr_config: rb.Config = .{
 };
 
 const AddressComparator = struct {
-    pub fn compare(self: *const @This(), left: *const MemoryRegion, right: *const MemoryRegion) bool {
+    pub fn compare(_: *const @This(), left: *const MemoryRegion, right: *const MemoryRegion) bool {
         return left.base >= right.base;
     }
 };
@@ -96,7 +96,7 @@ fn pageSize() usize {
 
 pub const AddrSpace = struct {
     emptyRanges: lib.memory.range_alloc.RangeAlloc = .{
-        .backing_allocator = os.memory.pmm.phys_heap,
+        .backing_allocator = os.memory.pmm.physHeap(),
     },
     usedRanges: RbTree = RbTree.init(.{}, {}),
 
@@ -108,7 +108,7 @@ pub const AddrSpace = struct {
         });
     }
 
-    pub fn deinit(self: *@This()) !void {
+    pub fn deinit(_: *@This()) !void {
         // TODO
         unreachable;
     }
@@ -152,7 +152,7 @@ pub const AddrSpace = struct {
     }
 
     pub fn findRangeContaining(self: *@This(), addr: usize, size: usize) ?*MemoryRegion {
-        if (findRangeAt(addr)) |range| {
+        if (self.findRangeAt(addr)) |range| {
             if (range.contains(addr + size - 1))
                 return range;
         }
@@ -172,6 +172,9 @@ pub const AddrSpace = struct {
 
     pub fn freeAndUnmap(self: *@This(), addr: usize, size: usize) void {
         // TODO
+        _ = self;
+        _ = addr;
+        _ = size;
         unreachable;
     }
 

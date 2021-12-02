@@ -1,8 +1,8 @@
 const os = @import("root").os;
 const std = @import("std");
 
-const build_options = @import("build_options");
-const copernicus_data = @embedFile(build_options.copernicus_path);
+const copernicus_options = @import("copernicus_options");
+const copernicus_data = @embedFile(copernicus_options.blob_path);
 const process = os.kernel.process;
 
 const blob = copernicus_data[32..];

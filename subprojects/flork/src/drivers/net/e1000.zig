@@ -11,7 +11,7 @@ const num_tx_desc = 8;
 
 const rx_block_size = 2048;
 
-const Register = extern enum(u16) {
+const Register = enum(u16) {
     ctrl = 0x0000,
     status = 0x0008,
     eeprom = 0x0014,
@@ -256,11 +256,11 @@ const Controller = struct {
 fn controllerTask(dev: os.platform.pci.Addr) void {
     var c: Controller = undefined;
     c.init(dev) catch |err| {
-        log(.crit, "Error while initializing: {e}", .{err});
+        log(.err, "Error while initializing: {e}", .{err});
         if (@errorReturnTrace()) |trace| {
             os.kernel.debug.dumpStackTrace(trace);
         } else {
-            log(.crit, "No error trace.", .{});
+            log(.err, "No error trace.", .{});
         }
     };
 

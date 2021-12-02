@@ -5,7 +5,7 @@ const config = @import("config");
 const CoreID = os.platform.CoreID;
 
 /// Maximum number of supported CPUs
-const max_cpus = comptime config.kernel.max_cpus;
+const max_cpus = config.kernel.max_cpus;
 
 /// CPUs data
 var core_datas: [max_cpus]CoreData = [1]CoreData{undefined} ** max_cpus;
@@ -36,8 +36,10 @@ pub const CoreData = struct {
         const guard_size = os.platform.thread.stack_guard_size;
         const total_size = guard_size + size;
         // Allocate non-backing virtual memory
-        const nonbacked = os.memory.vmm.nonbacked();
-        const virt = @ptrToInt(os.vital(nonbacked.allocFn(nonbacked, total_size, 1, 1, 0), "bootstrap stack valloc").ptr);
+        const virt = @ptrToInt(os.vital(
+            os.memory.vmm.nonbacked_alloc.ra.allocateAnywhere(total_size, 1, 1),
+            "bootstrap stack valloc",
+        ).ptr);
         // Map pages
         os.vital(os.memory.paging.map(.{
             .virt = virt + guard_size,
@@ -55,7 +57,7 @@ pub const CoreData = struct {
     }
 
     // Called from AP when AP is ready to get tasks to run
-    pub fn bootstrap_tasking(self: *@This()) noreturn {
+    pub fn bootstrap_tasking(_: *@This()) noreturn {
         const bootstrap_handler = struct {
             // Wait for the first task and run it
             pub fn bootstrap(frame: *os.platform.InterruptFrame, _: usize) void {

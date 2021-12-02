@@ -84,7 +84,9 @@ pub fn ipi(apic_id: u32, vector: u8) void {
 }
 
 // ACPI information
-fn handle_processor(apic_id: u32) void {}
+fn handle_processor(apic_id: u32) void {
+    _ = apic_id;
+}
 
 const Override = struct {
     gsi: u32,

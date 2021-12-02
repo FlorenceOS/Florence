@@ -10,6 +10,7 @@ const log = lib.output.log.scoped(.{
 const memory = os.memory;
 const platform = os.platform;
 const drivers = os.drivers;
+const paging = os.paging;
 const libalign = lib.util.libalign;
 const builtin = std.builtin;
 
@@ -41,6 +42,8 @@ const Tag = packed struct {
     next: ?*Tag,
 
     pub fn format(self: *const @This(), fmt: anytype) void {
+        _ = self;
+        _ = fmt;
         @compileError("Cannot format stivale2 tags");
     }
 };
@@ -392,8 +395,8 @@ export fn stivale2Main(info_in: *Info) noreturn {
         log(.debug, "Using VGA output", .{});
     }
 
-    log(.notice, "{}", .{info_in.*});
-    log(.notice, "{}", .{info});
+    log(.info, "{}", .{info_in.*});
+    log(.info, "{}", .{info});
 
     if (!info.valid()) {
         @panic("Stivale2: Info not valid!");
@@ -427,7 +430,7 @@ export fn stivale2Main(info_in: *Info) noreturn {
     if (info.framebuffer) |_| {
         blk: {
             display_buffer.init(
-                os.memory.pmm.phys_heap,
+                os.memory.pmm.physHeap(),
                 &display.context.region,
             ) catch |err| {
                 log(.err, "Stivale2: Error while allocating buffer: {e}", .{err});

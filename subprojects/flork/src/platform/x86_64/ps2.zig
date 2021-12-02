@@ -452,7 +452,7 @@ fn initDevice(irq: u8, device: Device) !bool {
     const first = read() catch |err| {
         switch (err) {
             error.Timeout => {
-                log(.notice, "No identity byte, assuming keyboard", .{});
+                log(.warn, "No identity byte, assuming keyboard", .{});
                 return initKeyboard(irq, device);
             },
             else => return err,
@@ -567,11 +567,11 @@ pub fn initController() !void {
 
 pub fn init() void {
     initController() catch |err| {
-        log(.crit, "Error while initializing: {e}", .{err});
+        log(.err, "Error while initializing: {e}", .{err});
         if (@errorReturnTrace()) |trace| {
             os.kernel.debug.dumpStackTrace(trace);
         } else {
-            log(.crit, "No error trace.", .{});
+            log(.err, "No error trace.", .{});
         }
     };
 }

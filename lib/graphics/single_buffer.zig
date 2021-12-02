@@ -11,7 +11,7 @@ pub const SingleBuffer = struct {
         self.backing_region.drawImageSameFmt(self.buffered_region.subregion(x, y, width, height), x, y, true);
     }
 
-    pub fn init(self: *@This(), allocator: *std.mem.Allocator, backing: *ImageRegion) !void {
+    pub fn init(self: *@This(), allocator: std.mem.Allocator, backing: *ImageRegion) !void {
         self.* = .{
             .buffered_region = .{
                 .bytes = try allocator.alloc(u8, backing.height * backing.pitch),
