@@ -224,7 +224,7 @@ pub const ImageRegion = struct {
             // Can we copy the entire thing in one memcpy?
             if (source.pitch == target.pitch and source.full_width and target.full_width) {
                 const num_bytes = source.pitch * source.height;
-                libalign.alignedCopy(u32, target.startingAt(x, y), source.bytes);
+                libalign.alignedCopy(u32, target.startingAt(x, y), source.bytes[0..num_bytes]);
             } else {
                 const num_bytes = source.width * comptime source_fmt.bytesPerPixel();
                 var source_bytes = source.bytes;
