@@ -41,7 +41,6 @@ pub fn renderBitmapFont(
 }
 
 fn numChars(comptime f: anytype) usize {
-    const num_bytes = f.data.len;
     const bytes_per_line = @divFloor(f.width + 7, 8);
     const bytes_per_char = bytes_per_line * f.height;
     return @divExact(f.data.len, bytes_per_char);
