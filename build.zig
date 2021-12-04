@@ -8,7 +8,9 @@ const flork = @import("subprojects/flork/build.zig");
 
 // zig fmt: off
 fn qemu_run_aarch64_sabaton(b: *Builder, board_name: []const u8, desc: []const u8) !void {
-    const sabaton_blob = try sabaton.build_blob(b, .aarch64, board_name);
+    const sabaton_blob = sabaton.aarch64VirtBlob(b);
+
+    const sabaton_blob_path = b.getInstallPath(sabaton_blob.dest_dir, sabaton_blob.dest_filename); 
 
     const kernel_step = try flork.buildKernel(.{
         .builder = b, 
@@ -23,7 +25,7 @@ fn qemu_run_aarch64_sabaton(b: *Builder, board_name: []const u8, desc: []const u
         "qemu-system-aarch64",
         "-M", board_name, 
         "-cpu", "cortex-a57",
-        "-drive", b.fmt("if=pflash,format=raw,file={s},readonly=on", .{sabaton_blob.output_path}),
+        "-drive", b.fmt("if=pflash,format=raw,file={s},readonly=on", .{sabaton_blob_path}),
         "-fw_cfg", b.fmt("opt/Sabaton/kernel,file={s}", .{kernel_path}),
         "-m", "4G",
         "-serial", "stdio",
