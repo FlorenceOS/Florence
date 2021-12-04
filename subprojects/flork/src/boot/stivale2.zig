@@ -4,7 +4,7 @@ const lib = @import("lib");
 
 const log = lib.output.log.scoped(.{
     .prefix = "boot/stivale2",
-    .filter = .info,
+    .filter = .debug,
 }).write;
 
 const memory = os.memory;
@@ -257,7 +257,7 @@ const ParsedInfo = struct {
 
 fn consumePhysMem(ent: *const MemmapEntry) void {
     if (ent.kind == 1) {
-        log(.info, "Consuming 0x{0X} to 0x{0X}", .{ ent.base, ent.base + ent.length });
+        log(.debug, "Consuming 0x{0X} to 0x{0X}", .{ ent.base, ent.base + ent.length });
         os.memory.pmm.consume(ent.base, ent.length);
     }
 }
@@ -363,7 +363,7 @@ export fn stivale2Main(info_in: *Info) noreturn {
 
     if (info.uart) |uart| {
         drivers.output.mmio_serial.register_mmio32_serial(uart.uart_addr);
-        log(.info, "Registered UART", .{});
+        log(.debug, "Registered UART", .{});
     }
 
     if (info.uart_status) |u| {
@@ -373,7 +373,7 @@ export fn stivale2Main(info_in: *Info) noreturn {
             u.status_mask,
             u.status_value,
         );
-        log(.info, "Registered status UART", .{});
+        log(.debug, "Registered status UART", .{});
     }
 
     log(.debug, "Initializing framebuffer", .{});
