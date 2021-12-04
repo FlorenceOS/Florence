@@ -142,5 +142,19 @@ pub const drivers = .{
     },
 };
 
+pub const debug = .{
+    .source_in_backtrace = .{
+        .enable = true,
+        .context_before = 2,
+        .context_after = 2,
+        .line_numbers = true,
+        .cursor = .{
+            .enable = true,
+            .pointer_style = "^- That's here you dummy",
+            .indent_style = ' ',
+        },
+    },
+};
+
 // Default keyboard layout
 pub const keyboard_layout = .en_US_QWERTY;

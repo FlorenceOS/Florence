@@ -1,6 +1,9 @@
 const os = @import("root").os;
 const std = @import("std");
-const log = @import("lib").output.log.scoped(.{
+const lib = @import("lib");
+const config = @import("config");
+
+const log = lib.output.log.scoped(.{
     .prefix = "kernel/debug",
     .filter = .info,
 });
@@ -116,6 +119,66 @@ fn printAddr(ip: usize) void {
     }
 }
 
+fn printLine(fname: []const u8, line: usize, line_digits: usize) !void {
+    const cfg = config.debug.source_in_backtrace;
+
+    var buf: [8]u8 = undefined;
+    _ = std.fmt.formatIntBuf(&buf, line, 10, undefined, .{
+        .fill = '0',
+        .width = line_digits,
+    });
+
+    if(comptime(cfg.line_numbers)) {
+        log.write(null, "{s}: {s}", .{
+            buf[0..line_digits],
+            try lib.util.source.getFileLine(fname, line),
+        });
+    } else {
+        log.write(null, "{s}", .{
+            try lib.util.source.getFileLine(fname, line),
+        });
+    }
+}
+
+inline fn printSourceContext(line_info: std.debug.LineInfo) !void {
+    const cfg = config.debug.source_in_backtrace;
+
+    if (comptime (!cfg.enable)) return;
+
+    const fname = line_info.file_name;
+    const line = line_info.line;
+
+    const min_line = line -| comptime cfg.context_before;
+    const max_line = line + comptime cfg.context_after;
+
+    const line_digits = blk: {
+        var buf: [8]u8 = undefined;
+        break :blk std.fmt.formatIntBuf(&buf, max_line, 10, undefined, .{});
+    };
+
+    var current_line = min_line;
+    while (current_line <= line) : (current_line += 1) {
+        try printLine(fname, current_line, line_digits);
+    }
+    if (comptime (cfg.cursor.enable)) {
+        if(line_info.column != 0) {
+            const effective_column = if(comptime(cfg.line_numbers))
+                line_info.column + line_digits + 2
+            else
+                line_info.column;
+            const l = log.start(null, "", .{});
+            var current_column: usize = 1;
+            while (current_column < effective_column) : (current_column += 1) {
+                log.cont(null, "{c}", .{comptime @as(u8, cfg.cursor.indent_style)}, l);
+            }
+            log.finish(null, "{s}", .{comptime cfg.cursor.pointer_style}, l);
+        }
+    }
+    while (current_line <= max_line) : (current_line += 1) {
+        try printLine(fname, current_line, line_digits);
+    }
+}
+
 fn printInfo(line_info: ?std.debug.LineInfo, ip: usize, symbol_name: ?[]const u8) void {
     const l = log.start(null, "0x{X}: ", .{ip});
 
@@ -129,6 +192,10 @@ fn printInfo(line_info: ?std.debug.LineInfo, ip: usize, symbol_name: ?[]const u8
         log.finish(null, "{s}", .{symname}, l);
     } else {
         log.finish(null, "<No symbol>", .{}, l);
+    }
+
+    if (line_info) |li| {
+        printSourceContext(li) catch {};
     }
 }
 
