@@ -124,7 +124,7 @@ fn printLine(fname: []const u8, line: usize, line_digits: usize) !void {
 
     var buf: [8]u8 = undefined;
     _ = std.fmt.formatIntBuf(&buf, line, 10, undefined, .{
-        .fill = '0',
+        .fill = ' ',
         .width = line_digits,
     });
 
