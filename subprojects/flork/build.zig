@@ -44,9 +44,13 @@ pub fn buildKernel(params: struct {
         .builder = params.builder,
         .arch = params.arch,
     });
+    const copernicus_path = params.builder.getInstallPath(
+        copernicus.dest_dir,
+        copernicus.dest_filename,
+    );
 
     var copernicus_options = params.builder.addOptions();
-    copernicus_options.addOption([]const u8, "blob_path", copernicus.output_path);
+    copernicus_options.addOption([]const u8, "blob_path", copernicus_path);
 
     kernel.addOptions("copernicus_options", copernicus_options);
 

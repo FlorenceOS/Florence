@@ -7,7 +7,7 @@ const Arch = if (@hasField(std.builtin, "Arch")) std.builtin.Arch else std.Targe
 pub fn buildCopernicus(params: struct {
     builder: *std.build.Builder,
     arch: Arch,
-}) !*exec.TransformFileCommandStep {
+}) !*std.build.InstallRawStep {
     const arch = params.arch;
 
     const copernicus_path = "subprojects/copernicus/";
@@ -38,7 +38,5 @@ pub fn buildCopernicus(params: struct {
 
     copernicus.setLinkerScriptPath(.{ .path = copernicus_path ++ "src/linker.ld" });
 
-    const blob = try exec.binaryBlobSection(params.builder, copernicus, ".blob");
-
-    return blob;
+    return exec.binaryBlobSection(params.builder, copernicus, ".blob");
 }

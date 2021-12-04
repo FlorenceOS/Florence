@@ -30,26 +30,11 @@ fn make_transform(b: *std.build.Builder, dep: *std.build.Step, command: [][]cons
     return transform;
 }
 
-pub fn binaryBlobSection(b: *std.build.Builder, elf: *std.build.LibExeObjStep, section_name: []const u8) !*TransformFileCommandStep {
-    const elf_path = b.getInstallPath(elf.install_step.?.dest_dir, elf.out_filename);
-
-    const dumped_path = b.fmt("{s}.bin", .{elf_path});
-
-    const dump_step = try make_transform(
-        b,
-        &elf.install_step.?.step,
-        // zig fmt: off
-        &[_][]const u8{
-            "llvm-objcopy",
-                "-O", "binary",
-                "--only-section", section_name,
-                elf_path, dumped_path,
-        },
-        // zig fmt: on
-        dumped_path,
-    );
-
-    return dump_step;
+pub fn binaryBlobSection(b: *std.build.Builder, elf: *std.build.LibExeObjStep, section_name: []const u8) *std.build.InstallRawStep {
+    return elf.installRaw(b.fmt("{s}.bin", .{elf.out_filename}), .{
+        .only_section_name = section_name,
+        .format = .bin,
+    });
 }
 
 fn makeSourceBlobStep(
