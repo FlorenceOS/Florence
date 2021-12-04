@@ -19,9 +19,6 @@ fn do_op(self: *const Command, port: u16, comptime str: []const u8) CommandResul
     var rsi: u64 = undefined;
     var rdi: u64 = undefined;
 
-    // https://github.com/ziglang/zig/issues/10262
-    _ = str;
-
     // zig fmt: off
     asm volatile (str
         : [_] "={rax}" (rax)

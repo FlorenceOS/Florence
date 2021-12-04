@@ -179,8 +179,6 @@ pub fn make_handler(comptime intnum: u8) idt.InterruptHandler {
     return struct {
         fn func() callconv(.Naked) void {
             const ec = if (comptime (!has_error_code(intnum))) "push $0\n" else "";
-            // https://github.com/ziglang/zig/issues/10262
-            _ = ec;
             asm volatile (ec ++ "push %[intnum]\njmp interrupt_common\n"
                 :
                 : [intnum] "i" (@as(u8, intnum))
