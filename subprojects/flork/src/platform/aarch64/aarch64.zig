@@ -26,6 +26,13 @@ pub fn msr(comptime T: type, comptime name: []const u8) type {
                 : [in] "X" (val)
             );
         }
+
+        pub fn writeImm(comptime val: T) void {
+            asm volatile ("MSR " ++ name ++ ", %[in]"
+                :
+                : [in] "i" (val)
+            );
+        }
     };
 }
 

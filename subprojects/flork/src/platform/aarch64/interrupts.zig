@@ -15,7 +15,7 @@ pub fn get_and_disable_interrupts() InterruptState {
     var daif = msr(u64, "DAIF").read();
 
     // Set the flag
-    msr(u64, "DAIFSET").write(2);
+    msr(u4, "DAIFSET").writeImm(2);
 
     // Check if it was set
     return (daif >> 7) & 1 == 0;
@@ -24,10 +24,10 @@ pub fn get_and_disable_interrupts() InterruptState {
 pub fn set_interrupts(s: InterruptState) void {
     if (s) {
         // Enable interrupts
-        msr(u64, "DAIFCLR").write(2);
+        msr(u4, "DAIFCLR").writeImm(2);
     } else {
         // Disable interrupts
-        msr(u64, "DAIFSET").write(2);
+        msr(u4, "DAIFSET").writeImm(2);
     }
 }
 
