@@ -19,23 +19,13 @@ pub fn buildKernel(params: struct {
     const kernel_filename = params.builder.fmt("Flork_{s}_{s}", .{ proto, @tagName(arch) });
     const main_file = params.builder.fmt(flork_path ++ "src/boot/{s}.zig", .{proto});
 
-    // For some reason if I define this directly in exec.makeExec param struct, it will
-    // contain incorrect values. ZIG BUG
-    const blob = .{
-        .global_source_path = flork_path ++ "/src",
-        .source_blob_name = kernel_filename,
-    };
-
-    const kernel = exec.makeExec(.{
+    const kernel = try exec.makeExec(.{
         .builder = params.builder,
         .arch = arch,
         .ctx = .kernel,
         .filename = kernel_filename,
         .main = main_file,
-        .source_blob = if (config.kernel.build_source_blob)
-            blob
-        else
-            null,
+        .source_blob = config.kernel.build_source_blob,
         .mode = config.kernel.build_mode,
         .strip_symbols = config.kernel.strip_symbols,
     });

@@ -2,17 +2,17 @@ const std = @import("std");
 const tar = @import("tar");
 
 fn getSourceBlob() ?[]const u8 {
-    if (@import("build_options").source_blob_path) |path| {
+    if (@import("sources").blob_path) |path| {
         return @embedFile(path);
     }
     return null;
 }
 
 pub fn getFileLine(filename: []const u8, line: usize) ![]const u8 {
-    const blob = getSourceBlob() orelse return error.FileNotFound;
+    const blob = comptime (getSourceBlob() orelse return error.BlobNotFound);
     var iterator = tar.iterate(blob) catch unreachable;
     while (iterator.has_file) : (iterator.next()) {
-        if (!std.mem.endsWith(u8, filename, iterator.file_name)) {
+        if (!std.mem.endsWith(u8, filename, iterator.file_name[2..])) {
             continue;
         }
         var content = iterator.file_contents;

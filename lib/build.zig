@@ -157,24 +157,41 @@ const internal_packages = struct {
         .name = "range",
         .path = here("util/range.zig"),
     };
-
-    const source = Pkg{
-        .name = "source",
-        .path = here("util/source.zig"),
-        .dependencies = &[_]Pkg{
-            tar,
-        },
-    };
 };
 
-pub const pkg = Pkg{
-    .name = "lib",
-    .path = here("lib.zig"),
-    .dependencies = (blk: {
-        comptime var result: []const Pkg = &[_]Pkg{};
-        for (@typeInfo(internal_packages).Struct.decls) |p| {
-            result = result ++ [_]Pkg{@field(internal_packages, p.name)};
-        }
-        break :blk result;
-    }),
+pub fn add(
+    b: *std.build.Builder,
+    exec: *std.build.LibExeObjStep,
+    source_blob_path: ?[]const u8,
+) !void {
+    var deps = std.ArrayList(Pkg).init(b.allocator);
+    defer deps.deinit();
+
+    try deps.appendSlice(lib_deps);
+
+    const source_blob_opts = b.addOptions();
+    source_blob_opts.addOption(?[]const u8, "blob_path", source_blob_path);
+
+    try deps.append(.{
+        .name = "source",
+        .path = comptime here("util/source.zig"),
+        .dependencies = &[_]Pkg{
+            internal_packages.tar,
+            source_blob_opts.getPackage("sources"),
+        },
+    });
+
+    exec.addPackage(.{
+        .name = "lib",
+        .path = comptime here("lib.zig"),
+        .dependencies = deps.toOwnedSlice(),
+    });
+}
+
+const lib_deps = blk: {
+    comptime var result: []const Pkg = &[_]Pkg{};
+    for (@typeInfo(internal_packages).Struct.decls) |p| {
+        result = result ++ [_]Pkg{@field(internal_packages, p.name)};
+    }
+    break :blk result;
 };

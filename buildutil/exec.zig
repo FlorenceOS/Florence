@@ -37,16 +37,46 @@ pub fn binaryBlobSection(b: *std.build.Builder, elf: *std.build.LibExeObjStep, s
     });
 }
 
-fn makeSourceBlobStep(
-    b: *std.build.Builder,
-    output: []const u8,
-    src: []const u8,
-) *std.build.RunStep {
-    return b.addSystemCommand(
-        &[_][]const u8{
-            "tar", "--no-xattrs", "-cf", output, "lib", src, "build.zig",
+var source_blob_step: ?std.build.Step = null;
+var source_blob_path: []const u8 = undefined;
+
+const tar = @import("../lib/format/tar.zig");
+
+fn sourceFilter(name: []const u8, parent_path: []const u8, kind: tar.Kind) tar.FilterResult {
+    // if (std.mem.startsWith(u8, name, ".")) return .Skip;
+
+    if (std.mem.eql(u8, parent_path, "./")) { // Root directory
+        if (std.mem.eql(u8, name, "assets")) return .Skip;
+        if (std.mem.eql(u8, name, "boot")) return .Skip;
+    }
+
+    switch (kind) {
+        .Directory => {
+            // Skip zig cache and output dirs everywhere
+            if (std.mem.eql(u8, name, "zig-cache")) return .Skip;
+            if (std.mem.eql(u8, name, "zig-out")) return .Skip;
+
+            // Skip git directories everywhere
+            if (std.mem.eql(u8, name, ".git")) return .Skip;
         },
-    );
+        .File => {},
+        else => {},
+    }
+
+    return .Include;
+}
+
+fn makeSourceBlob(_: *std.build.Step) anyerror!void {
+    try tar.create(".", source_blob_path, sourceFilter);
+}
+
+fn prepareSourceBlobStep(b: *std.build.Builder, exec: *std.build.LibExeObjStep) void {
+    if (source_blob_step == null) {
+        source_blob_step = std.build.Step.init(.custom, "source blob", b.allocator, makeSourceBlob);
+        exec.step.dependOn(&source_blob_step.?);
+        source_blob_path = b.getInstallPath(.bin, "sources.tar");
+        b.pushInstalledFile(.bin, "sources.tar");
+    }
 }
 
 pub fn setTargetFlags(
@@ -112,13 +142,10 @@ pub fn makeExec(params: struct {
     ctx: Context,
     filename: []const u8,
     main: []const u8,
-    source_blob: ?struct {
-        global_source_path: []const u8,
-        source_blob_name: []const u8,
-    },
+    source_blob: bool,
     mode: ?std.builtin.Mode = null,
     strip_symbols: bool = false,
-}) *std.build.LibExeObjStep {
+}) !*std.build.LibExeObjStep {
     const mode = params.mode orelse params.builder.standardReleaseOptions();
 
     const exec = params.builder.addExecutable(params.filename, params.main);
@@ -129,32 +156,20 @@ pub fn makeExec(params: struct {
     if (@hasField(@TypeOf(exec.*), "want_lto"))
         exec.want_lto = false;
 
-    exec.addPackage(@import("../lib/build.zig").pkg);
+    if (params.source_blob) {
+        prepareSourceBlobStep(params.builder, exec);
+    }
+
+    try @import("../lib/build.zig").add(
+        params.builder,
+        exec,
+        if (params.source_blob) source_blob_path else null,
+    );
     exec.addPackagePath("config", "./config/config.zig");
     exec.addPackagePath("assets", "./assets/assets.zig");
 
     exec.setMainPkgPath(".");
     exec.setOutputDir(params.builder.cache_root);
-
-    var source_blob_options = params.builder.addOptions();
-    if (params.source_blob) |blob| {
-        const cache_root = params.builder.cache_root;
-        const source_blob_path = params.builder.fmt("{s}/{s}.tar", .{
-            cache_root,
-            blob.source_blob_name,
-        });
-        source_blob_options.addOption(?[]const u8, "source_blob_path", source_blob_path);
-        exec.step.dependOn(&makeSourceBlobStep(
-            params.builder,
-            source_blob_path,
-            blob.global_source_path,
-        ).step);
-    } else {
-        source_blob_options.addOption(?[]const u8, "source_blob_path", null);
-    }
-
-    exec.addOptions("source_blob_options", source_blob_options);
-
     exec.install();
     return exec;
 }
