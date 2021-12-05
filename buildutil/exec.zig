@@ -73,10 +73,10 @@ fn makeSourceBlob(_: *std.build.Step) anyerror!void {
 fn prepareSourceBlobStep(b: *std.build.Builder, exec: *std.build.LibExeObjStep) void {
     if (source_blob_step == null) {
         source_blob_step = std.build.Step.init(.custom, "source blob", b.allocator, makeSourceBlob);
-        exec.step.dependOn(&source_blob_step.?);
         source_blob_path = b.getInstallPath(.bin, "sources.tar");
         b.pushInstalledFile(.bin, "sources.tar");
     }
+    exec.step.dependOn(&source_blob_step.?);
 }
 
 pub fn setTargetFlags(
