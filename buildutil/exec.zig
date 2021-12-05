@@ -67,6 +67,8 @@ fn sourceFilter(name: []const u8, parent_path: []const u8, kind: tar.Kind) tar.F
 }
 
 fn makeSourceBlob(_: *std.build.Step) anyerror!void {
+    const dirname = std.fs.path.dirname(source_blob_path).?;
+    std.fs.cwd().makePath(dirname) catch unreachable;
     try tar.create(".", source_blob_path, sourceFilter);
 }
 
