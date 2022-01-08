@@ -153,6 +153,7 @@ pub fn makeExec(params: struct {
     exec.setBuildMode(mode);
     exec.strip = params.strip_symbols;
 
+    // https://github.com/ziglang/zig/issues/10364
     if (@hasField(@TypeOf(exec.*), "want_lto"))
         exec.want_lto = false;
 
