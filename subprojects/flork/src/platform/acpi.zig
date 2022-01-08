@@ -204,16 +204,16 @@ export fn laihost_log(kind: c_int, str: [*:0]const u8) void {
     }
 }
 
-fn impl_laihost_scan_table(addr: usize, name: *const [4]u8, index: *c_int) ?*c_void {
+fn impl_laihost_scan_table(addr: usize, name: *const [4]u8, index: *c_int) ?*anyopaque {
     const table = get_sdt(addr);
     if (std.mem.eql(u8, table[0..4], name)) {
-        if (index.* == 0) return @ptrCast(*c_void, table.ptr);
+        if (index.* == 0) return @ptrCast(*anyopaque, table.ptr);
         index.* -= 1;
     }
     return null;
 }
 
-fn impl_laihost_scan_root(comptime T: type, addr: usize, name: *const [4]u8, index_c: c_int) ?*c_void {
+fn impl_laihost_scan_root(comptime T: type, addr: usize, name: *const [4]u8, index_c: c_int) ?*anyopaque {
     const sdt = get_sdt(addr);
 
     var index = index_c;
@@ -227,14 +227,14 @@ fn impl_laihost_scan_root(comptime T: type, addr: usize, name: *const [4]u8, ind
     return lai.NULL;
 }
 
-export fn laihost_scan(name: *const [4]u8, index: c_int) ?*c_void {
+export fn laihost_scan(name: *const [4]u8, index: c_int) ?*anyopaque {
     if (index == 0) {
-        if (std.mem.eql(u8, name, "RSDT")) return @ptrCast(*c_void, get_sdt(rsdp.rsdt_addr).ptr);
-        if (std.mem.eql(u8, name, "XSDT")) return @ptrCast(*c_void, get_sdt(rsdp.xsdt_addr).ptr);
+        if (std.mem.eql(u8, name, "RSDT")) return @ptrCast(*anyopaque, get_sdt(rsdp.rsdt_addr).ptr);
+        if (std.mem.eql(u8, name, "XSDT")) return @ptrCast(*anyopaque, get_sdt(rsdp.xsdt_addr).ptr);
         if (std.mem.eql(u8, name, "DSDT")) {
             const fadt = @ptrCast(*align(1) FADT, laihost_scan("FACP", 0) orelse return lai.NULL);
-            if (fadt.dsdt != 0) return @ptrCast(*c_void, get_sdt(fadt.dsdt).ptr);
-            if (fadt.x_dsdt != 0) return @ptrCast(*c_void, get_sdt(fadt.x_dsdt).ptr);
+            if (fadt.dsdt != 0) return @ptrCast(*anyopaque, get_sdt(fadt.dsdt).ptr);
+            if (fadt.x_dsdt != 0) return @ptrCast(*anyopaque, get_sdt(fadt.x_dsdt).ptr);
             return lai.NULL;
         }
     }
@@ -251,17 +251,17 @@ export fn laihost_panic(err: [*:0]const u8) noreturn {
     @panic("LAI PANIC");
 }
 
-export fn laihost_map(addr: usize, size: usize) ?*c_void {
+export fn laihost_map(addr: usize, size: usize) ?*anyopaque {
     _ = size;
-    return os.platform.phys_ptr(*c_void).from_int(addr).get_uncached();
+    return os.platform.phys_ptr(*anyopaque).from_int(addr).get_uncached();
 }
 
-export fn laihost_unmap(ptr: *c_void, size: usize) void {
+export fn laihost_unmap(ptr: *anyopaque, size: usize) void {
     _ = ptr;
     _ = size;
 }
 
-export fn laihost_handle_amldebug(_: *c_void) void {}
+export fn laihost_handle_amldebug(_: *anyopaque) void {}
 
 export fn laihost_sleep(some_unit_of_time: u64) void {
     _ = some_unit_of_time;

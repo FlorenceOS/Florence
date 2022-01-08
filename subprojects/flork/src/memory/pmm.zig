@@ -126,7 +126,7 @@ pub fn freePhys(phys: usize, size: usize) void {
 var phys_alloc = struct {
     vtab: std.mem.Allocator.VTable = .{ .alloc = alloc, .resize = resize, .free = free },
 
-    fn alloc(_: *c_void, len: usize, ptr_align: u29, len_align: u29, _: usize) std.mem.Allocator.Error![]u8 {
+    fn alloc(_: *anyopaque, len: usize, ptr_align: u29, len_align: u29, _: usize) std.mem.Allocator.Error![]u8 {
         const alloc_len = getAllocationSize(std.math.max(len_align, std.math.max(ptr_align, len)));
 
         const ptr = os.platform.phys_ptr([*]u8).from_int(allocPhys(alloc_len) catch |err| {
@@ -142,7 +142,7 @@ var phys_alloc = struct {
         return ptr.get_writeback()[0..len];
     }
 
-    fn resize(_: *c_void, old_mem: []u8, old_align: u29, new_size: usize, len_align: u29, ret_addr: usize) ?usize {
+    fn resize(_: *anyopaque, old_mem: []u8, old_align: u29, new_size: usize, len_align: u29, ret_addr: usize) ?usize {
         const old_alloc = getAllocationSize(std.math.max(old_mem.len, old_align));
 
         const addr = @ptrToInt(old_mem.ptr);
@@ -168,7 +168,7 @@ var phys_alloc = struct {
         }
     }
 
-    fn free(_: *c_void, old_mem: []u8, old_align: u29, _: usize) void {
+    fn free(_: *anyopaque, old_mem: []u8, old_align: u29, _: usize) void {
         const old_alloc = getAllocationSize(std.math.max(old_mem.len, old_align));
 
         const addr = @ptrToInt(old_mem.ptr);
@@ -193,19 +193,19 @@ pub fn physHeap() std.mem.Allocator {
     return phys_gpa.allocator();
 }
 
-export fn laihost_malloc(sz: usize) ?*c_void {
-    if (sz == 0) return @intToPtr(*c_void, 0x1000);
+export fn laihost_malloc(sz: usize) ?*anyopaque {
+    if (sz == 0) return @intToPtr(*anyopaque, 0x1000);
     const mem = physHeap().alloc(u8, sz) catch return os.kernel.lai.NULL;
-    return @ptrCast(*c_void, mem.ptr);
+    return @ptrCast(*anyopaque, mem.ptr);
 }
 
-export fn laihost_realloc(ptr: ?*c_void, newsize: usize, oldsize: usize) ?*c_void {
+export fn laihost_realloc(ptr: ?*anyopaque, newsize: usize, oldsize: usize) ?*anyopaque {
     if (oldsize == 0) {
         return laihost_malloc(newsize);
     }
     if (newsize == 0) {
         laihost_free(ptr, oldsize);
-        return @intToPtr(*c_void, 0x1000);
+        return @intToPtr(*anyopaque, 0x1000);
     }
     const ret = laihost_malloc(newsize);
     @memcpy(@ptrCast([*]u8, ret), @ptrCast([*]const u8, ptr), oldsize);
@@ -213,7 +213,7 @@ export fn laihost_realloc(ptr: ?*c_void, newsize: usize, oldsize: usize) ?*c_voi
     return ret;
 }
 
-export fn laihost_free(ptr: ?*c_void, oldsize: usize) void {
+export fn laihost_free(ptr: ?*anyopaque, oldsize: usize) void {
     if (oldsize == 0 or ptr == null) return;
     physHeap().free(@ptrCast([*]u8, ptr)[0..oldsize]);
 }
