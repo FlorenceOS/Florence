@@ -49,27 +49,31 @@ fn syscallNumber(frame: *platform.InterruptFrame) usize {
     }
 }
 
-fn syscallArg(frame: *platform.InterruptFrame, num: usize) usize {
+fn syscallArg(frame: *platform.InterruptFrame, num: usize) *usize {
     switch (comptime platform.arch) {
         .x86_64 => {
             return switch (num) {
-                0 => frame.rdi,
-                1 => frame.rsi,
-                2 => frame.rdx,
-                3 => frame.r10,
-                4 => frame.r8,
-                5 => frame.r9,
+                0 => &frame.rdi,
+                1 => &frame.rsi,
+                2 => &frame.rdx,
+                3 => &frame.rcx,
+                4 => &frame.r8,
+                5 => &frame.r9,
+                6 => &frame.r10,
+                7 => &frame.r11,
                 else => unreachable,
             };
         },
         .aarch64 => {
             return switch (num) {
-                0 => frame.x0,
-                1 => frame.x1,
-                2 => frame.x2,
-                3 => frame.x3,
-                4 => frame.x4,
-                5 => frame.x5,
+                0 => &frame.x0,
+                1 => &frame.x1,
+                2 => &frame.x2,
+                3 => &frame.x3,
+                4 => &frame.x4,
+                5 => &frame.x5,
+                6 => &frame.x6,
+                7 => &frame.x7,
                 else => unreachable,
             };
         },
@@ -143,11 +147,11 @@ pub const Process = struct {
     }
 
     fn linuxWrite(_: *@This(), frame: *platform.InterruptFrame) void {
-        const fd = syscallArg(frame, 0);
+        const fd = syscallArg(frame, 0).*;
         switch (fd) {
             1, 2 => {
-                const str_ptr = @intToPtr([*]const u8, syscallArg(frame, 1));
-                const str_len = syscallArg(frame, 2);
+                const str_ptr = @intToPtr([*]const u8, syscallArg(frame, 1).*);
+                const str_len = syscallArg(frame, 2).*;
                 if (str_len > 0) {
                     const ends_with_endl = str_ptr[str_len - 1] == '\n';
                     const str: []const u8 = if (ends_with_endl) str_ptr[0 .. str_len - 1] else str_ptr[0..str_len];
