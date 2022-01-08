@@ -5,7 +5,7 @@ PHDRS {
 }
 
 SECTIONS {
-  . = 0xFFF00000 - 32;
+  . = 0x30000000 - 32;
   .blob : {
     QUAD(__copernicus_base);
     QUAD(__data_offset);
