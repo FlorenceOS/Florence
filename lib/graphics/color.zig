@@ -1,4 +1,4 @@
-const PixelFormat = @import("pixel_format").PixelFormat;
+const PixelFormat = @import("pixel_format.zig").PixelFormat;
 
 pub const Color = struct {
     blue: u8,

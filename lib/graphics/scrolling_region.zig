@@ -1,7 +1,7 @@
 const std = @import("std");
 
-const ImageRegion = @import("image_region").ImageRegion;
-const Color = @import("color").Color;
+const ImageRegion = @import("image_region.zig").ImageRegion;
+const Color = @import("color.zig").Color;
 
 pub const ScrollingRegion = struct {
     used_height: usize = 0,

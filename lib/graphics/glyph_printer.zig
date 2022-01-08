@@ -1,7 +1,7 @@
-const ImageRegion = @import("image_region").ImageRegion;
-const ScrollingRegion = @import("scrolling_region").ScrollingRegion;
-const PixelFormat = @import("pixel_format").PixelFormat;
-const Color = @import("color").Color;
+const ImageRegion = @import("image_region.zig").ImageRegion;
+const ScrollingRegion = @import("scrolling_region.zig").ScrollingRegion;
+const PixelFormat = @import("pixel_format.zig").PixelFormat;
+const Color = @import("color.zig").Color;
 
 pub fn GlyphPrinter(comptime max_width: usize, comptime glyph_height: usize) type {
     return struct {

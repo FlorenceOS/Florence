@@ -1,8 +1,9 @@
 const std = @import("std");
-const libalign = @import("libalign");
 
-const PixelFormat = @import("pixel_format").PixelFormat;
-const Color = @import("color").Color;
+const libalign = @import("../util/libalign.zig");
+
+const PixelFormat = @import("pixel_format.zig").PixelFormat;
+const Color = @import("color.zig").Color;
 
 pub const InvalidateRectFunc = fn (r: *ImageRegion, x: usize, y: usize, width: usize, height: usize) void;
 

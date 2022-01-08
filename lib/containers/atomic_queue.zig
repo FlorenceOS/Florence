@@ -1,6 +1,6 @@
 /// We are exporting Node from non-atomic queue module, since we want the same Node type to be used
 /// both for atomic and non-atomic queues
-pub const Node = @import("queue").Node;
+pub const Node = @import("queue.zig").Node;
 
 const std = @import("std");
 

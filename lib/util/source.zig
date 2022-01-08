@@ -1,5 +1,5 @@
 const std = @import("std");
-const tar = @import("tar");
+const tar = @import("../format/tar.zig");
 
 fn getSourceBlob() ?[]const u8 {
     if (@import("sources").blob_path) |path| {

@@ -1,7 +1,8 @@
-const libfmt = @import("fmt");
 const std = @import("std");
 
 const Mutex = @import("root").os.thread.Mutex;
+
+const libfmt = @import("fmt.zig");
 
 var mutex = Mutex{};
 noinline fn getLock() Mutex.Held {

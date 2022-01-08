@@ -1,5 +1,5 @@
 const std = @import("std");
-const ImageRegion = @import("image_region").ImageRegion;
+const ImageRegion = @import("image_region.zig").ImageRegion;
 
 // Buffer for a region. Useful when you want to read from your buffer, without having to do expensive mmio.
 pub const SingleBuffer = struct {

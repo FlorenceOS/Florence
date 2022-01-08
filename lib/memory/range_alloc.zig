@@ -1,5 +1,5 @@
 const std = @import("std");
-const rb = @import("rbtree");
+const rb = @import("../containers/rbtree.zig");
 
 const Order = std.math.Order;
 const AddrNode = rb.Node(rb_features);

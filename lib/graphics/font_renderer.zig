@@ -1,6 +1,6 @@
-const Color = @import("color").Color;
-const PixelFormat = @import("pixel_format").PixelFormat;
-const ImageRegion = @import("image_region").ImageRegion;
+const Color = @import("color.zig").Color;
+const PixelFormat = @import("pixel_format.zig").PixelFormat;
+const ImageRegion = @import("image_region.zig").ImageRegion;
 
 pub fn renderBitmapFont(
     comptime f: anytype,
