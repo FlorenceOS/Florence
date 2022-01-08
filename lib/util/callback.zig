@@ -104,7 +104,7 @@ pub fn inlineAllocatedCallback(
         result.callFn = struct {
             fn caller(ctx_ptr: *anyopaque, arg: ArgType) ReturnType {
                 if(comptime(@sizeOf(TTC) == 0)) {
-                    return @call(.{.modifier = .always_inline}, TTC.call, .{{}, arg});
+                    return @call(.{.modifier = .always_inline}, TTC.call, .{undefined, arg});
                 } else {
                     const ctx = @ptrCast(*TTC, @alignCast(@alignOf(TTC), ctx_ptr));
                     return @call(.{.modifier = .always_inline}, TTC.call, .{ctx, arg});
@@ -118,7 +118,7 @@ pub fn inlineAllocatedCallback(
             result.deinitFn = struct {
                 fn deinit(ctx_ptr: *anyopaque) void {
                     if(comptime(@sizeOf(TTC) == 0)) {
-                        return @call(.{.modifier = .always_inline}, TTC.deinit, .{{}});
+                        return @call(.{.modifier = .always_inline}, TTC.deinit, .{undefined});
                     } else {
                         const ctx = @ptrCast(*TTC, @alignCast(@alignOf(TTC), ctx_ptr));
                         return @call(.{.modifier = .always_inline}, TTC.deinit, .{ctx});
@@ -169,6 +169,17 @@ test "Callbacks" {
     cb.deinit();
 
     try std.testing.expect(cb.call(5) == 5);
+
+    cb = inlineAllocatedCallback(CallbackT, struct {
+        fn call(_: *@This(), a: usize) usize {
+            return 5 + a;
+        }
+
+        fn deinit(_: *@This()) void { }
+    }{});
+
+    try std.testing.expect(cb.call(0) == 5);
+    try std.testing.expect(cb.call(5) == 5+5);
 
     cb = inlineAllocatedCallback(CallbackT, struct {
         value: usize,
