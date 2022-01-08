@@ -7,8 +7,8 @@ pub fn Callback(
     comptime deinitable: bool,
 ) type {
     return struct {
-        callFn: fn (usize, ArgType) ReturnType,
-        deinitFn: if (deinitable) fn (usize) void else void,
+        callFn: fn (*anyopaque, ArgType) ReturnType,
+        deinitFn: if (deinitable) fn (*anyopaque) void else void,
         inline_data: [inline_capacity]u8,
 
         pub const callback_inline_capacity = inline_capacity;
@@ -16,18 +16,18 @@ pub fn Callback(
         pub const CallbackReturnType = ReturnType;
         pub const CallbackArgType = ArgType;
 
-        pub fn call(self: *const @This(), arg: ArgType) callconv(.Inline) ReturnType {
+        pub inline fn call(self: *const @This(), arg: ArgType) ReturnType {
             return self.callFn(self.context(), arg);
         }
 
-        pub fn deinit(self: *const @This()) callconv(.Inline) void {
+        pub inline fn deinit(self: *const @This()) void {
             if (comptime (!deinitable))
                 @compileError("Cannot deinit() this!");
             self.deinitFn(self.context());
         }
 
-        pub fn context(self: *const @This()) callconv(.Inline) usize {
-            return @ptrToInt(&self.inline_data[0]);
+        pub inline fn context(self: *const @This()) *anyopaque {
+            return @intToPtr(*anyopaque, @ptrToInt(&self.inline_data[0]));
         }
     };
 }
@@ -35,29 +35,29 @@ pub fn Callback(
 fn heapAllocatedCallback(
     comptime CallbackType: type,
     thing_to_callback: anytype,
-    allocator: *std.mem.Allocator,
+    allocator: std.mem.Allocator,
 ) !CallbackType {
     const callback_inline_capacity = CallbackType.callback_inline_capacity;
     const CallbackReturnType = CallbackType.CallbackReturnType;
     const CallbackArgType = CallbackType.CallbackArgType;
 
     // What can we fit in the inline storage?
-    if (callback_inline_capacity < @sizeOf(usize)) {
+    if (comptime (callback_inline_capacity < @sizeOf(usize))) {
         @compileError("Not enough inline capacity to heap allocate, can't fit the heap pointer!");
     }
 
-    const allocator_inline = callback_inline_capacity >= @sizeOf(usize) * 2;
+    const allocator_inline = callback_inline_capacity >= @sizeOf(usize) + @sizeOf(std.mem.Allocator);
 
     const HeapAllocBlock = struct {
-        alloc: if (allocator_inline) void else *std.mem.Allocator,
+        alloc: if (allocator_inline) void else std.mem.Allocator,
         value: @TypeOf(thing_to_callback),
     };
 
     return inlineAllocatedCallback(CallbackType, try struct {
         heap_block: *HeapAllocBlock,
-        inline_allocator: if (allocator_inline) *std.mem.Allocator else void,
+        inline_allocator: if (allocator_inline) std.mem.Allocator else void,
 
-        fn init(alloc: *std.mem.Allocator, thing: anytype) !@This() {
+        fn init(alloc: std.mem.Allocator, thing: anytype) !@This() {
             const heap_block = try alloc.create(HeapAllocBlock);
             if (comptime (!allocator_inline)) heap_block.alloc = alloc;
             heap_block.value = thing;
@@ -67,7 +67,7 @@ fn heapAllocatedCallback(
             };
         }
 
-        fn allocator(self: *const @This()) callconv(.Inline) *std.mem.Allocator {
+        fn allocator(self: *const @This()) callconv(.Inline) std.mem.Allocator {
             if (comptime (allocator_inline))
                 return self.inline_allocator;
             return self.heap_block.alloc;
@@ -89,47 +89,45 @@ pub fn inlineAllocatedCallback(
     comptime CallbackType: type,
     thing_to_callback: anytype,
 ) CallbackType {
-    if (@sizeOf(@TypeOf(thing_to_callback)) > CallbackType.callback_inline_capacity) {
+    const TTC = @TypeOf(thing_to_callback);
+    if (@sizeOf(TTC) > CallbackType.callback_inline_capacity) {
         @compileError("Cannot fit this object in the inline capacity!");
     }
 
-    // WARNING: TYPE PUNNING AHEAD
     var result: CallbackType = undefined;
     std.mem.copy(u8, result.inline_data[0..], std.mem.asBytes(&thing_to_callback));
 
-    if (!@hasDecl(@TypeOf(thing_to_callback), "call"))
-        @compileError("Missing `call` declaration on " ++ @typeName(@TypeOf(thing_to_callback)) ++ "! Are you missing `pub`?");
-
-    if (comptime (@hasDecl(@TypeOf(thing_to_callback), "call"))) {
-        const CallType = @TypeOf(@TypeOf(thing_to_callback).call);
+    if (comptime (@hasDecl(TTC, "call"))) {
         const ReturnType = CallbackType.CallbackReturnType;
         const ArgType = CallbackType.CallbackArgType;
-        // zig fmt: off
-        if(CallType != fn(*@TypeOf(thing_to_callback), ArgType) ReturnType and
-           CallType != fn(*const @TypeOf(thing_to_callback), ArgType) ReturnType
-        // zig fmt: on
-        ) {
-            @compileError("Bad call function signature on " ++ @typeName(@TypeOf(thing_to_callback)) ++ "!");
-        }
-        result.callFn = @intToPtr(fn (usize, ArgType) ReturnType, @ptrToInt(@TypeOf(thing_to_callback).call));
-    } else {
-        @compileError("Missing call function on " ++ @typeName(@TypeOf(thing_to_callback)) ++ "! Are you missing `pub`?");
+
+        result.callFn = struct {
+            fn caller(ctx_ptr: *anyopaque, arg: ArgType) ReturnType {
+                if(comptime(@sizeOf(TTC) == 0)) {
+                    return @call(.{.modifier = .always_inline}, TTC.call, .{{}, arg});
+                } else {
+                    const ctx = @ptrCast(*TTC, @alignCast(@alignOf(TTC), ctx_ptr));
+                    return @call(.{.modifier = .always_inline}, TTC.call, .{ctx, arg});
+                }
+            }
+        }.caller;
     }
 
     if (comptime (CallbackType.callback_deinitable)) {
         if (comptime (@hasDecl(@TypeOf(thing_to_callback), "deinit"))) {
-            const DeinitType = @TypeOf(@TypeOf(thing_to_callback).deinit);
-            // zig fmt: off
-            if(DeinitType != fn(*@TypeOf(thing_to_callback)) void and
-               DeinitType != fn(*const @TypeOf(thing_to_callback)) void
-            // zig fmt: on
-            ) {
-                @compileError("Bad deinit function signature on " ++ @typeName(@TypeOf(thing_to_callback)) ++ "!");
-            }
-            result.deinitFn = @intToPtr(fn (usize) void, @ptrToInt(@TypeOf(thing_to_callback).deinit));
+            result.deinitFn = struct {
+                fn deinit(ctx_ptr: *anyopaque) void {
+                    if(comptime(@sizeOf(TTC) == 0)) {
+                        return @call(.{.modifier = .always_inline}, TTC.deinit, .{{}});
+                    } else {
+                        const ctx = @ptrCast(*TTC, @alignCast(@alignOf(TTC), ctx_ptr));
+                        return @call(.{.modifier = .always_inline}, TTC.deinit, .{ctx});
+                    }
+                }
+            }.deinit;
         } else {
             result.deinitFn = struct {
-                fn f(_: usize) void {}
+                fn f(_: *anyopaque) void {}
             }.f;
         }
     }
@@ -140,10 +138,83 @@ pub fn inlineAllocatedCallback(
 pub fn possiblyHeapAllocatedCallback(
     comptime CallbackType: type,
     thing_to_callback: anytype,
-    allocator: *std.mem.Allocator,
+    allocator: std.mem.Allocator,
 ) !CallbackType {
     if (comptime (CallbackType.callback_inline_capacity) < @sizeOf(@TypeOf(thing_to_callback))) {
         return heapAllocatedCallback(CallbackType, thing_to_callback, allocator);
     }
     return inlineAllocatedCallback(CallbackType, thing_to_callback);
+}
+
+test "Callbacks" {
+    const CallbackT = Callback(usize, usize, 8, true);
+
+    var cb = inlineAllocatedCallback(CallbackT, struct {
+        value: usize,
+
+        fn call(self: *@This(), a: usize) usize {
+            return self.value + a;
+        }
+
+        fn deinit(self: *@This()) void {
+            self.value = 0;
+        }
+    }{
+        .value = 4,
+    });
+
+    try std.testing.expect(cb.call(5) == 9);
+    try std.testing.expect(cb.call(3) == 7);
+
+    cb.deinit();
+
+    try std.testing.expect(cb.call(5) == 5);
+
+    cb = inlineAllocatedCallback(CallbackT, struct {
+        value: usize,
+
+        fn call(self: *@This(), a: usize) usize {
+            self.value += 1;
+            return self.value + a;
+        }
+
+        fn deinit(self: *@This()) void {
+            self.value = 0;
+        }
+    }{
+        .value = 4,
+    });
+
+    try std.testing.expect(cb.call(5) == 10);
+    try std.testing.expect(cb.call(5) == 11);
+    try std.testing.expect(cb.call(5) == 12);
+
+    cb.deinit();
+
+    try std.testing.expect(cb.call(5) == 6);
+
+    cb = try heapAllocatedCallback(CallbackT, struct {
+        v1: usize,
+        v2: usize,
+        v3: usize,
+
+        fn call(self: *@This(), a: usize) usize {
+            self.v1 += 1;
+            self.v2 = a;
+            self.v3 = self.v1 ^ self.v2;
+
+            return self.v3;
+        }
+
+        fn deinit(_: *@This()) void { }
+    }{
+        .v1 = 4,
+        .v2 = 1,
+        .v3 = undefined,
+    }, std.testing.allocator);
+
+    try std.testing.expect(cb.call(5) == 0);
+    try std.testing.expect(cb.call(5) == 6 ^ 5);
+
+    cb.deinit();
 }
