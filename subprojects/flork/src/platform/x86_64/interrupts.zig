@@ -51,7 +51,15 @@ pub const invlpg_vector: u8 = 0xFE;
 pub const spurious_vector: u8 = 0xFF;
 
 pub fn allocate_vector() u8 {
-    return @atomicRmw(u8, &last_vector, .Add, 1, .AcqRel) + 1;
+    const value = @atomicRmw(u8, &last_vector, .Add, 1, .AcqRel) + 1;
+    
+    if(value == syscall_vector) // Skip this one
+        return allocate_vector();
+
+    if(value >= 0xF0)
+        @panic("Out of vectors!");
+
+    return value;
 }
 
 pub fn init_interrupts() void {
