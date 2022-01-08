@@ -4,7 +4,6 @@ const Arch = if (@hasField(std.builtin, "Arch")) std.builtin.Arch else std.Targe
 
 pub const Context = enum {
     kernel,
-    userlib,
     userspace,
 };
 
@@ -125,8 +124,7 @@ pub fn setTargetFlags(
 
     exec.disable_stack_probing = switch (context) {
         .kernel => true,
-        .userlib => true,
-        else => false,
+        .userspace => false,
     };
 
     exec.setTarget(.{
