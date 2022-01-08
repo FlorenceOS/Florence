@@ -31,7 +31,7 @@ pub fn set_interrupts(s: InterruptState) void {
     }
 }
 
-pub const InterruptFrame = struct {
+pub const InterruptFrame = extern struct {
     spsr: u64,
     pc: u64,
     x31: u64,

@@ -195,7 +195,7 @@ pub fn make_handler(comptime intnum: u8) idt.InterruptHandler {
     }.func;
 }
 
-pub const InterruptFrame = packed struct {
+pub const InterruptFrame = extern struct {
     es: u64,
     ds: u64,
     r15: u64,
