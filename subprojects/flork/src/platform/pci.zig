@@ -174,7 +174,7 @@ fn function_scan(addr: Addr) void {
             }
         },
         0x03 => {
-            if (addr.vendor_id().read() == 0x1AF4 or addr.device_id().read() == 0x1050) {
+            if (addr.vendor_id().read() == 0x1AF4 and addr.device_id().read() == 0x1050) {
                 log.finish(.info, "Virtio display controller", .{}, l);
                 os.drivers.gpu.virtio_gpu.registerController(addr);
             } else switch (addr.sub_class().read()) {
