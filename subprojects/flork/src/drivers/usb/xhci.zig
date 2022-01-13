@@ -1,7 +1,11 @@
 const os = @import("root").os;
 const config = @import("config");
+const std = @import("std");
+const lib = @import("lib");
 
-const log = @import("lib").output.log.scoped(.{
+const bf = lib.util.bitfields;
+
+const log = lib.output.log.scoped(.{
     .prefix = "usb/xhci",
     .filter = .info,
 }).write;
@@ -27,8 +31,18 @@ const PortRegs = extern struct {
 };
 
 const OpRegs = extern struct {
-    usbcmd: u32,
-    usbsts: u32,
+    usbcmd: extern union {
+        _raw: u32,
+
+        run_not_stop: bf.Boolean(u32, 0),
+        reset: bf.Boolean(u32, 1),
+    },
+    usbsts: extern union {
+        _raw: u32,
+
+        halted: bf.Boolean(u32, 0),
+        controller_not_ready: bf.Boolean(u32, 11),
+    },
     page_size: u32,
     _res_0C: [0x14 - 0x0C]u8,
     dnctrl: u32,
@@ -77,12 +91,12 @@ const Controller = extern struct {
         };
     }
 
-    fn extcapsPtr(self: *const @This()) [*]volatile u32 {
+    fn extcapsPtr(self: @This()) [*]volatile u32 {
         const eoff = ((self.cap_regs.hcc_params_1 & 0xFFFF0000) >> 16) * 4;
         return @intToPtr([*]u32, @ptrToInt(self.cap_regs) + eoff);
     }
 
-    fn claim(self: *const @This()) void {
+    fn claim(self: @This()) void {
         var ext = self.extcapsPtr();
 
         while (true) {
@@ -100,10 +114,10 @@ const Controller = extern struct {
                 const os_sem = @intToPtr(*volatile u8, @ptrToInt(ext) + 3);
 
                 if (bios_sem.* != 0) {
-                    log(.debug, "XHCI: Controller is BIOS owned.", .{});
+                    log(.debug, "Controller is BIOS owned.", .{});
                     os_sem.* = 1;
                     while (bios_sem.* != 0) os.thread.scheduler.yield();
-                    log(.debug, "XHCI: Controller stolen from BIOS.", .{});
+                    log(.debug, "Controller stolen from BIOS.", .{});
                 }
             }
 
@@ -111,6 +125,38 @@ const Controller = extern struct {
             if (next_offset == 0) break;
             ext += next_offset;
         }
+    }
+
+    fn halted(self: @This()) bool {
+        return self.op_regs.usbsts.halted.read();
+    }
+
+    fn halt(self: @This()) void {
+        std.debug.assert(self.op_regs.usbcmd.run_not_stop.read());
+
+        self.op_regs.usbcmd.run_not_stop.write(false);
+        while (!self.halted()) os.thread.scheduler.yield();
+    }
+
+    fn start(self: @This()) void {
+        std.debug.assert(self.halted());
+        std.debug.assert(!self.op_regs.usbcmd.run_not_stop.read());
+
+        self.op_regs.usbcmd.run_not_stop.write(true);  
+    }
+
+    fn reset(self: @This()) void {
+        if(!self.halted()) self.halt();
+
+        self.op_regs.usbcmd.reset.write(true);
+    }
+
+    fn ready(self: @This()) bool {
+        return !self.op_regs.usbsts.controller_not_ready.read();
+    }
+
+    fn waitReady(self: @This()) void {
+        while(!self.ready()) os.thread.scheduler.yield();
     }
 };
 
@@ -120,23 +166,23 @@ fn controllerTask(dev: os.platform.pci.Addr) !void {
     controller.claim();
 
     const usb3 = dev.read(u32, 0xDC);
-    log(.debug, "XHCI: Switching usb3 ports: 0x{X}", .{usb3});
+    log(.debug, "Switching usb3 ports: 0x{X}", .{usb3});
     dev.write(u32, 0xD8, usb3);
 
     const usb2 = dev.read(u32, 0xD4);
-    log(.debug, "XHCI: Switching usb2 ports: 0x{X}", .{usb2});
+    log(.debug, "Switching usb2 ports: 0x{X}", .{usb2});
     dev.write(u32, 0xD0, usb2);
 
-    // Shut controller down
-    controller.op_regs.usbcmd |= 1 << 1;
-    while ((controller.op_regs.usbcmd & (1 << 1)) != 0) os.thread.scheduler.yield();
-    while ((controller.op_regs.usbsts & (1 << 0)) == 0) os.thread.scheduler.yield();
-    log(.debug, "XHCI: Controller halted.", .{});
+    controller.reset();
+    log(.debug, "Controller reset.", .{});
+
+    controller.waitReady();
+    controller.start();
 
     controller.op_regs.config = 44;
     controller.context_size = if ((controller.cap_regs.hcc_params_1 & 0b10) != 0) 64 else 32;
 
-    log(.debug, "XHCI: context size: {d}", .{controller.context_size});
+    log(.debug, "context size: {d}", .{controller.context_size});
 }
 
 pub fn registerController(dev: os.platform.pci.Addr) void {
