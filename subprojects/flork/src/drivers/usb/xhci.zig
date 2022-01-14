@@ -30,7 +30,7 @@ const CapRegs = extern struct {
 
         extended_caps_offset: bf.Bitfield(u32, 16, 16),
     },
-    db_regs_bar_offset: u32,
+    doorbell_regs_bar_offset: u32,
     run_regs_bar_offset: u32,
     gccparams2: u32,
 };
@@ -102,10 +102,6 @@ const RunRegs = extern struct {
     microframe_idx: u32,
     _res_04: [0x20 - 0x4]u8,
     interrupt_regs: [1024]InterruptRegs,
-};
-
-const DBRegs = extern struct {
-    db: [256]u32,
 };
 
 const SlotContext = extern struct {
@@ -186,7 +182,7 @@ const Controller = struct {
     cap_regs: *volatile CapRegs,
     op_regs: *volatile OpRegs,
     run_regs: *volatile RunRegs,
-    db_regs: *volatile DBRegs,
+    doorbells: *volatile [256]u32,
     context_size: usize = undefined,
     slots: []DeviceContext = undefined,
     commands: []CommandTRB = undefined,
@@ -198,7 +194,7 @@ const Controller = struct {
             .cap_regs = cap_regs,
             .op_regs = os.platform.phys_ptr(*volatile OpRegs).from_int(bar + cap_regs.capabilites_length).get_uncached(),
             .run_regs = os.platform.phys_ptr(*volatile RunRegs).from_int(bar + cap_regs.run_regs_bar_offset).get_uncached(),
-            .db_regs = os.platform.phys_ptr(*volatile DBRegs).from_int(bar + cap_regs.db_regs_bar_offset).get_uncached(),
+            .doorbells = os.platform.phys_ptr(*volatile [256]u32).from_int(bar + cap_regs.doorbell_regs_bar_offset).get_uncached(),
         };
 
         result.context_size = if (result.cap_regs.hcc_params_1.context_size_is_64bit.read()) 64 else 32;
