@@ -344,25 +344,25 @@ const kernel_stack_offset = @offsetOf(os.thread.Task, "stack");
 
 // zig fmt: off
 const syscall_handler_bytes = [0]u8{}
-// First make sure we get a proper stack pointer while
-// saving away all the userspace registers.
-    ++ swapgs // swapgs
-    ++ mov_gs_offset_rsp(rsp_stash_offset) // mov gs:[rsp_stash_offset], rsp
-    ++ mov_rsp_gs_offset(task_offset) // mov rsp, gs:[task_offset]
+    // First make sure we get a proper stack pointer while
+    // saving away all the userspace registers.
+    ++ swapgs                                  // swapgs
+    ++ mov_gs_offset_rsp(rsp_stash_offset)     // mov gs:[rsp_stash_offset], rsp
+    ++ mov_rsp_gs_offset(task_offset)          // mov rsp, gs:[task_offset]
     ++ mov_rsp_rsp_offset(kernel_stack_offset) // mov rsp, [rsp + kernel_stack_offset]
 
-// Now we have a kernel stack in rsp
-// Set up an iret frame
-    ++ pushi8(gdt.selector.userdata64) // push user_data_sel         // iret ss
-    ++ push_gs_offset(rsp_stash_offset) // push gs:[rsp_stash_offset] // iret rsp
-    ++ rex ++ push_reg(11 - 8) // push r11                   // iret rflags
-    ++ pushi8(gdt.selector.usercode64) // push user_code_sel         // iret cs
-    ++ push_reg(1) // push rcx                   // iret rip
+    // Now we have a kernel stack in rsp
+    // Set up an iret frame
+    ++ pushi8(gdt.selector.userdata64)         // push user_data_sel         // iret ss
+    ++ push_gs_offset(rsp_stash_offset)        // push gs:[rsp_stash_offset] // iret rsp
+    ++ rex ++ push_reg(11 - 8)                 // push r11                   // iret rflags
+    ++ pushi8(gdt.selector.usercode64)         // push user_code_sel         // iret cs
+    ++ push_reg(1)                             // push rcx                   // iret rip
     ++ swapgs ++ sti
 
-// Now let's set up the rest of the interrupt frame
-    ++ pushi8(0) // push 0                     // error code
-    ++ pushi32(syscall_vector) // push 0x80                  // interrupt vector
+    // Now let's set up the rest of the interrupt frame
+    ++ pushi8(0)                               // push 0                     // error code
+    ++ pushi32(syscall_vector)                 // push 0x80                  // interrupt vector
 ;
 // zig fmt: on
 
