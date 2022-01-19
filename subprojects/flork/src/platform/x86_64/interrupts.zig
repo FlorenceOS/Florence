@@ -71,7 +71,7 @@ pub fn init_interrupts() void {
     }
 
     add_handler(0x0E, page_fault_handler, true, 0, 1);
-    add_handler(0x80, userspace_syscall_handler, true, 3, 1);
+    add_handler(syscall_vector, userspace_syscall_handler, true, 3, 1);
     add_handler(ring_vector, ring_handler, true, 0, 1);
     add_handler(sched_call_vector, os.platform.thread.sched_call_impl_handler, true, 0, 2);
     add_handler(invlpg_vector, invlpg_handler, true, 0, 1);
