@@ -135,10 +135,10 @@ pub const Driver = struct {
     }
 
     /// Detect BARs and capabilities and set up the cfg/notify/isr/dev structures
-    fn detectBars(a: pci.Addr) Driver {
+    fn detectBars(addr: pci.Addr) Driver {
         var drv: Driver = undefined;
-        var cap = a.cap();
-        while (cap.off != 0) {
+        var caps = addr.caps();
+        while (caps.next()) |cap| {
             const vndr = cap.vndr();
             if (vndr == 0x09) {
                 const cfg_typ = cap.read(u8, virtio_pci_cap_cfg_type);
@@ -147,7 +147,7 @@ pub const Driver = struct {
                 const len = cap.read(u32, virtio_pci_cap_length);
                 _ = len;
 
-                const phy = a.barinfo(bar).phy + off;
+                const phy = addr.barinfo(bar).phy + off;
                 switch (cfg_typ) {
                     virtio_pci_cap_common_cfg => {
                         const CommonCfgPtr = os.platform.phys_ptr(*volatile CommonCfg);
@@ -169,7 +169,6 @@ pub const Driver = struct {
                     else => {}, // ignore
                 }
             }
-            cap.next();
         }
         return drv;
     }

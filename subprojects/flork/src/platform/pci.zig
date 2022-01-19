@@ -19,15 +19,23 @@ var handlers: [0x100]Handler = undefined;
 pub const Cap = struct {
     addr: Addr,
     off: u8,
-    pub fn next(self: *Cap) void {
+
+    pub fn next(self: *Cap) ?@This() {
+        if (self.off == 0) return null;
+
+        const retval = self.*;
         self.off = self.addr.read(u8, self.off + 0x01);
+        return retval;
     }
+
     pub fn vndr(self: *const Cap) u8 {
         return self.addr.read(u8, self.off + 0x00);
     }
+
     pub fn read(self: *const Cap, comptime T: type, off: regoff) T {
         return self.addr.read(T, self.off + off);
     }
+
     pub fn write(self: *const Cap, comptime T: type, off: regoff, value: T) void {
         self.addr.write(T, self.off + off, value);
     }
@@ -51,7 +59,7 @@ pub const Addr = struct {
     const int_line = cfgreg(u8, 0x3C);
     const int_pin = cfgreg(u8, 0x3D);
 
-    pub fn cap(self: Addr) Cap {
+    pub fn caps(self: Addr) Cap {
         return .{ .addr = self, .off = self.cap_ptr().read() & 0xFC };
     }
 
