@@ -2,6 +2,11 @@ const os = @import("root").os;
 
 const config = @import("config");
 
+const log = @import("lib").output.log.scoped(.{
+    .prefix = "x86_64",
+    .filter = .info,
+}).write;
+
 const interrupts = @import("interrupts.zig");
 const idt = @import("idt.zig");
 const gdt = @import("gdt.zig");
@@ -64,7 +69,14 @@ pub fn platform_init() !void {
 
     set_interrupts(true);
 
-    @import("vmware.zig").init();
+    @import("vmware.zig").init() catch |err| {
+        log(.err, "VMWare initialization failed: {s}", .{@errorName(err)});
+        if (@errorReturnTrace()) |trace| {
+            os.kernel.debug.dumpStackTrace(trace);
+        } else {
+            log(.err, "No error trace.", .{});
+        }
+    };
 
     try os.platform.pci.init_pci();
 }
