@@ -1,18 +1,11 @@
 /// Various containers & algorithms
 pub const containers = struct {
-    /// Atomic queues
     pub const atomic_queue = @import("containers/atomic_queue.zig");
-
-    /// Handle table.
     pub const handle_table = @import("containers/handle_table");
-
-    /// Non-atomic queues
     pub const queue = @import("containers/queue.zig");
-
-    /// Red-black tree
     pub const rbtree = @import("containers/rbtree.zig");
-
     // pub const refcounted = @import("containers/refcounted.zig");
+    pub const ring_buffer = @import("containers/ring_buffer.zig");
 };
 
 /// File format parsers
@@ -39,7 +32,6 @@ pub const input = struct {
 
 /// Memory management lirbaries
 pub const memory = struct {
-    /// Ranges allocator
     pub const range_alloc = @import("memory/range_alloc.zig");
 };
 
@@ -51,24 +43,11 @@ pub const output = struct {
 
 /// Various utilities
 pub const util = struct {
-    /// Bitfields library
     pub const bitfields = @import("util/bitfields.zig");
-
-    /// Bitsets library
     pub const bitset = @import("util/bitset.zig");
-
-    /// Callback library
     pub const callback = @import("util/callback.zig");
-
-    /// Alignment library
     pub const libalign = @import("util/libalign.zig");
-
-    /// Helpers to manipulate pointers
     pub const pointers = @import("util/pointers.zig");
-
-    /// Comptime ranges library
     pub const range = @import("util/range.zig");
-
-    /// Source querying library
     pub const source = @import("util/source.zig");
 };
