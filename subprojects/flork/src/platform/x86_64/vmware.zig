@@ -1,8 +1,9 @@
 const os = @import("root").os;
 
 const config = @import("config");
+const lib = @import("lib");
 
-const log = @import("lib").output.log.scoped(.{
+const log = lib.output.log.scoped(.{
     .prefix = "x86_64/vmware",
     .filter = .info,
 }).write;
@@ -107,6 +108,48 @@ fn detect() bool {
     return true;
 }
 
+const ScrollStep = enum(u2) {
+    None = 0b00, // 0
+    Down = 0b01, // 1
+    Up   = 0b11, // -1
+};
+
+const AbscursorEvent = struct {
+    scaled_x: u16,
+    scaled_y: u16,
+
+    lmb: bool,
+    rmb: bool,
+    mmb: bool,
+
+    scroll: ScrollStep,
+
+    pub fn format(self: *const @This(), fmt: anytype) void {
+        fmt("0x{0X} 0x{0X} l={b} r={b} m={b} s={s}", .{
+            self.scaled_x,
+            self.scaled_y,
+            self.lmb,
+            self.rmb,
+            self.mmb,
+            @tagName(self.scroll),
+        });
+    }
+};
+
+var abscursor_event_queue: lib.containers.ring_buffer.RingWaitQueue(?AbscursorEvent, 1024) = .{};
+
+fn abscursorTask() void {
+    while(true) {
+        const num_dropped_events = abscursor_event_queue.dropped();
+        if(num_dropped_events != 0) {
+            log(.warn, "System overloaded: There have been {d} abscursor events dropped!", .{num_dropped_events});
+        }
+
+        const event = abscursor_event_queue.get() orelse return; // null event is an exit signal
+        log(.info, "Abscursor event {}", .{event});
+    }
+}
+
 var counter: usize = 0;
 
 fn abscurorInterruptHandler(_: *os.platform.InterruptFrame) void {
@@ -137,31 +180,24 @@ fn abscurorInterruptHandler(_: *os.platform.InterruptFrame) void {
             });
 
             const buttons = @truncate(u16, mouse_pkt.rax);
-            const rmb = (buttons & 0x10) != 0;
-            const lmb = (buttons & 0x20) != 0;
-            const mmb = (buttons & 0x08) != 0;
 
-            const scaled_x = @truncate(u16, mouse_pkt.rbx);
-            const scaled_y = @truncate(u16, mouse_pkt.rcx);
+            _ = abscursor_event_queue.push(AbscursorEvent{
+                .lmb = (buttons & 0x20) != 0,
+                .rmb = (buttons & 0x10) != 0,
+                .mmb = (buttons & 0x08) != 0,
 
-            const scroll = @bitCast(i2, @truncate(u2, mouse_pkt.rdx));
+                .scaled_x = @truncate(u16, mouse_pkt.rbx),
+                .scaled_y = @truncate(u16, mouse_pkt.rcx),
 
-            // TODO: Use
-            _ = rmb;
-            _ = lmb;
-            _ = mmb;
- 
-            _ = scaled_x;
-            _ = scaled_y;
-
-            _ = scroll;
+                .scroll = @intToEnum(ScrollStep, @truncate(u2, mouse_pkt.rdx)),
+            });
         }
     }
 
     eoi();
 }
 
-pub fn init() void {
+pub fn init() !void {
     if (comptime (!config.kernel.x86_64.vmware.enable))
         return;
 
@@ -174,6 +210,13 @@ pub fn init() void {
     if (comptime config.kernel.x86_64.vmware.abscursor) {
         if (comptime (!config.kernel.x86_64.ps2.mouse.enable))
             @compileError("PS/2 mouse has to be enabled for vmware cursor support");
+
+        try os.thread.scheduler.spawnTask("VMWare abscursor handler task", abscursorTask, .{});
+
+        // We assert since we should always be able to put an event in the case of not being able to
+        // start generating them, the buffer should always be empty
+        errdefer std.debug.assert(abscursor_event_queue.push(null));
+
 
         log(.info, "Enabling abscursor...", .{});
         const state = os.platform.get_and_disable_interrupts();
