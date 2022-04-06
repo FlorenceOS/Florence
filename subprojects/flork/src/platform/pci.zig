@@ -60,6 +60,7 @@ pub const Addr = struct {
     const int_pin = cfgreg(u8, 0x3D);
 
     pub fn caps(self: Addr) Cap {
+        if ((self.status().read() & (1 << 4)) == 0) return .{ .addr = undefined, .off = 0 };
         return .{ .addr = self, .off = self.cap_ptr().read() & 0xFC };
     }
 
