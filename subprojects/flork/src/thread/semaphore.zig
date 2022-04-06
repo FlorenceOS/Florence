@@ -28,11 +28,11 @@ pub const Semaphore = struct {
         return .{ .available = count };
     }
 
-    /// Try to acquire `count` resources. Don't call from interrupt context!
-    pub fn try_acquire(self: *@This(), count: usize) !void {
-        const task = os.platform.get_current_task();
-
+    /// Acquire `count` resources. Don't call from interrupt context!
+    pub fn acquire(self: *@This(), count: usize) void {
         const lock_state = self.spinlock.lock();
+
+        const task = os.platform.get_current_task();
 
         if (self.available >= count) {
             self.available -= count;
@@ -50,7 +50,8 @@ pub const Semaphore = struct {
         os.platform.set_interrupts(lock_state);
     }
 
-    /// Release `count` resources
+    /// Release `count` resources, can be called from interrupt context but could be slow
+    /// if hit _really_ often
     pub fn release(self: *@This(), count: usize) void {
         const lock_state = self.spinlock.lock();
 
@@ -64,12 +65,5 @@ pub const Semaphore = struct {
             }
         }
         self.spinlock.unlock(lock_state);
-    }
-
-    // Acquire `count` resources or panic. Don't call from interrupt context!
-    pub fn acquire(self: *@This(), count: usize) void {
-        self.try_acquire(count) catch {
-            unreachable;
-        };
     }
 };

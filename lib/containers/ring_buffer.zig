@@ -91,7 +91,7 @@ pub fn RingWaitQueue(comptime T: type, comptime max_size: usize) type {
         pub fn get(self: *@This()) T {
             while(true) {
                 if(self.buffer.pop()) |p| return p;
-                self.semaphore.try_acquire(1);
+                self.semaphore.acquire(1);
             }
         }
 
