@@ -436,7 +436,7 @@ export fn stivale2Main(info_in: *Info) noreturn {
                 log(.err, "Stivale2: Error while allocating buffer: {e}", .{err});
                 break :blk;
             };
-            drivers.output.vesa_log.use(&display_buffer.buffered_region);
+            drivers.output.vesa_log.use(display_buffer.region());
             log(.debug, "Stivale2: Using buffered output", .{});
         }
     }
