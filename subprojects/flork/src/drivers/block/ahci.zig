@@ -316,10 +316,13 @@ const FisH2D = packed struct {
     count: u16,
     icc: u8,
     control: u8,
+
+    _res10: [4]u8,
 };
 
 comptime {
     std.debug.assert(@offsetOf(FisH2D, "command") == 2);
+    std.debug.assert(@sizeOf(FisH2D) == 0x14);
 }
 
 const CommandFis = extern union {
@@ -428,7 +431,8 @@ const PortState = struct {
         identify_fis.command = self.identifyCommand();
 
         identify_fis.c = 1;
-        identify_fis.device = 0;
+        identify_fis.device = 0xA0 | (1 << 6);
+        identify_fis.control = 0x08;
 
         self.mmio.issueCommands(1);
 
