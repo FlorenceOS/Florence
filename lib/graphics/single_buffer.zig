@@ -49,5 +49,9 @@ pub fn BufferWithInvalidateHook(hook: anytype) type {
                 },
             };
         }
+
+        pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+            allocator.free(self.buffered_region.bytes);
+        }
     };
 }

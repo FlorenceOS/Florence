@@ -15,6 +15,7 @@ pub const format = struct {
 
 /// Graphics and drawing library
 pub const graphics = struct {
+    pub const buffer_switcher = @import("graphics/buffer_switcher.zig");
     pub const color = @import("graphics/color.zig");
     pub const font_renderer = @import("graphics/font_renderer.zig");
     pub const glyph_printer = @import("graphics/glyph_printer.zig");

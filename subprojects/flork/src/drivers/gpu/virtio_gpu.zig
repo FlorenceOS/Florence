@@ -271,9 +271,6 @@ pub fn registerController(addr: os.platform.pci.Addr) void {
     };
     errdefer drv.deinit();
 
-    if (comptime (!config.drivers.output.vesa_log.enable))
-        return;
-
     // @TODO: Get the actual screen resolution
     const res = config.drivers.gpu.virtio_gpu.default_resolution;
 
@@ -292,8 +289,9 @@ pub fn registerController(addr: os.platform.pci.Addr) void {
     };
 
     drv.modeset(phys);
+    log(.info, "Modeset done!", .{});
 
-    os.drivers.output.vesa_log.use(&drv.display_region);
+    os.kernel.addFramebuffer(&drv.display_region);
 }
 
 /// General callback on an interrupt, context is a pointer to a Driver structure

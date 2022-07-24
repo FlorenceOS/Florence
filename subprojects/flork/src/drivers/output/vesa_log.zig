@@ -22,9 +22,7 @@ pub fn use(region: *graphics.image_region.ImageRegion) void {
     if (comptime !config.drivers.output.vesa_log.enable)
         return;
 
-    if (drawTarget == region) {
-        // Same target, do nothing
-    } else if (drawTarget) |old_target| {
+    if (drawTarget) |old_target| {
         printer.retarget(old_target.*, region.*, bg);
     } else {
         // First target, clear and start using

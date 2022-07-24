@@ -255,13 +255,6 @@ const ParsedInfo = struct {
     }
 };
 
-fn consumePhysMem(ent: *const MemmapEntry) void {
-    if (ent.kind == 1) {
-        log(.debug, "Consuming 0x{0X} to 0x{0X}", .{ ent.base, ent.base + ent.length });
-        os.memory.pmm.consume(ent.base, ent.length);
-    }
-}
-
 fn mapPhys(ent: *const MemmapEntry, context: *platform.paging.PagingContext) void {
     if (ent.kind != 1 and ent.kind != 0x1000) {
         return;
@@ -376,6 +369,12 @@ export fn stivale2Main(info_in: *Info) noreturn {
         log(.debug, "Registered status UART", .{});
     }
 
+    for (info.memmap.?.get()) |*ent| {
+        if(ent.kind == 1) {
+            os.memory.pmm.consume(ent.base, ent.length);
+        }
+    }
+
     log(.debug, "Initializing framebuffer", .{});
 
     if (info.framebuffer) |fb| {
@@ -388,10 +387,11 @@ export fn stivale2Main(info_in: *Info) noreturn {
             if (fb.bpp == 32) .rgbx else .rgb,
             null, // No invalidation needed for stivale2 framebuffer
         );
-        drivers.output.vesa_log.use(&display.context.region);
+
+        os.kernel.bootFramebuffer(&display.context.region);
         log(.debug, "Using non-buffered output", .{});
     } else {
-        drivers.output.vga_log.register();
+        os.kernel.bootFramebuffer(null);
         log(.debug, "Using VGA output", .{});
     }
 
@@ -407,10 +407,6 @@ export fn stivale2Main(info_in: *Info) noreturn {
         log(.debug, "Stivale2: Parsed devicetree blob!", .{});
     }
 
-    for (info.memmap.?.get()) |*ent| {
-        consumePhysMem(ent);
-    }
-
     if (info.kernel_file) |file| {
         const pp = os.platform.phys_ptr([*]u8).from_int(file.addr);
         os.kernel.debug.addDebugElf(pp.get_writeback());
@@ -424,21 +420,6 @@ export fn stivale2Main(info_in: *Info) noreturn {
     if (info.uart_status) |uart| {
         phys_high = std.math.max(phys_high, uart.uart_addr + 4);
         phys_high = std.math.max(phys_high, uart.uart_status + 4);
-    }
-
-    // Attempt to speed up log scrolling using a buffer
-    if (info.framebuffer) |_| {
-        blk: {
-            display_buffer.init(
-                os.memory.pmm.physHeap(),
-                &display.context.region,
-            ) catch |err| {
-                log(.err, "Stivale2: Error while allocating buffer: {e}", .{err});
-                break :blk;
-            };
-            drivers.output.vesa_log.use(display_buffer.region());
-            log(.debug, "Stivale2: Using buffered output", .{});
-        }
     }
 
     const page_size = platform.paging.page_sizes[0];

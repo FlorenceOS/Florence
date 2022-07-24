@@ -61,6 +61,7 @@ fn kbEvent() void {
     switch (keyboardBuffer()[0]) {
         0xE1 => {
             if (finishSequence(1, "\x1D\x45\xE1\x9D\xC5")) {
+                os.kernel.klogViewerSwap();
                 kb_state.event(.press, .pause_break) catch return;
                 // There is no event for releasing this key,
                 // so we just gotta pretend it's released instantly
@@ -377,7 +378,7 @@ fn portTest() !bool {
 fn awaitAck() !void {
     while (true) {
         const v = read() catch |err| {
-            log(.err, "ACK read failed: {e}!", .{err});
+            log(.err, "ACK read failed: {s}!", .{@errorName(err)});
             return err;
         };
 

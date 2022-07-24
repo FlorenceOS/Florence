@@ -35,7 +35,62 @@ pub const lai = @cImport({
     @cInclude("lai/helpers/sci.h");
 });
 
+const ImageRegion = @import("lib").graphics.image_region.ImageRegion;
+const BufferSwitcher = @import("lib").graphics.buffer_switcher.BufferSwitcher(os.thread.Mutex);
+
+var has_proper_framebuffer = false;
+pub var klog_viewer: BufferSwitcher = undefined;
+var swap_semaphore = os.thread.Semaphore{.available = 0};
+const klog_buffer = klog_viewer.primary.region();
+
+pub fn bootFramebuffer(fb: ?*ImageRegion) void {
+    std.debug.assert(!has_proper_framebuffer);
+
+    if(fb) |f| {
+        os.drivers.output.vesa_log.use(f);
+
+        klog_viewer = os.vital(
+            BufferSwitcher.init(f, os.memory.pmm.physHeap()),
+            "Allocating buffer switcher",
+        );
+
+        os.drivers.output.vesa_log.use(klog_buffer);
+    } else {
+        os.drivers.output.vga_log.register();
+    }
+}
+
+pub fn addFramebuffer(fb: *ImageRegion) void {
+    if(has_proper_framebuffer) {
+        // Just ignore it for now
+        return;
+    }
+
+    os.drivers.output.vesa_log.use(fb);
+
+    os.vital(
+        klog_viewer.retarget(fb, os.memory.pmm.physHeap()),
+        "Retargetting klog viewer",
+    );
+
+    has_proper_framebuffer = true;
+    os.drivers.output.vesa_log.use(klog_buffer);
+}
+
+pub fn klogViewerSwap() void {
+    swap_semaphore.release(1);
+}
+
+fn klogViewerSwapper() void {
+    while(true) {
+        swap_semaphore.acquire(1);
+        klog_viewer.swap();
+    }
+}
+
 pub fn kmain() noreturn {
+    os.thread.scheduler.spawnTask("Klog switcher task", klogViewerSwapper, .{ }) catch @panic("Could not launch klog switcher");
+
     if (@import("config").kernel.kepler.run_tests) {
         os.kepler.tests.run();
     }
