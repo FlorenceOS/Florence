@@ -75,6 +75,7 @@ fn kbEvent() void {
             switch (keyboardBuffer()[1]) {
                 0x2A => {
                     if (finishSequence(2, &[_]u8{ scancode_extended, 0x37 })) {
+                        os.kernel.objects.printObjTree();
                         kb_state.event(.press, .print_screen) catch return;
                     }
                 },

@@ -21,6 +21,8 @@ pub const process = @import("process.zig");
 /// Copernicus userspace library
 pub const copernicus = @import("copernicus.zig");
 
+pub const objects = @import("objects.zig");
+
 /// Lightweight ACPI interpreter
 pub const lai = @cImport({
     @cInclude("lai/core.h");
@@ -89,6 +91,7 @@ fn klogViewerSwapper() void {
 }
 
 pub fn kmain() noreturn {
+    objects.launchPrintTask();
     os.thread.scheduler.spawnTask("Klog switcher task", klogViewerSwapper, .{ }) catch @panic("Could not launch klog switcher");
 
     if (@import("config").kernel.kepler.run_tests) {

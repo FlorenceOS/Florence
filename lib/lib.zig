@@ -36,6 +36,10 @@ pub const memory = struct {
     pub const range_alloc = @import("memory/range_alloc.zig");
 };
 
+pub const obj = struct {
+    pub const object = @import("obj/object.zig");
+};
+
 /// Output libraries
 pub const output = struct {
     pub const fmt = @import("output/fmt.zig");
