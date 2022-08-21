@@ -14,7 +14,7 @@ fn PtrCastPreserveCV(comptime T: type, comptime PtrToT: type, comptime NewT: typ
 fn BitType(comptime FieldType: type, comptime ValueType: type, comptime shamt: usize) type {
     const self_bit: FieldType = (1 << shamt);
 
-    return struct {
+    return extern struct {
         bits: Bitfield(FieldType, shamt, 1),
 
         pub fn set(self: anytype) void {
@@ -58,7 +58,7 @@ pub fn Bitfield(comptime FieldType: type, comptime shamt: usize, comptime num_bi
 
     const ValueType = std.meta.Int(.unsigned, num_bits);
 
-    return struct {
+    return extern struct {
         dummy: FieldType,
 
         fn field(self: anytype) PtrCastPreserveCV(@This(), @TypeOf(self), FieldType) {
